@@ -215,6 +215,43 @@ struct Model3DIncrementalExtractionTests {
         #expect(try sources(render).first?.transform.origin.x == 15)
     }
 
+    @Test("Path-tracing roles split raster meshes from tracer-only proxies, inherited from ancestors")
+    func pathTracingRolesSplitSources() async throws {
+        let (app, render) = try await makeApp()
+        let mesh = cube(), material = PBRMaterial()
+        let detailed = app.main.spawn { Transform(); PathTracingGeometry3D.rasterOnly }
+        let proxyRoot = app.main.spawn { Transform(); PathTracingGeometry3D.pathTracingOnly }
+        let plain = app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity) }
+        let child = app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity) }
+        let proxy = app.main.spawn { Mesh3DComponent(mesh: mesh, materials: [material]); GlobalTransform(matrix: .identity) }
+        detailed.addChild(child)
+        proxyRoot.addChild(proxy)
+        await render.runScheduler(.extract)
+        let extracted = try #require(render.getResource(ExtractedMesh3DSources.self))
+        // Raster passes see the plain and the raster-only mesh, never the proxy.
+        #expect(Set(extracted.meshes.map(\.entity)) == [plain.id, child.id])
+        #expect(extracted.pathTracingProxies.map(\.entity) == [proxy.id])
+        // The tracer sees the plain mesh and the proxy, never the raster-only detail.
+        #expect(Set(extracted.pathTracedMeshes.map(\.entity)) == [plain.id, proxy.id])
+
+        // Removing the role rebuilds the cached source and returns the proxy to raster.
+        proxyRoot.components.remove(PathTracingGeometry3D.self)
+        await render.runScheduler(.extract)
+        let restored = try #require(render.getResource(ExtractedMesh3DSources.self))
+        #expect(Set(restored.meshes.map(\.entity)) == [plain.id, child.id, proxy.id])
+        #expect(restored.pathTracingProxies.isEmpty)
+    }
+
+    @Test("Without path-tracing roles the published raster list is the tracer's list")
+    func withoutRolesTracerSeesRasterList() async throws {
+        let (app, render) = try await makeApp()
+        _ = app.main.spawn { Mesh3DComponent(mesh: cube(), materials: [PBRMaterial()]); GlobalTransform(matrix: .identity) }
+        await render.runScheduler(.extract)
+        let extracted = try #require(render.getResource(ExtractedMesh3DSources.self))
+        #expect(extracted.pathTracingProxies.isEmpty)
+        #expect(extracted.pathTracedMeshes.map(\.entity) == extracted.meshes.map(\.entity))
+    }
+
     private func makeApp(core3D: Bool = false) async throws -> (AppWorlds, World) {
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless

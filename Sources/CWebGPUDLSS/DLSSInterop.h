@@ -4,6 +4,8 @@
 #include <dawn/webgpu_cpp.h>
 #include <nvsdk_ngx_helpers.h>
 #include <nvsdk_ngx_helpers_d3d.h>
+#include <nvsdk_ngx_helpers_dlssd_d3d.h>
+#include <cstdlib>
 #include <array>
 #include <memory>
 #include <mutex>
@@ -26,7 +28,16 @@ struct AdaDLSSDevice {
     std::mutex mutex;
     uint64_t serial = 0;
     bool initialized = false;
+    /// Ray Reconstruction (NGX "DLSS-D") is available in addition to Super Resolution.
+    bool supportsRayReconstruction = false;
+    /// `nvngx_dlssd.dll` sits next to `nvngx_dlss.dll`.
+    bool hasDenoiserRuntime = false;
+    /// Extra folders NGX searches for its runtime DLLs; NGX may read them whenever it creates a feature.
+    std::vector<std::wstring> runtimeFolders;
+    std::vector<const wchar_t*> runtimeFolderPointers;
     ~AdaDLSSDevice();
+    /// Finds `nvngx_dlss.dll` beside the executable or in the prepared SDK; false with `lastError` set otherwise.
+    bool locateRuntime();
     bool initialize();
     bool wait(uint64_t value);
     bool idle();
@@ -56,6 +67,9 @@ struct AdaDLSSView {
     AdaDLSSDevice& device;
     uint32_t width, height, outputWidth, outputHeight;
     AdaDLSSSharedTexture color, depth, motion, bias, output;
+    /// Ray Reconstruction guides, allocated only when `rayReconstruction` is set.
+    AdaDLSSSharedTexture diffuseAlbedo, specularAlbedo, normals;
+    bool rayReconstruction = false;
     std::array<wgpu::TextureView, 3> packedViews;
     wgpu::Texture boundDepth, boundMotion, boundReactive;
     wgpu::BindGroup packGroup;
@@ -73,4 +87,10 @@ struct AdaDLSSView {
         AdaDLSSFrame& frame);
     bool evaluate(WGPUTexture inputColor, WGPUTexture inputDepth, WGPUTexture inputMotion,
         WGPUTexture reactive, WGPUTexture destination, float jitterX, float jitterY, bool reset);
+    /// Ray Reconstruction; the guides are copied into shared textures before NGX reads them.
+    bool evaluateDenoised(WGPUTexture inputColor, WGPUTexture inputDepth, WGPUTexture inputMotion,
+        WGPUTexture reactive, WGPUTexture diffuse, WGPUTexture specular, WGPUTexture normalRoughness,
+        WGPUTexture destination, float jitterX, float jitterY, const float* worldToView, const float* viewToClip, bool reset);
+    bool copyGuides(WGPUTexture diffuse, WGPUTexture specular, WGPUTexture normalRoughness, AdaDLSSFrame& frame);
+
 };

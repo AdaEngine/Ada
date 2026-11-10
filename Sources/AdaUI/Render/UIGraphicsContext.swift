@@ -67,6 +67,8 @@ public struct UIGraphicsContext: Sendable {
     /// Window this draw context belongs to. A nil value renders into every window camera.
     public var windowId: WindowID?
 
+    var isWindowOverlay = false
+
     private(set) var commandQueue = CommandQueue()
 
     /// Create graphics context.

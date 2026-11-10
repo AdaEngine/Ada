@@ -261,6 +261,7 @@ extension EditorViewModel {
         let projectSettings = projectURL.flatMap {
             try? ProjectSystem.loadProject(at: $0, fileManager: fileManager)
         }
+        let destination = selectedRunDestination.adaProjectDestination
         if let projectURL,
             let settings = projectSettings,
             settings.build.system == .adaScript,
@@ -271,7 +272,11 @@ extension EditorViewModel {
                 at: projectURL,
                 statusTitle: "Build AdaScript Project"
             ) { [weak self] artifact in
-                self?.launchAdaScriptProject(artifact, projectName: projectName)
+                self?.launchAdaScriptProject(
+                    artifact,
+                    projectName: projectName,
+                    diagnosticsOverlay: destination.supportsDiagnosticsOverlay && settings.run.diagnosticsOverlay
+                )
             }
             return
         }
@@ -300,7 +305,11 @@ extension EditorViewModel {
             runOnAdaPlayer()
         case .macOS, .windows, .linux:
             executeWorkspaceCommand(
-                .run(target: product, arguments: projectSettings?.run.arguments ?? []),
+                .run(
+                    target: product,
+                    arguments: projectSettings?.run.arguments ?? [],
+                    diagnosticsOverlay: projectSettings?.run.diagnosticsOverlay ?? false
+                ),
                 statusTitle: product.map { "Run \($0) on \(selectedRunDestination.rawValue)" } ?? "Run on \(selectedRunDestination.rawValue)"
             )
         case .web:
@@ -457,7 +466,8 @@ extension EditorViewModel {
     @discardableResult
     func launchAdaScriptProject(
         _ artifact: EditorAdaScriptProjectBuildArtifact,
-        projectName: String
+        projectName: String,
+        diagnosticsOverlay: Bool = false
     ) -> Bool {
         do {
             if let nativeAdaScriptLauncher {
@@ -471,7 +481,11 @@ extension EditorViewModel {
             let width = Float(windowSettings.size.width)
             let height = Float(windowSettings.size.height)
             let controls = EditorGameWindowControls(projectSize: Size(width: width, height: height))
-            let runtimeView = try EditorAdaScriptProjectRuntimeView(artifact: artifact, controls: controls)
+            let runtimeView = try EditorAdaScriptProjectRuntimeView(
+                artifact: artifact,
+                controls: controls,
+                diagnosticsOverlay: diagnosticsOverlay
+            )
             let windowManager = try requireWindowManager()
             adaScriptRuntimeWindow?.close()
             let windowTitle = windowSettings.title.flatMap { $0.isEmpty ? nil : $0 } ?? projectName

@@ -478,7 +478,22 @@ public protocol RenderCommandEncoder: CommonCommandEncoder {
     @discardableResult
     func drawIndexedIndirect(arguments: any Buffer, offset: Int) -> Bool
 
+    /// Encodes `drawCount` consecutive GPU-generated indexed draws in one call. Returns false when unsupported.
+    @discardableResult
+    func multiDrawIndexedIndirect(arguments: any Buffer, offset: Int, drawCount: Int) -> Bool
+
+    /// Encodes up to `maxDrawCount` consecutive GPU-generated indexed draws; the GPU reads the actual number, a
+    /// `UInt32`, from `drawCountBuffer` at `drawCountOffset`. Returns false without encoding when unsupported.
+    @discardableResult
+    func multiDrawIndexedIndirect(arguments: any Buffer, offset: Int, maxDrawCount: Int, drawCountBuffer: any Buffer, drawCountOffset: Int) -> Bool
+
     func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int)
+
+    /// Issues an indexed draw whose per-instance vertex data starts at `firstInstance`.
+    ///
+    /// Lets consecutive batches share one bound instance buffer instead of rebinding it at a
+    /// new offset for every draw.
+    func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int, firstInstance: Int)
 
     /// Issues a non-indexed draw call.
     ///
@@ -523,4 +538,16 @@ extension RenderCommandEncoder {
 
 extension RenderCommandEncoder {
     public func drawIndexedIndirect(arguments _: any Buffer, offset _: Int) -> Bool { false }
+
+    /// Issues `drawCount` consecutive ``IndexedIndirectArguments`` starting at `offset`.
+    /// Returns `false` without encoding anything when the backend has no multi-draw support.
+    public func multiDrawIndexedIndirect(arguments _: any Buffer, offset _: Int, drawCount _: Int) -> Bool { false }
+
+    public func multiDrawIndexedIndirect(
+        arguments _: any Buffer,
+        offset _: Int,
+        maxDrawCount _: Int,
+        drawCountBuffer _: any Buffer,
+        drawCountOffset _: Int
+    ) -> Bool { false }
 }

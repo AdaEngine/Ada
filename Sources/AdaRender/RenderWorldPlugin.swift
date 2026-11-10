@@ -119,7 +119,11 @@ public struct RenderSystem {
         // Because we can have a situation when we start task, but main thread already cleared surfaces.
         let windows = surfaces.windows
         do {
-            try await runRenderGraph(in: context.world)
+            if RenderPipelining.isActive(in: context.world) {
+                try await runPipelinedRenderGraph(in: context.world)
+            } else {
+                try await runRenderGraph(in: context.world)
+            }
             for window in windows {
                 try window.currentDrawable?.present()
             }
@@ -128,9 +132,22 @@ public struct RenderSystem {
         }
     }
 
+    /// A pipelined render world executes off the shared `RenderGraphActor`, so a serial world's graph
+    /// (for example the UI window) does not queue behind it. Its own updates never overlap: the parent
+    /// waits for the previous update before extracting the next frame.
+    @concurrent
+    private func runPipelinedRenderGraph(in world: World) async throws {
+        try await executeRenderGraph(in: world)
+    }
+
     @RenderGraphActor
     @inline(__always)
-    private func runRenderGraph(
+    private func runRenderGraph(in world: World) async throws {
+        try await executeRenderGraph(in: world)
+    }
+
+    @inline(__always)
+    private func executeRenderGraph(
         in world: World
     ) async throws {
         guard
@@ -160,7 +177,18 @@ struct RenderWorldExctractor: WorldExctractor {
         if let primaryWindow = mainWorld.getResource(PrimaryWindowId.self) {
             renderWorld.insertResource(primaryWindow)
         }
+        // Copied, not read through `Extract`, because surfaces are created after extraction (`.prepare`).
+        if let frameRequests = mainWorld.getResource(WindowFrameRequests.self) {
+            renderWorld.insertResource(frameRequests)
+        } else {
+            renderWorld.removeResource(WindowFrameRequests.self)
+        }
         await renderWorld.runScheduler(.extract)
+        // A pipelined render world renders while the main world simulates the next frame.
+        // Reading the main world after extraction would race, so the reference ends here.
+        if RenderPipelining.isActive(in: renderWorld) {
+            renderWorld.removeResource(MainWorld.self)
+        }
     }
 }
 
@@ -201,8 +229,8 @@ public func CreateWindowSurfaces(
     _ surfaces: ResMut<WindowSurfaces>,
     _ renderDevice: Res<RenderDeviceHandler>,
     _ renderInstance: Res<RenderEngineHandler>,
-    _ primaryWindow: Extract<Res<PrimaryWindowId>>,
-    _ frameRequests: Extract<Res<WindowFrameRequests?>>
+    _ primaryWindow: Res<PrimaryWindowId?>,
+    _ frameRequests: Res<WindowFrameRequests?>
 ) async {
     surfaces.windows.removeAll()
     // Keep this system in the camera dependency graph, but never acquire host drawables offscreen.
@@ -210,7 +238,7 @@ public func CreateWindowSurfaces(
         return
     }
     let device = renderDevice.renderDevice
-    let requests = frameRequests.wrappedValue.wrappedValue
+    let requests = frameRequests.wrappedValue
     surfaces.wrappedValue.pendingFrameRequests.include(requests)
 
     do {
@@ -228,7 +256,7 @@ public func CreateWindowSurfaces(
             }
 
             let ref: WindowRef =
-                if primaryWindow.wrappedValue.windowId == windowId {
+                if primaryWindow.wrappedValue?.windowId == windowId {
                     .primary
                 } else {
                     .windowId(windowId)

@@ -26,6 +26,22 @@ final class TextEditorViewNode: ViewNode {
     struct LineInfo {
         var text: String
         var startOffset: Int
+        /// Character count of `text`, measured once when the line table is built.
+        var length: Int
+        /// Position of the line in the editor text; nil for derived rows such as wrapped fragments.
+        var startIndex: String.Index?
+
+        init(text: String, startOffset: Int, startIndex: String.Index? = nil) {
+            self.text = text
+            self.startOffset = startOffset
+            self.length = text.count
+            self.startIndex = startIndex
+        }
+    }
+
+    struct TokenSpanLineIndex {
+        var sorted: [Int: [TextEditorTokenSpan]] = [:]
+        var documentOrder: [Int: [TextEditorTokenSpan]] = [:]
     }
 
     final class CachedTextLayout {
@@ -63,7 +79,7 @@ final class TextEditorViewNode: ViewNode {
 
     var placeholder: String
     var textBinding: Binding<String>
-    var tokenSpans: [TextEditorTokenSpan]
+    var tokenSpans: [TextEditorTokenSpan] { didSet { tokenSpansByLineCache = nil } }
     var sourceInteraction: TextEditorSourceInteraction?
     var showsLineNumbers: Bool
     var wrapsLines: Bool
@@ -77,7 +93,15 @@ final class TextEditorViewNode: ViewNode {
         showsIndentationGuides || showsTabMarkers || showsSpaceMarkers
     }
     var highlightsSelectedIdentifier: Bool
-    var text: String { didSet { if oldValue != text { invalidateInputComposition() } } }
+    /// The line table holds indices into the previous text; drop it before any observer can read it.
+    var text: String {
+        didSet {
+            if oldValue != text {
+                lineCache = nil
+                invalidateInputComposition()
+            }
+        }
+    }
 
     var isFocused = false
     var isCursorActive = false
@@ -123,6 +147,9 @@ final class TextEditorViewNode: ViewNode {
     var renderedLineCacheHits = 0
     var renderedLineCacheMisses = 0
     var lineCache: [LineInfo]?
+    var lineCacheBuilds = 0
+    var tokenSpansByLineCache: TokenSpanLineIndex?
+    var tokenSpanIndexBuilds = 0
     var foldRangesCache: [Int: Range<Int>]?
     var displayedLinesCache: [Int]?
     var collapsedFoldLines: Set<Int> = []
@@ -158,7 +185,7 @@ final class TextEditorViewNode: ViewNode {
         let lineHeight = self.lineHeight(for: pointSize)
         let lines = self.lines()
         let displayedLines = self.displayedLines()
-        let maxLineCharacterCount = wrapsLines ? 1 : max(displayedLines.map { lines[$0].text.count }.max() ?? 0, self.placeholder.count, 1)
+        let maxLineCharacterCount = wrapsLines ? 1 : max(displayedLines.map { lines[$0].length }.max() ?? 0, self.placeholder.count, 1)
         let maxLineWidth = Float(maxLineCharacterCount) * self.characterAdvance(for: pointSize)
         let ideal = Size(
             width: max(Constants.minimumWidth, Constants.horizontalInset * 2 + self.gutterInset + maxLineWidth),
@@ -195,7 +222,9 @@ final class TextEditorViewNode: ViewNode {
 
         self.placeholder = node.placeholder
         self.textBinding = node.textBinding
-        self.tokenSpans = node.tokenSpans
+        if self.tokenSpans != node.tokenSpans {
+            self.tokenSpans = node.tokenSpans
+        }
         self.sourceInteraction = node.sourceInteraction
         self.showsLineNumbers = node.showsLineNumbers
         if wrapsLines != node.wrapsLines {

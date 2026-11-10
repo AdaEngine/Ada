@@ -35,7 +35,9 @@ extension EditorWorkbenchViewModel {
     @concurrent
     private nonisolated static func decodeSceneDocument(_ content: String) async throws -> EditorSceneModel {
         try Task.checkCancellation()
+        let stall = PerformanceStallProbe.begin()
         let model = try EditorSceneModel.decode(from: content)
+        PerformanceStallProbe.end("Studio.SceneDecode", since: stall, bytes: content.utf8.count, count: model.entities.count)
         try Task.checkCancellation()
         return model
     }
@@ -80,7 +82,11 @@ extension EditorWorkbenchViewModel {
                     document.isDirty = true
                     document.statusMessage = "Edited"
                 }
-                self.refreshFileSearchSelection(documentID: documentID)
+                // A second document write per keystroke re-notifies every workbench observer; skip it
+                // unless find-in-file needs its match selection refreshed.
+                if self.textDocument(id: documentID)?.fileSearch.isPresented == true {
+                    self.refreshFileSearchSelection(documentID: documentID)
+                }
             }
         )
     }

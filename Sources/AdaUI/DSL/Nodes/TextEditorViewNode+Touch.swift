@@ -105,7 +105,7 @@ extension TextEditorViewNode {
                 let local = convertPointFromRoot(touch.location)
                 if let drag = session.handleDrag {
                     selectionAnchor = drag.fixedOffset
-                    selectionHead = drag.movingOffset(closestOffset(to: drag.caretPoint(for: local)), textCount: text.count)
+                    selectionHead = drag.movingOffset(closestOffset(to: drag.caretPoint(for: local)), textCount: textCharacterCount)
                 } else {
                     selectionHead = closestOffset(to: local)
                 }

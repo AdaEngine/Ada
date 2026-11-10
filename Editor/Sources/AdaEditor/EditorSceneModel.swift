@@ -161,6 +161,9 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
            let model = try? decodeJSON(Data(content.utf8)) {
             return model
         }
+        if let model = try? EditorSceneYAMLPayloadDecoder.decode(content) {
+            return model
+        }
         return try YAMLDecoder(encoding: .utf8).decode(Self.self, from: content)
     }
 

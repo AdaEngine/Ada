@@ -28,17 +28,28 @@ public struct TextureAlphaMask: Sendable {
             self.samples = []
             return
         }
-        let first = image.data[3]
-        var alpha: [UInt8] = []
-        alpha.reserveCapacity(count.partialValue)
-        var isConstant = true
-        for index in 0..<count.partialValue {
-            let value = image.data[index * 4 + 3]
-            alpha.append(value)
-            isConstant = isConstant && value == first
+        let texels = count.partialValue
+        // Scan raw bytes: per-element `Data` subscripts dominate import time for 4K material textures.
+        let (first, isConstant) = unsafe image.data.withUnsafeBytes { raw -> (UInt8, Bool) in
+            let bytes = unsafe raw.bindMemory(to: UInt8.self)
+            let first = unsafe bytes[3]
+            for index in 1 ..< texels where unsafe bytes[index * 4 + 3] != first {
+                return (first, false)
+            }
+            return (first, true)
         }
         self.constant = isConstant ? first : nil
-        self.samples = isConstant ? [] : alpha
+        if isConstant {
+            self.samples = []
+        } else {
+            self.samples = unsafe image.data.withUnsafeBytes { raw in
+                let bytes = unsafe raw.bindMemory(to: UInt8.self)
+                return unsafe [UInt8](unsafeUninitializedCapacity: texels) { output, initialized in
+                    for index in 0 ..< texels { unsafe output[index] = bytes[index * 4 + 3] }
+                    initialized = texels
+                }
+            }
+        }
     }
 
     /// Samples a nearest base-level texel using GPU UVs (top-left image origin).

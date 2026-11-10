@@ -1,6 +1,7 @@
 @_spi(AdaEngine) import AdaEngine
 @_spi(Internal) @testable import AdaInput
 @_spi(Internal) @testable import AdaUI
+import Foundation
 import Math
 import Observation
 import Synchronization
@@ -120,6 +121,53 @@ struct EditorTextInteractionPerformanceTests {
         for event in events where event.window == window.id && event is MouseEvent {
             #expect(input.isScenePickingBlocked(eventID: event.id))
         }
+    }
+
+    /// Opt-in CPU benchmark for opening and typing in a large Swift file (no GPU/presentation time).
+    @Test("Profile opening and typing in a large Swift file", .enabled(if: ProcessInfo.processInfo.environment["ADAEDITOR_PERF_CODE"] != nil))
+    func largeSwiftFileTypingBenchmark() async throws {
+        prepareRenderer()
+        let source = (0..<6_000).map { index in
+            "    func value\(index)(_ input: Int) -> String { return \"item \\(input + \(index))\" } // note \(index)"
+        }.joined(separator: "\n")
+        let model = EditorWorkbenchViewModel(
+            openDocuments: [.text(EditorTextDocument(id: "text", title: "Large.swift", relativePath: "Large.swift", language: .swift, content: source))],
+            activeDocumentID: "text"
+        )
+        let clock = ContinuousClock()
+        func milliseconds(_ duration: Duration) -> Double {
+            Double(duration.components.seconds) * 1_000 + Double(duration.components.attoseconds) / 1e15
+        }
+
+        let openStart = clock.now
+        let container = UIContainerView(rootView: PerformanceCodeView(model: model).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 1_200, height: 800)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        container.viewTree.rootNode.draw(with: UIGraphicsContext())
+        let open = milliseconds(openStart.duration(to: clock.now))
+        let node = try #require(editorNode(in: container.viewTree.rootNode))
+        _ = try container.uiFocusNode(matching: .runtimeID(String(UInt(bitPattern: node.id), radix: 16)))
+        node.setSelection(to: node.offset(line: 3_000, column: 4, lines: node.lines()))
+
+        var keystrokes: [Double] = []
+        for character in "let typed = 1234567890 // abc" {
+            let start = clock.now
+            node.insertText(String(character))
+            container.layoutIfNeeded()
+            container.viewTree.rootNode.draw(with: UIGraphicsContext())
+            keystrokes.append(milliseconds(start.duration(to: clock.now)))
+        }
+        keystrokes.sort()
+
+        // The previous path re-highlighted the whole edited document synchronously on every keystroke.
+        let edited = model.textDocument(id: "text")?.content ?? source
+        let highlightStart = clock.now
+        _ = EditorSyntaxHighlighter.spans(for: edited + " ", language: .swift, palette: model.codeColorPalette)
+        let highlight = milliseconds(highlightStart.duration(to: clock.now))
+
+        #expect(model.textDocument(id: "text")?.content.contains("let typed = 1234567890 // abc") == true)
+        print("Code editor benchmark: bytes=\(source.utf8.count), open+first draw=\(open) ms, keystroke p50=\(keystrokes[keystrokes.count / 2]) ms, p95=\(keystrokes[Int(Double(keystrokes.count) * 0.95)]) ms, max=\(keystrokes.last ?? 0) ms, synchronous full highlight (old per-keystroke cost)=\(highlight) ms")
     }
 
     private func makeModel() -> EditorWorkbenchViewModel {

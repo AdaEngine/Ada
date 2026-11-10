@@ -201,6 +201,22 @@
             self.currentIndexType = (metalIndexBuffer.indexFormat == .uInt32) ? .uint32 : .uint16
         }
 
+        func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int, firstInstance: Int) {
+            guard let indexBuffer = self.currentIndexBuffer else {
+                fatalError("Index buffer is not set. Call setIndexBuffer(_:offset:) before drawIndexed().")
+            }
+            renderEncoder.drawIndexedPrimitives(
+                type: currentPrimitiveType,
+                indexCount: indexCount,
+                indexType: self.currentIndexType,
+                indexBuffer: indexBuffer,
+                indexBufferOffset: indexBufferOffset,
+                instanceCount: instanceCount,
+                baseVertex: 0,
+                baseInstance: firstInstance
+            )
+        }
+
         func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int) {
             guard let indexBuffer = self.currentIndexBuffer else {
                 fatalError("Index buffer is not set. Call setIndexBuffer(_:offset:) before drawIndexed().")

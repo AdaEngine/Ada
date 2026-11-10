@@ -18,6 +18,15 @@ import Math
 public struct UIPlugin: Plugin {
     public init() {}
 
+    @MainActor
+    package static func installWindowOverlayPass(in app: AppWorlds) {
+        guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else { return }
+        let graph = renderWorld.getRefResource(RenderGraph.self)
+        let name: RenderNodeLabel = "PrimaryWindowOverlay"
+        graph.wrappedValue.addNode(UIRenderNode(isWindowOverlay: true), by: name)
+        graph.wrappedValue.addNodeEdge(from: .cameraRender, to: name)
+    }
+
     public func setup(in app: AppWorlds) {
         UIComponent.registerComponent()
 

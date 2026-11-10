@@ -35,6 +35,9 @@ public final class AppWorlds {
     /// Assign on the root of an embedded game. Nested worlds inherit its profiling context.
     public var profilingTargetID: String?
 
+    /// Receives the variable game tick and whether continuous simulation is active.
+    package var gameDiagnosticsTick: (@MainActor (Bool) -> Void)?
+
     /// Skips this runtime in its host's automatic frame loop while retaining it
     /// for tooling and explicit updates (for example an inactive editor preview).
     package var isHostedUpdateSuspended = false
@@ -54,6 +57,9 @@ public final class AppWorlds {
 
     /// The world extractor.
     nonisolated(unsafe) var worldExctractor: (any WorldExctractor)?
+
+    /// The in-flight update of a pipelined subworld (see ``RenderPipelining``).
+    var pipelinedUpdate: Task<Void, any Error>?
 
     /// The plugins.
     @usableFromInline
@@ -106,6 +112,18 @@ extension AppWorlds {
         self.runner = block
     }
 
+    /// Tooling sees a consistent state only after in-flight pipelined renders finish. A failed render is
+    /// logged here instead of failing the unrelated tooling operation.
+    private func waitForPipelinedUpdatesAtSafePoint() async throws {
+        do {
+            try await waitForPipelinedUpdates()
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            logger.error("Pipelined update failed: \(error)")
+        }
+    }
+
     /// Executes a synchronous tooling operation between frame updates.
     /// Call on the root AppWorlds so subworld schedulers and extraction are also covered.
     /// Do not call from a running system: it would wait for its own frame to finish.
@@ -113,6 +131,7 @@ extension AppWorlds {
         while activeUpdates > 0 {
             await withCheckedContinuation { updateWaiters.append($0) }
         }
+        try await waitForPipelinedUpdatesAtSafePoint()
         try Task.checkCancellation()
         return try operation()
     }
@@ -124,6 +143,7 @@ extension AppWorlds {
         while activeUpdates > 0 {
             await withCheckedContinuation { updateWaiters.append($0) }
         }
+        try await waitForPipelinedUpdatesAtSafePoint()
         try Task.checkCancellation()
         activeUpdates += 1
         defer {
@@ -200,6 +220,7 @@ extension AppWorlds {
         let simulationControl = main.getOrInitRefResource(SimulationControl.self) {
             SimulationControl()
         }
+        gameDiagnosticsTick?(simulationControl.wrappedValue.mode == .running)
         let shouldRunMainWorld: Bool
         switch simulationControl.wrappedValue.mode {
         case .running:
@@ -220,10 +241,17 @@ extension AppWorlds {
         }
 
         for world in self.subWorlds.values where !world.isHostedUpdateSuspended && world.hostedUpdateSuspensionCount == 0 {
+            // A pipelined subworld may still render the previous frame; extraction is the only meeting point.
+            let pipelined = world.isUpdatePipelined
+            try await world.waitForPipelinedUpdates()
             let stall = PerformanceStallProbe.begin()
             unsafe await world.worldExctractor?.exctract(from: main, to: world.main)
             if stall != nil { PerformanceStallProbe.end("App.Extract.\(world.main.name ?? "subworld")", since: stall) }
-            try await world.update()
+            if pipelined {
+                world.startPipelinedUpdate()
+            } else {
+                try await world.update()
+            }
         }
 
         // UI lifecycle callbacks can enqueue removals while a subworld is
@@ -241,6 +269,7 @@ extension AppWorlds {
                 return
             }
             try await withExecutionContext {
+                try await world.waitForPipelinedUpdates()
                 unsafe await world.worldExctractor?.exctract(from: main, to: world.main)
                 try await world.update()
             }

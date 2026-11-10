@@ -28,7 +28,21 @@ Stage the signed runtime and license beside each executable:
 python script/build_dlss.py --stage-runtime path/to/bin
 ```
 
-`nvngx_dlss.dll` and `NVIDIA-DLSS-LICENSE.txt` come from the pinned SDK.
+`nvngx_dlss.dll` (Super Resolution), `nvngx_dlssd.dll` (Ray Reconstruction) and
+`NVIDIA-DLSS-LICENSE.txt` come from the pinned SDK. `ada_tool build/install studio` and the
+Windows Studio packager copy them automatically when the bridge is prepared. For `swift run` of an
+example, either stage them beside the executable or set `ADAENGINE_DLSS_SDK_PATH` to the prepared SDK
+(`.build-tools/dlss-sdk`); NGX then loads them from there. Without either, DLSS reports
+"DLSS runtime nvngx_dlss.dll not found next to …" rather than an adapter or driver problem.
+
+## Ray Reconstruction
+
+Path-traced views use DLSS Ray Reconstruction (NGX "DLSS-D") when `PathTracing3D.denoiser` is
+`.automatic` or `.rayReconstruction`, the camera uses DLSS temporal upscaling, NGX reports the feature
+on the adapter, and the tracer runs at input size. The bridge copies three RGBA16F guides (diffuse albedo,
+specular albedo, world normal with packed roughness) into shared textures beside colour, depth and motion,
+and evaluates with the frame's world-to-view and view-to-clip matrices. A failed evaluation disables Ray
+Reconstruction for that view and falls back to Super Resolution of the noisy frame.
 The custom-engine project GUID is a development identity, not an
 NVIDIA-assigned application ID.
 

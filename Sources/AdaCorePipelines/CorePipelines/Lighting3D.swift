@@ -129,6 +129,7 @@ public struct DirectionalShadowViewUniform: Sendable {
 public struct DirectionalShadow3DScratch: Resource, Sendable {
     public var view: BufferData<DirectionalShadowViewUniform>
     var cache = FrameUniformCache3D<DirectionalShadowViewUniform>()
+    var gpuCull = GPUShadowCull3D()
 
     public init() {
         self.view = BufferData(label: "Directional Shadow View", elements: [])

@@ -172,6 +172,47 @@ class CLIParsingTests(unittest.TestCase):
                     self.assertIn("--configuration debug", plan)
                 self.assertEqual(list(root.iterdir()), [])
 
+    def test_profile_build_keeps_release_optimizations_and_emits_symbols(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for host in ("windows", "macos", "linux"):
+                for target in ("studio", "engine"):
+                    args = parser().parse_args(["build", target, "--profile", "--dry-run"])
+                    ctx = Context(args, root=root, host=host)
+                    ctx.arch = "x86_64"
+                    output = io.StringIO()
+                    with contextlib.redirect_stderr(output):
+                        studio.build(ctx, args)
+                    plan = output.getvalue()
+                    if host == "macos" and target == "studio":
+                        self.assertIn("-configuration Release", plan)
+                        self.assertIn("DEBUG_INFORMATION_FORMAT=dwarf-with-dsym", plan)
+                    else:
+                        self.assertIn("--configuration release", plan)
+                        self.assertIn("-Xswiftc -g", plan)
+                    if host == "windows" and target == "studio":
+                        self.assertIn("-Xswiftc -debug-info-format=codeview", plan)
+                        self.assertIn("-Xlinker -debug", plan)
+                    # Profiling builds never reuse or invalidate the plain release cache.
+                    self.assertIn(target + "-profile", plan)
+                    self.assertEqual(list(root.iterdir()), [])
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            parser().parse_args(["build", "studio", "--profile", "--debug"])
+        with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+            parser().parse_args(["run", "studio", "--profile", "--debug"])
+
+    def test_profile_installation_lives_beside_release_and_debug(self):
+        with tempfile.TemporaryDirectory() as directory:
+            for host in ("windows", "macos", "linux"):
+                ctx = Context(parser().parse_args(["run", "studio", "--dry-run"]), root=Path(directory), host=host)
+                names = [studio.default_destination(ctx, debug, profile).name
+                         for debug, profile in ((False, False), (True, False), (False, True))]
+                self.assertEqual(len(set(names)), 3, names)
+                self.assertTrue("Profile" in names[2] or names[2] == "ada-studio-profile", names)
+            args = parser().parse_args(["install", "studio", "--profile", "--dry-run", "--no-shortcut"])
+            self.assertTrue(args.profile)
+            self.assertFalse(args.debug)
+
     def test_windows_wasm_plan_uses_worker_compiler_and_reuses_frontend(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

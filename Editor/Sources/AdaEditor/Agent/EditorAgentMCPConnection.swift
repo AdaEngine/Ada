@@ -18,7 +18,7 @@ import FoundationNetworking
                 return []
             }
             if supportsHTTP {
-                return [.http(.init(name: "AdaEditor", url: EditorMCPServerAddress.url))]
+                return [.http(.init(name: "AdaEditor", url: EditorMCPServerAddress.url, headers: []))]
             }
             // ACP requires stdio support. Reuse this executable as a bridge to the live
             // editor instead of launching another GUI with a separate project/undo history.

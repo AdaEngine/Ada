@@ -418,7 +418,7 @@ enum SwiftPMCommandKind: Equatable, Sendable {
     case resolve
     case describe
     case build(target: String?, buildTests: Bool)
-    case run(target: String?, arguments: [String])
+    case run(target: String?, arguments: [String], diagnosticsOverlay: Bool = false)
     case runWeb(target: String, outputPath: String, serve: Bool)
     case test(filter: String?, eventStreamPath: String? = nil)
     case update
@@ -619,7 +619,7 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
                 ["package", "describe", "--type", "json"]
             case let .build(target, buildTests):
                 buildArguments(target: target, buildTests: buildTests)
-            case let .run(target, arguments):
+            case let .run(target, arguments, _):
                 runArguments(target: target, runArguments: arguments, configuration: configuration)
             case let .runWeb(target, outputPath, serve):
                 webRunArguments(target: target, outputPath: outputPath, serve: serve)
@@ -646,7 +646,10 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
         let platform: EditorBuildPlatform
         if case .runWeb = kind { platform = .web } else { platform = .host }
         var environment = buildSettings.environment(for: platform)
-        if case .run = kind { environment.merge(project?.run.environment ?? [:]) { _, value in value } }
+        if case let .run(_, _, diagnosticsOverlay) = kind {
+            environment.merge(project?.run.environment ?? [:]) { _, value in value }
+            environment["ADAENGINE_DIAGNOSTICS_OVERLAY"] = diagnosticsOverlay ? "1" : "0"
+        }
         if case .runWeb = kind {
             environment["ADAENGINE_WEB_EXPORT"] = "1"
             environment["BUILD_WASM"] = "1"

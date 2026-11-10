@@ -153,7 +153,7 @@ extension TextEditorViewNode {
                     }
                 }
                 if let font {
-                    let spans = tokenSpans.filter { $0.line == row.sourceLine }.map { span in
+                    let spans = documentOrderTokenSpans(forLine: row.sourceLine).map { span in
                         TextEditorTokenSpan(line: span.line, startColumn: span.startColumn - row.startColumn, length: span.length, color: span.color, font: span.font)
                     }
                     let attributed = attributedLineText(row.line.text, lineSpans: spans, font: font, fallbackColor: resolvedTextColor())

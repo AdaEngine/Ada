@@ -50,7 +50,12 @@ or replacing the retained scene releases it. Hidden hierarchies do not prepare r
 Preserve the one-scene-per-pane bound and code input ownership when changing tabs.
 Lifecycle coverage: `EditorWorkbenchSplitTests.retainedScenePresentation` and
 `EditorScenePerformanceRegressionTests.retainedScenePausesHostedFrames`.
-Large scene documents decode off the UI actor; previews prepare model/LOD/Spine
+Large scene documents decode off the UI actor. YAML scenes parse once and convert
+component payloads directly with Yams' scalar constructors (`EditorSceneYAMLPayloadDecoder`);
+only the envelope uses `YAMLDecoder`, and unexpected shapes fall back to it. Do not send
+mesh/physics payloads through `StudioValue`'s Codable probes. Coverage:
+`EditorSceneYAMLPayloadDecoderTests`; opt-in timing: `ADAEDITOR_PERF_SCENE=<path>`.
+Previews prepare model/LOD/Spine
 assets asynchronously and install entities in batches while hosted frames are
 suspended. They retain shared handles per preview world, cancel stale loads and reuse unchanged imports. JSON
 component arrays use the portable value parser; edit worlds omit physics-body

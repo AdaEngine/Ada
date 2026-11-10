@@ -201,6 +201,30 @@ struct EditorWindowsACPTests {
         #expect(received == arguments)
     }
 
+    @Test("Native npm launchers resolve directly to an executable with literal arguments")
+    func nativeNpmShim() throws {
+        let fixture = try Fixture(mode: "cancel")
+        defer { fixture.remove() }
+        let executable = fixture.root.appendingPathComponent("node_modules/opencode-ai/bin/opencode.exe")
+        try FileManager.default.createDirectory(at: executable.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data().write(to: executable)
+        let shim = fixture.root.appendingPathComponent("opencode.cmd")
+        let launcher = #""%dp0%\node_modules\opencode-ai\bin\opencode.exe"   %*"#
+        try ("@ECHO off\r\nSET dp0=%~dp0\r\n" + launcher + "\r\n").write(to: shim, atomically: true, encoding: .utf8)
+        let arguments = ["acp", "Игра & путь", "%PATH%"]
+        do {
+            let invocation = try EditorWindowsAgentCommand.resolve(shim.path, arguments: arguments, environment: [:])
+            #expect(invocation.executable.path == executable.path)
+            #expect(invocation.arguments == arguments)
+        } catch {
+            Issue.record("Native npm launcher could not be resolved: \(error)")
+        }
+        try (launcher + " & echo unexpected").write(to: shim, atomically: true, encoding: .utf8)
+        #expect(throws: EditorAgentCatalogError.self) {
+            try EditorWindowsAgentCommand.resolve(shim.path, arguments: arguments, environment: [:])
+        }
+    }
+
     @Test("Windows archives reject drive paths, alternate streams, traversal and links")
     func archivePaths() throws {
         try EditorAgentCatalogService.validateArchive(names: "./agent.exe\n", details: "-rw-r--r-- agent.exe\n", command: "./agent.exe")

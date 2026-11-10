@@ -6,6 +6,7 @@ import Math
 
 struct LocalShadow3DScratch: Resource {
     var cache = FrameUniformCache3D<DirectionalShadowViewUniform>()
+    var gpuCull = GPUShadowCull3D()
 }
 
 struct LocalShadow3DPipeline: RenderPipelineConfigurator {
@@ -49,6 +50,7 @@ public struct LocalShadow3DRenderNode: RenderNode {
     @ResMut<LocalShadow3DScratch> private var scratch
     @ResMut<LocalLighting3DGPUScratch> private var uniforms
     @ResMut<VisibleMesh3DLists> private var lists
+    @ResMut<ShadowCasterRegistry3D> private var registry
     @ResMut<PBR3DUniforms> private var materials
     @Res<Skinning3DUniforms> private var skinning
     @ResMut<RenderPipelines<LocalShadow3DPipeline>> private var pipelines
@@ -67,6 +69,7 @@ public struct LocalShadow3DRenderNode: RenderNode {
         _scratch.update(from: world)
         _uniforms.update(from: world)
         _lists.update(from: world)
+        _registry.update(from: world)
         _materials.update(from: world)
         _skinning.update(from: world)
         _pipelines.update(from: world)
@@ -85,8 +88,33 @@ public struct LocalShadow3DRenderNode: RenderNode {
         }
         for id in views.entries.keys where !active.contains(id) { views.entries.removeValue(forKey: id) }
         scratch.cache.retainViews(active)
+        scratch.gpuCull.retainViews(active)
         statistics.retainViews(active)
         uniforms.retainViews(active)
+    }
+
+    /// Rebuilds the CPU lists of `faces` from every caster, for a frame whose GPU culling could not be encoded.
+    private func prepareCPUFallback(
+        faces: [Int],
+        sources: [Mesh3DRenderSource],
+        camera: Entity.ID,
+        uniform: GlobalViewUniform,
+        matrices: [Transform3D],
+        lod: Bool
+    ) {
+        for index in faces {
+            lists.prepare(
+                sources: sources,
+                view: camera,
+                pass: 100 + index,
+                viewMatrix: uniform.viewMatrix,
+                projection: uniform.projectionMatrix,
+                cullingProjection: matrices[index],
+                settings: MeshVisibilitySettings3D(frustumCulling: true, lod: lod, distanceCulling: false),
+                device: device.renderDevice,
+                materials: &_materials.wrappedValue
+            )
+        }
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
@@ -171,8 +199,41 @@ public struct LocalShadow3DRenderNode: RenderNode {
                 : nil
             PerformanceStallProbe.end("LocalShadow.SceneDigest", since: digestStart, count: candidates.meshes.count)
             let sceneUnchanged = sceneDigest != nil && sceneDigest == entry.sceneDigest
+            // Static casters are culled for every redrawn face in one GPU pass; the rest keep the CPU lists.
+            registry.update(
+                sources: candidates.meshes,
+                materials: &_materials.wrappedValue,
+                identityPalette: skinning.identityBuffer,
+                device: device.renderDevice
+            )
+            let usesGPU = scratch.gpuCull.isAvailable(
+                camera: source.entityId,
+                registry: registry,
+                viewCount: entry.allocator.slots.count * 6,
+                device: device.renderDevice
+            )
+            let cpuSources = usesGPU ? registry.cpuSources : candidates.meshes
+            // Faces kept from earlier frames must also hold the current GPU-path casters.
+            let registryRevision: UInt64? = usesGPU ? registry.revision : nil
+            let registryChanges: [AABB]?
+            if registryRevision == entry.registryRevision {
+                registryChanges = []
+            } else if let previous = entry.registryRevision, let current = registryRevision, current == previous &+ 1 {
+                registryChanges = registry.changedBounds
+            } else {
+                registryChanges = nil
+            }
+            // A face is dirtied by a GPU-path caster that was, or now is, inside it (the CPU frustum test).
+            func registryDirties(_ matrix: Transform3D) -> Bool {
+                guard let registryChanges else { return true }
+                guard !registryChanges.isEmpty else { return false }
+                let frustum = MeshVisibilityFrustum3D(viewProjection: matrix)
+                return registryChanges.contains { frustum.intersects($0) }
+            }
             let prepareStart = PerformanceStallProbe.begin()
             var preparedFaceCount = 0
+            var culledFaceCount = 0
+            let viewFrustum = MeshVisibilityFrustum3D(viewProjection: uniform.viewProjectionMatrix)
             for light in entry.lights {
                 guard let slot = entry.allocator.slots[light.entity] else { continue }
                 let matrices = LocalLighting3DMath.shadowProjections(light)
@@ -183,6 +244,13 @@ public struct LocalShadow3DRenderNode: RenderNode {
                     var matrixDigest = FrameDigest3D()
                     matrixDigest.combine(matrices[face])
                     matrixDigests[index] = matrixDigest.value
+                    // A moving light changes every face matrix each frame. Faces nothing on screen (or lit by
+                    // dynamic irradiance) can sample are skipped; without a digest they redraw once they matter.
+                    let faceBounds = LocalLighting3DMath.shadowFaceBounds(light, face: face)
+                    guard LocalLighting3DMath.shadowFaceIsSampled(faceBounds, viewFrustum: viewFrustum, irradianceBounds: bounds) else {
+                        culledFaceCount += 1
+                        continue
+                    }
                     if sceneUnchanged, let kept = entry.faceDigests[index], entry.faceMatrixDigests[index] == matrixDigest.value {
                         digests[index] = kept
                         faces.append(Face(index: index, tile: tile, isClean: true))
@@ -191,7 +259,7 @@ public struct LocalShadow3DRenderNode: RenderNode {
                     // Light-volume culling is independent of the main camera list and its distance cuts.
                     let listStart = PerformanceStallProbe.begin()
                     lists.prepare(
-                        sources: candidates.meshes,
+                        sources: cpuSources,
                         view: source.entityId,
                         pass: 100 + index,
                         viewMatrix: uniform.viewMatrix,
@@ -214,15 +282,18 @@ public struct LocalShadow3DRenderNode: RenderNode {
                         digest = combined.value
                         digests[index] = combined.value
                     }
-                    faces.append(Face(index: index, tile: tile, isClean: digest != nil && entry.faceDigests[index] == digest))
+                    let isClean = digest != nil && entry.faceDigests[index] == digest && !registryDirties(matrices[face])
+                    faces.append(Face(index: index, tile: tile, isClean: isClean))
                 }
             }
             PerformanceStallProbe.end("LocalShadow.PrepareFaces", since: prepareStart, count: preparedFaceCount)
             entry.sceneDigest = sceneDigest
+            entry.registryRevision = registryRevision
             entry.faceMatrixDigests = matrixDigests
             entry.faceDigests = digests
             entry.reusedFaces = faces.filter(\.isClean).count
             entry.renderedFaces = faces.count - entry.reusedFaces
+            entry.culledFaces = culledFaceCount
             guard entry.renderedFaces > 0 else {
                 // Every face already holds what it would draw again.
                 statistics.record(view: source.entityId, scene: _lighting.wrappedValue, entry: entry)
@@ -233,6 +304,26 @@ public struct LocalShadow3DRenderNode: RenderNode {
             let keepsContents = entry.reusedFaces > 0
             let command = renderContext.commandQueue.makeCommandBuffer()
             command.label = "Local Shadows 3D"
+            let dirtyFaces = faces.filter { !$0.isClean }
+            registry.flushCopies(on: command)
+            var culled: GPUShadowCullResult?
+            if usesGPU {
+                culled = scratch.gpuCull.cull(
+                    camera: source.entityId,
+                    registry: &_registry.wrappedValue,
+                    views: dirtyFaces.map { GPUShadowCullView(viewProjection: entry.matrices[$0.index], culls: true) },
+                    command: command,
+                    device: device.renderDevice
+                )
+                if culled == nil {
+                    // The GPU pass could not be encoded: draw every caster from CPU lists instead.
+                    prepareCPUFallback(
+                        faces: dirtyFaces.map(\.index), sources: candidates.meshes, camera: source.entityId,
+                        uniform: uniform, matrices: entry.matrices, lod: environment.meshVisibility.lod
+                    )
+                    entry.registryRevision = nil
+                }
+            }
             let beginPassStart = PerformanceStallProbe.begin()
             let pass = command.beginRenderPass(
                 .init(
@@ -248,7 +339,9 @@ public struct LocalShadow3DRenderNode: RenderNode {
             PerformanceStallProbe.end("LocalShadow.BeginPass", since: beginPassStart, count: entry.renderedFaces)
             let encodeStart = PerformanceStallProbe.begin()
             var encodedDrawCount = 0
-            for face in faces where !face.isClean {
+            // Faces of one light, and of all lights, draw the same batches: resolve their state once.
+            var batches = ShadowBatchEncoder3D(requiresMaterialBuffer: true)
+            for (viewIndex, face) in dirtyFaces.enumerated() {
                 let index = face.index
                 let tile = face.tile
                 pass.setViewport(tile)
@@ -258,7 +351,6 @@ public struct LocalShadow3DRenderNode: RenderNode {
                     pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
                 }
                 let buffers = lists.buffers(view: source.entityId, pass: 100 + index)
-                guard let instances = buffers.instances else { continue }
                 let constants = scratch.cache.write(
                     DirectionalShadowViewUniform(viewProjection: entry.matrices[index], tileBounds: [tile.minX, tile.minY, tile.maxX, tile.maxY]),
                     view: source.entityId,
@@ -266,35 +358,27 @@ public struct LocalShadow3DRenderNode: RenderNode {
                     device: device.renderDevice
                 )
                 pass.setVertexBuffer(constants, offset: 0, slot: GlobalBufferIndex.viewUniform)
-                for item in lists.items(view: source.entityId, pass: 100 + index) {
-                    guard item.castShadows, let range = item.batchRange, (item.material as? PBRMaterial)?.effectiveAlphaMode != .blend else { continue }
-                    let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
-                    guard let material = materials.buffer(for: item.material), let palette = item.skinningBuffer ?? skinning.identityBuffer else { continue }
-                    let morphed = item.morphBuffer != nil && part.morphTargets != nil
-                    let pipeline = pipelines.pipeline(for: Shadow3DConfiguration(vertex: part.vertexDescriptor, morph: morphed), device: device.renderDevice)
-                    guard ShaderGraph3DPipeline.bindShadow(encoder: pass, base: pipeline, material: item.material, device: device.renderDevice, morph: morphed) else { continue }
-                    if morphed, let morphBuffer = item.morphBuffer, let morphSet = part.morphTargets {
-                        pass.setResourceSet(RenderResourceSet(bindings: [
-                            .init(binding: Morph3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(morphBuffer, offset: 0)),
-                            .init(binding: Morph3DUniforms.textureBinding, shaderStages: .vertex, resource: .texture(morphSet.deltaTexture)),
-                        ]), index: 0)
-                    }
-                    pass.setVertexBuffer(part.vertexBuffer, offset: 0, slot: 0)
-                    pass.setVertexBuffer(instances, offset: Int(range.lowerBound) * MemoryLayout<Flat3DInstanceData>.stride, slot: 3)
-                    if let defaults = buffers.defaults { pass.setVertexBuffer(defaults, offset: 0, slot: 4) }
-                    let base = (item.material as? PBRMaterial)?.baseColorTexture ?? Texture2D.whiteTexture
-                    pass.setResourceSet(
-                        .init(bindings: [
-                            .init(binding: 15, shaderStages: .fragment, resource: .uniformBuffer(material, offset: 0)),
-                            .init(binding: 4, shaderStages: .fragment, resource: .texture(base)),
-                            .init(binding: 7, shaderStages: .fragment, resource: .sampler(base.sampler)),
-                            .init(binding: Skinning3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(palette, offset: 0)),
-                        ]),
-                        index: 0
+                if let instances = buffers.instances {
+                    encodedDrawCount += batches.encode(
+                        items: lists.items(view: source.entityId, pass: 100 + index),
+                        instances: instances,
+                        defaults: buffers.defaults,
+                        pass: pass,
+                        pipelines: &_pipelines.wrappedValue,
+                        materials: materials,
+                        identityPalette: skinning.identityBuffer,
+                        device: device.renderDevice
                     )
-                    pass.setIndexBuffer(part.indexBuffer, offset: 0)
-                    pass.drawIndexed(indexCount: part.indexCount, indexBufferOffset: 0, instanceCount: Int(range.count))
-                    encodedDrawCount += 1
+                }
+                if let culled {
+                    encodedDrawCount += GPUShadowCull3D.draw(
+                        registry: registry,
+                        output: culled,
+                        view: viewIndex,
+                        pass: pass,
+                        pipelines: &_pipelines.wrappedValue,
+                        device: device.renderDevice
+                    )
                 }
             }
             pass.endRenderPass()

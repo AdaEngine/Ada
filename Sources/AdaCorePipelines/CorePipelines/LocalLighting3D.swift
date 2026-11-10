@@ -177,6 +177,40 @@ public enum LocalLighting3DMath {
         let directions: [Vector3] = light.kind == .point ? [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]] : [light.direction]
         return directions.map { projection * view(position: light.position, direction: $0) }
     }
+
+    /// Conservative world bounds of what one shadow face can see. A point light face covers the 90° pyramid
+    /// along its axis, which lies inside the half-box towards that axis; a spot face lies inside the light's
+    /// range sphere. A receiver can only sample a face whose volume contains it.
+    public static func shadowFaceBounds(_ light: ExtractedLocalLight3D, face: Int) -> AABB {
+        let range = finiteRenderValue(light.range, fallback: 10, range: 0.1...500)
+        let position = light.position
+        guard light.kind == .point, (0..<6).contains(face) else {
+            return AABB(min: position - Vector3(range, range, range), max: position + Vector3(range, range, range))
+        }
+        var lower = position - Vector3(range, range, range)
+        var upper = position + Vector3(range, range, range)
+        let positive = face % 2 == 0
+        switch face / 2 {
+        case 0: if positive { lower.x = position.x } else { upper.x = position.x }
+        case 1: if positive { lower.y = position.y } else { upper.y = position.y }
+        default: if positive { lower.z = position.z } else { upper.z = position.z }
+        }
+        return AABB(min: lower, max: upper)
+    }
+
+    /// Whether a face can affect what is shaded for a view: its volume reaches the camera frustum, or the
+    /// surfaces lit by dynamic irradiance (which may lie outside the view).
+    public static func shadowFaceIsSampled(_ bounds: AABB, viewFrustum: MeshVisibilityFrustum3D, irradianceBounds: AABB?) -> Bool {
+        if viewFrustum.intersects(bounds) {
+            return true
+        }
+        guard let irradianceBounds else {
+            return false
+        }
+        return bounds.min.x <= irradianceBounds.max.x && bounds.max.x >= irradianceBounds.min.x
+            && bounds.min.y <= irradianceBounds.max.y && bounds.max.y >= irradianceBounds.min.y
+            && bounds.min.z <= irradianceBounds.max.z && bounds.max.z >= irradianceBounds.min.z
+    }
 }
 
 /// Stable slots within a camera's bounded atlas. Changing rank doesn't move retained winners.
@@ -244,9 +278,13 @@ struct LocalShadow3DViews: Resource {
         var faceMatrixDigests: [Int: UInt64] = [:]
         /// Fingerprint of the shadow casters when the faces were last prepared, or `nil` when it was not reusable.
         var sceneDigest: UInt64?
+        /// Shadow caster registry revision the faces were last drawn with, when they used the GPU path.
+        var registryRevision: UInt64?
         /// Faces drawn and faces kept from an earlier frame by the last pass.
         var renderedFaces = 0
         var reusedFaces = 0
+        /// Faces no visible or irradiance-lit surface could sample, skipped and marked stale by the last pass.
+        var culledFaces = 0
     }
     var entries: [Entity.ID: Entry] = [:]
 }

@@ -46,6 +46,7 @@ public struct SceneView<Placeholder: View>: View {
     let placeholder: @MainActor () -> Placeholder
     private var prepareFramePresentation: (@MainActor () -> (@MainActor () -> Void))?
     private var frameCaptureLabel: String?
+    private var pipelinedRendering = false
 
     /// Makes completed frames of this scene readable through ``SceneViewFrameRegistry``.
     ///
@@ -54,6 +55,18 @@ public struct SceneView<Placeholder: View>: View {
     public func frameCaptureLabel(_ label: String?) -> Self {
         var view = self
         view.frameCaptureLabel = label
+        return view
+    }
+
+    /// Renders this scene one frame behind its simulation, overlapping the scene's rendering with the
+    /// next frame's simulation and the window's UI. Frames take about as long as the slower of the two
+    /// instead of their sum; input reaches the screen one frame later.
+    ///
+    /// Scene systems must follow the pipelined-rendering rules: render systems read the scene only
+    /// during extraction, and gameplay code does not mutate assets in place while they are rendered.
+    public func pipelinedRendering(_ isEnabled: Bool = true) -> Self {
+        var view = self
+        view.pipelinedRendering = isEnabled
         return view
     }
 
@@ -106,14 +119,15 @@ public struct SceneView<Placeholder: View>: View {
 
     public var body: some View {
         OffscreenViewportContainer(
-            delegateFactory: { [make, updateContent, onFrameRendered, useSceneCameras, prepareFramePresentation, frameCaptureLabel] in
+            delegateFactory: { [make, updateContent, onFrameRendered, useSceneCameras, prepareFramePresentation, frameCaptureLabel, pipelinedRendering] in
                 SceneViewCoordinator(
                     useSceneCameras: useSceneCameras,
                     make: make,
                     updateContent: updateContent,
                     onFrameRendered: onFrameRendered,
                     prepareFramePresentation: prepareFramePresentation,
-                    frameCaptureLabel: frameCaptureLabel
+                    frameCaptureLabel: frameCaptureLabel,
+                    pipelinedRendering: pipelinedRendering
                 )
             },
             contentBuilder: { [placeholder, isInteractive, updatesWhenWindowInactive] delegate in

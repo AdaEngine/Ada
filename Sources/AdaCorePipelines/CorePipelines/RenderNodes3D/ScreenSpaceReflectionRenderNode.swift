@@ -177,6 +177,8 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                 // The traced HDR already owns every surface lighting term. Keep only presentation/fog here.
                 uniform.reflection.x = 0
                 uniform.quality.x = 0
+                // The response target holds the tracer's emission guide, not a specular response.
+                uniform.quality.w = 0
                 uniform.diffuseGI = [0,0,1,0]
             }
             let constants = scratch.cache.write(uniform, view: source.entityId, device: renderDevice.renderDevice)

@@ -7,7 +7,7 @@
 
 import AdaCorePipelines
 import AdaECS
-import AdaRender
+@_spi(Internal) import AdaRender
 import AdaUtils
 import Math
 
@@ -23,8 +23,8 @@ public struct UIViewUniform: Resource {
 
     mutating func retainViews(_ views: [Entity.ID]) { bufferedViews.retainViews(views) }
 
-    mutating func write(_ uniform: GlobalViewUniform, view: Entity.ID, device: RenderDevice) -> BufferData<GlobalViewUniform> {
-        bufferedViews.write(uniform, view: view, device: device)
+    mutating func write(_ uniform: GlobalViewUniform, view: Entity.ID, pass: Int, device: RenderDevice) -> BufferData<GlobalViewUniform> {
+        bufferedViews.write(uniform, view: view, pass: pass, device: device)
     }
 }
 
@@ -58,11 +58,17 @@ public struct UIRenderNode: RenderNode {
     @ResMut<GlassBackgroundTexture>
     private var glassBackground
 
-    public init() {}
+    private let isWindowOverlay: Bool
 
-    public let inputResources: [RenderSlot] = [
-        RenderSlot(name: InputNode.view, kind: .entity)
-    ]
+    public init() { self.init(isWindowOverlay: false) }
+
+    init(isWindowOverlay: Bool) {
+        self.isWindowOverlay = isWindowOverlay
+    }
+
+    public var inputResources: [RenderSlot] {
+        isWindowOverlay ? [] : [RenderSlot(name: InputNode.view, kind: .entity)]
+    }
 
     public func update(from world: World) {
         query.update(from: world)
@@ -80,26 +86,30 @@ public struct UIRenderNode: RenderNode {
         context: inout Context,
         renderContext: AdaRender.RenderContext
     ) async throws -> [AdaRender.RenderSlotValue] {
-        guard let view = context.viewEntity else {
+        let view = context.viewEntity
+        guard isWindowOverlay || view != nil else {
             return []
         }
 
+        var drewWindowOverlay = false
         try query.forEach { entity, camera, target, _, source in
-            if entity != view {
-                return
-            }
-
-            guard let mainTexture = target.mainTexture else {
-                return
-            }
             let targetWindowId = camera.targetWindowId(from: primaryWindowId)
+            if isWindowOverlay {
+                guard !drewWindowOverlay, camera.isActive, targetWindowId == primaryWindowId.windowId else { return }
+            } else if entity != view {
+                return
+            }
+            guard let mainTexture = isWindowOverlay ? target.outputTexture : target.mainTexture else { return }
 
             // A pixel-perfect camera drew its scene at a low resolution. The UI is not part of that picture: the scene is
             // scaled into a picture of the output's size first, and the UI is drawn onto it at full resolution.
             var texture: RenderTexture = mainTexture
-            var uiViewport = camera.viewport.rect
+            var uiViewport = isWindowOverlay
+                ? Rect(x: 0, y: 0, width: Float(texture.width), height: Float(texture.height))
+                : camera.viewport.rect
             var pixelPerfectPresent: (layout: PixelPerfectLayout, settings: PixelPerfectSettings, pictures: PixelPerfectPictures, pipelines: PixelPerfectPipelines)?
             if
+                !isWindowOverlay,
                 let settings = target.pixelPerfect,
                 let output = target.outputTexture,
                 let pipelines = context.world.getResource(PixelPerfectPipelines.self),
@@ -115,9 +125,9 @@ public struct UIRenderNode: RenderNode {
             let texHeight = texture.height
 
             // Snapshot main target for glass (must complete before glass fragments sample it).
-            if glassBackground.texture == nil
+            if !isWindowOverlay && (glassBackground.texture == nil
                 || glassBackground.texture?.width != texWidth
-                || glassBackground.texture?.height != texHeight {
+                || glassBackground.texture?.height != texHeight) {
                 glassBackground.texture = RenderTexture(
                     size: SizeInt(width: texWidth, height: texHeight),
                     scaleFactor: texture.scaleFactor,
@@ -152,7 +162,9 @@ public struct UIRenderNode: RenderNode {
             let viewportSize = uiViewport.size
             let logicalViewportSize = camera.logicalViewport.rect.size
             let effectiveScaleFactor: Float
-            if logicalViewportSize.width > 0 {
+            if isWindowOverlay {
+                effectiveScaleFactor = camera.computedData.targetScaleFactor
+            } else if logicalViewportSize.width > 0 {
                 effectiveScaleFactor = viewportSize.width / logicalViewportSize.width
             } else {
                 effectiveScaleFactor = texture.scaleFactor
@@ -169,7 +181,9 @@ public struct UIRenderNode: RenderNode {
             let uiViewUniform = makeUIViewUniform(
                 projection: uiProjection
             )
-            let viewConstants = self.uiViewUniform.write(uiViewUniform, view: source.entityId, device: renderDevice.renderDevice)
+            let viewConstants = self.uiViewUniform.write(
+                uiViewUniform, view: source.entityId, pass: isWindowOverlay ? 1 : 0, device: renderDevice.renderDevice
+            )
 
             let uiRenderPassDescriptor = RenderPassDescriptor(
                 label: "UI Render Pass",
@@ -223,7 +237,8 @@ public struct UIRenderNode: RenderNode {
 
             var renderPass: RenderCommandEncoder?
 
-            for item in renderItems.items where item.windowId == nil || item.windowId == targetWindowId {
+            for item in renderItems.items
+            where item.isWindowOverlay == isWindowOverlay && (item.windowId == nil || item.windowId == targetWindowId) {
                 let itemUsesGlass = !item.drawData.glassIndexBuffer.isEmpty
 
                 if itemUsesGlass {
@@ -249,7 +264,7 @@ public struct UIRenderNode: RenderNode {
                         .render(
                             with: activePass,
                             world: context.world,
-                            view: view,
+                            view: entity,
                             item: item
                         )
                 }
@@ -257,6 +272,7 @@ public struct UIRenderNode: RenderNode {
 
             renderPass?.endRenderPass()
             commandBuffer.commit()
+            drewWindowOverlay = isWindowOverlay
         }
 
         return []

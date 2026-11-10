@@ -46,6 +46,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     private(set) var standaloneTickInFlight = false
 
     private let hostSubworldName: AppWorldName
+    private let pipelinedRendering: Bool
     private var currentSize: SizeInt = .zero
     private var scaleFactor: Float = 1
     private var pendingSize: SizeInt?
@@ -85,8 +86,10 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         onFrameRendered: (@MainActor (Texture2D) -> Void)? = nil,
         prepareFramePresentation: (@MainActor () -> (@MainActor () -> Void))? = nil,
         frameCaptureLabel: String? = nil,
+        pipelinedRendering: Bool = false,
         joinsHostSession: Bool = true
     ) {
+        self.pipelinedRendering = pipelinedRendering
         self.joinsHostSession = joinsHostSession
         self.frameCaptureLabel = frameCaptureLabel
         self.useSceneCameras = useSceneCameras
@@ -446,9 +449,15 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         }
     }
 
+    /// Steady state holds the front texture, `maxFramesInFlight` retired fronts that the window may
+    /// still sample, and up to `maxFramesInFlight` frames on the GPU. A smaller pool leaves no free
+    /// target while the previous frame renders, which skips the frame and serializes CPU and GPU.
+    static var renderTexturePoolSize: Int {
+        1 + 2 * max(1, unsafe RenderEngine.configurations.maxFramesInFlight)
+    }
+
     private func rebuildRenderTexturePool(size: SizeInt, scaleFactor: Float) {
-        let poolSize = max(3, unsafe RenderEngine.configurations.maxFramesInFlight + 2)
-        renderTexturePool = (0..<poolSize)
+        renderTexturePool = (0..<Self.renderTexturePoolSize)
             .map { index in
                 let texture = RenderTexture(
                     size: size,
@@ -670,9 +679,33 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         let target = ContentUpdateTarget(coordinator: self)
         app.insertResource(target)
         app.addSystem(ContentUpdateSystem.self, on: .preUpdate)
-        if let renderWorld = app.getSubworldBuilder(by: .renderWorld) {
-            renderWorld.insertResource(target)
+        guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else { return }
+        renderWorld.insertResource(target)
+        if pipelinedRendering {
+            renderWorld.insertResource(RenderPipelining(isEnabled: true))
+        }
+        if renderWorld.isUpdatePipelined {
+            // A pipelined render world still renders frame N while this world reserves frame N+1's target,
+            // so the check must use this world's cameras, not the render world's extracted ones.
+            app.addSystem(PipelinedFrameSubmissionSystem.self, on: .postUpdate)
+        } else {
             renderWorld.addSystem(FrameSubmissionSystem.self, on: .postUpdate)
+        }
+    }
+
+    /// Main-world counterpart of ``FrameSubmissionSystem`` for pipelined rendering. A reservation counts as
+    /// submitted when an active camera of this world targets it; the coordinator performs that check itself
+    /// when the extracted-camera predicate reports no match.
+    private struct PipelinedFrameSubmissionSystem: System {
+        @Res<ContentUpdateTarget> private var target
+
+        var queries: SystemQueries { SystemQueries(queries: [_target]) }
+
+        init(world _: World) {}
+
+        @MainActor
+        func update(context _: UpdateContext) {
+            target.coordinator?.finishRenderSubmission { _ in false }
         }
     }
 

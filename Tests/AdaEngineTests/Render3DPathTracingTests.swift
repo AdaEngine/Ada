@@ -3,7 +3,7 @@ import AdaAssets
 @testable import AdaCorePipelines
 import AdaECS
 @_spi(Internal) @testable import AdaRender
-import AdaScene
+@testable import AdaScene
 import AdaTransform
 import AdaUtils
 import Foundation
@@ -43,6 +43,29 @@ struct Render3DPathTracingSettingsTests {
         #expect(invalid.sanitized.textureTileSize == 128)
         invalid.textureTileSize = 100000
         #expect(invalid.sanitized.textureTileSize == 512)
+    }
+
+    @Test func denoiserSettingsDefaultRoundTripAndSanitize() throws {
+        let decoded = try JSONDecoder().decode(PathTracing3D.self,from:Data("{\"isEnabled\":true}".utf8))
+        #expect(decoded.denoiser == .automatic && decoded.minimumHistoryWeight == 1.0 / 32)
+        var settings = PathTracing3D(isEnabled:true)
+        settings.denoiser = .rayReconstruction
+        settings.minimumHistoryWeight = 0.25
+        #expect(try JSONDecoder().decode(PathTracing3D.self,from:JSONEncoder().encode(settings)) == settings)
+        settings.minimumHistoryWeight = .nan
+        #expect(settings.sanitized.minimumHistoryWeight == 1.0 / 32)
+        settings.minimumHistoryWeight = 0
+        #expect(settings.sanitized.minimumHistoryWeight == 0.005)
+    }
+
+    @Test func pathTracingSurfaceVariantNeedsBothOutputs() {
+        // Without both outputs attached the variant would write undeclared fragment outputs and fail to compile.
+        #expect(Model3DDrawPass.writesPathTracingSurface(active:true,albedo:true,emission:true))
+        #expect(!Model3DDrawPass.writesPathTracingSurface(active:true,albedo:true,emission:false))
+        #expect(!Model3DDrawPass.writesPathTracingSurface(active:true,albedo:false,emission:true))
+        #expect(!Model3DDrawPass.writesPathTracingSurface(active:false,albedo:true,emission:true))
+        #expect(!Model3DDrawPass.writesPathTracingSurface(nil))
+        #expect(PBRMaterial.ShaderFeatures.pathTracingSurface.enablingMacros == ["ADA_PATH_TRACING_SURFACE"])
     }
 
     @Test func stacklessBVHCoversEveryTriangleAndHasValidEscapes() {
@@ -134,6 +157,104 @@ extension Render3DGPUTests {
             node.update(from: world)
             #expect(statistics.snapshots[key] == nil)
             #expect(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id] == nil)
+        }
+
+        @Test(.enabled(if: GoldenFrame.activeBackend != nil))
+        func lightTableIsReusedUntilLightsChange() async throws {
+            let scene = try await Self.scene()
+            _ = Self.receiver(scene)
+            let lamp = scene.app.main.spawn("Table lamp") { PointLightComponent(intensity:80,range:20); Transform(position:[0,1,-2]) }
+            _ = try await scene.render(.none, frames: 4)
+            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+            let entry = try #require(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id])
+            let table = try #require(entry.lightTable)
+            #expect(entry.lightTableBuilds == 1)
+            _ = try await scene.render(.none, frames: 3)
+            let retained = try #require(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id])
+            #expect(retained.lightTableBuilds == 1)
+            #expect(retained.lightTable === table)
+            // A changed light gets a fresh table, never an in-place rewrite of one a frame in flight may read.
+            lamp.components[PointLightComponent.self] = PointLightComponent(intensity:40,range:20)
+            _ = try await scene.render(.none, frames: 1)
+            let changed = try #require(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id])
+            #expect(changed.lightTableBuilds == 2)
+            #expect(changed.lightTable !== table)
+        }
+
+        @Test(.enabled(if: GoldenFrame.activeBackend != nil))
+        func portableHistorySurvivesMotionButRestartsWhenALightChanges() async throws {
+            let scene = try await Self.scene()
+            _ = Self.receiver(scene)
+            try scene.configure { $0.pathTracing.denoiser = .portable }
+            let lamp = scene.app.main.spawn("Moving lamp") { PointLightComponent(intensity:80,range:20); Transform(position:[0,1,-2]) }
+            _ = try await scene.render(.none, frames: 4)
+            let key = String(scene.camera.id)
+            let before = try #require(Self.stats(scene).snapshots[key])
+            #expect(before.denoiser == PathTracingDenoiser.portable.rawValue && before.failure == nil)
+            // Reprojection keeps history through camera and light motion.
+            lamp.components[Transform.self] = Transform(position:[0.3,1,-2])
+            if var transform = scene.camera.components[Transform.self] {
+                transform.position += Vector3(0.05, 0, 0)
+                scene.camera.components[Transform.self] = transform
+            }
+            _ = try await scene.render(.none, frames: 3)
+            #expect(try #require(Self.stats(scene).snapshots[key]).historyResets == before.historyResets)
+            // Retuning a light restarts it, so a switched-off or dimmed lamp never lingers.
+            lamp.components[PointLightComponent.self] = PointLightComponent(intensity:20,range:20)
+            _ = try await scene.render(.none, frames: 1)
+            #expect(try #require(Self.stats(scene).snapshots[key]).historyResets == before.historyResets + 1)
+        }
+
+        @Test(.enabled(if: GoldenFrame.activeBackend != nil))
+        func referenceAccumulationRestartsOnCameraMotion() async throws {
+            let scene = try await Self.scene()
+            _ = Self.receiver(scene)
+            try scene.configure { $0.pathTracing.denoiser = .off }
+            _ = try await scene.render(.none, frames: 3)
+            let key = String(scene.camera.id)
+            let before = try #require(Self.stats(scene).snapshots[key])
+            #expect(before.denoiser == PathTracingDenoiser.off.rawValue)
+            if var transform = scene.camera.components[Transform.self] {
+                transform.position += Vector3(0.05, 0, 0)
+                scene.camera.components[Transform.self] = transform
+            }
+            // The moved transform reaches the extracted camera within two frames.
+            _ = try await scene.render(.none, frames: 2)
+            #expect(try #require(Self.stats(scene).snapshots[key]).historyResets > before.historyResets)
+        }
+
+        @Test(.enabled(if: GoldenFrame.activeBackend != nil))
+        func portableOutputIsFiniteAndConvergesTowardReference() async throws {
+            let scene = try await Self.scene()
+            let pbr = Self.receiver(scene)
+            pbr.baseColorFactor = [0.9, 0.2, 0.1, 1]
+            _ = scene.app.main.spawn("Lamp") { PointLightComponent(intensity:80,range:20); Transform(position:[0,1,-2]) }
+            try scene.configure { $0.pathTracing.denoiser = .portable }
+            let portable = try await scene.render(.none, frames: 12)
+            try scene.configure { $0.pathTracing.denoiser = .off }
+            let reference = try await scene.render(.none, frames: 16)
+            for y in stride(from: 0, to: 480, by: 16) {
+                for x in stride(from: 0, to: 640, by: 16) {
+                    let pixel = portable.getPixel(x: x, y: y)
+                    #expect(pixel.red.isFinite && pixel.green.isFinite && pixel.blue.isFinite)
+                }
+            }
+            // Demodulation keeps the surface colour; the denoised light matches the converged reference closely.
+            let denoised = Self.red(portable), converged = Self.red(reference)
+            #expect(converged > 0.05)
+            #expect(abs(denoised - converged) < max(0.05, converged * 0.15))
+        }
+
+        @Test(.enabled(if: GoldenFrame.activeBackend != nil))
+        func unavailableRayReconstructionFallsBackToPortable() async throws {
+            let scene = try await Self.scene()
+            _ = Self.receiver(scene)
+            // The test camera has no DLSS temporal upscaling, so Ray Reconstruction cannot run.
+            try scene.configure { $0.pathTracing.denoiser = .rayReconstruction }
+            _ = try await scene.render(.none, frames: 2)
+            let status = try #require(Self.stats(scene).snapshots[String(scene.camera.id)])
+            #expect(status.denoiser == PathTracingDenoiser.portable.rawValue)
+            #expect(status.denoiserFallback != nil)
         }
 
         @Test(.enabled(if: GoldenFrame.activeBackend != nil))

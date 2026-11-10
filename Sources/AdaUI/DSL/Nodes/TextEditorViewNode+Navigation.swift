@@ -15,26 +15,31 @@ extension TextEditorViewNode {
             return lineCache
         }
 
+        // Split once per text revision. Each line records its character length and string index so
+        // offset conversions do not rescan the whole document on every keystroke or frame.
         var result: [LineInfo] = []
-        var current = ""
         var startOffset = 0
-        var offset = 0
-
-        for character in self.text {
-            if character == "\n" {
-                result.append(LineInfo(text: current, startOffset: startOffset))
-                current = ""
-                offset += 1
-                startOffset = offset
-            } else {
-                current.append(character)
-                offset += 1
-            }
+        var lineStart = self.text.startIndex
+        for line in self.text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let info = LineInfo(text: String(line), startOffset: startOffset, startIndex: lineStart)
+            result.append(info)
+            startOffset += info.length + 1
+            lineStart = line.endIndex < self.text.endIndex ? self.text.index(after: line.endIndex) : self.text.endIndex
         }
-
-        result.append(LineInfo(text: current, startOffset: startOffset))
+        if result.isEmpty {
+            result.append(LineInfo(text: "", startOffset: 0, startIndex: self.text.startIndex))
+        }
         self.lineCache = result
+        self.lineCacheBuilds += 1
         return result
+    }
+
+    /// Character count of the whole text, derived from the cached line table.
+    var textCharacterCount: Int {
+        guard let last = self.lines().last else {
+            return 0
+        }
+        return last.startOffset + last.length
     }
 
     func invalidateTextCaches() {
@@ -50,21 +55,30 @@ extension TextEditorViewNode {
         self.markNeedsLayout()
     }
 
-    func position(forOffset offset: Int, lines: [LineInfo]) -> TextPosition {
-        let clamped = max(0, min(offset, self.text.count))
-        var bestLine = 0
-
-        for index in lines.indices {
-            let line = lines[index]
-            let lineEndOffset = line.startOffset + line.text.count
-            if clamped <= lineEndOffset {
-                return TextPosition(line: index, column: clamped - line.startOffset)
+    /// Index of the line containing `offset`; line ends belong to their line, as before.
+    func lineIndex(containingOffset offset: Int, lines: [LineInfo]) -> Int {
+        var lower = 0
+        var upper = lines.count
+        while lower < upper {
+            let middle = (lower + upper) / 2
+            if lines[middle].startOffset <= offset {
+                lower = middle + 1
+            } else {
+                upper = middle
             }
-            bestLine = index
         }
+        return max(0, lower - 1)
+    }
 
-        let fallback = lines[bestLine]
-        return TextPosition(line: bestLine, column: fallback.text.count)
+    func position(forOffset offset: Int, lines: [LineInfo]) -> TextPosition {
+        guard !lines.isEmpty else {
+            return TextPosition(line: 0, column: 0)
+        }
+        let last = lines[lines.count - 1]
+        let clamped = max(0, min(offset, last.startOffset + last.length))
+        let index = self.lineIndex(containingOffset: clamped, lines: lines)
+        let line = lines[index]
+        return TextPosition(line: index, column: min(clamped - line.startOffset, line.length))
     }
 
     func offset(line: Int, column: Int, lines: [LineInfo]) -> Int {
@@ -73,7 +87,7 @@ extension TextEditorViewNode {
         }
 
         let lineIndex = max(0, min(line, lines.count - 1))
-        return lines[lineIndex].startOffset + max(0, min(column, lines[lineIndex].text.count))
+        return lines[lineIndex].startOffset + max(0, min(column, lines[lineIndex].length))
     }
 
     func closestOffset(to point: Point) -> Int {

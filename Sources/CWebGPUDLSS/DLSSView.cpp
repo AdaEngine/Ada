@@ -1,10 +1,11 @@
 #include "DLSSInterop.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
 AdaDLSSView::~AdaDLSSView() {
     // A failed preparation may have acquired only a subset of the textures.
-    for (auto* texture : {&color, &depth, &motion, &bias, &output}) {
+    for (auto* texture : {&color, &depth, &motion, &bias, &output, &diffuseAlbedo, &specularAlbedo, &normals}) {
         texture->end(device, outputWaitFences);
     }
     device.idle();
@@ -25,11 +26,17 @@ bool AdaDLSSView::initialize() {
             wgpu::TextureFormat::R8Unorm, rendered, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET)
         || !output.create(device, outputWidth, outputHeight, DXGI_FORMAT_R16G16B16A16_FLOAT,
             wgpu::TextureFormat::RGBA16Float, sampled | wgpu::TextureUsage::CopySrc, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS)) return false;
+    if (rayReconstruction) {
+        for (auto* guide : {&diffuseAlbedo, &specularAlbedo, &normals}) {
+            if (!guide->create(device, width, height, DXGI_FORMAT_R16G16B16A16_FLOAT, wgpu::TextureFormat::RGBA16Float,
+                    sampled | wgpu::TextureUsage::CopyDst, D3D12_RESOURCE_FLAG_NONE)) return false;
+        }
+    }
     packedViews = {depth.texture.CreateView(), motion.texture.CreateView(), bias.texture.CreateView()};
     outputWaitFences.reserve(1);
     if (!ada_dlss_check_ngx(NVSDK_NGX_D3D12_AllocateParameters(&parameters), "DLSS parameter allocation")) return false;
     for (auto& frame : frames) {
-        frame.waitFences.reserve(6);
+        frame.waitFences.reserve(9);
         if (!ada_dlss_check(device.native->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT,
                 IID_PPV_ARGS(&frame.allocator)), "DLSS command allocator")
             || !ada_dlss_check(device.native->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT,
@@ -173,6 +180,149 @@ bool AdaDLSSView::evaluate(WGPUTexture inputColor, WGPUTexture inputDepth, WGPUT
     ++evaluated;
     if (evaluated == 1) fprintf(stderr, "AdaEngine DLSS: evaluated %ux%u -> %ux%u via Dawn shared textures\n", width, height, outputWidth, outputHeight);
     return true;
+}
+
+bool AdaDLSSView::copyGuides(WGPUTexture diffuse, WGPUTexture specular, WGPUTexture normalRoughness, AdaDLSSFrame& frame) {
+    AdaDLSSSharedTexture* targets[] = {&diffuseAlbedo, &specularAlbedo, &normals};
+    WGPUTexture sources[] = {diffuse, specular, normalRoughness};
+    for (auto* target : targets) if (!target->begin(device, lastSignal)) return false;
+    auto encoder = device.webgpu.CreateCommandEncoder();
+    wgpu::Extent3D extent{width, height, 1};
+    for (int i = 0; i < 3; ++i) {
+        wgpu::TexelCopyTextureInfo source, destination;
+        source.texture = wgpu::Texture(sources[i]);
+        destination.texture = targets[i]->texture;
+        encoder.CopyTextureToTexture(&source, &destination, &extent);
+    }
+    auto commands = encoder.Finish();
+    device.webgpu.GetQueue().Submit(1, &commands);
+    for (auto* target : targets) if (!target->end(device, frame.waitFences)) return false;
+    return true;
+}
+
+bool AdaDLSSView::evaluateDenoised(WGPUTexture inputColor, WGPUTexture inputDepth, WGPUTexture inputMotion,
+    WGPUTexture reactive, WGPUTexture diffuse, WGPUTexture specular, WGPUTexture normalRoughness,
+    WGPUTexture destination, float jitterX, float jitterY, const float* worldToView, const float* viewToClip, bool reset) {
+    if (!valid || !rayReconstruction || !inputColor || !inputDepth || !inputMotion || !reactive || !diffuse || !specular
+        || !normalRoughness || !destination || !worldToView || !viewToClip || !std::isfinite(jitterX) || !std::isfinite(jitterY)) return false;
+    for (auto texture : {inputColor, inputDepth, inputMotion, reactive, diffuse, specular, normalRoughness}) {
+        if (wgpuTextureGetWidth(texture) != width || wgpuTextureGetHeight(texture) != height) return false;
+    }
+    for (auto texture : {diffuse, specular, normalRoughness}) {
+        if (wgpuTextureGetFormat(texture) != WGPUTextureFormat_RGBA16Float) return false;
+    }
+    if (wgpuTextureGetWidth(destination) != outputWidth || wgpuTextureGetHeight(destination) != outputHeight
+        || wgpuTextureGetFormat(inputColor) != WGPUTextureFormat_RGBA16Float
+        || wgpuTextureGetFormat(destination) != WGPUTextureFormat_RGBA16Float
+        || wgpuTextureGetFormat(inputDepth) != WGPUTextureFormat_Depth32Float) return false;
+    auto& frame = frames[evaluated % frames.size()];
+    if (!device.wait(frame.completion)) return false;
+    frame.waitFences.clear();
+    frame.waitFences.swap(outputWaitFences);
+    if (!pack(inputColor, inputDepth, inputMotion, reactive, frame) || !copyGuides(diffuse, specular, normalRoughness, frame)) {
+        valid = false;
+        return false;
+    }
+    if (!ada_dlss_check(frame.allocator->Reset(), "Reset DLSS-RR allocator")
+        || !ada_dlss_check(frame.commands->Reset(frame.allocator.Get(), nullptr), "Reset DLSS-RR commands")) return false;
+    if (!feature) {
+        NVSDK_NGX_DLSSD_Create_Params create{};
+        create.InDenoiseMode = NVSDK_NGX_DLSS_Denoise_Mode_DLUnified;
+        create.InRoughnessMode = NVSDK_NGX_DLSS_Roughness_Mode_Packed;
+        create.InUseHWDepth = NVSDK_NGX_DLSS_Depth_Type_HW;
+        create.InWidth = width;
+        create.InHeight = height;
+        create.InTargetWidth = outputWidth;
+        create.InTargetHeight = outputHeight;
+        const float scale = float(width) / outputWidth;
+        create.InPerfQualityValue = scale >= 0.99f ? NVSDK_NGX_PerfQuality_Value_DLAA
+            : scale >= 0.6f ? NVSDK_NGX_PerfQuality_Value_MaxQuality
+            : scale >= 0.55f ? NVSDK_NGX_PerfQuality_Value_Balanced : NVSDK_NGX_PerfQuality_Value_MaxPerf;
+        create.InFeatureCreateFlags = NVSDK_NGX_DLSS_Feature_Flags_IsHDR | NVSDK_NGX_DLSS_Feature_Flags_MVLowRes
+            | NVSDK_NGX_DLSS_Feature_Flags_AutoExposure;
+        fprintf(stderr, "AdaEngine DLSS: creating Ray Reconstruction feature\n");
+        if (!ada_dlss_check_ngx(NGX_D3D12_CREATE_DLSSD_EXT(frame.commands.Get(), 1, 1, &feature, parameters, &create),
+            "Create DLSS Ray Reconstruction feature")) { valid = false; return false; }
+    }
+    std::array<ID3D12Resource*, 8> resources{color.native.Get(), depth.native.Get(), motion.native.Get(), bias.native.Get(),
+        diffuseAlbedo.native.Get(), specularAlbedo.native.Get(), normals.native.Get(), output.native.Get()};
+    std::array<D3D12_RESOURCE_BARRIER, 8> barriers{};
+    for (size_t i = 0; i < barriers.size(); ++i) {
+        barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barriers[i].Transition.pResource = resources[i];
+        barriers[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+        barriers[i].Transition.StateBefore = D3D12_RESOURCE_STATE_COMMON;
+        barriers[i].Transition.StateAfter = i == 7 ? D3D12_RESOURCE_STATE_UNORDERED_ACCESS : D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+    }
+    frame.commands->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+    std::array<float, 16> view{}, clip{};
+    std::copy(worldToView, worldToView + 16, view.begin());
+    std::copy(viewToClip, viewToClip + 16, clip.begin());
+    NVSDK_NGX_D3D12_DLSSD_Eval_Params evaluate{};
+    evaluate.pInDiffuseAlbedo = diffuseAlbedo.native.Get();
+    evaluate.pInSpecularAlbedo = specularAlbedo.native.Get();
+    evaluate.pInNormals = normals.native.Get();
+    evaluate.pInColor = color.native.Get();
+    evaluate.pInOutput = output.native.Get();
+    evaluate.pInDepth = depth.native.Get();
+    evaluate.pInMotionVectors = motion.native.Get();
+    evaluate.pInBiasCurrentColorMask = bias.native.Get();
+    evaluate.InMVScaleX = float(width);
+    evaluate.InMVScaleY = float(height);
+    evaluate.InJitterOffsetX = jitterX;
+    evaluate.InJitterOffsetY = jitterY;
+    evaluate.InReset = reset || evaluated == 0;
+    evaluate.InRenderSubrectDimensions = {width, height};
+    evaluate.pInWorldToViewMatrix = view.data();
+    evaluate.pInViewToClipMatrix = clip.data();
+    evaluate.InPreExposure = 1.0f;
+    evaluate.InExposureScale = 1.0f;
+    if (!ada_dlss_check_ngx(NGX_D3D12_EVALUATE_DLSSD_EXT(frame.commands.Get(), feature, parameters, &evaluate), "Evaluate DLSS Ray Reconstruction")) {
+        valid = false;
+        return false;
+    }
+    for (auto& barrier : barriers) std::swap(barrier.Transition.StateBefore, barrier.Transition.StateAfter);
+    frame.commands->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
+    if (!ada_dlss_check(frame.commands->Close(), "Close DLSS-RR evaluation")) return false;
+    ID3D12CommandList* lists[] = {frame.commands.Get()};
+    device.queue->ExecuteCommandLists(1, lists);
+    lastSignal = ++device.serial;
+    if (!ada_dlss_check(device.queue->Signal(device.fence.Get(), lastSignal), "Signal DLSS-RR completion")) return false;
+    frame.completion = lastSignal;
+    output.initialized = true;
+    if (!output.begin(device, lastSignal)) { valid = false; return false; }
+    auto copy = device.webgpu.CreateCommandEncoder();
+    wgpu::TexelCopyTextureInfo source, target;
+    source.texture = output.texture;
+    target.texture = wgpu::Texture(destination);
+    wgpu::Extent3D extent{outputWidth, outputHeight, 1};
+    copy.CopyTextureToTexture(&source, &target, &extent);
+    auto copied = copy.Finish();
+    device.webgpu.GetQueue().Submit(1, &copied);
+    if (!output.end(device, outputWaitFences)) { valid = false; return false; }
+    ++evaluated;
+    if (evaluated == 1) fprintf(stderr, "AdaEngine DLSS: Ray Reconstruction evaluated %ux%u -> %ux%u\n", width, height, outputWidth, outputHeight);
+    return true;
+}
+
+extern "C" bool ada_dlss_device_supports_ray_reconstruction(AdaDLSSDevice* device) {
+    return device && device->supportsRayReconstruction;
+}
+extern "C" AdaDLSSView* ada_dlss_rr_view_create(AdaDLSSDevice* device, uint32_t width, uint32_t height, uint32_t ow, uint32_t oh) {
+    if (!device || !device->supportsRayReconstruction) return nullptr;
+    std::lock_guard lock(device->mutex);
+    auto view = std::make_unique<AdaDLSSView>(*device, width, height, ow, oh);
+    view->rayReconstruction = true;
+    return view->initialize() ? view.release() : nullptr;
+}
+extern "C" bool ada_dlss_rr_evaluate(AdaDLSSView* view, void* color, void* depth, void* motion, void* reactive,
+    void* diffuse, void* specular, void* normalRoughness, void* output, float jitterX, float jitterY,
+    const float* worldToView, const float* viewToClip, bool reset) {
+    if (!view) return false;
+    std::lock_guard lock(view->device.mutex);
+    return view->evaluateDenoised(static_cast<WGPUTexture>(color), static_cast<WGPUTexture>(depth), static_cast<WGPUTexture>(motion),
+        static_cast<WGPUTexture>(reactive), static_cast<WGPUTexture>(diffuse), static_cast<WGPUTexture>(specular),
+        static_cast<WGPUTexture>(normalRoughness), static_cast<WGPUTexture>(output), jitterX, jitterY, worldToView, viewToClip, reset);
 }
 
 extern "C" AdaDLSSView* ada_dlss_view_create(AdaDLSSDevice* device, uint32_t width, uint32_t height, uint32_t ow, uint32_t oh) {

@@ -150,7 +150,9 @@ Game-authored UI follows its own art direction unless the task explicitly adopts
   `--launch` opens it after installation. Defaults are per-user, including `~/Applications` on macOS.
 - `python ada_tool.py build studio|engine` builds without installing; `--debug`, `--jobs N`,
   `--scratch-path PATH` and `--swift PATH` select the build configuration/tools.
-  `python ada_tool.py run studio [--debug]` opens an installed distribution.
+  `python ada_tool.py run studio [--debug|--profile]` opens an installed distribution.
+  `--profile` (build/install/run) is release plus debug symbols in a separate cache and
+  installation, for CPU profilers (WPA/Superluminal on Windows, Instruments, perf).
 - `python ada_tool.py build playground --cloud-panels PATH` builds the existing DOM shell;
   the panels must first be built in adawebsite with `npm run build:panels`.
   `python ada_tool.py build wasm --output dist/web` exports DOM Studio and AdaWebPlayer,

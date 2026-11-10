@@ -156,6 +156,16 @@ public final class ShaderCompiler {
         }
         let version = self.getShaderVersion(for: stage)
         let hasChanges = ShaderCache.hasChanges(for: self.shaderSource, stage: stage, version: version, includeSearchPaths: self.includeSearchPaths)
+        do {
+            return try compileShader(for: stage, version: version, hasChanges: hasChanges)
+        } catch {
+            // The manifest already holds the new source hash: roll it back so the next launch recompiles.
+            if hasChanges { ShaderCache.invalidate(for: self.shaderSource, stage: stage) }
+            throw error
+        }
+    }
+
+    private func compileShader(for stage: ShaderStage, version: Int, hasChanges: Bool) throws -> Shader {
         if !hasChanges {
             if let deviceCompiledShader = ShaderCache.getCachedDeviceCompiledShader(for: self.shaderSource, stage: stage),
                deviceCompiledShader.language == (unsafe RenderEngine.shared.type.deviceLang) {

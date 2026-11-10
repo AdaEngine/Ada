@@ -292,6 +292,31 @@ enum ShaderCache {
         }
     }
 
+    /// Forgets a stage whose changed source failed to compile.
+    ///
+    /// ``hasChanges(for:stage:version:includeSearchPaths:)`` records the new source hash before compiling. Without
+    /// this rollback a failed compile would leave the manifest current while the previous translation stays on disk,
+    /// and every later launch would silently reuse that stale translation.
+    static func invalidate(for source: ShaderSource, stage: ShaderStage) {
+        guard let fileURL = source.fileURL else { return }
+        let cacheKey = fileURL.prepareCachePath
+        cachedManifest.withLock { cacheData in
+            if cacheData == nil { cacheData = self.loadCacheData() }
+            guard cacheData?[cacheKey]?[stage] != nil else { return }
+            cacheData?[cacheKey]?[stage] = nil
+            if let cacheData { self.saveCacheData(cacheData) }
+        }
+        removeReflection(for: fileURL, stage: stage)
+        do {
+            let cacheFile = try self.getCacheDirectory()
+                .appending(path: cacheKey, directoryHint: .isDirectory)
+                .appending(path: "cache-\(stage.rawValue).device-compiled-shader.\(Constants.shaderCacheFileExtension)", directoryHint: .notDirectory)
+            if fileSystem.itemExists(at: cacheFile) { try fileSystem.removeItem(at: cacheFile) }
+        } catch {
+            logger.error("Failed to remove a stale device-compiled shader: \(error)")
+        }
+    }
+
     static func removeReflection(for fileURL: URL, stage: ShaderStage) {
         let path = fileURL.prepareCachePath
 

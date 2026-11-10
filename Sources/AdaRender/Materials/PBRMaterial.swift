@@ -96,8 +96,8 @@ public enum PBRLayerTexture: Int, CaseIterable, Hashable, Sendable {
 /// A material that uses Physically Based Rendering (PBR) to define its appearance.
 public class PBRMaterial: Material, @unchecked Sendable {
     /// Optional fragment graph; lighting, skinning and render-pass configuration stay shared.
-    @_spi(Internal) public var terrainBindings: TerrainMaterialBindings? { didSet { uniformRevision &+= 1 } }
-    public var graphMaterial: ShaderGraphMaterial? { didSet { uniformRevision &+= 1 } }
+    @_spi(Internal) public var terrainBindings: TerrainMaterialBindings? { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
+    public var graphMaterial: ShaderGraphMaterial? { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     public var effectiveAlphaMode: AlphaMode {
         switch graphMaterial?.program.renderSettings.mode {
         case .opaque: .opaque
@@ -108,67 +108,67 @@ public class PBRMaterial: Material, @unchecked Sendable {
     }
     public var effectiveAlphaCutoff: Float { graphMaterial?.program.renderSettings.alphaCutoff ?? alphaCutoff }
     public var effectiveDoubleSided: Bool { graphMaterial?.program.renderSettings.doubleSided ?? doubleSided }
-    public var baseColorFactor: Vector4 = .one { didSet { uniformRevision &+= 1 } }
-    public var baseColorTexture: Texture2D?
-    public var metallicFactor: Float = 1
-    public var roughnessFactor: Float = 1
-    public var metallicRoughnessTexture: Texture2D?
-    public var normalTexture: Texture2D?
-    public var emissiveTexture: Texture2D?
-    public var emissiveStrength: Float = 0
-    public var emissiveFactor: Vector3 = .one { didSet { uniformRevision &+= 1 } }
-    public var occlusionTexture: Texture2D? { didSet { uniformRevision &+= 1 } }
-    public var occlusionStrength: Float = 1 { didSet { uniformRevision &+= 1 } }
+    public var baseColorFactor: Vector4 = .one { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
+    public var baseColorTexture: Texture2D? { didSet { stateRevision &+= 1 } }
+    public var metallicFactor: Float = 1 { didSet { stateRevision &+= 1 } }
+    public var roughnessFactor: Float = 1 { didSet { stateRevision &+= 1 } }
+    public var metallicRoughnessTexture: Texture2D? { didSet { stateRevision &+= 1 } }
+    public var normalTexture: Texture2D? { didSet { stateRevision &+= 1 } }
+    public var emissiveTexture: Texture2D? { didSet { stateRevision &+= 1 } }
+    public var emissiveStrength: Float = 0 { didSet { stateRevision &+= 1 } }
+    public var emissiveFactor: Vector3 = .one { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
+    public var occlusionTexture: Texture2D? { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
+    public var occlusionStrength: Float = 1 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Linear incident diffuse lighting / pi on UV1. Static lighting replaces diffuse IBL, preserving its specular.
-    public var lightmapTexture: Texture2D? { didSet { uniformRevision &+= 1 } }
-    public var lightmapScaleOffset: Vector4 = [1, 1, 0, 0] { didSet { uniformRevision &+= 1 } }
-    public var lightmapIntensity: Float = 1 { didSet { uniformRevision &+= 1 } }
-    public var normalScale: Float = 1 { didSet { uniformRevision &+= 1 } }
+    public var lightmapTexture: Texture2D? { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
+    public var lightmapScaleOffset: Vector4 = [1, 1, 0, 0] { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
+    public var lightmapIntensity: Float = 1 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
+    public var normalScale: Float = 1 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Height map for parallax occlusion mapping, read from the red channel (`1` is the top of the surface, `0` the
     /// deepest point). Use a linear (non-sRGB) texture. Parallax shifts every material texture that shares
     /// ``heightTextureCoordinate``, so the relief stays consistent with color, normal and occlusion maps.
     /// The shader has no free sampler slot, so the height map is read with the base color texture's sampler:
     /// give both the same address and filter modes.
-    public var heightTexture: Texture2D? { didSet { uniformRevision &+= 1 } }
+    public var heightTexture: Texture2D? { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Depth of the relief in world units, measured from the top of the surface. `0` disables parallax.
-    public var heightScale: Float = 0.05 { didSet { uniformRevision &+= 1 } }
+    public var heightScale: Float = 0.05 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// UV set the height map is sampled with.
-    public var heightTextureCoordinate: Int = 0 { didSet { uniformRevision &+= 1 } }
+    public var heightTextureCoordinate: Int = 0 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Largest number of ray-march steps, used at grazing angles (a quarter of it is used head-on). Clamped to `4...64`.
-    public var heightMaxLayers: Int = 32 { didSet { uniformRevision &+= 1 } }
+    public var heightMaxLayers: Int = 32 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Camera distance in view units beyond which parallax has faded out completely. It fades over the last half.
-    public var heightFadeDistance: Float = 30 { didSet { uniformRevision &+= 1 } }
+    public var heightFadeDistance: Float = 30 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     public enum AlphaMode: UInt8, Sendable { case opaque, mask, blend }
-    public var alphaMode: AlphaMode = .opaque { didSet { uniformRevision &+= 1 } }
-    public var alphaCutoff: Float = 0.5 { didSet { uniformRevision &+= 1 } }
-    public var doubleSided = false { didSet { uniformRevision &+= 1 } }
+    public var alphaMode: AlphaMode = .opaque { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
+    public var alphaCutoff: Float = 0.5 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
+    public var doubleSided = false { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// UV sets for base color, metallic/roughness, normal, occlusion, and emission.
-    public var textureCoordinates: [Int] = [0, 0, 0, 0, 0] { didSet { uniformRevision &+= 1 } }
+    public var textureCoordinates: [Int] = [0, 0, 0, 0, 0] { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// A negative value emits everywhere. Non-negative values fade emission
     /// out as direct illumination rises above this threshold.
-    public var emissiveLightThreshold: Float = -1
+    public var emissiveLightThreshold: Float = -1 { didSet { stateRevision &+= 1 } }
     /// UV transforms for base color, metallic/roughness, normal, occlusion, and emission.
-    public var textureTransforms: [PBRTextureTransform] = Array(repeating: .identity, count: 5) { didSet { uniformRevision &+= 1 } }
+    public var textureTransforms: [PBRTextureTransform] = Array(repeating: .identity, count: 5) { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Index of refraction of the dielectric layer. The default 1.5 gives the usual 4% reflectance at normal incidence.
-    public var ior: Float = 1.5 { didSet { uniformRevision &+= 1 } }
+    public var ior: Float = 1.5 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Strength of the dielectric specular reflection (`KHR_materials_specular`).
-    public var specularFactor: Float = 1 { didSet { uniformRevision &+= 1 } }
+    public var specularFactor: Float = 1 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Tint of the dielectric specular reflection (`KHR_materials_specular`).
-    public var specularColorFactor: Vector3 = .one { didSet { uniformRevision &+= 1 } }
+    public var specularColorFactor: Vector3 = .one { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Strength of a clear lacquer layer over the surface (`KHR_materials_clearcoat`); 0 turns the layer off.
-    public var clearcoatFactor: Float = 0 { didSet { uniformRevision &+= 1 } }
+    public var clearcoatFactor: Float = 0 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Roughness of the clearcoat layer, independent of the base layer's roughness.
-    public var clearcoatRoughnessFactor: Float = 0 { didSet { uniformRevision &+= 1 } }
+    public var clearcoatRoughnessFactor: Float = 0 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Color of a soft fabric sheen over the surface (`KHR_materials_sheen`); black turns the layer off.
-    public var sheenColorFactor: Vector3 = .zero { didSet { uniformRevision &+= 1 } }
+    public var sheenColorFactor: Vector3 = .zero { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Roughness of the sheen layer.
-    public var sheenRoughnessFactor: Float = 0 { didSet { uniformRevision &+= 1 } }
+    public var sheenRoughnessFactor: Float = 0 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// How much highlights stretch (`KHR_materials_anisotropy`, 0 to 1); 0 keeps them round.
-    public var anisotropyStrength: Float = 0 { didSet { uniformRevision &+= 1 } }
+    public var anisotropyStrength: Float = 0 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Rotation of the stretch direction from the surface tangent, in radians.
-    public var anisotropyRotation: Float = 0 { didSet { uniformRevision &+= 1 } }
+    public var anisotropyRotation: Float = 0 { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
     /// Textures of the clearcoat, sheen, anisotropy and specular layers. Each multiplies its layer's factor.
-    public var layerTextures: [PBRLayerTexture: PBRTextureBinding] = [:] { didSet { uniformRevision &+= 1 } }
+    public var layerTextures: [PBRLayerTexture: PBRTextureBinding] = [:] { didSet { uniformRevision &+= 1; stateRevision &+= 1 } }
 
     /// The optional shading layers and layer textures a material needs. The main shader is compiled with only what a
     /// material uses; the empty set is the plain shader, which is also the only one that has a shader cache and a web build.
@@ -191,6 +191,9 @@ public class PBRMaterial: Material, @unchecked Sendable {
         public static let terrain = Self(rawValue: 1 << 16)
         /// Diagnostic line pass; never an authored material feature.
         public static let wireframe = Self(rawValue: 1 << 17)
+        /// Path-traced views: the ``hybridReflection`` and ``diffuseSurface`` outputs carry emission and base colour
+        /// for the tracer's first hit instead of their raster meanings. Always combined with both of them.
+        public static let pathTracingSurface = Self(rawValue: 1 << 18)
 
         /// Every layer, without textures.
         public static let all: ShaderFeatures = [.clearcoat, .sheen, .anisotropy]
@@ -208,6 +211,7 @@ public class PBRMaterial: Material, @unchecked Sendable {
             if contains(.irradianceGrid) { macros.append("ADA_IRRADIANCE_GRID") }
             if contains(.terrain) { macros.append("ADA_TERRAIN") }
             if contains(.wireframe) { macros.append("ADA_WIREFRAME") }
+            if contains(.pathTracingSurface) { macros.append("ADA_PATH_TRACING_SURFACE") }
             for texture in PBRLayerTexture.allCases where contains(texture.feature) {
                 macros.append(texture.macro)
             }
@@ -233,6 +237,71 @@ public class PBRMaterial: Material, @unchecked Sendable {
 
     /// Changes whenever parameters in the shared PBR uniform snapshot are edited.
     @_spi(Internal) public private(set) var uniformRevision: UInt64 = 0
+
+    /// Changes whenever any stored property changes.
+    @_spi(Internal) public private(set) var stateRevision: UInt64 = 0
+
+    /// For a render snapshot, the live material it copies.
+    @_spi(Internal) public private(set) weak var snapshotSource: PBRMaterial?
+
+    /// The last snapshot handed to a pipelined render world, with the revision it copied.
+    private var cachedRenderSnapshot: (revision: UInt64, material: PBRMaterial)?
+
+    /// An immutable copy for a pipelined render world, taken at extraction.
+    ///
+    /// A pipelined render world draws frame N while gameplay edits materials for frame N+1. It draws this
+    /// copy instead of the live object, so edits reach the renderer at the next extraction and never race
+    /// with it. The copy is reused until the material changes. Call only at extraction, while no pipelined
+    /// render is in flight. Subclasses are returned unchanged; they are not snapshotted.
+    @_spi(Internal) public func renderSnapshot() -> PBRMaterial {
+        guard type(of: self) == PBRMaterial.self else { return self }
+        if let cachedRenderSnapshot, cachedRenderSnapshot.revision == stateRevision {
+            return cachedRenderSnapshot.material
+        }
+        let copy = PBRMaterial()
+        copy.snapshotSource = self
+        copy.assetMetaInfo = assetMetaInfo
+        copy.terrainBindings = terrainBindings
+        copy.graphMaterial = graphMaterial
+        copy.baseColorFactor = baseColorFactor
+        copy.baseColorTexture = baseColorTexture
+        copy.metallicFactor = metallicFactor
+        copy.roughnessFactor = roughnessFactor
+        copy.metallicRoughnessTexture = metallicRoughnessTexture
+        copy.normalTexture = normalTexture
+        copy.emissiveTexture = emissiveTexture
+        copy.emissiveStrength = emissiveStrength
+        copy.emissiveFactor = emissiveFactor
+        copy.occlusionTexture = occlusionTexture
+        copy.occlusionStrength = occlusionStrength
+        copy.lightmapTexture = lightmapTexture
+        copy.lightmapScaleOffset = lightmapScaleOffset
+        copy.lightmapIntensity = lightmapIntensity
+        copy.normalScale = normalScale
+        copy.heightTexture = heightTexture
+        copy.heightScale = heightScale
+        copy.heightTextureCoordinate = heightTextureCoordinate
+        copy.heightMaxLayers = heightMaxLayers
+        copy.heightFadeDistance = heightFadeDistance
+        copy.alphaMode = alphaMode
+        copy.alphaCutoff = alphaCutoff
+        copy.doubleSided = doubleSided
+        copy.textureCoordinates = textureCoordinates
+        copy.emissiveLightThreshold = emissiveLightThreshold
+        copy.textureTransforms = textureTransforms
+        copy.ior = ior
+        copy.specularFactor = specularFactor
+        copy.specularColorFactor = specularColorFactor
+        copy.clearcoatFactor = clearcoatFactor
+        copy.clearcoatRoughnessFactor = clearcoatRoughnessFactor
+        copy.sheenColorFactor = sheenColorFactor
+        copy.sheenRoughnessFactor = sheenRoughnessFactor
+        copy.anisotropyStrength = anisotropyStrength
+        copy.anisotropyRotation = anisotropyRotation
+        copy.layerTextures = layerTextures
+        cachedRenderSnapshot = (stateRevision, copy)
+        return copy
+    }
 
     public init() {
         // FIXME: (Vlad) We need a way to specify the shader for PBR material.

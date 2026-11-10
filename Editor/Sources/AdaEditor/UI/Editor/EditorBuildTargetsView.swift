@@ -143,6 +143,7 @@ struct EditorBuildTargetsDialog: View {
                     }
                 }
             }
+            diagnosticsOverlaySetting
             if model.draft?.build.system == .swiftpm {
                 field("Executable Product", id: "Product", text: Binding(get: { model.productText }, set: { value in
                     model.productText = value
@@ -183,6 +184,25 @@ struct EditorBuildTargetsDialog: View {
             Text(L10n.text("Use project-relative paths separated by commas. Empty Included Files uses the project's source folder. Runtime and plugin settings are saved per target in Project Settings."))
                 .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
         }.frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var diagnosticsOverlaySetting: some View {
+        let supportsOverlay = model.editedTarget?.run.destination.supportsDiagnosticsOverlay == true
+        return VStack(alignment: .leading, spacing: 5) {
+            Toggle(L10n.text("Diagnostics overlay"), isOn: Binding(
+                get: { model.editedTarget?.run.diagnosticsOverlay ?? false },
+                set: { enabled in model.edit { $0.run.diagnosticsOverlay = enabled } }
+            ))
+            .toggleStyle(.editorSettings(colors: theme.editorColors))
+            .disabled(!supportsOverlay)
+            .accessibilityIdentifier("AdaEditor.BuildTargets.DiagnosticsOverlay")
+
+            Text(supportsOverlay
+                ? L10n.text("Shows FPS and frame time the next time you run this target on desktop.")
+                : L10n.text("Available for local desktop runs."))
+                .font(.system(size: 11))
+                .foregroundColor(theme.editorColors.muted)
+        }
     }
 
     private var sceneList: some View {

@@ -69,7 +69,38 @@ AdaDLSSDevice::~AdaDLSSDevice() {
         NVSDK_NGX_D3D12_Shutdown1(native.Get());
     }
 }
+bool AdaDLSSDevice::locateRuntime() {
+    std::wstring module(MAX_PATH, L'\0');
+    const DWORD length = GetModuleFileNameW(nullptr, module.data(), static_cast<DWORD>(module.size()));
+    if (length == 0 || length >= module.size()) { lastError = "Cannot resolve the executable folder for the DLSS runtime"; return false; }
+    module.resize(length);
+    const auto executableFolder = std::filesystem::path(module).parent_path();
+    std::error_code error;
+    if (std::filesystem::is_regular_file(executableFolder / L"nvngx_dlss.dll", error)) {
+        hasDenoiserRuntime = std::filesystem::is_regular_file(executableFolder / L"nvngx_dlssd.dll", error);
+        return true;
+    }
+    // Development builds (`swift run` of an example) may use the prepared SDK instead of a staged copy.
+    wchar_t* sdk = nullptr;
+    size_t sdkLength = 0;
+    if (_wdupenv_s(&sdk, &sdkLength, L"ADAENGINE_DLSS_SDK_PATH") == 0 && sdk) {
+        const auto folder = std::filesystem::path(sdk) / L"lib" / L"Windows_x86_64" / L"rel";
+        free(sdk);
+        if (std::filesystem::is_regular_file(folder / L"nvngx_dlss.dll", error)) {
+            hasDenoiserRuntime = std::filesystem::is_regular_file(folder / L"nvngx_dlssd.dll", error);
+            runtimeFolders.push_back(folder.wstring());
+            for (const auto& path : runtimeFolders) runtimeFolderPointers.push_back(path.c_str());
+            return true;
+        }
+    }
+    // u8string never throws for characters outside the ANSI code page; nothing may throw across the C API.
+    lastError = "DLSS runtime nvngx_dlss.dll not found next to " + executableFolder.u8string()
+        + "; stage it with script/build_dlss.py --stage-runtime or set ADAENGINE_DLSS_SDK_PATH";
+    return false;
+}
+
 bool AdaDLSSDevice::initialize() {
+    if (!locateRuntime()) return false;
     if (!webgpu.HasFeature(wgpu::FeatureName::SharedTextureMemoryD3D12Resource)
         || !webgpu.HasFeature(wgpu::FeatureName::SharedFenceDXGISharedHandle)) {
         lastError = "Dawn D3D12 shared texture/fence features are unavailable";
@@ -91,15 +122,24 @@ bool AdaDLSSDevice::initialize() {
     auto logs = std::filesystem::temp_directory_path(error) / L"AdaEngine" / L"NGX";
     std::filesystem::create_directories(logs, error);
     if (error) { lastError = "NGX log directory is unavailable"; return false; }
+    NVSDK_NGX_FeatureCommonInfo featureInfo{};
+    featureInfo.PathListInfo.Path = runtimeFolderPointers.empty() ? nullptr : runtimeFolderPointers.data();
+    featureInfo.PathListInfo.Length = static_cast<unsigned int>(runtimeFolderPointers.size());
     const auto result = NVSDK_NGX_D3D12_Init_with_ProjectID(projectID, NVSDK_NGX_ENGINE_TYPE_CUSTOM,
-        "AdaEngine", logs.c_str(), native.Get());
+        "AdaEngine", logs.c_str(), native.Get(), &featureInfo, NVSDK_NGX_Version_API);
     if (!ada_dlss_check_ngx(result, "NGX initialization")) return false;
     initialized = true;
     if (!ada_dlss_check_ngx(NVSDK_NGX_D3D12_GetCapabilityParameters(&capabilities), "DLSS capabilities")) return false;
     int supported = 0, driverUpdate = 0;
     capabilities->Get(NVSDK_NGX_Parameter_SuperSampling_Available, &supported);
     capabilities->Get(NVSDK_NGX_Parameter_SuperSampling_NeedsUpdatedDriver, &driverUpdate);
-    if (!supported || driverUpdate) { lastError = "DLSS is unavailable on the selected adapter/driver"; return false; }
+    if (driverUpdate) { lastError = "DLSS needs a newer NVIDIA driver"; return false; }
+    if (!supported) { lastError = "DLSS Super Resolution is not supported by the selected NVIDIA adapter"; return false; }
+    int denoising = 0, denoisingDriverUpdate = 0;
+    capabilities->Get(NVSDK_NGX_Parameter_SuperSamplingDenoising_Available, &denoising);
+    capabilities->Get(NVSDK_NGX_Parameter_SuperSamplingDenoising_NeedsUpdatedDriver, &denoisingDriverUpdate);
+    supportsRayReconstruction = denoising && !denoisingDriverUpdate && hasDenoiserRuntime;
+    if (denoising && !hasDenoiserRuntime) fprintf(stderr, "AdaEngine DLSS: Ray Reconstruction runtime nvngx_dlssd.dll not found\n");
     if (!ada_dlss_check(native->CreateFence(0, D3D12_FENCE_FLAG_SHARED, IID_PPV_ARGS(&fence)), "Create shared fence")) return false;
     HANDLE handle = nullptr;
     if (!ada_dlss_check(native->CreateSharedHandle(fence.Get(), nullptr, GENERIC_ALL, nullptr, &handle), "Share fence")) return false;

@@ -251,7 +251,9 @@ final class PBR3DShaderVariants: @unchecked Sendable {
             assertionFailure("Shader variant \(features.rawValue) of \(path) failed to compile: \(error)")
             // A plain shader has no fifth fragment output and cannot safely write a hybrid render pass.
             // Morph changes the vertex contract too. These defines remain mandatory even when a layer fails.
-            let required = features.intersection([.hybridReflection, .morph, .diffuseSurface, .lightmap, .irradianceGrid, .terrain, .wireframe])
+            let required = features.intersection([
+                .hybridReflection, .morph, .diffuseSurface, .lightmap, .irradianceGrid, .terrain, .wireframe, .pathTracingSurface,
+            ])
             if required.isEmpty {
                 variant = fallback
             } else {
