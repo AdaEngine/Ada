@@ -12,6 +12,8 @@ public struct SystemAccessSet: Sendable, Equatable {
     private var componentWrites: Set<ComponentId> = []
     private var resourceReads: Set<ObjectIdentifier> = []
     private var resourceWrites: Set<ObjectIdentifier> = []
+    @usableFromInline
+    var hasComponentWrites: Bool { !componentWrites.isEmpty || hasExclusiveWorldAccess }
 
     /// True when the system records structural world mutations that must be
     /// applied after the system has finished running.

@@ -87,11 +87,11 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
 
         // Collect all chunks from all matching archetypes
         for archetypeIndex in state.archetypeIndecies {
-            guard archetypeIndex < world.archetypes.archetypes.count else {
+            guard archetypeIndex < world.storageArchetypes.archetypes.count else {
                 continue
             }
 
-            let archetype = world.archetypes.archetypes[archetypeIndex]
+            let archetype = world.storageArchetypes.archetypes[archetypeIndex]
             for chunkIndex in 0..<archetype.chunks.chunks.count {
                 allChunks.append(
                     ChunkInfo(
@@ -133,7 +133,7 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
         )
 
         for chunkInfo in batch {
-            let archetypes = world.archetypes
+            let archetypes = world.storageArchetypes
             guard chunkInfo.archetypeIndex < archetypes.archetypes.count else {
                 continue
             }
@@ -218,7 +218,7 @@ public struct ParallelQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
         var results: [T] = []
 
         for chunkInfo in batch {
-            let archetypes = world.archetypes
+            let archetypes = world.storageArchetypes
             guard chunkInfo.archetypeIndex < archetypes.archetypes.count else {
                 continue
             }

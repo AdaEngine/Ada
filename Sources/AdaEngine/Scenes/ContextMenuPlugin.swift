@@ -7,11 +7,13 @@
 
 import AdaApp
 import AdaECS
+import AdaInput
 import AdaRender
 import AdaScene
 @_spi(Internal) import AdaUI
 import AdaUtils
 import Math
+import Observation
 
 public struct ContextMenuPlugin: Plugin {
     public init() {}
@@ -29,6 +31,11 @@ public struct ContextMenuPlugin: Plugin {
         ContextMenuPresentationCenter.dismissForDeactivation = { window in
             ContextMenuPresenter.dismissForDeactivation(of: window)
         }
+        #if !os(iOS) && !os(visionOS)
+            ContextMenuPresentationCenter.handleSelectionKey = { event, window in
+                ContextMenuPresenter.handleSelectionKey(event, in: window)
+            }
+        #endif
     }
 }
 
@@ -48,12 +55,13 @@ private enum ContextMenuPresenter {
 
             let session = ContextMenuSession(
                 sourceWindow: presentation.sourceWindow,
-                onDismiss: presentation.onDismiss
+                onDismiss: presentation.onDismiss,
+                selection: presentation.isSelectionMenu ? ContextMenuSelection(items: presentation.items) : nil
             )
             activeSession = session
             let window = makeWindow(
                 items: presentation.items,
-                origin: menuOrigin(for: presentation, menuSize: menuSize(for: presentation.items)),
+                origin: menuOrigin(for: presentation, menuSize: menuSize(for: presentation.items, limitsHeight: session.selection != nil)),
                 app: app,
                 session: session,
                 level: 0
@@ -148,6 +156,24 @@ private enum ContextMenuPresenter {
         action?()
     }
 
+    static func handleSelectionKey(_ event: KeyEvent, in window: UIWindow?) -> Bool {
+        guard event.status == .down, let session = activeSession, let selection = session.selection,
+              let window, session.sourceWindow === window || session.contains(window) else { return false }
+        if event.keyCode == .tab {
+            dismissAll()
+            return false
+        }
+        guard event.modifiers.subtracting(.capsLock).isEmpty else { return false }
+        switch selection.handle(event.keyCode) {
+        case .moved: return true
+        case let .confirmed(index):
+            let items = session.items(at: 0)
+            if !event.isRepeated, items.indices.contains(index) { performAction(items[index].action, in: session) }
+            return true
+        case .ignored: return false
+        }
+    }
+
     private static func makeWindow(
         items: [ContextMenuPresentation.Item],
         origin: Point,
@@ -155,7 +181,7 @@ private enum ContextMenuPresenter {
         session: ContextMenuSession,
         level: Int
     ) -> UIWindow {
-        let size = menuSize(for: items)
+        let size = menuSize(for: items, limitsHeight: session.selection != nil)
         let window = UIWindow(
             configuration: UIWindow.Configuration(
                 title: "",
@@ -191,13 +217,13 @@ private enum ContextMenuPresenter {
         return window
     }
 
-    private static func menuSize(for items: [ContextMenuPresentation.Item]) -> Size {
+    private static func menuSize(for items: [ContextMenuPresentation.Item], limitsHeight: Bool = false) -> Size {
         let longestTitleCount = items.lazy.filter { !$0.isSeparator }.map(\.title.count).max() ?? 0
         let width = ContextMenuMetrics.width(longestTitleCharacterCount: longestTitleCount)
         let height = items.reduce(ContextMenuMetrics.verticalPadding * 2) { height, item in
             height + ContextMenuMetrics.height(for: item)
         }
-        return Size(width: width, height: height)
+        return Size(width: width, height: limitsHeight ? min(height, ContextMenuMetrics.selectionMaximumHeight) : height)
     }
 
     private static func menuOrigin(for presentation: ContextMenuPresentation, menuSize: Size) -> Point {
@@ -271,13 +297,15 @@ private enum ContextMenuPresenter {
 private final class ContextMenuSession {
     weak var sourceWindow: UIWindow?
     var app: AppWorlds!
+    let selection: ContextMenuSelection?
     private var onDismiss: (() -> Void)?
     private var windowsByLevel: [Int: UIWindow] = [:]
     private var itemsByLevel: [Int: [ContextMenuPresentation.Item]] = [:]
 
-    init(sourceWindow: UIWindow?, onDismiss: (() -> Void)?) {
+    init(sourceWindow: UIWindow?, onDismiss: (() -> Void)?, selection: ContextMenuSelection?) {
         self.sourceWindow = sourceWindow
         self.onDismiss = onDismiss
+        self.selection = selection
     }
 
     func setWindow(_ window: UIWindow, items: [ContextMenuPresentation.Item], at level: Int) {
@@ -307,6 +335,33 @@ private final class ContextMenuSession {
     }
 }
 
+@MainActor @Observable
+final class ContextMenuSelection {
+    enum KeyResult: Equatable {
+        case moved
+        case confirmed(Int)
+        case ignored
+    }
+
+    private let lastIndex: Int
+    private(set) var index: Int
+
+    init(items: [ContextMenuPresentation.Item]) {
+        lastIndex = max(0, items.count - 1)
+        index = items.firstIndex(where: \.isSelected) ?? 0
+    }
+
+    func handle(_ key: KeyCode) -> KeyResult {
+        switch key {
+        case .arrowDown: index = min(index + 1, lastIndex)
+        case .arrowUp: index = max(index - 1, 0)
+        case .enter, .space: return .confirmed(index)
+        default: return .ignored
+        }
+        return .moved
+    }
+}
+
 enum ContextMenuMetrics {
     static let rowHeight: Float = 28
     static let separatorHeight: Float = 9
@@ -317,6 +372,8 @@ enum ContextMenuMetrics {
     static let horizontalPadding: Float = 10
     static let itemSpacing: Float = 8
     static let submenuIndicatorWidth: Float = 8
+    static let selectionVisibleRows = 8
+    static let selectionMaximumHeight = rowHeight * Float(selectionVisibleRows) + verticalPadding * 2
 
     static func width(longestTitleCharacterCount: Int) -> Float {
         max(minimumWidth, min(maximumWidth, Float(longestTitleCharacterCount * 7 + 44)))
@@ -340,18 +397,34 @@ private struct ContextMenuWindowContent: View {
     let level: Int
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ForEach(0..<items.count) { index in
-                menuRow(for: items[index], at: index)
+        Group {
+            if let selection = session.selection, items.count > ContextMenuMetrics.selectionVisibleRows {
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: true) { menuRows }
+                        .frame(height: ContextMenuMetrics.selectionMaximumHeight)
+                        .onAppear { proxy.scrollTo(selection.index, anchor: .center) }
+                        .onChange(of: selection.index) { _, index in proxy.scrollTo(index, anchor: .center) }
+                }
+            } else {
+                menuRows
             }
         }
-        .padding(.vertical, ContextMenuMetrics.verticalPadding)
         .frame(width: menuWidth)
         .background(RoundedRectangleShape(cornerRadius: 7).fill(backgroundColor))
         .overlay {
             RoundedRectangleShape(cornerRadius: 7)
                 .stroke(borderColor, lineWidth: 1)
         }
+    }
+
+    private var menuRows: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(0..<items.count) { index in
+                menuRow(for: items[index], at: index)
+                    .id(index)
+            }
+        }
+        .padding(.vertical, ContextMenuMetrics.verticalPadding)
     }
 
     @ViewBuilder
@@ -403,7 +476,7 @@ private struct ContextMenuWindowContent: View {
                 .padding(.horizontal, ContextMenuMetrics.horizontalPadding)
                 .frame(width: menuWidth, height: ContextMenuMetrics.rowHeight)
             })
-            .buttonStyle(ContextMenuButtonStyle(role: item.role))
+            .buttonStyle(ContextMenuButtonStyle(role: item.role, keyboardHighlighted: session.selection?.index == index))
             .onHover { isHovered in
                 guard isHovered else {
                     return
@@ -445,13 +518,14 @@ struct ContextMenuCheckmark: Shape {
 
 private struct ContextMenuButtonStyle: ButtonStyle {
     let role: ContextMenuPresentation.Item.Role?
+    let keyboardHighlighted: Bool
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .background(
                 RoundedRectangleShape(cornerRadius: 5)
                     .fill(
-                        configuration.isHighlighted ? highlightColor : Color.clear
+                        configuration.isHighlighted || keyboardHighlighted ? highlightColor : Color.clear
                     )
             )
     }

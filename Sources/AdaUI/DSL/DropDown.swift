@@ -41,7 +41,7 @@ private final class DropDownController {
         present(.init(sourceWindow: node.owner?.window, location: owner?.convert(anchor, to: owner?.window) ?? anchor,
             items: options.enumerated().map { index, option in
                 .init(id: index, title: option.label, action: { selection.wrappedValue = option.value }, isSelected: selection.wrappedValue == option.value)
-            }))
+            }, isSelectionMenu: true))
     }
 }
 

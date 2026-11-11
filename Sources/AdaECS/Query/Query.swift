@@ -72,6 +72,7 @@ public struct FilterQuery<each T: QueryTarget, F: Filter>: Sequence, Sendable {
     }
 
     public init(from world: World) {
+        world.checkQueryWriter(F.self)
         self.state = QueryState(
             predicate: .init(
                 evaluate: { Builder.predicate(in: $0) && QueryBuilderTargets<F>.predicate(in: $0) }
@@ -148,6 +149,7 @@ extension FilterQuery: SystemParameter {
     }
 
     public func update(from world: World) {
+        world.checkQueryWriter(F.self)
         self.state.updateArchetypes(in: world)
     }
 }
@@ -182,7 +184,7 @@ final class QueryState: @unchecked Sendable {
     func updateArchetypes(in world: World) {
         self.entities = world.entities
         self.archetypeIndecies.removeAll(keepingCapacity: true)
-        for (index, archetype) in world.archetypes.archetypes.enumerated() where self.predicate.evaluate(archetype) {
+        for (index, archetype) in world.storageArchetypes.archetypes.enumerated() where self.predicate.evaluate(archetype) {
             self.archetypeIndecies.append(index)
         }
         self.lastTick = world.lastTick
@@ -252,7 +254,7 @@ public struct FilterQueryIterator<
         self.count = state.archetypeIndecies.count
         self.state = state
         self.cursor = Cursor()
-        self.archetypes = state.world.archetypes
+        self.archetypes = state.world.storageArchetypes
 
         self.states = B.initState(world: state.world)
         self.fetches = B.initFetches(

@@ -148,6 +148,8 @@ public struct ShadowCasterRegistry3D: Resource {
     public private(set) var input = GPUShadowCullInput()
     /// Casters that keep the CPU-culled path.
     public private(set) var cpuSources: [Mesh3DRenderSource] = []
+    private(set) var cpuSourceIndices: [Int] = []
+    private var cpuSourceSlots: [Int: Int] = [:]
     /// Increments whenever ``input`` or the draw groups change.
     public private(set) var revision: UInt64 = 0
     /// Bounds of casters added, removed or changed by the last revision (old and new), or `nil` when the change
@@ -171,8 +173,17 @@ public struct ShadowCasterRegistry3D: Resource {
     private var frame: UInt64 = 0
     /// Material frame and switch state of the last update, so the second shadow node of a frame reuses it.
     private var updated: (frame: Int, enabled: Bool, palette: ObjectIdentifier?)?
+    private var hasPreviousTransformChanges = false
 
-    public init() {}
+    private let supportsDistanceCulling: Bool
+
+    public init() {
+        supportsDistanceCulling = false
+    }
+
+    init(supportsDistanceCulling: Bool) {
+        self.supportsDistanceCulling = supportsDistanceCulling
+    }
 
     /// Number of indirect draws per shadow view.
     public var partCount: Int { input.parts.count }
@@ -210,9 +221,22 @@ public struct ShadowCasterRegistry3D: Resource {
         identityPalette: (any UniformBuffer)?,
         device: RenderDevice
     ) {
+        update(sources: sources, materials: &materials, identityPalette: identityPalette, device: device, transformChanges: nil)
+    }
+
+    mutating func update(
+        sources: [Mesh3DRenderSource],
+        materials: inout PBR3DUniforms,
+        identityPalette: (any UniformBuffer)?,
+        device: RenderDevice,
+        transformChanges: [Int]?
+    ) {
         // Both shadow nodes update with the same extracted sources in one frame.
         let state = (frame: materials.frame, enabled: isEnabled, palette: identityPalette.map { ObjectIdentifier($0) })
-        if let updated, updated == state { return }
+        let previous = updated
+        if let previous, previous == state { return }
+        let canUsePreviousSources = hasPreviousTransformChanges
+        hasPreviousTransformChanges = transformChanges != nil
         updated = state
         frame &+= 1
         // Backends without GPU culling never build pools or queue copies.
@@ -221,6 +245,21 @@ public struct ShadowCasterRegistry3D: Resource {
             clear()
             return
         }
+        // Ordinary transforms cannot change the CPU/GPU classification. If only
+        // CPU casters moved, the pooled geometry and all GPU input remain valid.
+        if canUsePreviousSources, let previous, let transformChanges, previous.frame &+ 1 == state.frame,
+           previous.enabled == state.enabled, previous.palette == state.palette,
+           hasCasters || hasClusterCasters,
+           transformChanges.allSatisfy({ index in
+               !sources[index].castShadows || cpuSourceSlots[index] != nil
+           }) {
+            for index in transformChanges {
+                if let slot = cpuSourceSlots[index] { cpuSources[slot] = sources[index] }
+            }
+            return
+        }
+        cpuSourceIndices.removeAll(keepingCapacity: true)
+        cpuSourceSlots.removeAll(keepingCapacity: true)
         var cpu: [Mesh3DRenderSource] = []
         var casters: [GPUShadowCaster] = []
         var records: [Flat3DInstanceData] = []
@@ -234,10 +273,14 @@ public struct ShadowCasterRegistry3D: Resource {
         var nextClusterSnapshots: [ClusterSnapshot] = []
         var clusterGeometries: [(geometry: MeshletGeometry, transform: Transform3D)] = []
         for sourceIndex in sources.indices where sources[sourceIndex].castShadows {
-            guard Self.isEligible(sources[sourceIndex]) else {
+            guard Self.isEligible(sources[sourceIndex], supportsDistanceCulling: supportsDistanceCulling) else {
+                cpuSourceSlots[sourceIndex] = cpu.count
+                cpuSourceIndices.append(sourceIndex)
                 cpu.append(sources[sourceIndex])
                 continue
             }
+            let maximum = Self.finiteDistance(sources[sourceIndex]) ?? 0
+            let fadeDistance = maximum > 0 ? finiteRenderValue(sources[sourceIndex].fadeDistance, fallback: 4, range: 0...maximum) : 0
             let mesh = sources[sourceIndex].mesh
             let count = sources[sourceIndex].instances?.count ?? 1
             for ordinal in 0..<count {
@@ -264,7 +307,7 @@ public struct ShadowCasterRegistry3D: Resource {
                         let descriptor = parts[partIndex].vertexDescriptor
                         materials.write(material: material, descriptor: descriptor, device: device)
                         guard let buffer = materials.buffer(for: material) else { continue }
-                        if buildsClusters, let geometry = clusterGeometry(
+                        if buildsClusters, maximum == 0, let geometry = clusterGeometry(
                             part: parts[partIndex], material: pbr, transform: transform,
                             isSingleton: placement < 0 && !sources[sourceIndex].forceVisible && bounds != nil
                         ) {
@@ -331,7 +374,10 @@ public struct ShadowCasterRegistry3D: Resource {
                             bounds: bounds,
                             forceVisible: sources[sourceIndex].forceVisible,
                             part: index,
-                            instance: UInt32(records.count)
+                            instance: UInt32(records.count),
+                            position: transform.origin,
+                            maximumDistance: maximum,
+                            fadeDistance: fadeDistance
                         ))
                         records.append(Flat3DInstanceData(
                             modelMatrix: transform,
@@ -443,6 +489,10 @@ public struct ShadowCasterRegistry3D: Resource {
             // The shadow pipelines read the model matrix, colour and shadow flags (first 128 bytes).
             next.copiedBytes = MemoryLayout<Flat3DInstanceData>.offset(of: \.shadowFlags).map { $0 + MemoryLayout<Vector4>.stride }
                 ?? MemoryLayout<Flat3DInstanceData>.stride
+            if supportsDistanceCulling {
+                next.distanceFadeOffset = MemoryLayout<Flat3DInstanceData>.offset(of: \.shadowFlags)
+                    .map { $0 + 3 * MemoryLayout<Float>.stride }
+            }
             next.parts = parts
             next.segments = segments
             next.revision = revision
@@ -511,10 +561,12 @@ public struct ShadowCasterRegistry3D: Resource {
     // MARK: - Eligibility
 
     /// Whether every part of `source` can be drawn by the GPU path with exactly the CPU path's result.
-    static func isEligible(_ source: borrowing Mesh3DRenderSource) -> Bool {
+    static func isEligible(_ source: borrowing Mesh3DRenderSource, supportsDistanceCulling: Bool = false) -> Bool {
         guard source.skinningBuffer == nil, source.morphBuffers.isEmpty, source.alternatives.isEmpty else { return false }
         // A finite maximum distance fades the caster per view when distance culling is on.
-        if let maximum = source.maximumDistance, maximum.isFinite, maximum > 0 { return false }
+        if !supportsDistanceCulling, finiteDistance(source) != nil {
+            return false
+        }
         for model in source.mesh.models {
             for part in model.parts {
                 guard source.materials.indices.contains(part.materialIndex) else { return false }
@@ -531,6 +583,13 @@ public struct ShadowCasterRegistry3D: Resource {
             }
         }
         return true
+    }
+
+    private static func finiteDistance(_ source: borrowing Mesh3DRenderSource) -> Float? {
+        guard let maximum = source.maximumDistance, maximum.isFinite, maximum > 0 else {
+            return nil
+        }
+        return maximum
     }
 
     /// The meshlets of a part that is culled per cluster, or nil to keep it a per-caster caster.
@@ -555,6 +614,8 @@ public struct ShadowCasterRegistry3D: Resource {
         poolIndex = [:]
         copies = []
         clusterParts = []
+        cpuSourceIndices = []
+        cpuSourceSlots = [:]
         guard !input.casters.isEmpty || !groups.isEmpty || !clusterInput.clusters.isEmpty else { return }
         clusterInput = GPUShadowClusterInput()
         isClusterInputValid = false

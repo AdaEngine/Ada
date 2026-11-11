@@ -648,7 +648,10 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
         var environment = buildSettings.environment(for: platform)
         if case let .run(_, _, diagnosticsOverlay) = kind {
             environment.merge(project?.run.environment ?? [:]) { _, value in value }
-            environment["ADAENGINE_DIAGNOSTICS_OVERLAY"] = diagnosticsOverlay ? "1" : "0"
+            environment = EditorHostTools.mergedEnvironment(
+                ["ADAENGINE_DIAGNOSTICS_OVERLAY": diagnosticsOverlay ? "1" : "0"],
+                inheriting: environment
+            )
         }
         if case .runWeb = kind {
             environment["ADAENGINE_WEB_EXPORT"] = "1"
@@ -723,10 +726,10 @@ actor SwiftPMWorkspaceService: SwiftPMWorkspaceServicing {
 
         let describeCommand = makeCommand(.describe, projectURL: projectURL, toolchain: resolvedToolchain)
         await progress(SwiftPMWorkspaceProgress(phase: .describingPackage, title: "Reading SwiftPM package graph", command: describeCommand))
-        let describeResult =
-            resolveResult.succeeded
-            ? await processRunner.run(describeCommand)
-            : EditorProcessResult(command: describeCommand, exitCode: 1, standardOutput: "", standardError: "Skipped because dependency resolution failed.")
+        // SwiftPM can describe the local targets even when a dependency is unavailable.
+        let describeResult = Task.isCancelled
+            ? EditorProcessResult(command: describeCommand, exitCode: 130, standardOutput: "", standardError: "")
+            : await processRunner.run(describeCommand)
         let packageModel = describeResult.succeeded ? SwiftPackageModel.parse(from: describeResult.standardOutput) : nil
 
         let indexBuildResult: EditorProcessResult?

@@ -245,9 +245,7 @@ extension EditorViewModel {
 
         do {
             try newFileKind.initialContent(fileName: fileName).write(to: destinationURL, atomically: true, encoding: .utf8)
-            projectSidebar.replaceItems(Self.projectTreeItems(for: project, fileManager: fileManager))
-            toolbar.searchableItems = projectSidebar.items
-            syncInspectorTextureAssets()
+            refreshProjectFiles(logsRefresh: false)
             refreshSourceControl()
 
             let relativePath = relativeProjectPath(for: destinationURL.path)
@@ -361,7 +359,8 @@ extension EditorViewModel {
     func saveProjectSettings(
         runtime: AdaProjectRuntime? = nil,
         inputActions: [InputAction]? = nil,
-        adaScriptTypeChecking: AdaScriptTypeCheckingMode? = nil
+        adaScriptTypeChecking: AdaScriptTypeCheckingMode? = nil,
+        buildSystem: AdaProjectBuildSystem? = nil
     ) {
         guard let projectURL else {
             projectSettingsStatusMessage = "No project is open."
@@ -369,17 +368,8 @@ extension EditorViewModel {
         }
 
         do {
-            var settings = try ProjectSystem.loadProject(at: projectURL, fileManager: fileManager)
-            let targetName: String
-            if settings.build.system == .swiftpm {
-                guard let selectedRunTargetName else {
-                    projectSettingsStatusMessage = "Load the package and select an executable target first."
-                    return
-                }
-                targetName = selectedRunTargetName
-            } else {
-                targetName = ""
-            }
+            let saved = try ProjectSystem.loadProject(at: projectURL, fileManager: fileManager)
+            var settings = saved
             if let inputActions {
                 settings.inputActions = inputActions
             }
@@ -388,7 +378,6 @@ extension EditorViewModel {
             }
             settings.project.displayName = Self.optionalText(from: projectDisplayNameText)
             settings.project.bundleIdentifier = Self.optionalText(from: projectBundleIdentifierText)
-            settings.editor.startupScene = Self.optionalText(from: projectMainSceneText)
             settings.paths.resourceRoots = Self.pathList(from: projectResourceRootsText)
             settings.build.includedFiles = projectIncludedFiles
             settings.build.excludedFiles = projectExcludedFiles
@@ -397,18 +386,136 @@ extension EditorViewModel {
             if let runtime {
                 settings.runtime = runtime
             }
-            if settings.build.system.isAdaScript {
-                settings.runtime.entry.scene = settings.editor.startupScene
+            let editedScene = Self.optionalText(from: projectMainSceneText)
+            if editedScene != saved.preferredEditorScene {
+                settings.editor.startupScene = editedScene
+                if settings.build.system.isAdaScript { settings.runtime.entry.scene = editedScene }
             }
-            try EditorProjectStore(fileManager: fileManager).saveProjectSettings(settings, at: projectURL, targetName: targetName)
-            projectSettingsStatusMessage =
-                settings.build.system == .adaScript
-                ? "Project settings saved to .ada/project.json."
-                : "Project settings saved to .ada/project.json and Package.swift."
+            if let buildSystem, buildSystem != saved.build.system {
+                settings.setBuildSystem(buildSystem)
+                settings.captureActiveBuildTarget()
+                try changeProjectBuildSystem(settings, previousSettings: saved, at: projectURL)
+                return
+            }
+            if settings.build.system == .swiftpm, settings.hasDifferentBuildFileSelection(from: saved) {
+                guard let selectedRunTargetName else {
+                    projectSettingsStatusMessage = "Load the package and select an executable target first."
+                    return
+                }
+                try EditorProjectStore(fileManager: fileManager).saveProjectSettings(settings, at: projectURL, targetName: selectedRunTargetName)
+                projectSettingsStatusMessage = "Project settings saved to .ada/project.json and Package.swift."
+            } else {
+                try ProjectSystem.saveProject(settings, at: projectURL, fileManager: fileManager)
+                projectSettingsStatusMessage = "Project settings saved to .ada/project.json."
+            }
             bootstrapWorkspaceIfNeeded(force: true)
         } catch {
             projectSettingsStatusMessage = "Failed to save project settings: \(error.localizedDescription)"
         }
+    }
+
+    private func changeProjectBuildSystem(_ settings: AdaProject, previousSettings: AdaProject, at projectURL: URL) throws {
+        guard canChangeBuildTarget else {
+            projectBuildSystemError = L10n.tr("Stop the current task before changing the build system.")
+            return
+        }
+        do {
+            try EditorDistribution.current.validate(buildSystem: settings.build.system)
+            try ProjectSystem.validate(settings)
+        } catch {
+            projectBuildSystemError = EditorBuildTargetsModel.errorDetail(error)
+            return
+        }
+
+        let manifest = projectURL.appendingPathComponent("Package.swift")
+        let manifestContents: Data?
+        if settings.build.system == .swiftpm {
+            let resolvedRoot = projectURL.resolvingSymlinksInPath().standardizedFileURL
+            let resolvedManifest = manifest.resolvingSymlinksInPath().standardizedFileURL
+            guard resolvedManifest.deletingLastPathComponent().path == resolvedRoot.path,
+                  (try? resolvedManifest.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+                  fileManager.isReadableFile(atPath: resolvedManifest.path) else {
+                projectBuildSystemError = L10n.tr("Add a Package.swift at the project root, or select AdaScript.")
+                return
+            }
+            manifestContents = try Data(contentsOf: manifest)
+        } else {
+            manifestContents = nil
+        }
+
+        projectBuildSystemError = nil
+        projectSettingsStatusMessage = manifestContents == nil ? "Checking AdaScript sources…" : "Checking the SwiftPM package…"
+        isChangingProjectBuildSystem = true
+        workspaceTask = Task { [weak self] in
+            guard let self else { return }
+            let preflight: Result<SwiftPackageModel?, any Error>
+            do {
+                if manifestContents != nil {
+                    preflight = .success(try await self.describeSwiftPackageForSwitch(at: projectURL))
+                } else {
+                    try await Self.validateAdaScriptForSwitch(settings, at: projectURL)
+                    preflight = .success(nil)
+                }
+            } catch {
+                preflight = .failure(error)
+            }
+            guard !Task.isCancelled else { return }
+            self.workspaceTask = nil
+            self.isChangingProjectBuildSystem = false
+            self.projectSettingsStatusMessage = ""
+            guard self.canChangeBuildTarget else { return }
+            do {
+                let package = try preflight.get()
+                let currentSettings = try ProjectSystem.loadProject(at: projectURL, fileManager: self.fileManager)
+                let manifestIsUnchanged = try manifestContents.map { try Data(contentsOf: manifest) == $0 } ?? true
+                guard currentSettings == previousSettings, manifestIsUnchanged else {
+                    self.projectBuildSystemError = L10n.tr("Project settings or Package.swift changed. Review your choices and save again.")
+                    return
+                }
+                try self.persistProjectBuildSystem(settings, package: package, at: projectURL)
+            } catch {
+                self.projectBuildSystemError = EditorBuildTargetsModel.errorDetail(error)
+            }
+        }
+    }
+
+    private func describeSwiftPackageForSwitch(at projectURL: URL) async throws -> SwiftPackageModel {
+        let result = await workspaceService.execute(.describe, projectURL: projectURL)
+        try Task.checkCancellation()
+        guard result.succeeded, let package = SwiftPackageModel.parse(from: result.standardOutput) else {
+            appendOutput(result)
+            throw ProjectSystemError.invalidField(path: "build.system", message: "SwiftPM could not read Package.swift. See Build Output.")
+        }
+        guard !package.executableProducts.isEmpty else {
+            throw ProjectSystemError.invalidField(path: "build.system", message: "Add an executable product to Package.swift before selecting SwiftPM.")
+        }
+        return package
+    }
+
+    @concurrent
+    nonisolated private static func validateAdaScriptForSwitch(_ settings: AdaProject, at projectURL: URL) async throws {
+        try ProjectSystem.validateRunCompatibility(of: settings, at: projectURL, destination: settings.run.destination)
+        _ = try EditorAdaScriptProjectBuilder().prepare(project: settings, at: projectURL)
+    }
+
+    private func persistProjectBuildSystem(_ settings: AdaProject, package: SwiftPackageModel?, at projectURL: URL) throws {
+        try ProjectSystem.saveProject(settings, at: projectURL, fileManager: fileManager)
+        let saved = try ProjectSystem.loadProject(at: projectURL, fileManager: fileManager)
+        projectBuildSystem = saved.build.system
+        projectBuildSystemError = nil
+        projectMainSceneText = saved.preferredEditorScene ?? ""
+        buildTargets.isPresented = false
+        buildTargets.draft = nil
+        buildTargets.refresh(saved)
+        projectSidebar.usesSwiftPM = saved.build.system == .swiftpm
+        projectSidebar.sourceRootTarget = saved.build.system.isAdaScript
+            ? .init(relativePath: saved.paths.sources ?? "Sources", title: saved.runtime.moduleName)
+            : nil
+        packageModel = package
+        selectedRunProduct = saved.activeBuildTarget?.product ?? soleRunProduct
+        projectSettingsStatusMessage = "Project settings saved to .ada/project.json."
+        refreshProjectFiles(logsRefresh: false)
+        bootstrapWorkspaceIfNeeded(force: true)
     }
 
     static func pathList(from text: String) -> [String] {
@@ -448,8 +555,17 @@ extension EditorViewModel {
         packageModel?.executableProducts.map(\.name).sorted() ?? []
     }
 
+    var soleRunProduct: String? {
+        let products = runProducts
+        return products.count == 1 ? products.first : nil
+    }
+
+    var resolvedRunProduct: String? {
+        selectedRunProduct.flatMap { runProducts.contains($0) ? $0 : nil } ?? soleRunProduct
+    }
+
     var selectedRunTargetName: String? {
-        guard let productName = selectedRunProduct ?? runProducts.first else {
+        guard let productName = resolvedRunProduct else {
             return nil
         }
         return packageModel?.executableTargetName(forProductNamed: productName)

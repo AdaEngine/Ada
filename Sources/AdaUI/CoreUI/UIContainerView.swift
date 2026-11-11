@@ -35,7 +35,7 @@ public protocol UIWindowDragRegionResolving: AnyObject {
     func uiAllowsWindowDrag(at windowPoint: Point, with event: MouseEvent) -> Bool
 }
 
-/// A container view that contains a view tree.
+/// Hosts a view tree with a transparent background by default.
 public final class UIContainerView<Content: View>: UIView, ViewOwner {
     /// The container view of the container view.
     var containerView: UIView? {
@@ -65,6 +65,7 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
             environment: UIHotReloadRuntime.initialHostEnvironment ?? EnvironmentValues()
         )
         super.init()
+        self.backgroundColor = .clear
         viewTree.setViewOwner(self)
     }
 
@@ -284,6 +285,9 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
     }
 
     override public func onKeyEvent(_ event: KeyEvent) {
+        if ContextMenuPresentationCenter.handleSelectionKey?(event, window) == true {
+            return
+        }
         if event.status == .down, event.keyCode == .escape {
             if ContextMenuPresentationCenter.dismissAll?() == true {
                 return
@@ -595,7 +599,7 @@ extension UIContainerView: UIInspectionOverlayStateProviding {
     var inspectionFocusedNode: ViewNode? {
         self.focusManager.focusedNode
     }
-    
+
     var inspectionHitTestNode: ViewNode? {
         self.inspectionLastHitTestNode
     }

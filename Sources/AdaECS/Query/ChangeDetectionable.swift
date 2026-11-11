@@ -42,5 +42,6 @@ extension ChangeDetectionable {
             .change?
             .getPointer()
             .pointee = self.changeTick.currentTick
+        self.changeTick.observedWrite?.record()
     }
 }

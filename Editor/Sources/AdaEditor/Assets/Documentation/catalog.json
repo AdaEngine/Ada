@@ -315,7 +315,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Movie Maker\n• Terrain\n• visionOS Windowed Mode",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• Terrain\n• visionOS Windowed Mode",
         "level": 0,
         "links": [
           {
@@ -343,8 +343,16 @@
             "destination": "AnimationIK"
           },
           {
+            "title": "Game diagnostics overlay",
+            "destination": "GameDiagnosticsOverlay"
+          },
+          {
             "title": "Movie Maker",
             "destination": "MovieMaker"
+          },
+          {
+            "title": "Pipelined Rendering",
+            "destination": "PipelinedRendering"
           },
           {
             "title": "Terrain",
@@ -2853,6 +2861,30 @@
     "blocks": [
       {
         "kind": "heading",
+        "text": "Choose the project build system",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In standalone desktop Studio, open **Project Settings → Project** and choose\n**AdaScript** or **SwiftPM** under **Build System**. **Save Project Settings**\napplies the choice to the whole project and all its named build targets. SwiftPM\nrequires a `Package.swift` in the project root with an executable product.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For example, a SwiftPM manifest can declare\n`.executableTarget(name: \"MyGame\", path: \"Native\")`. Add a Swift entry point in\n`Native/`, then choose **SwiftPM** and save. In the project navigator,\n**Targets** shows `MyGame` and the source files SwiftPM assigns to it, including\nfiles in custom directories. Use **Files** to browse the full project.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "On the local desktop, **Run** starts the Swift executable. A Swift AdaEngine\napp can open its first window in its `@main` app code without any `.ascn` file.\nIf the package has several executables, choose **Executable Product** in\n**Edit Build Targets…**. The optional editor scene is used for scene editing\nand scene Play. AdaScript projects use the configured scene, root view, or\nstartup system.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
         "text": "Named build targets",
         "level": 2,
         "links": []
@@ -2866,6 +2898,24 @@
       {
         "kind": "text",
         "text": "Targets persist in `.ada/project.json` as `buildTargets` with `activeBuildTargetID`.\nExisting projects retain their settings and need no migration. Opening the target\neditor prepares a Main target from those settings; only Save writes it to disk.\nActivating a target projects its settings onto the ordinary `build`, `run`,\n`runtime`, `editor.startupScene` and `paths.resourceRoots` fields, so existing\nPlay/build/export/CLI consumers use the same active configuration. Ordinary\nProject Settings saves update the active target. Project identity, input actions,\nengine paths and AI settings remain shared. SwiftPM targets also remember the\nexecutable product and apply file/resource selection through the manifest editor.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Game diagnostics overlay",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In **Edit Build Targets…**, turn on **Diagnostics overlay** for a local desktop\ntarget, save, and run that target. FPS and frame time appear in the top-left of\nthe game window. The readout passes input through to the game. It shows update\ncadence and mean time between updates, including stalls.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The flag defaults to off. Duplicate a target to copy its value. You can keep one\ntarget for everyday play and enable diagnostics on a separate performance\ntarget. The setting applies to local AdaScript and compatible Swift product\nruns on Windows, macOS, and Linux, in Debug and Release. Swift apps need a\nversion of AdaEngine with overlay support and a standard `DefaultAppWindow`\nor `WindowGroup`. Other destinations keep the saved flag for future desktop\nruns.",
         "level": 0,
         "links": []
       },
@@ -4472,6 +4522,184 @@
       {
         "kind": "text",
         "text": "Use `Asset` and `AssetsManager.registerAssetType` for resources with a different\nruntime structure, such as an Aseprite animation containing frames, durations\nand tags. A custom asset type does not automatically extend the formats accepted\nby `Image`. GPU texture containers with mipmaps or compressed blocks should\npreserve those contents through a dedicated texture asset/loading path.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "PipelinedRendering",
+    "title": "Pipelined Rendering",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/PipelinedRendering.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Render a scene one frame behind its simulation to overlap rendering with the next frame's work.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Overview",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "By default a frame runs every world in sequence: the scene simulates, extracts its renderable state,\nrenders, and only then can the window's UI and the next frame start. With pipelined rendering, the\nscene's render world draws frame N while the simulation and UI already prepare frame N+1. Extraction is\nthe only point where the two meet: before extracting frame N+1, the engine waits for frame N to finish.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A frame then takes about as long as the slower of the two paths instead of their sum. The cost is one\nframe of input latency, about 7 ms on a 143 Hz display. Pipelining does not reduce GPU time: when the GPU\nis already the limit, the frame rate does not change.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Enable it for a `SceneView`:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "SceneView(useSceneCameras: true, make: { app in\n    app.addPlugin(RenderWorldPlugin())\n    // ...\n}, updateContent: { _, _ in })\n.pipelinedRendering()",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Or for any render world you manage yourself:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "renderWorld.insertResource(RenderPipelining(isEnabled: true))",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Set `ADAENGINE_PIPELINED_RENDERING=0` or `=1` to override the setting of every world that declares it,\nfor example to compare both modes. WebAssembly builds always render serially.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Rules for scene code",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "While a frame is in flight, the simulation and the renderer run at the same time. Two rules keep them\napart:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• **Render systems read the scene only during extraction.** Use `Extract` parameters only in systems\n  registered on the `.extract` schedule, and copy what later schedules need into render-world resources.\n  The `MainWorld` reference is removed after extraction; debug builds assert when `Extract` is read later.\n• **Do not mutate assets in place while they are rendered.** The renderer draws a snapshot of each\n  `PBRMaterial` taken at extraction, so material edits are safe and appear one frame later. Other assets\n  such as meshes and textures should be replaced, not edited in place, while a frame may be rendering them.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Tooling entry points such as `AppWorlds.withWorldAccess(_:)` wait for the frame in flight before they run.\nRender statistics resources are synchronized and can be read at any time.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Measuring",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Run with `ADAENGINE_STALL_PROBE=1` to print slow operations, including `App.Update.*` and `Schedule.*`\nspans for each world. With pipelining on, the scene's update on the main thread shrinks to its simulation\nand extraction while its render world appears as a separate span. The Sponza technical example also\nprints per-second frame statistics with `ADAENGINE_SPONZA_FRAME_LOG=1`.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "GameDiagnosticsOverlay",
+    "title": "Game diagnostics overlay",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/GameDiagnosticsOverlay.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "See the game's update rate while you play. The overlay shows **FPS** and\n**Frame time** in the top-left corner of the game window. Mouse and keyboard\ninput still reach the game under the overlay.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Enable it in Ada Studio",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "1\\. Open the build-target picker and choose **Edit Build Targets…**.\n2\\. Select a target with a local desktop **Run Destination**, then turn on\n   **Diagnostics overlay** and select **Save Build Targets**.\n3\\. Run the selected target. The first readings appear after about one second.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For example, duplicate the **Main** target, call the copy **Performance**, and\nenable the overlay only for that copy. Run **Performance** to inspect frame\npacing, then select and run **Main** to play without the readout.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The setting applies to local product runs on Windows, macOS, and Linux for\nAdaScript games and compatible Swift apps. It works in both Debug and Release.\nIt is off by default and applies on the next run. Scene-document Play, debugger\nsessions, AdaPlayer, exports, and Movie Maker run independently of this setting.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Enable it from a shell",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For a Swift app using `DefaultAppWindow` or `WindowGroup`, set the environment\nvariable when you launch the product. The app must be built with an AdaEngine\nversion that includes the overlay.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "ADAENGINE_DIAGNOSTICS_OVERLAY=1 swift run -c release",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "$env:ADAENGINE_DIAGNOSTICS_OVERLAY = '1'\nswift run -c release\nRemove-Item Env:ADAENGINE_DIAGNOSTICS_OVERLAY",
+        "language": "powershell",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Read the numbers",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**FPS** is the number of game update intervals per second. **Frame time** is the\naverage duration of those intervals in milliseconds. At a steady 60 FPS, it\nreads about 16.7 ms. Both numbers include frame pacing and stalls between\nupdates. They describe the game's update loop. Use profiling tools to measure\nGPU work or investigate individual slow systems.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The overlay refreshes its text about once per second. It displays dashes while\ncollecting the first sample window and after an explicit simulation pause.",
         "level": 0,
         "links": []
       }

@@ -48,7 +48,12 @@ final class EditorViewModel {
             }
         }
     }
-    var packageModel: SwiftPackageModel?
+    var packageModel: SwiftPackageModel? {
+        didSet { projectSidebar.swiftPackage = projectSidebar.usesSwiftPM ? packageModel : nil }
+    }
+    var projectBuildSystem: AdaProjectBuildSystem?
+    var projectBuildSystemError: String?
+    var isChangingProjectBuildSystem = false
     /// Counts and per-test results of the latest AdaScript test run; nil before the first run.
     var adaScriptTestSummary: EditorAdaScriptTestSummary?
     var gameLogLines: [EditorWorkspaceLogLine] = []
@@ -116,7 +121,14 @@ final class EditorViewModel {
     @ObservationIgnored
     let previewLibrary = EditorPreviewDynamicLibrary()
     @ObservationIgnored
-    var workspaceTask: Task<Void, Never>?
+    var workspaceTask: Task<Void, Never>? {
+        didSet {
+            if workspaceTask == nil, swiftPackageRefreshPending {
+                Task { [weak self] in self?.refreshPendingSwiftPackageTargets() }
+            }
+        }
+    }
+    @ObservationIgnored var swiftPackageRefreshPending = false
     @ObservationIgnored
     var sourceControlTask: Task<Void, Never>?
     @ObservationIgnored
@@ -259,6 +271,7 @@ final class EditorViewModel {
         self.footer = footer
         self.workspaceStatus = workspaceStatus
         self.packageModel = packageModel
+        self.projectBuildSystem = savedProject?.build.system
         self.outputLines = outputLines ?? (project == nil ? AdaEngineStyleContent.logLines.map { EditorWorkspaceLogLine(text: $0) } : [])
         self.buildActivity = buildActivity
         self.problems = problems
@@ -280,7 +293,7 @@ final class EditorViewModel {
         #endif
         self.projectDisplayNameText = savedProject?.project.displayName ?? savedProject?.project.name ?? project?.name ?? ""
         self.projectBundleIdentifierText = savedProject?.project.bundleIdentifier ?? ""
-        self.projectMainSceneText = savedProject?.runtime.entry.scene ?? savedProject?.editor.startupScene ?? ""
+        self.projectMainSceneText = savedProject?.preferredEditorScene ?? ""
         self.projectResourceRootsText = savedProject?.paths.resourceRoots.joined(separator: "\n") ?? ""
         self.projectIncludedFiles = savedProject?.build.includedFiles ?? []
         self.projectExcludedFiles = savedProject?.build.excludedFiles ?? []
@@ -289,6 +302,8 @@ final class EditorViewModel {
         self.selectedTestFilter = selectedTestFilter
         self.playModeState = playModeState
         if let savedProject { self.buildTargets.refresh(savedProject) }
+        self.projectSidebar.usesSwiftPM = savedProject?.build.system == .swiftpm
+        self.projectSidebar.swiftPackage = self.projectSidebar.usesSwiftPM ? packageModel : nil
         self.inspectorSidebar.textureAssets = Self.textureAssets(from: self.projectSidebar.items)
         self.inspectorSidebar.tileMapAssets = Self.tileMapAssets(from: self.projectSidebar.items)
         self.inspectorSidebar.modelAssets = Self.modelAssets(from: self.projectSidebar.items)

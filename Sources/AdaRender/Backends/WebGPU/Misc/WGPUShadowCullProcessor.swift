@@ -18,7 +18,7 @@
             var partCount: UInt32
             var strideWords: UInt32
             var copiedWords: UInt32
-            var padding0: UInt32 = 0
+            var distanceFadeWord: UInt32
             var padding1: UInt32 = 0
             var padding2: UInt32 = 0
         }
@@ -148,7 +148,8 @@
                 viewCount: UInt32(views.count),
                 partCount: UInt32(input.parts.count),
                 strideWords: UInt32(input.instanceStride / 4),
-                copiedWords: UInt32(input.copiedBytes / 4)
+                copiedWords: UInt32(input.copiedBytes / 4),
+                distanceFadeWord: input.distanceFadeOffset.map { UInt32($0 / 4) } ?? UInt32.max
             )
             unsafe withUnsafeBytes(of: &params) { bytes in
                 unsafe context.device.queue.writeBuffer(buffer: buffers.params, bufferOffset: 0, data: bytes)

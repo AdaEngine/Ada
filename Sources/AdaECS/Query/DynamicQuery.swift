@@ -137,11 +137,11 @@ public final class DynamicQueryCursor: @unchecked Sendable {
 
         while archetypePosition < state.archetypeIndecies.count {
             let archetypeIndex = state.archetypeIndecies[archetypePosition]
-            guard world.archetypes.archetypes.indices.contains(archetypeIndex) else {
+            guard world.storageArchetypes.archetypes.indices.contains(archetypeIndex) else {
                 moveToNextArchetype()
                 continue
             }
-            let archetype = world.archetypes.archetypes[archetypeIndex]
+            let archetype = world.storageArchetypes.archetypes[archetypeIndex]
             guard chunkPosition < archetype.chunks.chunks.count else {
                 moveToNextArchetype()
                 continue
@@ -198,8 +198,14 @@ public final class DynamicQueryCursor: @unchecked Sendable {
     public func updateTyped<C: Component>(_ type: C.Type, componentAt index: Int, _ update: (inout C) throws -> Void) rethrows -> Bool {
         guard componentIDs.indices.contains(index), componentIDs[index] == type.identifier,
               columns.indices.contains(index), rowPosition >= 0, entityID >= 0, let column = columns[index] else { return false }
-        let pointer = unsafe column.data.advanced(by: rowPosition * column.stride).assumingMemoryBound(to: C.self)
-        defer { unsafe column.changedTicks.advanced(by: rowPosition).pointee = state.world.currentTick }
+        let row = rowPosition
+        let entity = entityID
+        let world: World = state.world
+        let pointer = unsafe column.data.advanced(by: row * column.stride).assumingMemoryBound(to: C.self)
+        defer {
+            unsafe column.changedTicks.advanced(by: row).pointee = world.currentTick
+            world.componentChanges.record(entity: entity, component: type.identifier)
+        }
         try unsafe update(&pointer.pointee)
         return true
     }
@@ -252,6 +258,7 @@ public final class DynamicQueryCursor: @unchecked Sendable {
             return false
         }
         unsafe column.changedTicks.advanced(by: rowPosition).pointee = state.world.currentTick
+        state.world.componentChanges.record(entity: entityID, component: componentIDs[componentIndex])
         return true
     }
 

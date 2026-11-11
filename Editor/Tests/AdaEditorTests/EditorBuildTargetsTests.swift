@@ -124,6 +124,8 @@ extension EditorLocalizationTests {
         #expect(model.buildTargets.draft?.buildTargets.count == 2)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.BuildTargets.Scene.Assets/Scenes/Test.ascn"))
         #expect(model.buildTargets.editedTarget?.runtime.entry.scene == "Assets/Scenes/Test.ascn")
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.BuildTargets.DiagnosticsOverlay"))
+        #expect(model.buildTargets.editedTarget?.run.diagnosticsOverlay == true)
         EditorLocalization.shared.preference = .russian
         for _ in 0..<10 { await Task.yield(); container.update(1 / 60) }
         container.layoutIfNeeded()
@@ -133,6 +135,7 @@ extension EditorLocalizationTests {
         #expect(cancel.absoluteFrame.maxX < save.absoluteFrame.minX)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.BuildTargets.Delete"))
         #expect(model.buildTargets.draft?.buildTargets.count == 1)
+        #expect(model.buildTargets.editedTarget?.run.diagnosticsOverlay == false)
         #expect(try ProjectSystem.loadProject(at: root).buildTargets.isEmpty)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.BuildTargets.Save"))
         for _ in 0..<200 where model.workspaceTask != nil { try await Task.sleep(for: .milliseconds(10)) }

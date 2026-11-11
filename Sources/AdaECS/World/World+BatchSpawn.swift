@@ -49,10 +49,10 @@ extension World {
             guard let indices = groups[target] else {
                 continue
             }
-            archetypes.archetypes[target].reserveBatchCapacity(indices.count)
-            let firstRow = archetypes.archetypes[target].entities.count
-            archetypes.archetypes[target].entities.append(contentsOf: indices.lazy.map { batch[$0] })
-            let chunkLocations = archetypes.archetypes[target].chunks.insertBatch(
+            storageArchetypes.archetypes[target].reserveBatchCapacity(indices.count)
+            let firstRow = storageArchetypes.archetypes[target].entities.count
+            storageArchetypes.archetypes[target].entities.append(contentsOf: indices.lazy.map { batch[$0] })
+            let chunkLocations = storageArchetypes.archetypes[target].chunks.insertBatch(
                 batch,
                 components: values,
                 indices: indices,
@@ -61,7 +61,7 @@ extension World {
             for offset in chunkLocations.indices {
                 let chunk = chunkLocations[offset]
                 locations[indices[offset]] = EntityLocation(
-                    archetypeId: archetypes.archetypes[target].id,
+                    archetypeId: storageArchetypes.archetypes[target].id,
                     archetypeRow: firstRow + offset,
                     chunkIndex: chunk.chunkIndex,
                     chunkRow: chunk.entityRow

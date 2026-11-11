@@ -1,5 +1,25 @@
 # Build & Export settings
 
+## Choose the project build system
+
+In standalone desktop Studio, open **Project Settings → Project** and choose
+**AdaScript** or **SwiftPM** under **Build System**. **Save Project Settings**
+applies the choice to the whole project and all its named build targets. SwiftPM
+requires a `Package.swift` in the project root with an executable product.
+
+For example, a SwiftPM manifest can declare
+`.executableTarget(name: "MyGame", path: "Native")`. Add a Swift entry point in
+`Native/`, then choose **SwiftPM** and save. In the project navigator,
+**Targets** shows `MyGame` and the source files SwiftPM assigns to it, including
+files in custom directories. Use **Files** to browse the full project.
+
+On the local desktop, **Run** starts the Swift executable. A Swift AdaEngine
+app can open its first window in its `@main` app code without any `.ascn` file.
+If the package has several executables, choose **Executable Product** in
+**Edit Build Targets…**. The optional editor scene is used for scene editing
+and scene Play. AdaScript projects use the configured scene, root view, or
+startup system.
+
 ## Named build targets
 
 The shared desktop toolbar shows a build-target picker next to the run platform.
@@ -20,6 +40,21 @@ Play/build/export/CLI consumers use the same active configuration. Ordinary
 Project Settings saves update the active target. Project identity, input actions,
 engine paths and AI settings remain shared. SwiftPM targets also remember the
 executable product and apply file/resource selection through the manifest editor.
+
+### Game diagnostics overlay
+
+In **Edit Build Targets…**, turn on **Diagnostics overlay** for a local desktop
+target, save, and run that target. FPS and frame time appear in the top-left of
+the game window. The readout passes input through to the game. It shows update
+cadence and mean time between updates, including stalls.
+
+The flag defaults to off. Duplicate a target to copy its value. You can keep one
+target for everyday play and enable diagnostics on a separate performance
+target. The setting applies to local AdaScript and compatible Swift product
+runs on Windows, macOS, and Linux, in Debug and Release. Swift apps need a
+version of AdaEngine with overlay support and a standard `DefaultAppWindow`
+or `WindowGroup`. Other destinations keep the saved flag for future desktop
+runs.
 
 AdaScript source inclusion/exclusion applies to project sources in local builds
 and native exports; library dependencies remain included. Paths are relative to

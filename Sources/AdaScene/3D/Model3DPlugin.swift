@@ -137,7 +137,7 @@ func ExtractModel3D(
 ) {
     terrainUniforms.wrappedValue.beginFrame()
     cache.wrappedValue.extract(
-        sourceWorldID: mainWorld.wrappedValue?.world.id,
+        sourceWorld: mainWorld.wrappedValue?.world,
         elapsed: clock.wrappedValue?.elapsed ?? 0,
         query: query.wrappedValue,
         instanceQuery: instanceQuery.wrappedValue,

@@ -123,8 +123,10 @@ struct EditorBuildTargetsDialog: View {
     private var settings: some View {
         VStack(alignment: .leading, spacing: 14) {
             field("Target Name", id: "Name", text: Binding(get: { model.editedTarget?.name ?? "" }, set: { value in model.edit { $0.name = value } }))
-            field("Startup Scene", id: "Scene", text: Binding(get: { model.sceneText }, set: setScene))
-            sceneList
+            if model.draft?.build.system.isAdaScript == true {
+                field("Startup Scene", id: "Scene", text: Binding(get: { model.sceneText }, set: setScene))
+                sceneList
+            }
             Text(L10n.text("Build Configuration")).font(.system(size: 12, weight: .semibold))
             HStack(spacing: 8) {
                 ForEach(["debug", "release"], id: \.self) { configuration in
@@ -145,10 +147,22 @@ struct EditorBuildTargetsDialog: View {
             }
             diagnosticsOverlaySetting
             if model.draft?.build.system == .swiftpm {
-                field("Executable Product", id: "Product", text: Binding(get: { model.productText }, set: { value in
-                    model.productText = value
-                    model.edit { $0.product = EditorViewModel.optionalText(from: value) }
-                }))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(L10n.text("Executable Product")).font(.system(size: 12))
+                    EditorEnumField(
+                        cases: [""] + viewModel.runProducts,
+                        selection: Binding(get: {
+                            viewModel.runProducts.contains(model.productText) ? model.productText : (viewModel.soleRunProduct ?? "")
+                        }, set: { value in
+                            model.productText = value
+                            model.edit { $0.product = EditorViewModel.optionalText(from: value) }
+                        }),
+                        accessibilityID: "AdaEditor.BuildTargets.Product",
+                        labels: ["": L10n.tr("Select an executable product")],
+                        localizesValues: false
+                    )
+                    .disabled(viewModel.runProducts.isEmpty)
+                }
             }
             Text(L10n.text("Run Arguments (one per line)")).font(.system(size: 12))
             TextEditor(text: Binding(get: { model.argumentsText }, set: { value in

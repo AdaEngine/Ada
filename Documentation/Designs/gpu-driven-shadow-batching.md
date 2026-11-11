@@ -11,6 +11,7 @@ Bevy 0.20-dev (`bevy_pbr/src/render/light.rs`, `bevy_light/src/lib.rs`, `mesh_pr
 Existing contracts: [ADR-0018 local lights and shadow scheduling](../ArchitectureDecisions/0018-local-lights-and-shadow-scheduling.md),
 [ADR-0020 GPU visibility](../ArchitectureDecisions/0020-gpu-visibility-and-animation-lod.md).
 Plan: [2026-11-09-GPUDrivenShadowBatching.md](../Plans/2026-11-09-GPUDrivenShadowBatching.md).
+Proposed follow-up: [Incremental mesh extraction and directional cascades](incremental-mesh-extraction-and-cascades.md).
 
 ## 1. Problem
 

@@ -43,7 +43,8 @@ extension EditorViewModel {
         let saved = (try? Data(contentsOf: sessionURL)).flatMap { try? JSONDecoder().decode(EditorDocumentSession.self, from: $0) }
         lastRememberedProjectFile = saved?.relativePath
         let metadata = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager)
-        let candidates = [saved?.relativePath, metadata?.runtime.entry.scene, metadata?.editor.startupScene, "Assets/Scenes/Main.ascn"]
+        let runtimeScene = metadata?.build.system.isAdaScript == true ? metadata?.runtime.entry.scene : nil
+        let candidates = [saved?.relativePath, runtimeScene, metadata?.editor.startupScene, "Assets/Scenes/Main.ascn"]
             .compactMap { $0 }
         let item =
             candidates.lazy

@@ -6,6 +6,7 @@ including decisions D1–D5 as written.
 Date: 2026-11-09.
 Classification: improvement of an existing subsystem (the `AppWorlds` frame loop and the render world).
 Evidence: [Sponza load, pacing and binding cost](../Performance/SponzaLoadAndPacing-2026-11-09.md).
+Proposed follow-up: [Incremental mesh extraction and directional cascades](incremental-mesh-extraction-and-cascades.md).
 
 ## 1. Problem
 

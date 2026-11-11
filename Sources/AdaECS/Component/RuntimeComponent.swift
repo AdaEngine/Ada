@@ -325,7 +325,7 @@ extension World {
         guard let location = entities.entities[entity] else {
             return nil
         }
-        return archetypes.archetypes[location.archetypeId]
+        return storageArchetypes.archetypes[location.archetypeId]
             .chunks.chunks[location.chunkIndex]
             .getRuntimeComponent(componentID, at: location.chunkRow)
     }

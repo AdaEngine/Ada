@@ -23,7 +23,7 @@ public struct UIViewUniform: Resource {
 
     mutating func retainViews(_ views: [Entity.ID]) { bufferedViews.retainViews(views) }
 
-    mutating func write(_ uniform: GlobalViewUniform, view: Entity.ID, pass: Int, device: RenderDevice) -> BufferData<GlobalViewUniform> {
+    mutating func write(_ uniform: GlobalViewUniform, view: Entity.ID, pass: Int = 0, device: RenderDevice) -> BufferData<GlobalViewUniform> {
         bufferedViews.write(uniform, view: view, pass: pass, device: device)
     }
 }
@@ -59,15 +59,13 @@ public struct UIRenderNode: RenderNode {
     private var glassBackground
 
     private let isWindowOverlay: Bool
+    public let inputResources: [RenderSlot]
 
     public init() { self.init(isWindowOverlay: false) }
 
     init(isWindowOverlay: Bool) {
         self.isWindowOverlay = isWindowOverlay
-    }
-
-    public var inputResources: [RenderSlot] {
-        isWindowOverlay ? [] : [RenderSlot(name: InputNode.view, kind: .entity)]
+        self.inputResources = isWindowOverlay ? [] : [RenderSlot(name: InputNode.view, kind: .entity)]
     }
 
     public func update(from world: World) {
@@ -95,11 +93,15 @@ public struct UIRenderNode: RenderNode {
         try query.forEach { entity, camera, target, _, source in
             let targetWindowId = camera.targetWindowId(from: primaryWindowId)
             if isWindowOverlay {
-                guard !drewWindowOverlay, camera.isActive, targetWindowId == primaryWindowId.windowId else { return }
+                guard !drewWindowOverlay, camera.isActive, targetWindowId == primaryWindowId.windowId else {
+                    return
+                }
             } else if entity != view {
                 return
             }
-            guard let mainTexture = isWindowOverlay ? target.outputTexture : target.mainTexture else { return }
+            guard let mainTexture = isWindowOverlay ? target.outputTexture : target.mainTexture else {
+                return
+            }
 
             // A pixel-perfect camera drew its scene at a low resolution. The UI is not part of that picture: the scene is
             // scaled into a picture of the output's size first, and the UI is drawn onto it at full resolution.

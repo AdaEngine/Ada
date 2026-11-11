@@ -63,6 +63,8 @@ extension EditorViewModel {
         studioTools.scheduleReload()
         let selectedID = projectSidebar.selectedItem?.id
         let items = Self.projectTreeItems(for: project, fileManager: fileManager)
+        let shouldRefreshPackage = projectBuildSystem == .swiftpm
+            && (logsRefresh || Self.swiftPackageInputs(items) != Self.swiftPackageInputs(projectSidebar.items))
         projectSidebar.replaceItems(items)
         if let selected = items.first(where: { $0.id == selectedID }) {
             projectSidebar.select(selected)
@@ -72,6 +74,33 @@ extension EditorViewModel {
         reloadScriptableObjectSupport()
         if logsRefresh {
             appendOutput("Refreshed project files")
+        }
+        if shouldRefreshPackage {
+            swiftPackageRefreshPending = true
+            refreshPendingSwiftPackageTargets()
+        }
+    }
+
+    private static func swiftPackageInputs(_ items: [EditorProjectSidebarViewModel.Item]) -> Set<String> {
+        let sourceExtensions: Set<String> = ["swift", "c", "cc", "cpp", "cxx", "m", "mm", "s"]
+        return Set(items.lazy.filter { item in
+            !item.isFolder && (item.relativePath == "Package.swift"
+                || item.relativePath.split(separator: ".").last.map { sourceExtensions.contains($0.lowercased()) } == true)
+        }.map(\.relativePath))
+    }
+
+    func refreshPendingSwiftPackageTargets() {
+        guard swiftPackageRefreshPending, workspaceTask == nil else { return }
+        swiftPackageRefreshPending = false
+        guard projectBuildSystem == .swiftpm, let projectURL, EditorDistribution.current.supportsSwiftProjects else { return }
+        projectSidebar.swiftTargetsFailed = false
+        workspaceTask = Task { [weak self, workspaceService] in
+            let result = await workspaceService.execute(.describe, projectURL: projectURL)
+            guard let self, !Task.isCancelled else { return }
+            self.workspaceTask = nil
+            self.packageModel = result.succeeded ? SwiftPackageModel.parse(from: result.standardOutput) : nil
+            self.projectSidebar.swiftTargetsFailed = self.packageModel == nil
+            if self.projectSidebar.swiftTargetsFailed { self.appendOutput(result) }
         }
     }
 

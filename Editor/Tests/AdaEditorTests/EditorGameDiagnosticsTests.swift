@@ -43,6 +43,9 @@ struct EditorGameDiagnosticsTests {
         defer { try? FileManager.default.removeItem(at: root) }
         var project = ProjectSystem.defaultProject(projectName: "Game", buildSystem: .swiftpm)
         project.run.environment = ["ADAENGINE_DIAGNOSTICS_OVERLAY": "0", "GAME_MODE": "test"]
+        #if os(Windows)
+        project.run.environment["adaengine_diagnostics_overlay"] = "0"
+        #endif
         try ProjectSystem.saveProject(project, at: root)
         let service = SwiftPMWorkspaceService()
         let toolchain = SwiftToolchain(swiftExecutablePath: "swift", sourceKitLSPExecutablePath: nil)
@@ -52,9 +55,12 @@ struct EditorGameDiagnosticsTests {
             toolchain: toolchain
         )
         #expect(command.environment["ADAENGINE_DIAGNOSTICS_OVERLAY"] == "1")
+        #if os(Windows)
+        #expect(command.environment["adaengine_diagnostics_overlay"] == nil)
+        #endif
         #expect(command.environment["GAME_MODE"] == "test")
         #expect(command.arguments.suffix(3) == ["--", "--level", "test"])
-        let build = service.makeCommand(.build(target: "Game"), projectURL: root, toolchain: toolchain)
+        let build = service.makeCommand(.build(target: "Game", buildTests: false), projectURL: root, toolchain: toolchain)
         #expect(build.environment["ADAENGINE_DIAGNOSTICS_OVERLAY"] == nil)
     }
 }

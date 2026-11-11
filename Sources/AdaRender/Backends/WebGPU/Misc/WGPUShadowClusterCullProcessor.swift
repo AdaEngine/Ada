@@ -15,7 +15,10 @@
         /// multiple of `maximumRun`) writes one draw covering the run, compacted per (view, part) with a counter.
         static let cull = """
             struct Cluster { minimum: vec4f, maximum: vec4f, firstIndex: u32, indexCount: u32, part: u32, instance: u32 }
-            struct View { planes: array<vec4f, 6>, culls: u32, pad0: u32, pad1: u32, pad2: u32 }
+            struct View {
+                planes: array<vec4f, 6>, culls: u32, pad0: u32, pad1: u32, pad2: u32,
+                distanceCamera: vec4f,
+            }
             struct Params { clusterCount: u32, viewCount: u32, partCount: u32, pad0: u32 }
             struct Draw { indexCount: u32, instanceCount: u32, firstIndex: u32, baseVertex: i32, firstInstance: u32 }
             const maximumRun = \(maximumRun)u;

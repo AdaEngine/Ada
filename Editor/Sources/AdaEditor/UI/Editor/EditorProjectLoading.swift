@@ -51,7 +51,8 @@ enum EditorProjectStartupLoader {
         await onPhase(.document)
         let sessionURL = root.appendingPathComponent(".ada/workspace/editor-session.json")
         let saved = (try? Data(contentsOf: sessionURL)).flatMap { try? JSONDecoder().decode(EditorDocumentSession.self, from: $0) }
-        let candidates = [saved?.relativePath, metadata.runtime.entry.scene, metadata.editor.startupScene, "Assets/Scenes/Main.ascn"]
+        let runtimeScene = metadata.build.system.isAdaScript ? metadata.runtime.entry.scene : nil
+        let candidates = [saved?.relativePath, runtimeScene, metadata.editor.startupScene, "Assets/Scenes/Main.ascn"]
             .compactMap { $0 }
         let item = candidates.lazy.compactMap { path in items.first { !$0.isFolder && $0.relativePath == path } }.first
             ?? items.first { $0.kind == .scene }

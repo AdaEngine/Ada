@@ -3,11 +3,17 @@
         /// One thread per (view, caster). Mirrors `MeshVisibilityFrustum3D.intersects` with a relative tolerance
         /// toward drawing, so GPU float differences can only add (harmless) draws, never drop one.
         static let cull = """
-            struct Caster { minimum: vec4f, maximum: vec4f, part: u32, instance: u32, pad0: u32, pad1: u32 }
-            struct View { planes: array<vec4f, 6>, culls: u32, pad0: u32, pad1: u32, pad2: u32 }
+            struct Caster {
+                minimum: vec4f, maximum: vec4f, part: u32, instance: u32, fadeDistance: f32, pad: u32,
+                distanceCenter: vec4f,
+            }
+            struct View {
+                planes: array<vec4f, 6>, culls: u32, pad0: u32, pad1: u32, pad2: u32,
+                distanceCamera: vec4f,
+            }
             struct Params {
                 casterCount: u32, viewCount: u32, partCount: u32, strideWords: u32,
-                copiedWords: u32, pad0: u32, pad1: u32, pad2: u32,
+                copiedWords: u32, distanceFadeWord: u32, pad1: u32, pad2: u32,
             }
             struct Draw {
                 indexCount: u32, instanceCount: atomic<u32>, firstIndex: u32, baseVertex: i32, firstInstance: u32,
@@ -43,13 +49,25 @@
                 if (i >= params.casterCount * params.viewCount) { return; }
                 let v = i / params.casterCount;
                 let c = casters[i % params.casterCount];
-                if (!visible(c, views[v])) { return; }
+                let view = views[v];
+                if (!visible(c, view)) { return; }
+                var removed = 0.0;
+                if (view.distanceCamera.w != 0.0 && c.maximum.w > 0.0) {
+                    let distance = length(c.distanceCenter.xyz - view.distanceCamera.xyz);
+                    if (distance >= c.maximum.w) { return; }
+                    if (c.fadeDistance > 0.0) {
+                        removed = 1.0 - clamp((c.maximum.w - distance) / c.fadeDistance, 0.0, 1.0);
+                    }
+                }
                 let draw = v * params.partCount + c.part;
                 let destination = v * params.casterCount + segments[c.part] + atomicAdd(&draws[draw].instanceCount, 1u);
                 let source = c.instance * params.strideWords;
                 let output = destination * params.strideWords;
                 for (var word = 0u; word < params.copiedWords; word++) {
                     instanceOutput[output + word] = instanceInput[source + word];
+                }
+                if (params.distanceFadeWord < params.copiedWords && removed > 0.0) {
+                    instanceOutput[output + params.distanceFadeWord] = bitcast<u32>(removed);
                 }
             }
             """

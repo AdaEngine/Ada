@@ -99,7 +99,10 @@ public struct QueryBuilderTargets<each T>: QueryBuilder where repeat each T: Wor
     @inlinable
     @inline(__always)
     public static func initState(world: World) -> ComponentsStates {
-        (repeat (each T)._initState(world: world))
+        for target in repeat (each T).self {
+            world.checkQueryWriter(target)
+        }
+        return (repeat (each T)._initState(world: world))
     }
 
     @inlinable

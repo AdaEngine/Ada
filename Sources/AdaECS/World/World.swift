@@ -29,6 +29,7 @@ public final class World: @unchecked Sendable, Codable {
     /// The unique identifier of the world.
     public let id = ID()
     public let name: String?
+    package let componentChanges = ComponentChangeJournal()
 
     public private(set) var changeTick = ManagedAtomic<Int>(1)
     public private(set) var lastTick: Tick = Tick(value: 0)
@@ -39,7 +40,22 @@ public final class World: @unchecked Sendable, Codable {
 
     /// The archetypes of the world.
     public private(set) var entities: Entities = Entities()
-    public private(set) var archetypes: Archetypes = Archetypes()
+    @usableFromInline
+    internal private(set) var storageArchetypes = Archetypes()
+
+    /// Provides live low-level storage. Chunk handles can mutate it outside
+    /// the tracked World and Query APIs after this accessor returns.
+    public var archetypes: Archetypes {
+        componentChanges.disableSparseReads()
+        return storageArchetypes
+    }
+
+    @usableFromInline
+    func checkQueryWriter(_ target: any WorldQueryTarget.Type) {
+        if target.access.hasComponentWrites, !(target is any JournaledQueryWriter.Type) {
+            componentChanges.disableSparseReads()
+        }
+    }
 
     /// The removed entities of the world.
     internal private(set) var removedEntities: Set<Entity.ID> = []
@@ -68,7 +84,8 @@ public final class World: @unchecked Sendable, Codable {
 
     private init(from world: borrowing World) {
         self.name = world.name
-        self.archetypes = world.archetypes
+        self.storageArchetypes = world.archetypes
+        componentChanges.disableSparseReads()
         self.entities = world.entities
         self.componentsStorage = world.componentsStorage
         self.runtimeComponents = world.runtimeComponents
@@ -241,7 +258,7 @@ extension World {
     public func getEntities() -> [Entity] {
         return self.entities.entities
             .compactMap { location in
-                let archetype = self.archetypes.archetypes[location.archetypeId]
+                let archetype = self.storageArchetypes.archetypes[location.archetypeId]
                 return archetype.entities[location.archetypeRow]
             }
     }
@@ -255,7 +272,7 @@ extension World {
             return nil
         }
 
-        return self.archetypes
+        return self.storageArchetypes
             .archetypes[location.archetypeId]
             .entities[location.archetypeRow]
     }
@@ -265,7 +282,7 @@ extension World {
     /// - Complexity: O(n)
     /// - Returns: An entity with matched name or nil if entity with given name not exists.
     public func getEntityByName(_ name: String) -> Entity? {
-        for arch in archetypes.archetypes {
+        for arch in storageArchetypes.archetypes {
             if let ent = arch.entities.first(where: { $0.name == name }) {
                 return ent
             }
@@ -377,8 +394,9 @@ extension World {
     /// Remove all data from world exclude resources.
     /// - Complexity: O(n)
     public func clear() {
+        componentChanges.invalidate()
         self.entities.clear()
-        self.archetypes.clear()
+        self.storageArchetypes.clear()
         self.spawnPlans.invalidate()
         self.removedEntities.removeAll(keepingCapacity: true)
         self.addedEntities.removeAll(keepingCapacity: true)
@@ -554,7 +572,7 @@ extension World {
         guard let location = self.entities.entities[entity] else {
             return nil
         }
-        return self.archetypes
+        return self.storageArchetypes
             .archetypes[location.archetypeId]
             .chunks
             .chunks[location.chunkIndex]
@@ -579,17 +597,18 @@ extension World {
         }
 
         // We have component in archetype, just update
-        if self.archetypes.archetypes[location.archetypeId].componentLayout.maskSet.contains(T.identifier) {
-            self.archetypes
+        if self.storageArchetypes.archetypes[location.archetypeId].componentLayout.maskSet.contains(T.identifier) {
+            self.storageArchetypes
                 .archetypes[location.archetypeId]
                 .chunks
                 .chunks[location.chunkIndex]
                 .insert(consume component, at: location.chunkRow, lastTick: currentTick)
+            componentChanges.record(entity: entityId, component: T.identifier)
             return
         }
 
         // Prepare new layout
-        var newLayout = self.archetypes.archetypes[location.archetypeId].componentLayout
+        var newLayout = self.storageArchetypes.archetypes[location.archetypeId].componentLayout
         newLayout.insert(T.self)
 
         var components: [any Component] = []
@@ -611,15 +630,15 @@ extension World {
         }
 
         // Move entity to new archetype
-        if let newArchetype = self.archetypes.archetypes[location.archetypeId].edges.getArchetypeAfterInsertion(for: newLayout) {
+        if let newArchetype = self.storageArchetypes.archetypes[location.archetypeId].edges.getArchetypeAfterInsertion(for: newLayout) {
             self.moveEntityToArchetype(
                 entityId,
                 oldLocation: location,
                 newArchetype: newArchetype
             )
         } else {
-            let newArchetype = self.archetypes.getOrCreate(for: newLayout)
-            self.archetypes.archetypes[location.archetypeId].edges.addArchetypeAfterInsertion(newArchetype, for: newLayout)
+            let newArchetype = self.storageArchetypes.getOrCreate(for: newLayout)
+            self.storageArchetypes.archetypes[location.archetypeId].edges.addArchetypeAfterInsertion(newArchetype, for: newLayout)
             self.moveEntityToArchetype(
                 entityId,
                 oldLocation: location,
@@ -634,13 +653,13 @@ extension World {
         }
 
         for component in components {
-            self.archetypes
+            self.storageArchetypes
                 .archetypes[newLocation.archetypeId]
                 .chunks
                 .initialize(component, for: entityId, lastTick: currentTick)
         }
 
-        self.archetypes
+        self.storageArchetypes
             .archetypes[newLocation.archetypeId]
             .chunks
             .initialize(consume component, for: entityId, lastTick: currentTick)
@@ -654,14 +673,16 @@ extension World {
         guard let location = entities.entities[entityId] else {
             return
         }
-        if archetypes.archetypes[location.archetypeId].componentLayout.maskSet.contains(component.componentID) {
-            archetypes.archetypes[location.archetypeId]
+        if storageArchetypes.archetypes[location.archetypeId].componentLayout.maskSet.contains(component.componentID) {
+            let componentID = component.componentID
+            storageArchetypes.archetypes[location.archetypeId]
                 .chunks.chunks[location.chunkIndex]
                 .insertRuntimeComponent(consume component, at: location.chunkRow, lastTick: currentTick)
+            componentChanges.record(entity: entityId, component: componentID)
             return
         }
 
-        var newLayout = archetypes.archetypes[location.archetypeId].componentLayout
+        var newLayout = storageArchetypes.archetypes[location.archetypeId].componentLayout
         newLayout.insert(runtime: component.componentID)
         var requiredComponents: [any Component] = []
         for required in componentsStorage.getRequiredComponents(for: component.componentID) {
@@ -674,11 +695,11 @@ extension World {
         }
 
         let newArchetype: Archetype.ID
-        if let cached = archetypes.archetypes[location.archetypeId].edges.getArchetypeAfterInsertion(for: newLayout) {
+        if let cached = storageArchetypes.archetypes[location.archetypeId].edges.getArchetypeAfterInsertion(for: newLayout) {
             newArchetype = cached
         } else {
-            newArchetype = archetypes.getOrCreate(for: newLayout)
-            archetypes.archetypes[location.archetypeId].edges.addArchetypeAfterInsertion(newArchetype, for: newLayout)
+            newArchetype = storageArchetypes.getOrCreate(for: newLayout)
+            storageArchetypes.archetypes[location.archetypeId].edges.addArchetypeAfterInsertion(newArchetype, for: newLayout)
         }
         moveEntityToArchetype(entityId, oldLocation: location, newArchetype: newArchetype)
         guard let newLocation = entities.entities[entityId] else {
@@ -686,10 +707,10 @@ extension World {
             return
         }
         for required in requiredComponents {
-            archetypes.archetypes[newLocation.archetypeId]
+            storageArchetypes.archetypes[newLocation.archetypeId]
                 .chunks.initialize(required, for: entityId, lastTick: currentTick)
         }
-        archetypes.archetypes[newLocation.archetypeId]
+        storageArchetypes.archetypes[newLocation.archetypeId]
             .chunks.chunks[newLocation.chunkIndex]
             .initializeRuntimeComponent(consume component, at: newLocation.chunkRow, lastTick: currentTick)
     }
@@ -723,7 +744,7 @@ extension World {
         guard let location = entities.entities[entityId] else {
             return
         }
-        let entity = self.archetypes.archetypes[location.archetypeId].entities[location.archetypeRow]
+        let entity = self.storageArchetypes.archetypes[location.archetypeId].entities[location.archetypeRow]
         eventManager.send(ComponentEvents.WillRemove(componentType: T.self, entity: entity))
         self.remove(T.identifier, from: entityId)
     }
@@ -735,20 +756,20 @@ extension World {
         }
 
         // Get the entity from the archetype
-        guard self.archetypes.archetypes[location.archetypeId].componentLayout.maskSet.contains(componentId) else {
+        guard self.storageArchetypes.archetypes[location.archetypeId].componentLayout.maskSet.contains(componentId) else {
             return
         }
-        var newLayout = self.archetypes.archetypes[location.archetypeId].chunks.componentLayout
+        var newLayout = self.storageArchetypes.archetypes[location.archetypeId].chunks.componentLayout
         newLayout.remove(componentId)
-        if let newArchetype = self.archetypes.archetypes[location.archetypeId].edges.getArchetypeAfterRemoval(for: newLayout) {
+        if let newArchetype = self.storageArchetypes.archetypes[location.archetypeId].edges.getArchetypeAfterRemoval(for: newLayout) {
             self.moveEntityToArchetype(
                 entityId,
                 oldLocation: location,
                 newArchetype: newArchetype
             )
         } else {
-            let newArchetype = self.archetypes.getOrCreate(for: newLayout)
-            self.archetypes.archetypes[location.archetypeId].edges.addArchetypeAfterRemoval(newArchetype, for: newLayout)
+            let newArchetype = self.storageArchetypes.getOrCreate(for: newLayout)
+            self.storageArchetypes.archetypes[location.archetypeId].edges.addArchetypeAfterRemoval(newArchetype, for: newLayout)
             self.moveEntityToArchetype(
                 entityId,
                 oldLocation: location,
@@ -797,7 +818,7 @@ extension World {
             return false
         }
 
-        return self.archetypes
+        return self.storageArchetypes
             .archetypes[location.archetypeId]
             .componentLayout
             .maskSet
@@ -845,15 +866,15 @@ extension World {
     func insertNewEntity(_ entity: Entity, components: [any Component]) {
         let (components, archetypeIndex) = prepareSpawnComponents(components)
 
-        let row = self.archetypes.archetypes[archetypeIndex].append(entity)
-        let chunkLocation = self.archetypes.archetypes[archetypeIndex].chunks.insertEntity(
+        let row = self.storageArchetypes.archetypes[archetypeIndex].append(entity)
+        let chunkLocation = self.storageArchetypes.archetypes[archetypeIndex].chunks.insertEntity(
             entity.id,
             components: components,
             tick: self.currentTick
         )
         self.entities.insert(
             EntityLocation(
-                archetypeId: self.archetypes.archetypes[archetypeIndex].id,
+                archetypeId: self.storageArchetypes.archetypes[archetypeIndex].id,
                 archetypeRow: row,
                 chunkIndex: chunkLocation.chunkIndex,
                 chunkRow: chunkLocation.entityRow
@@ -862,6 +883,9 @@ extension World {
         )
         entity.world = self
         addedEntities.insert(entity.id)
+        componentChanges.recordMembership(
+            entity: entity.id, before: nil, after: storageArchetypes.archetypes[archetypeIndex].componentLayout.maskSet
+        )
         eventManager.send(WorldEvents.DidAddEntity(entity: entity), source: self)
     }
 
@@ -930,13 +954,13 @@ extension World {
         let components = expanded ?? inputs
         if matchesPlan, let plan,
            components.count == plan.outputIDs.count,
-           archetypes.archetypes.indices.contains(plan.archetypeIndex),
-           archetypes.archetypes[plan.archetypeIndex].componentLayout.maskSet == plan.layout.maskSet {
+           storageArchetypes.archetypes.indices.contains(plan.archetypeIndex),
+           storageArchetypes.archetypes[plan.archetypeIndex].componentLayout.maskSet == plan.layout.maskSet {
             return (components, plan.archetypeIndex)
         }
 
         let componentsLayout = ComponentLayout(components: components)
-        let archetypeIndex = archetypes.getOrCreate(for: componentsLayout)
+        let archetypeIndex = storageArchetypes.getOrCreate(for: componentsLayout)
         // Do not publish snapshots from a spawn that changed the registry while
         // running factories. The next spawn must resolve the current requirements.
         if revision == spawnPlans.revision {
@@ -954,9 +978,12 @@ extension World {
     func registerSpawnBatch(_ batch: [Entity], locations: [EntityLocation]) {
         entities.insertBatch(batch, locations: locations)
         addedEntities.reserveCapacity(addedEntities.count + batch.count)
-        for entity in batch {
+        for (entity, location) in zip(batch, locations) {
             entity.world = self
             addedEntities.insert(entity.id)
+            componentChanges.recordMembership(
+                entity: entity.id, before: nil, after: storageArchetypes.archetypes[location.archetypeId].componentLayout.maskSet
+            )
         }
     }
 
@@ -966,7 +993,7 @@ extension World {
         oldLocation location: EntityLocation,
         newArchetype: Archetype.ID
     ) {
-        let (row, result, moveResult) = self.archetypes.withMutablePair(
+        let (row, result, moveResult) = self.storageArchetypes.withMutablePair(
             at: location.archetypeId,
             and: newArchetype
         ) { source, destination in
@@ -1025,6 +1052,11 @@ extension World {
             ),
             for: entityId
         )
+        componentChanges.recordMembership(
+            entity: entityId,
+            before: storageArchetypes.archetypes[location.archetypeId].componentLayout.maskSet,
+            after: storageArchetypes.archetypes[newArchetype].componentLayout.maskSet
+        )
     }
 
     /// Remove entity record.
@@ -1033,9 +1065,12 @@ extension World {
         guard let record = self.entities.entities[entity] else {
             return
         }
+        componentChanges.recordMembership(
+            entity: entity, before: storageArchetypes.archetypes[record.archetypeId].componentLayout.maskSet, after: nil
+        )
         self.entities.remove(entity)
 
-        let removeResult = self.archetypes.archetypes[record.archetypeId].swapRemove(at: record.archetypeRow)
+        let removeResult = self.storageArchetypes.archetypes[record.archetypeId].swapRemove(at: record.archetypeRow)
 
         if let swappedEntity = removeResult.swappedEntity,
             let swappedLocation = entities.entities[swappedEntity] {
@@ -1050,7 +1085,7 @@ extension World {
             )
         }
 
-        let removeChunkResult = self.archetypes.archetypes[record.archetypeId].chunks.removeEntity(entity)
+        let removeChunkResult = self.storageArchetypes.archetypes[record.archetypeId].chunks.removeEntity(entity)
         if let removeChunkResult, let swappedEntity = removeChunkResult.swappedEntity {
             if let swappedLocation = entities.entities[swappedEntity] {
                 entities.insert(
@@ -1095,12 +1130,20 @@ public struct ChangeDetectionTick: Sendable {
     public var change: UnsafeBox<Tick>?
     public let lastTick: Tick
     public let currentTick: Tick
+    @usableFromInline
+    var observedWrite: ObservedComponentWrite?
 
     public init(added: UnsafeBox<Tick>?, change: UnsafeBox<Tick>?, lastTick: Tick, currentTick: Tick) {
         self.added = added
         self.change = change
         self.lastTick = lastTick
         self.currentTick = currentTick
+    }
+
+    @usableFromInline
+    init(added: UnsafeBox<Tick>?, change: UnsafeBox<Tick>?, lastTick: Tick, currentTick: Tick, observedWrite: ObservedComponentWrite?) {
+        self.init(added: added, change: change, lastTick: lastTick, currentTick: currentTick)
+        self.observedWrite = observedWrite
     }
 }
 

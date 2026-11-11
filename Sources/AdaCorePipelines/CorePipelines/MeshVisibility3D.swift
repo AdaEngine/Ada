@@ -122,9 +122,14 @@ public struct Mesh3DRenderSource: Sendable {
 
 public struct ExtractedMesh3DSources: Resource {
     /// Meshes drawn by raster passes, including ``PathTracingGeometry3D/rasterOnly`` ones.
-    public var meshes: [Mesh3DRenderSource] = []
+    public var meshes: [Mesh3DRenderSource] = [] {
+        didSet { transformChanges = nil }
+    }
     /// ``PathTracingGeometry3D/pathTracingOnly`` proxies, intersected by the path tracer only.
     public var pathTracingProxies: [Mesh3DRenderSource] = []
+    /// Stable indices changed since the preceding extraction. Nil requires consumers
+    /// to reconcile the whole source list, including its membership and material state.
+    package var transformChanges: [Int]?
     public init() {}
 
     /// The meshes the path tracer intersects: raster meshes that are not raster-only, plus the proxies.
@@ -144,6 +149,17 @@ public struct Visibility3DCount: Codable, Sendable {
     public var lod0Triangles = 0
     public var lodInstances: [Int] = [0, 0, 0]
     public init() {}
+
+    mutating func merge(_ other: Self) {
+        candidates += other.candidates
+        visibleMeshes += other.visibleMeshes
+        frustumRejected += other.frustumRejected
+        distanceRejected += other.distanceRejected
+        drawCalls += other.drawCalls
+        triangles += other.triangles
+        lod0Triangles += other.lod0Triangles
+        for level in lodInstances.indices { lodInstances[level] += other.lodInstances[level] }
+    }
 }
 
 /// Local debug counters, independent of GPU timing collection.

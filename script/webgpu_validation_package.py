@@ -64,6 +64,7 @@ for relative in [
     "Tests/AdaRenderTests/WGPUShadowCullProcessorTests.swift",
     "Tests/AdaEngineTests/MaterialUploadReuseTests.swift",
     "Tests/AdaECSTests/OptionalResourceTests.swift",
+    "Tests/AdaECSTests/ComponentChangeJournalTests.swift",
     "Tests/AdaTransformTests/AdaTransformTests.swift",
     "Tests/AdaRenderTests/ShaderIncluderTests.swift",
     "Tests/AdaRenderTests/ShaderCacheKeyTests.swift",

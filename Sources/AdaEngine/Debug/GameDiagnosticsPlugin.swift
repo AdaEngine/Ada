@@ -7,19 +7,28 @@ struct GameDiagnosticsPlugin: Plugin {
     }
 
     func finish(for app: borrowing AppWorlds) {
-        guard let window = app.getResource(PrimaryWindow.self)?.window else { return }
+        guard let window = app.getResource(PrimaryWindow.self)?.window else {
+            return
+        }
         let session = GameDiagnosticsSession()
         session.attach(to: app)
 
         let titleBar = window.configuration.titleBar
+        #if os(Windows) || os(macOS)
+        let defaultTitleInset: Float = window.configuration.chrome == .standard ? 32 : 0
+        #else
+        let defaultTitleInset: Float = 0
+        #endif
         let titleInset = titleBar.background == .transparent && !titleBar.reservesSafeArea
-            ? titleBar.dragRegionHeight ?? 0 : 0
+            ? titleBar.dragRegionHeight ?? defaultTitleInset : 0
         let content = UIContainerView(
             rootView: GameDiagnosticsOverlay(session: session)
                 .padding(.top, titleInset)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         )
-        let overlay = UIWindowOverlayView(content: content)
+        let overlay = UIWindowOverlayView(content: content) { [weak app = copy app] in
+            app?.gameDiagnosticsTick = nil
+        }
         overlay.frame = window.bounds
         window.addSubview(overlay)
         overlay.setNeedsLayout()

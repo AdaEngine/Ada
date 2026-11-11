@@ -188,9 +188,7 @@ extension EditorViewModel {
             if !sourceURLs.isEmpty {
                 workbench.achievements?.record([.firstImport: 1])
             }
-            projectSidebar.replaceItems(Self.projectTreeItems(for: project, fileManager: fileManager))
-            toolbar.searchableItems = projectSidebar.items
-            syncInspectorTextureAssets()
+            refreshProjectFiles(logsRefresh: false)
             refreshSourceControl()
         } catch {
             appendOutput("Asset import failed: \(error.localizedDescription)")

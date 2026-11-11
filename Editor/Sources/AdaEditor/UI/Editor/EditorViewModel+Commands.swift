@@ -49,6 +49,7 @@ extension EditorViewModel {
         }
 
         guard EditorDistribution.current.supportsSwiftProjects else {
+            projectSidebar.swiftTargetsFailed = true
             workspaceStatus = .failed(EditorDistributionError.swiftProjectsMessage)
             footer.setWorkspaceFooterTitle(workspaceStatus.title)
             appendOutput(EditorDistributionError.swiftProjectsMessage)
@@ -56,6 +57,7 @@ extension EditorViewModel {
         }
 
         workspaceStatus = .resolving
+        projectSidebar.swiftTargetsFailed = false
         buildActivity = EditorBuildActivity(title: "Prepare Workspace")
         footer.setWorkspaceFooterTitle("Workspace: Preparing")
         lastLoggedWorkspaceProgressPhase = nil
@@ -77,15 +79,16 @@ extension EditorViewModel {
             }
             await MainActor.run {
                 self.packageModel = result.packageModel
+                self.projectSidebar.swiftTargetsFailed = result.packageModel == nil
                 self.replaceBuildDiagnostics(with: result.diagnostics)
                 self.showProblemsIfNeeded()
-                let failureOutput =
-                    result.describeResult.combinedOutput.isEmpty
-                    ? result.resolveResult.combinedOutput
-                    : result.describeResult.combinedOutput
+                let failureOutput = result.resolveResult.succeeded ? result.describeResult.combinedOutput : result.resolveResult.combinedOutput
                 self.workspaceStatus = result.succeeded ? .ready : .failed(failureOutput)
                 self.footer.setWorkspaceFooterTitle(self.workspaceStatus.title)
-                self.selectedRunProduct = self.selectedRunProduct ?? self.runProducts.first
+                if self.packageModel != nil, self.selectedRunProduct.map({ self.runProducts.contains($0) }) != true {
+                    let savedProduct = self.buildTargets.targets.first { $0.id == self.buildTargets.activeID }?.product
+                    self.selectedRunProduct = savedProduct.flatMap { self.runProducts.contains($0) ? $0 : nil } ?? self.soleRunProduct
+                }
                 self.appendOutput(result.resolveResult)
                 self.appendOutput(result.describeResult)
                 if let indexBuildResult = result.indexBuildResult {
@@ -244,7 +247,6 @@ extension EditorViewModel {
         guard !debugger.isActive else {
             return
         }
-        let product = selectedRunProduct ?? runProducts.first
         if workbench.activeDocument?.isDirty == true {
             guard saveActiveDocumentIfNeeded() else {
                 let detail = workbench.activeDocumentSaveFailureDescription ?? "the active document could not be saved"
@@ -261,6 +263,9 @@ extension EditorViewModel {
         let projectSettings = projectURL.flatMap {
             try? ProjectSystem.loadProject(at: $0, fileManager: fileManager)
         }
+        let product = projectSettings?.build.system == .swiftpm
+            ? resolvedRunProduct
+            : (selectedRunProduct ?? runProducts.first)
         let destination = selectedRunDestination.adaProjectDestination
         if let projectURL,
             let settings = projectSettings,
@@ -304,6 +309,16 @@ extension EditorViewModel {
         case .player:
             runOnAdaPlayer()
         case .macOS, .windows, .linux:
+            if projectSettings?.build.system == .swiftpm, product == nil {
+                let message = runProducts.isEmpty
+                    ? L10n.tr("Load a SwiftPM package with an executable product before running.")
+                    : L10n.tr("Select an executable product in Edit Build Targets before running.")
+                workspaceStatus = .failed(message)
+                footer.setWorkspaceFooterTitle(workspaceStatus.title)
+                appendOutput(message)
+                if !runProducts.isEmpty { presentBuildTargets() }
+                return
+            }
             executeWorkspaceCommand(
                 .run(
                     target: product,
@@ -714,15 +729,20 @@ extension EditorViewModel {
         let cancellingAndroidRunner = androidRunner
         #endif
         workspaceTask?.cancel()
-        workspaceTask = nil
+        if isChangingProjectBuildSystem {
+            isChangingProjectBuildSystem = false
+            projectSettingsStatusMessage = ""
+        }
         workspaceStatus = .cancelled
-        Task {
+        workspaceTask = Task { [weak self] in
+            guard let self else { return }
             await workspaceService.cancel()
             tests.finish()
             #if os(macOS) || os(Windows) || os(Linux)
             await adaScriptWebExportRunner?.cancelAll()
             await cancellingAndroidRunner?.cancelAll()
             #endif
+            if !Task.isCancelled { workspaceTask = nil }
         }
     }
 
@@ -809,7 +829,7 @@ extension EditorViewModel {
         case .build:
             buildAll()
         case .run:
-            if selectedRunDestination == .android || selectedRunDestination == .web || selectedRunDestination == .player {
+            if projectBuildSystem == .swiftpm || selectedRunDestination == .android || selectedRunDestination == .web || selectedRunDestination == .player {
                 runSelectedTarget()
             } else if workbench.activeSceneDocument != nil {
                 runActiveSceneInEditor()

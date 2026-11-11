@@ -87,6 +87,59 @@
             }
         }
 
+        @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_WEBGPU_VISIBILITY_SMOKE"] == "1"))
+        func shadowCullWritesDistanceFadeAndHonorsTheViewToggle() async throws {
+            let device = try WebGPURenderBackend.createBackend().createLocalRenderDevice()
+            let processor = try #require(device.createGPUShadowCullProcessor())
+            var input = GPUShadowCullInput()
+            let distances: [Float] = [4, 8, 12]
+            input.casters = distances.enumerated().map { index, distance in
+                GPUShadowCaster(
+                    bounds: nil,
+                    forceVisible: true,
+                    part: 0,
+                    instance: UInt32(index),
+                    position: [distance, 0, 0],
+                    maximumDistance: 12,
+                    fadeDistance: 8
+                )
+            }
+            // Reconstructing this center from rounded bounds moves it onto the cutoff.
+            let boundary = Float(0.1).nextUp
+            input.casters.append(GPUShadowCaster(
+                bounds: AABB(center: [0.1, 0, 0], halfExtents: [0.2, 0.1, 0.1]),
+                forceVisible: false,
+                part: 0,
+                instance: 3,
+                maximumDistance: boundary
+            ))
+            let records: [UInt32] = [1, 0, 2, 0, 3, 0, 4, 0]
+            input.instances = unsafe records.withUnsafeBytes { unsafe Array($0) }
+            input.instanceStride = 8
+            input.copiedBytes = 8
+            input.distanceFadeOffset = 4
+            input.parts = [IndexedIndirectArguments(indexCount: 3)]
+            input.segments = [0]
+            input.revision = 1
+            let views = [
+                GPUShadowCullView(viewProjection: .identity, culls: false, distanceCamera: .zero),
+                GPUShadowCullView(viewProjection: .identity, culls: false)
+            ]
+            let command = device.createCommandQueue().makeCommandBuffer()
+            let output = try #require(processor.encode(on: command, input: input, views: views, firstInstance: false))
+            command.commit()
+            let arguments = Self.shadowWords(try await output.arguments.readData())
+            let compacted = Self.shadowWords(try await output.instances.readData())
+            #expect(arguments[1] == 3)
+            #expect(arguments[6] == 4)
+            let faded = Dictionary(uniqueKeysWithValues: (0..<Int(arguments[1])).map { index in
+                (compacted[index * 2], Float(bitPattern: compacted[index * 2 + 1]))
+            })
+            #expect(faded == [1: 0, 2: 0.5, 4: 0])
+            let unfaded = (0..<Int(arguments[6])).map { compacted[(input.casters.count + $0) * 2 + 1] }
+            #expect(unfaded == [0, 0, 0, 0])
+        }
+
         private static func shadowWords(_ data: Data) -> [UInt32] {
             data.withUnsafeBytes { raw in
                 stride(from: 0, to: raw.count, by: 4).map { unsafe raw.loadUnaligned(fromByteOffset: $0, as: UInt32.self) }

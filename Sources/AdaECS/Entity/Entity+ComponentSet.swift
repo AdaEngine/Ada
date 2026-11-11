@@ -39,7 +39,7 @@ extension Entity {
             self.notFlushedComponents = other.notFlushedComponents
             if let world = other.world,
                 let location = world.entities.entities[other.entity] {
-                let chunk = world.archetypes
+                let chunk = world.storageArchetypes
                     .archetypes[location.archetypeId]
                     .chunks.chunks[location.chunkIndex]
                 for (identifier, component) in chunk.getComponents(for: other.entity) {
@@ -81,7 +81,7 @@ extension Entity {
                 throw CodableError.entityNotFoundInWorld
             }
 
-            let chunk = world.archetypes
+            let chunk = world.storageArchetypes
                 .archetypes[location.archetypeId]
                 .chunks.chunks[location.chunkIndex]
             let components = chunk.getComponents(for: entity)
@@ -206,7 +206,7 @@ extension Entity {
             else {
                 return self.notFlushedComponents.count
             }
-            return world.archetypes
+            return world.storageArchetypes
                 .archetypes[location.archetypeId]
                 .chunks.chunks[location.chunkIndex]
                 .getComponents(for: entity)
@@ -299,7 +299,7 @@ extension Entity.ComponentSet: CustomStringConvertible {
             return "ComponentSet(entity: \(entity), world: \(world))"
         }
 
-        let chunk = world.archetypes
+        let chunk = world.storageArchetypes
             .archetypes[location.archetypeId]
             .chunks.chunks[location.chunkIndex]
         let components = chunk.getComponents(for: entity)

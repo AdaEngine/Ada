@@ -9,12 +9,55 @@ import Testing
 @testable import AdaUI
 @testable import AdaPlatform
 import AdaInput
+import AdaUtils
 import Math
 
 @MainActor
 struct UIWindowInputRoutingTests {
     init() async throws {
         try Application.prepareForTest()
+    }
+
+    @Test
+    func windowOverlayPassesPointerAndTextToTheGame() {
+        var text = "a"
+        let game = UIContainerView(
+            rootView: TextField(
+                "Type",
+                text: Binding(get: { text }, set: { text = $0 })
+            )
+            .frame(width: 240, height: 36)
+        )
+        let window = UIWindow(frame: Rect(x: 0, y: 0, width: 260, height: 80))
+        game.frame = window.bounds
+        window.addSubview(game)
+        var overlayClosed = false
+        var gameClosed = false
+        let content = UIContainerView(rootView: Text("FPS"))
+        let overlay = UIWindowOverlayView(content: content) {
+            overlayClosed = true
+        }
+        window.onDidDisappear = { gameClosed = true }
+        overlay.frame = window.bounds
+        window.addSubview(overlay)
+        overlay.safeAreaInsets.top = 8
+        window.layoutSubviews()
+        #expect(overlay.backgroundColor.alpha == 0)
+        #expect(content.backgroundColor == .clear)
+        #expect(content.safeAreaInsets.top == 8)
+
+        for phase in [MouseEvent.Phase.began, .ended] {
+            window.sendEvent(
+                MouseEvent(window: window.id, button: .left, mousePosition: Point(130, 40), phase: phase, modifierKeys: [], time: 0)
+            )
+        }
+        window.sendEvent(TextInputEvent(window: window.id, text: "b", action: .insert, time: 1))
+        #expect(text == "ab")
+
+        window.windowDidDisappear()
+        #expect(overlay.parentView == nil)
+        #expect(overlayClosed)
+        #expect(gameClosed)
     }
 
     @Test

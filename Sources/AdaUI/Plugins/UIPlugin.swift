@@ -20,7 +20,9 @@ public struct UIPlugin: Plugin {
 
     @MainActor
     package static func installWindowOverlayPass(in app: AppWorlds) {
-        guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else { return }
+        guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
+            return
+        }
         let graph = renderWorld.getRefResource(RenderGraph.self)
         let name: RenderNodeLabel = "PrimaryWindowOverlay"
         graph.wrappedValue.addNode(UIRenderNode(isWindowOverlay: true), by: name)

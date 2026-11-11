@@ -69,12 +69,14 @@ public struct ContextMenuPresentation {
     public let location: Point
     public let items: [Item]
     public let onDismiss: (() -> Void)?
+    public let isSelectionMenu: Bool
 
-    public init(sourceWindow: UIWindow?, location: Point, items: [Item], onDismiss: (() -> Void)? = nil) {
+    public init(sourceWindow: UIWindow?, location: Point, items: [Item], onDismiss: (() -> Void)? = nil, isSelectionMenu: Bool = false) {
         self.sourceWindow = sourceWindow
         self.location = location
         self.items = items
         self.onDismiss = onDismiss
+        self.isSelectionMenu = isSelectionMenu
     }
 }
 
@@ -85,6 +87,7 @@ public enum ContextMenuPresentationCenter {
     public static var dismissAll: (() -> Bool)?
     public static var dismissForInteraction: ((UIWindow?) -> Void)?
     public static var dismissForDeactivation: ((UIWindow?) -> Void)?
+    public static var handleSelectionKey: ((KeyEvent, UIWindow?) -> Bool)?
 }
 
 /// A submenu entry for ``View/contextMenu(menuItems:)``.

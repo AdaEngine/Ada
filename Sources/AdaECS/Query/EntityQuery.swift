@@ -124,12 +124,12 @@ public struct EntityIterator: IteratorProtocol {
             let currentArchetypeIndex = self.state.archetypeIndecies[self.currentArchetypeIndex]
 
             // Validate archetype index is within bounds
-            guard currentArchetypeIndex < world.archetypes.archetypes.count else {
+            guard currentArchetypeIndex < world.storageArchetypes.archetypes.count else {
                 self.currentArchetypeIndex += 1
                 continue
             }
 
-            let currentEntitiesCount = world.archetypes.archetypes[currentArchetypeIndex].entities.count
+            let currentEntitiesCount = world.storageArchetypes.archetypes[currentArchetypeIndex].entities.count
             if self.currentEntityIndex < currentEntitiesCount - 1 {
                 self.currentEntityIndex += 1
             } else {
@@ -139,7 +139,7 @@ public struct EntityIterator: IteratorProtocol {
             }
 
             let currentArchetype = self.state.archetypeIndecies[self.currentArchetypeIndex]
-            let entity = world.archetypes.archetypes[currentArchetype].entities[self.currentEntityIndex]
+            let entity = world.storageArchetypes.archetypes[currentArchetype].entities[self.currentEntityIndex]
             guard entity.isActive else {
                 continue
             }

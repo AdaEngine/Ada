@@ -7,7 +7,7 @@ extension World {
             return []
         }
 
-        let chunk = self.archetypes
+        let chunk = self.storageArchetypes
             .archetypes[location.archetypeId]
             .chunks
             .chunks[location.chunkIndex]
@@ -26,7 +26,7 @@ extension World {
             return nil
         }
 
-        let chunk = self.archetypes
+        let chunk = self.storageArchetypes
             .archetypes[location.archetypeId]
             .chunks
             .chunks[location.chunkIndex]
@@ -86,7 +86,7 @@ extension World {
         guard let location = entities.entities[entity] else {
             return nil
         }
-        let chunk = archetypes.archetypes[location.archetypeId].chunks.chunks[location.chunkIndex]
+        let chunk = storageArchetypes.archetypes[location.archetypeId].chunks.chunks[location.chunkIndex]
         guard
             let data = chunk.componentsData[component],
             let base = unsafe data.data.buffer.pointer.baseAddress,
@@ -108,7 +108,7 @@ extension World {
         guard field.accepts(value), let location = entities.entities[entity] else {
             return false
         }
-        let chunk = archetypes.archetypes[location.archetypeId].chunks.chunks[location.chunkIndex]
+        let chunk = storageArchetypes.archetypes[location.archetypeId].chunks.chunks[location.chunkIndex]
         guard
             let data = chunk.componentsData[component],
             let base = unsafe data.data.buffer.pointer.baseAddress,
@@ -120,6 +120,7 @@ extension World {
             return false
         }
         unsafe ticks.advanced(by: location.chunkRow).pointee = currentTick
+        componentChanges.record(entity: entity, component: component)
         return true
     }
 

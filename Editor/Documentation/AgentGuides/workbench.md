@@ -22,6 +22,9 @@ This inventory was originally recorded on **2026-10-04** and subsequently mainta
   a surrounding GeometryReader rebuilt the row menus during unrelated layout.
   Imports expand the destination's ancestors so the copied files are visible.
   Coverage: `EditorProjectTreeStateTests` and `EditorFileDropTests`.
+- In SwiftPM workspaces, **Targets** uses package target paths and source
+  membership, including custom source directories. **Files** shows the full
+  project tree. Refresh Project Files also refreshes the SwiftPM description.
 - Source highlighting and semantic position conversion use `EditorSourceLines`
   so Windows CRLF counts as one newline, matching TextEditor's normalized text.
   Live text selections are kept outside the observed document array; command

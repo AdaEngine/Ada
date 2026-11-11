@@ -26,12 +26,29 @@ struct Model3DExtractionCache: Resource {
     private var seen: [Bool] = []
     private var materialOwners: [Key: RID] = [:]
     private var uniqueMaterials: [RID: Material] = [:]
+    private static let observedComponents: Set<ComponentId> = [
+        GlobalTransform.identifier, Mesh3DComponent.identifier, Mesh3DInstancesComponent.identifier,
+        MeshLOD3DComponent.identifier, Visibility.identifier, NoFrustumCulling.identifier,
+        RelationshipComponent.identifier, SkinnedMesh3DComponent.identifier, MorphWeights3DComponent.identifier,
+        MeshTerrain3DSourceMask.identifier, PathTracingGeometry3D.identifier
+    ]
+    private var cursor: UInt64?
+    private struct MaterialSlot {
+        let source: Int
+        let slot: Int
+    }
+    private var materialRevisions: [RID: UInt64] = [:]
+    private var materialSlots: [RID: [MaterialSlot]] = [:]
+    private var canApplyTransformChanges = false
+    private var usesMaterialSnapshots = false
+    private var settlingTransforms: Set<Entity.ID> = []
     /// Every extracted mesh, indexed by ``Entry/index``; ``ExtractedMesh3DSources`` publishes views of it.
     private var storage: [Mesh3DRenderSource] = []
     private(set) var geometryBuildCount = 0
+    private(set) var sourceVisitCount = 0
 
     mutating func extract(
-        sourceWorldID: World.ID?,
+        sourceWorld: World?,
         elapsed: Float,
         query: Query<Entity, Mesh3DComponent, GlobalTransform>,
         instanceQuery: Query<Entity, Mesh3DInstancesComponent, GlobalTransform>,
@@ -55,19 +72,41 @@ struct Model3DExtractionCache: Resource {
         // Drop the published share first, so in-place updates of `storage` do not copy the whole array.
         sources.meshes = []
         sources.pathTracingProxies = []
-        if worldID != sourceWorldID {
+        sources.transformChanges = nil
+        if worldID != sourceWorld?.id {
             entries.removeAll(keepingCapacity: true)
             storage.removeAll(keepingCapacity: true)
             seen.removeAll(keepingCapacity: true)
             materialOwners.removeAll(keepingCapacity: true)
             uniqueMaterials.removeAll(keepingCapacity: true)
-            worldID = sourceWorldID
+            worldID = sourceWorld?.id
+            cursor = nil
+            canApplyTransformChanges = false
         }
-        for index in seen.indices { seen[index] = false }
+        var changes: [ComponentChangeJournal.Change]?
+        if let sourceWorld {
+            if let cursor {
+                let batch = sourceWorld.componentChanges.read(after: cursor)
+                changes = batch.changes
+                self.cursor = batch.cursor
+            } else {
+                cursor = sourceWorld.componentChanges.observe(Self.observedComponents)
+            }
+        }
         animatedBounds.beginFrame()
         skinning.beginFrame(device: device)
         morphUniforms.beginFrame()
         materials.beginFrame()
+        if let sourceWorld, let changes, canApplyTransformChanges,
+           usesMaterialSnapshots == snapshotsMaterials,
+           let update = applyTransformChanges(changes, from: sourceWorld) {
+            sources.meshes = storage
+            if !update.changedMaterials { sources.transformChanges = update.indices }
+            skinning.finishPackedWrites()
+            animatedBounds.finishFrame()
+            return
+        }
+        for index in seen.indices { seen[index] = false }
 
         var lodByEntity: [Entity.ID: MeshLOD3DComponent] = [:]
         lods.batched().forEach { entity, lod in lodByEntity[entity.id] = lod }
@@ -77,7 +116,9 @@ struct Model3DExtractionCache: Resource {
         morphs.batched().forEach { entity, morph in morphByEntity[entity.id] = morph.weights }
         var posedBounds: [Entity.ID: AABB] = [:]
         var skinScale: [Entity.ID: Float] = [:]
+        var hasSkins = false
         skins.batched().forEach { entity, skin in
+            hasSkins = true
             let revision = SkinningPoseRevision(id: skin.paletteID, generation: skin.poseGeneration)
             // Atmospheres keep the positive instance-Y channel for their own parameters.
             let isAtmosphere = entity.components[Mesh3DComponent.self]?.materials.contains { $0 is AtmosphereMaterial } == true
@@ -318,6 +359,7 @@ struct Model3DExtractionCache: Resource {
             )
             geometryBuildCount &+= 1
         }
+        sourceVisitCount &+= meshCount
         // Each imported node shares its model's full material table. Scanning that table per mesh
         // repeated hundreds of thousands of casts on a static scene. Keep the union of live bindings,
         // including hidden meshes, and inspect each material only once per frame. Material objects
@@ -355,8 +397,79 @@ struct Model3DExtractionCache: Resource {
             seen.removeLast(seen.count - destination)
         }
         if snapshotsMaterials { Self.useRenderSnapshots(in: &storage) }
+        usesMaterialSnapshots = snapshotsMaterials
+        settlingTransforms = Set(storage.lazy.filter { $0.transform != $0.previousTransform }.map(\.entity))
+        materialRevisions.removeAll(keepingCapacity: true)
+        materialSlots.removeAll(keepingCapacity: true)
+        for (id, material) in uniqueMaterials {
+            if let pbr = material as? PBRMaterial, type(of: pbr) == PBRMaterial.self, pbr.graphMaterial == nil {
+                materialRevisions[id] = pbr.stateRevision
+            }
+        }
+        canApplyTransformChanges = masks.isEmpty && !hasSkins && morphByEntity.isEmpty
+            && hidden.isEmpty && !roles && materialRevisions.count == uniqueMaterials.count
+            && !entries.values.contains(where: \.settlesInstances)
+        if canApplyTransformChanges, snapshotsMaterials {
+            for (index, source) in storage.enumerated() {
+                for (slot, material) in source.materials.enumerated() {
+                    let id = (material as? PBRMaterial)?.snapshotSource?.rid ?? material.rid
+                    materialSlots[id, default: []].append(MaterialSlot(source: index, slot: slot))
+                }
+            }
+        }
         publish(into: &sources, roles: roles)
         animatedBounds.finishFrame()
+    }
+
+    /// Ordinary retained geometry uses the stream to read only changed transforms.
+    /// The full extractor still owns structural changes and specialized geometry.
+    private mutating func applyTransformChanges(
+        _ changes: [ComponentChangeJournal.Change], from world: World
+    ) -> (indices: [Int], changedMaterials: Bool)? {
+        guard changes.allSatisfy({ $0.component == GlobalTransform.identifier }) else { return nil }
+        var editedMaterials: [(RID, PBRMaterial)] = []
+        for (id, material) in uniqueMaterials {
+            guard let pbr = material as? PBRMaterial, pbr.graphMaterial == nil else { return nil }
+            if materialRevisions[id] != pbr.stateRevision { editedMaterials.append((id, pbr)) }
+        }
+        let entities = settlingTransforms.union(changes.lazy.map(\.entity))
+        var updates: [(Key, Transform3D)] = []
+        updates.reserveCapacity(entities.count)
+        for entity in entities {
+            let key = Key(entity: entity, instanced: false)
+            if entries[Key(entity: entity, instanced: true)] != nil { return nil }
+            guard entries[key] != nil else { continue }
+            guard let global = world.get(GlobalTransform.self, from: entity) else { return nil }
+            updates.append((key, global.matrix))
+        }
+        sourceVisitCount &+= updates.count
+        settlingTransforms.removeAll(keepingCapacity: true)
+        var indices: [Int] = []
+        indices.reserveCapacity(updates.count)
+        for (key, matrix) in updates {
+            guard let entry = entries[key] else { continue }
+            let index = entry.index
+            if storage[index].transform != matrix {
+                storage[index].previousTransform = storage[index].transform
+                storage[index].transform = matrix
+                storage[index].bounds = entry.localBounds.map { MeshVisibility3DMath.transformed($0, by: matrix) }
+                settlingTransforms.insert(key.entity)
+                indices.append(index)
+            } else if storage[index].previousTransform != matrix {
+                storage[index].previousTransform = matrix
+                indices.append(index)
+            }
+        }
+        for (id, material) in editedMaterials {
+            materialRevisions[id] = material.stateRevision
+            if usesMaterialSnapshots {
+                let snapshot = material.renderSnapshot()
+                for entry in materialSlots[id] ?? [] {
+                    storage[entry.source].materials[entry.slot] = snapshot
+                }
+            }
+        }
+        return (indices.sorted(), !editedMaterials.isEmpty)
     }
 
     /// Publishes the raster meshes and, when any mesh is ``PathTracingGeometry3D/pathTracingOnly``, the tracer's proxies.

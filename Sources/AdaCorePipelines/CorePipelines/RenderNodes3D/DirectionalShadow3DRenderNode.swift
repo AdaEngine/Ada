@@ -76,8 +76,8 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
     @ResMut<DirectionalShadow3DScratch>
     private var scratch
 
-    @ResMut<ShadowCasterRegistry3D>
-    private var registry
+    @Res<ShadowCasterRegistry3D>
+    private var shadowCasterSettings
 
     @ResMut<RenderPipelines<DirectionalShadow3DPipeline>>
     private var pipelines
@@ -100,7 +100,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
         _materialUniforms.update(from: world)
         _shadow.update(from: world)
         _scratch.update(from: world)
-        _registry.update(from: world)
+        _shadowCasterSettings.update(from: world)
         _pipelines.update(from: world)
         _renderDevice.update(from: world)
         let activeViews: [Entity.ID]
@@ -114,6 +114,8 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
         }
         scratch.cache.retainViews(activeViews)
         scratch.gpuCull.retainViews(activeViews)
+        scratch.preparedCascades = scratch.preparedCascades.filter { activeViews.contains($0.key) }
+        if activeViews.isEmpty { scratch.cpuCasters = DirectionalShadowCasters3D() }
     }
 
     public func execute(context: inout Context, renderContext: RenderContext) async throws -> [RenderSlotValue] {
@@ -136,6 +138,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                 !candidates.meshes.isEmpty
             else {
                 shadow.isEnabled = false
+                scratch.preparedCascades.removeValue(forKey: source.entityId)
                 return
             }
 
@@ -173,25 +176,35 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             commandBuffer.label = "Directional Shadow 3D Pass"
             let visibility = environments.environments[source.entityId]?.meshVisibility ?? MeshVisibilitySettings3D()
             // Static casters are culled for every cascade in one GPU pass; the rest keep the CPU lists.
-            registry.update(
+            scratch.casterRegistry.isEnabled = shadowCasterSettings.isEnabled
+            scratch.casterRegistry.update(
                 sources: candidates.meshes,
                 materials: &_materialUniforms.wrappedValue,
                 identityPalette: skinningUniforms.identityBuffer,
-                device: renderDevice.renderDevice
+                device: renderDevice.renderDevice,
+                transformChanges: candidates.transformChanges
             )
-            var culled: GPUShadowCullResult?
-            if scratch.gpuCull.isAvailable(camera: source.entityId, registry: registry, viewCount: cascades.count, device: renderDevice.renderDevice) {
-                culled = scratch.gpuCull.cull(
-                    camera: source.entityId,
-                    registry: &_registry.wrappedValue,
-                    views: cascades.map { GPUShadowCullView(viewProjection: $0.viewProjection, culls: visibility.frustumCulling) },
-                    command: commandBuffer,
-                    device: renderDevice.renderDevice
-                )
+            let distanceCamera = visibility.distanceCulling ? viewUniform.viewMatrix.inverse.origin : nil
+            let views = cascades.map {
+                GPUShadowCullView(viewProjection: $0.viewProjection, culls: visibility.frustumCulling, distanceCamera: distanceCamera)
             }
-            // Pool copies are encoded even when this camera does not cull on the GPU, so they never accumulate.
-            registry.flushCopies(on: commandBuffer)
+            let culled = scratch.cullCasters(camera: source.entityId, views: views, command: commandBuffer, device: renderDevice.renderDevice)
+            let registry = scratch.casterRegistry
             let cpuSources = culled == nil ? candidates.meshes : registry.cpuSources
+            if PerformanceStallProbe.isEnabled {
+                let gpuParts = culled?.casters == nil ? 0 : registry.input.casters.count
+                let gpuClusters = culled?.clusters == nil ? 0 : registry.clusterInput.clusters.count
+                PerformanceStallProbe.mark("DirectionalShadow3D casters cpuSources=\(cpuSources.count) gpuParts=\(gpuParts) gpuClusters=\(gpuClusters)")
+            }
+            let reconcile = scratch.cpuCasters.update(
+                sources: candidates.meshes, cpuIndices: culled == nil ? nil : registry.cpuSourceIndices,
+                changes: candidates.transformChanges, frame: materialUniforms.frame
+            )
+            let retained = reconcile != nil
+            if reconcile == true { lists.reconcileHistory(sources: cpuSources) }
+            let stableSources = retained ? scratch.cpuCasters.stable : cpuSources
+            let movingSources = retained ? scratch.cpuCasters.dynamic : []
+            let sourceRevision = retained ? scratch.cpuCasters.stableRevision : nil
             let pass = commandBuffer.beginRenderPass(
                 RenderPassDescriptor(
                     label: "Directional Shadow 3D Pass",
@@ -214,22 +227,57 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             var batches = ShadowBatchEncoder3D(requiresMaterialBuffer: false)
             for cascadeIndex in cascades.indices {
                 pass.setViewport(Rect(x: Float(cascadeIndex) * resolution, y: 0, width: resolution, height: resolution))
+                let preparationStart = PerformanceStallProbe.begin()
                 let preparationSpan = AdaTrace.startSpan("Render3D.ShadowPrepare")
-                lists.prepare(
-                    sources: cpuSources,
-                    view: source.entityId,
-                    pass: cascadeIndex,
-                    viewMatrix: viewUniform.viewMatrix,
-                    projection: viewUniform.projectionMatrix,
-                    cullingProjection: cascades[cascadeIndex].viewProjection,
-                    settings: visibility,
-                    device: renderDevice.renderDevice,
-                    materials: &_materialUniforms.wrappedValue
-                )
+                let prepared = sourceRevision.map {
+                    DirectionalShadow3DScratch.PreparedCascade(
+                        sourceRevision: $0, cameraView: viewUniform.viewMatrix,
+                        cameraProjection: viewUniform.projectionMatrix, cascadeProjection: cascades[cascadeIndex].viewProjection,
+                        atlasSize: colorTexture.size, frustumCulling: visibility.frustumCulling,
+                        usesLOD: visibility.lod, distanceCulling: visibility.distanceCulling
+                    )
+                }
+                let reuse = prepared != nil && scratch.preparedCascades[source.entityId]?[cascadeIndex] == prepared
+                    && lists.refreshShadowMaterials(
+                        view: source.entityId, pass: cascadeIndex, device: renderDevice.renderDevice, materials: &_materialUniforms.wrappedValue
+                    )
+                if !reuse {
+                    lists.prepare(
+                        sources: stableSources,
+                        view: source.entityId,
+                        pass: cascadeIndex,
+                        viewMatrix: viewUniform.viewMatrix,
+                        projection: viewUniform.projectionMatrix,
+                        cullingProjection: cascades[cascadeIndex].viewProjection,
+                        settings: visibility,
+                        device: renderDevice.renderDevice,
+                        materials: &_materialUniforms.wrappedValue,
+                        reconcileMembership: !retained
+                    )
+                    scratch.preparedCascades[source.entityId, default: [:]][cascadeIndex] = prepared
+                }
+                // The second set of buffers is only written for moving casters.
+                let movingPass = cascadeIndex + 3
+                if !movingSources.isEmpty {
+                    lists.prepare(
+                        sources: movingSources,
+                        view: source.entityId,
+                        pass: movingPass,
+                        viewMatrix: viewUniform.viewMatrix,
+                        projection: viewUniform.projectionMatrix,
+                        cullingProjection: cascades[cascadeIndex].viewProjection,
+                        settings: visibility,
+                        device: renderDevice.renderDevice,
+                        materials: &_materialUniforms.wrappedValue,
+                        reconcileMembership: false
+                    )
+                }
                 preparationSpan.end()
+                PerformanceStallProbe.end("DirectionalShadow3D.PrepareCascade", since: preparationStart)
                 let visibleItems = lists.items(view: source.entityId, pass: cascadeIndex)
                 let buffers = lists.buffers(view: source.entityId, pass: cascadeIndex)
                 var count = lists.count(view: source.entityId, pass: cascadeIndex)
+                if !movingSources.isEmpty { count.merge(lists.count(view: source.entityId, pass: movingPass)) }
                 if culled != nil { count.drawCalls += registry.partCount + registry.clusterParts.count }
                 statistics.record(count, view: source.entityId, pass: cascadeIndex)
                 let constants = scratch.cache.write(
@@ -255,6 +303,17 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                         identityPalette: skinningUniforms.identityBuffer,
                         device: renderDevice.renderDevice
                     )
+                }
+                if !movingSources.isEmpty {
+                    let movingBuffers = lists.buffers(view: source.entityId, pass: movingPass)
+                    if let instances = movingBuffers.instances {
+                        batches.encode(
+                            items: lists.items(view: source.entityId, pass: movingPass),
+                            instances: instances, defaults: movingBuffers.defaults, pass: pass,
+                            pipelines: &_pipelines.wrappedValue, materials: materialUniforms,
+                            identityPalette: skinningUniforms.identityBuffer, device: renderDevice.renderDevice
+                        )
+                    }
                 }
                 if let culled {
                     GPUShadowCull3D.draw(

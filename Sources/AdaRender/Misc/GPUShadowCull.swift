@@ -1,6 +1,6 @@
 import Math
 
-/// One shadow-casting instance of one pooled mesh part, culled on the GPU against every shadow view (48 bytes).
+/// One shadow-casting instance of one pooled mesh part, culled on the GPU against every shadow view (64 bytes).
 public struct GPUShadowCaster: Sendable, Equatable {
     /// World-space bounds minimum. `w` is 1 when the caster must always be drawn (no bounds, forced visible).
     public var minimum: Vector4
@@ -10,20 +10,33 @@ public struct GPUShadowCaster: Sendable, Equatable {
     public var part: UInt32
     /// Record index of the caster in ``GPUShadowCullInput/instances``.
     public var instance: UInt32
-    private var padding0: UInt32 = 0
+    /// Width of the distance fade. `maximum.w` stores the maximum draw distance.
+    public var fadeDistance: Float = 0
     private var padding1: UInt32 = 0
+    /// Exact CPU distance-test center, before rounding to the min/max representation.
+    public var distanceCenter: Vector4
 
-    public init(bounds: AABB?, forceVisible: Bool, part: UInt32, instance: UInt32) {
+    public init(
+        bounds: AABB?,
+        forceVisible: Bool,
+        part: UInt32,
+        instance: UInt32,
+        position: Vector3 = .zero,
+        maximumDistance: Float = 0,
+        fadeDistance: Float = 0
+    ) {
         let alwaysVisible = forceVisible || bounds == nil
         minimum = Vector4(bounds?.min ?? .zero, alwaysVisible ? 1 : 0)
-        maximum = Vector4(bounds?.max ?? .zero, 0)
+        maximum = Vector4(bounds?.max ?? .zero, maximumDistance)
         self.part = part
         self.instance = instance
+        self.fadeDistance = fadeDistance
+        distanceCenter = Vector4(bounds?.center ?? position, 0)
     }
 }
 
 /// The six clip planes of one shadow view, as rows of its view-projection (`row3 ± row0`, `row3 ± row1`, `row2`,
-/// `row3 - row2`), matching the CPU mesh-visibility frustum test (112 bytes).
+/// `row3 - row2`), matching the CPU mesh-visibility frustum test (128 bytes).
 public struct GPUShadowCullView: Sendable {
     public var plane0: Vector4
     public var plane1: Vector4
@@ -36,8 +49,10 @@ public struct GPUShadowCullView: Sendable {
     private var padding0: UInt32 = 0
     private var padding1: UInt32 = 0
     private var padding2: UInt32 = 0
+    /// World-space camera position. A nonzero `w` enables distance culling.
+    public var distanceCamera: Vector4
 
-    public init(viewProjection: Transform3D, culls: Bool) {
+    public init(viewProjection: Transform3D, culls: Bool, distanceCamera: Vector3? = nil) {
         let row0 = viewProjection.row(at: 0)
         let row1 = viewProjection.row(at: 1)
         let row2 = viewProjection.row(at: 2)
@@ -49,6 +64,7 @@ public struct GPUShadowCullView: Sendable {
         plane4 = row2
         plane5 = row3 - row2
         self.culls = culls ? 1 : 0
+        self.distanceCamera = Vector4(distanceCamera ?? .zero, distanceCamera == nil ? 0 : 1)
     }
 }
 
@@ -63,6 +79,8 @@ public struct GPUShadowCullInput: Sendable {
     public var instanceStride = 0
     /// Leading bytes of each record that the shadow passes read; the remainder is not copied.
     public var copiedBytes = 0
+    /// Byte offset of the float that encodes the fraction removed by distance dithering.
+    public var distanceFadeOffset: Int?
     /// Index count, first index and base vertex of each pooled part. Instance counts are ignored.
     public var parts: [IndexedIndirectArguments] = []
     /// First output record of each part inside a view's range; the parts' caster counts partition `casters.count`.
@@ -78,6 +96,9 @@ public struct GPUShadowCullInput: Sendable {
             instanceStride > 0, instanceStride % 4 == 0, copiedBytes > 0, copiedBytes % 4 == 0, copiedBytes <= instanceStride,
             instances.count % instanceStride == 0
         else { return false }
+        if let offset = distanceFadeOffset, offset < 0 || offset % 4 != 0 || offset > copiedBytes - 4 {
+            return false
+        }
         let records = instances.count / instanceStride
         var counts = [Int](repeating: 0, count: parts.count)
         for caster in casters {

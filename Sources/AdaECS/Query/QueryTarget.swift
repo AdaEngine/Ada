@@ -41,6 +41,13 @@ extension WorldQueryTarget {
     }
 }
 
+/// Only targets backed by the ECS write notification can retain sparse reads.
+@usableFromInline
+protocol JournaledQueryWriter {}
+
+extension Ref: JournaledQueryWriter where T: Component {}
+extension Optional: JournaledQueryWriter where Wrapped: JournaledQueryWriter {}
+
 /// A protocol that allows to use components and entities as query targets.
 public protocol QueryTarget: WorldQueryTarget, ~Copyable {
     /// Check that entity contains target.
@@ -137,6 +144,10 @@ extension Component {
 @safe
 public struct RefFetch<T> {
     @usableFromInline
+    var journal: ComponentChangeJournal?
+    @usableFromInline
+    var entityIDs: ContiguousArray<Entity.ID>?
+    @usableFromInline
     var data: UnsafeMutableBufferPointer<T>?
 
     @usableFromInline
@@ -188,18 +199,22 @@ extension Ref: QueryTarget where T: Component {
     }
 
     public static func _initFetch(
-        world _: World,
-        state _: ComponentId,
+        world: World,
+        state: ComponentId,
         lastTick: Tick,
         currentTick: Tick
     ) -> RefFetch<T> {
-        unsafe RefFetch(
+        var fetch = unsafe RefFetch<T>(
             data: nil,
             added: nil,
             change: nil,
             lastTick: lastTick,
             currentTick: currentTick
         )
+        if world.componentChanges.observes(state) {
+            fetch.journal = world.componentChanges
+        }
+        return fetch
     }
 
     public static func _initState(world _: World) -> ComponentId {
@@ -218,6 +233,9 @@ extension Ref: QueryTarget where T: Component {
         archetype _: Archetype
     ) -> RefFetch<T> {
         var newFetch = fetch
+        if newFetch.journal != nil {
+            newFetch.entityIDs = chunk.entities
+        }
         guard
             let slice = unsafe chunk.getMutableComponentSlice(for: T.self),
             let ticks = chunk.getMutableComponentTicksSlice(for: T.self)
@@ -242,17 +260,21 @@ extension Ref: QueryTarget where T: Component {
     @inlinable
     public static func _queryFetch(
         for _: Entity,
-        state _: ComponentId,
+        state: ComponentId,
         fetch: RefFetch<T>,
         at row: Int
     ) -> Ref<T>? {
+        let observedWrite = fetch.journal.flatMap { journal in
+            fetch.entityIDs.map { ObservedComponentWrite(journal: journal, entity: $0[row], component: state) }
+        }
         return unsafe Ref(
             pointer: unsafe fetch.data?.baseAddress?.advanced(by: row),
             changeTick: ChangeDetectionTick(
                 added: fetch.added?.baseAddress?.advanced(by: row).unsafeBox(),
                 change: fetch.change?.baseAddress?.advanced(by: row).unsafeBox(),
                 lastTick: fetch.lastTick,
-                currentTick: fetch.currentTick
+                currentTick: fetch.currentTick,
+                observedWrite: observedWrite
             )
         )
     }

@@ -152,6 +152,9 @@ final class EditorProjectSidebarViewModel {
         var isSymbolicLink: Bool = false
         var kind: EditorProjectFileKind
         var assetRoot: String?
+        var targetPath: String?
+
+        var navigationPath: String { targetPath ?? relativePath }
     }
 
     // Tree topology and row selection have separate observation lifetimes.
@@ -172,6 +175,7 @@ final class EditorProjectSidebarViewModel {
             synchronizeRowSelections()
             let validIDs = Set(newValue.map(\.id))
             rowSelections = rowSelections.filter { validIDs.contains($0.key) }
+            refreshSwiftTargetRows()
             itemsRevision &+= 1
         }
     }
@@ -182,7 +186,13 @@ final class EditorProjectSidebarViewModel {
     var isDisplayModeMenuPresented: Bool
     var revealedItemID: String?
     var revealRevision: UInt64 = 0
-    let sourceRootTarget: SourceRootTarget?
+    var sourceRootTarget: SourceRootTarget?
+    var usesSwiftPM = false
+    var swiftTargetsFailed = false
+    var swiftPackage: SwiftPackageModel? {
+        didSet { refreshSwiftTargetRows() }
+    }
+    private var swiftTargetRows: [Item] = []
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let expansionPreferenceKey: String?
@@ -198,7 +208,7 @@ final class EditorProjectSidebarViewModel {
         defer { span.end() }
         let displayedItems = displayedItems
         let collapsedIDs = collapsedFolderIDs
-        let collapsedPaths = Set(displayedItems.lazy.filter { $0.isFolder && collapsedIDs.contains($0.id) }.map(\.relativePath))
+        let collapsedPaths = Set(displayedItems.lazy.filter { $0.isFolder && collapsedIDs.contains($0.id) }.map(\.navigationPath))
         return displayedItems.filter { !Self.isHiddenByCollapsedFolder($0, collapsedPaths: collapsedPaths) }
     }
 
@@ -274,11 +284,15 @@ final class EditorProjectSidebarViewModel {
         }
     }
 
+    var displayedItemOrder: [String] {
+        (usesSwiftPM && displayMode == .targets ? targetItems : items).map(\.id)
+    }
+
     private var targetItems: [Item] {
         var targetRoots = items.filter { item in
-            item.assetRoot == item.relativePath || isSourceTarget(item)
+            item.assetRoot == item.relativePath || (!usesSwiftPM && isSourceTarget(item))
         }
-        if let sourceRootTarget,
+        if !usesSwiftPM, let sourceRootTarget,
             var sourceRoot = items.first(where: { $0.isFolder && $0.relativePath == sourceRootTarget.relativePath }),
             !targetRoots.contains(where: { $0.id == sourceRoot.id }) {
             sourceRoot.title = sourceRootTarget.title
@@ -293,9 +307,11 @@ final class EditorProjectSidebarViewModel {
                 candidate.id != other.id && candidate.relativePath.hasPrefix(other.relativePath + "/")
             }
         }
-        return roots.flatMap { root in
-            items.compactMap { item in
-                guard item.relativePath == root.relativePath || item.relativePath.hasPrefix("\(root.relativePath)/") else {
+        let swiftFileIDs = Set(swiftTargetRows.lazy.filter { !$0.isFolder }.map(\.id))
+        let resourceRows = roots.flatMap { root in
+            items.compactMap { item -> Item? in
+                guard !swiftFileIDs.contains(item.id),
+                      item.relativePath == root.relativePath || item.relativePath.hasPrefix("\(root.relativePath)/") else {
                     return nil
                 }
 
@@ -306,6 +322,56 @@ final class EditorProjectSidebarViewModel {
                 }
                 return targetItem
             }
+        }
+        return resourceRows + swiftTargetRows
+    }
+
+    private func refreshSwiftTargetRows() {
+        guard swiftPackage != nil || !swiftTargetRows.isEmpty else { return }
+        let oldFolders = Set(swiftTargetRows.lazy.filter(\.isFolder).map(\.id))
+        let expandedPaths = Set(expansionPreferenceKey.flatMap { defaults.stringArray(forKey: $0) } ?? [])
+        swiftTargetRows = makeSwiftTargetRows()
+        let newFolders = swiftTargetRows.filter(\.isFolder)
+        let newIDs = Set(newFolders.map(\.id))
+        let newlyCollapsed = newFolders.lazy.filter { !oldFolders.contains($0.id) && !expandedPaths.contains($0.navigationPath) }.map(\.id)
+        let updatedCollapsed = collapsedFolderIDs.subtracting(oldFolders.subtracting(newIDs)).union(newlyCollapsed)
+        if updatedCollapsed != collapsedFolderIDs {
+            collapsedFolderIDs = updatedCollapsed
+        }
+    }
+
+    private func makeSwiftTargetRows() -> [Item] {
+        guard let swiftPackage else { return [] }
+        let byPath = Dictionary(items.map { ($0.relativePath, $0) }, uniquingKeysWith: { first, _ in first })
+        let targets = swiftPackage.targets.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        return targets.flatMap { target -> [Item] in
+            guard let root = target.path?.replacingOccurrences(of: "\\", with: "/") else { return [] }
+            let prefix = root == "." ? "" : root + "/"
+            let group = "swiftpm:\(target.name)"
+            var members: [String: Item] = [:]
+            for source in target.sources {
+                let localPath = source.replacingOccurrences(of: "\\", with: "/")
+                guard let file = byPath[prefix + localPath], !file.isFolder else { continue }
+                members[localPath] = file
+                var path = localPath[...]
+                while let slash = path.lastIndex(of: "/") {
+                    path = path[..<slash]
+                    let directory = String(path)
+                    if members[directory] != nil { break }
+                    if let folder = byPath[prefix + directory] { members[directory] = folder }
+                }
+            }
+            guard !members.isEmpty else { return [] }
+            let heading = Item(id: group, disclosure: "", icon: "", title: target.name, relativePath: root,
+                               level: 0, isActive: false, isFolder: true, kind: .folder, targetPath: group)
+            let children = members.keys.sorted().compactMap { path -> Item? in
+                guard var row = members[path] else { return nil }
+                row.targetPath = group + "/" + path
+                row.level = path.split(separator: "/").count
+                if row.isFolder { row.id = row.navigationPath }
+                return row
+            }
+            return [heading] + children
         }
     }
 
@@ -358,7 +424,9 @@ final class EditorProjectSidebarViewModel {
     func revealFile(relativePath: String) -> Bool {
         guard let item = items.first(where: { $0.relativePath == relativePath && !$0.isFolder }) else { return false }
         if !displayedItems.contains(where: { $0.id == item.id }) { displayMode = .files }
-        let ancestors = items.filter { $0.isFolder && item.relativePath.hasPrefix($0.relativePath + "/") }.map(\.id)
+        let rows = displayedItems
+        let path = rows.first(where: { $0.id == item.id })?.navigationPath ?? item.relativePath
+        let ancestors = rows.filter { $0.isFolder && path.hasPrefix($0.navigationPath + "/") }.map(\.id)
         collapsedFolderIDs.subtract(ancestors)
         select(item)
         revealedItemID = item.id
@@ -385,7 +453,8 @@ final class EditorProjectSidebarViewModel {
         let previousFolderIDs = Set(items.lazy.filter(\.isFolder).map(\.id))
         let newFolderIDs = Set(newItems.lazy.filter(\.isFolder).map(\.id))
         items = newItems
-        collapsedFolderIDs = collapsedFolderIDs.intersection(newFolderIDs)
+        let swiftFolderIDs = swiftTargetRows.lazy.filter(\.isFolder).map(\.id)
+        collapsedFolderIDs = collapsedFolderIDs.intersection(newFolderIDs.union(swiftFolderIDs))
             .union(newFolderIDs.subtracting(previousFolderIDs))
     }
 
@@ -400,7 +469,7 @@ final class EditorProjectSidebarViewModel {
 
     func collapseAll() {
         revealedItemID = nil
-        collapsedFolderIDs = Set(items.lazy.filter(\.isFolder).map(\.id))
+        collapsedFolderIDs = Set((items + swiftTargetRows).lazy.filter(\.isFolder).map(\.id))
     }
 
     func toggleAllFolders() {
@@ -410,7 +479,7 @@ final class EditorProjectSidebarViewModel {
 
     private func persistExpandedFolders() {
         guard let expansionPreferenceKey else { return }
-        let expandedPaths = items.filter { $0.isFolder && !collapsedFolderIDs.contains($0.id) }.map(\.relativePath).sorted()
+        let expandedPaths = (items + swiftTargetRows).filter { $0.isFolder && !collapsedFolderIDs.contains($0.id) }.map(\.navigationPath).sorted()
         let writeSpan = AdaTrace.startSpan("AdaEditor.FolderPreferences.set")
         defaults.set(expandedPaths, forKey: expansionPreferenceKey)
         writeSpan.end()
@@ -425,7 +494,7 @@ final class EditorProjectSidebarViewModel {
     private static func isHiddenByCollapsedFolder(_ item: Item, collapsedPaths: Set<String>) -> Bool {
         // Check only this item's ancestors. Looking up every collapsed folder in
         // `items` for every file made an expanded Assets tree stall all tab changes.
-        var ancestor = item.relativePath[...]
+        var ancestor = item.navigationPath[...]
         while let slash = ancestor.lastIndex(of: "/") {
             ancestor = ancestor[..<slash]
             if collapsedPaths.contains(String(ancestor)) { return true }

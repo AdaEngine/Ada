@@ -137,9 +137,10 @@ public struct VisibleMesh3DLists: Resource {
         cullingProjection: Transform3D,
         settings: MeshVisibilitySettings3D,
         device: RenderDevice,
-        materials: inout PBR3DUniforms
+        materials: inout PBR3DUniforms,
+        reconcileMembership: Bool = true
     ) {
-        reconcileHistory(sources: sources)
+        if reconcileMembership { reconcileHistory(sources: sources) }
         preparedPassCount &+= 1
         let key = Key(view: view, pass: pass)
         var entry = entries.removeValue(forKey: key) ?? Entry()
@@ -163,8 +164,10 @@ public struct VisibleMesh3DLists: Resource {
         for sourceIndex in sources.indices {
             if isShadowPass && !sources[sourceIndex].castShadows { continue }
             var prototypeBounds = sources[sourceIndex].mesh.bounds
-            for alternative in sources[sourceIndex].alternatives {
-                prototypeBounds = AABB(min: min(prototypeBounds.min, alternative.bounds.min), max: max(prototypeBounds.max, alternative.bounds.max))
+            if sources[sourceIndex].instances != nil {
+                for alternative in sources[sourceIndex].alternatives {
+                    prototypeBounds = AABB(min: min(prototypeBounds.min, alternative.bounds.min), max: max(prototypeBounds.max, alternative.bounds.max))
+                }
             }
             let count = sources[sourceIndex].instances?.count ?? 1
             for ordinal in 0..<count {
@@ -414,6 +417,17 @@ public struct VisibleMesh3DLists: Resource {
     public func gpuCandidates(view: Entity.ID, pass: Int) -> [GPUVisibilityCandidate] { entries[Key(view: view, pass: pass)]?.candidates ?? [] }
 
     public func items(view: Entity.ID, pass: Int) -> [Opaque3DRenderItem] { entries[Key(view: view, pass: pass)]?.items ?? [] }
+
+    /// A retained shadow list still needs this frame's material bindings.
+    func refreshShadowMaterials(view: Entity.ID, pass: Int, device: RenderDevice, materials: inout PBR3DUniforms) -> Bool {
+        guard let entry = entries[Key(view: view, pass: pass)] else { return false }
+        for item in entry.items {
+            let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
+            materials.write(material: item.material, descriptor: part.vertexDescriptor, device: device)
+        }
+        return true
+    }
+
     public func count(view: Entity.ID, pass: Int) -> Visibility3DCount { entries[Key(view: view, pass: pass)]?.count ?? Visibility3DCount() }
     public func buffers(view: Entity.ID, pass: Int) -> Active3DInstanceBuffers {
         var result = Active3DInstanceBuffers()
@@ -426,7 +440,7 @@ public struct VisibleMesh3DLists: Resource {
 
     // Keep IDs alive independently of camera visibility. Rebuild a membership set only when its
     // placement revision changes, so unchanged 100k-placement arrays are not scanned per camera/pass.
-    private mutating func reconcileHistory(sources: [Mesh3DRenderSource]) {
+    mutating func reconcileHistory(sources: [Mesh3DRenderSource]) {
         var next: [SelectionSource: Membership] = [:]
         var changed = false
         for source in sources where !source.alternatives.isEmpty {

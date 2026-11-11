@@ -15,7 +15,7 @@ public struct BatchedQueryResult<B: QuertyTargetBuilder, F: Filter>: Sendable {
         let requiresEntity = B.requiresEntity
         let requiresRowEvaluation = F.requiresRowEvaluation
         for archetypeIndex in state.archetypeIndecies {
-            let archetype = world.archetypes.archetypes[archetypeIndex]
+            let archetype = world.storageArchetypes.archetypes[archetypeIndex]
             for chunk in archetype.chunks.chunks where !chunk.isEmpty {
                 // Match the ordinary iterator's per-chunk target/filter state lifetime.
                 let states = B.initState(world: world)

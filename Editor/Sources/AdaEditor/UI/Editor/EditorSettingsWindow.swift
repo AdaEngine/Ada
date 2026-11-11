@@ -91,6 +91,7 @@ final class EditorSettingsWindowViewModel {
     var runtimeDraft: EditorRuntimeSettingsDraft
     var runtimeSettings: AdaProjectRuntime
     var runtimeSettingsStatusMessage = ""
+    var buildSystemDraft: String
 
     init(
         editorViewModel: EditorViewModel?,
@@ -112,6 +113,7 @@ final class EditorSettingsWindowViewModel {
         self.adaScriptTypeChecking = Self.loadTypeChecking(from: editorViewModel)
         self.runtimeSettings = runtimeSettings
         self.runtimeDraft = EditorRuntimeSettingsDraft(runtime: runtimeSettings)
+        self.buildSystemDraft = editorViewModel?.projectBuildSystem?.rawValue ?? AdaProjectBuildSystem.adaScript.rawValue
         self.selectedPage = nil
         let availablePages = pages(in: selectedSection)
         self.selectedPage = selectedPage.flatMap { availablePages.contains($0) ? $0 : nil } ?? availablePages.first
@@ -153,6 +155,8 @@ final class EditorSettingsWindowViewModel {
         adaScriptTypeChecking = Self.loadTypeChecking(from: editorViewModel)
         runtimeSettings = Self.loadRuntimeSettings(from: editorViewModel)
         runtimeDraft = EditorRuntimeSettingsDraft(runtime: runtimeSettings)
+        buildSystemDraft = editorViewModel?.projectBuildSystem?.rawValue ?? AdaProjectBuildSystem.adaScript.rawValue
+        editorViewModel?.projectBuildSystemError = nil
         generalSettingsStatusMessage = ""
         runtimeSettingsStatusMessage = ""
     }
@@ -205,10 +209,15 @@ final class EditorSettingsWindowViewModel {
     }
 
     var isAdaScriptProject: Bool {
-        editorViewModel?.projectURL
-            .flatMap {
-                try? ProjectSystem.loadProject(at: $0).build.system.isAdaScript
-            } ?? false
+        editorViewModel?.projectBuildSystem?.isAdaScript == true
+    }
+
+    var buildSystemBinding: Binding<String> {
+        Binding(get: { self.buildSystemDraft }, set: { value in
+            self.buildSystemDraft = value
+            self.editorViewModel?.projectBuildSystemError = nil
+            self.runtimeSettingsStatusMessage = ""
+        })
     }
 
     func runtimeTextBinding(_ keyPath: WritableKeyPath<EditorRuntimeSettingsDraft, String>) -> Binding<String> {
@@ -291,24 +300,26 @@ final class EditorSettingsWindowViewModel {
     }
 
     func saveProjectSettings() {
-        guard let editorViewModel else {
+        guard let editorViewModel, !editorViewModel.isChangingProjectBuildSystem else {
             return
         }
         do {
+            let buildSystem = EditorDistribution.current.supportsSwiftProjects ? AdaProjectBuildSystem(rawValue: buildSystemDraft) : nil
+            let changesBuildSystem = buildSystem.map { $0 != editorViewModel.projectBuildSystem } ?? false
             let actions = try inputBindingsDraft.validatedActions()
             if isAdaScriptProject {
-                runtimeDraft.scene = editorViewModel.projectMainSceneText
                 runtimeSettings = try runtimeDraft.applying(to: runtimeSettings)
                 _ = try EditorAdaScriptRuntimePluginResolver.resolve(runtimeSettings.plugins)
                 editorViewModel.saveProjectSettings(
                     runtime: runtimeSettings,
                     inputActions: actions,
-                    adaScriptTypeChecking: adaScriptTypeChecking
+                    adaScriptTypeChecking: adaScriptTypeChecking,
+                    buildSystem: buildSystem
                 )
             } else {
-                editorViewModel.saveProjectSettings(inputActions: actions)
+                editorViewModel.saveProjectSettings(inputActions: actions, buildSystem: buildSystem)
             }
-            runtimeSettingsStatusMessage = editorViewModel.projectSettingsStatusMessage
+            runtimeSettingsStatusMessage = changesBuildSystem ? "" : editorViewModel.projectSettingsStatusMessage
         } catch {
             runtimeSettingsStatusMessage = error.localizedDescription
         }
@@ -719,6 +730,25 @@ struct EditorSettingsWindowView: View {
                 EditorStudioToolsSettings(host: editorViewModel.studioTools)
             }
             settingsGroup("PROJECT") {
+                if EditorDistribution.current.supportsSwiftProjects {
+                    settingsRow(title: "Build System", detail: "Applies to every build target.") {
+                        EditorEnumField(
+                            cases: [AdaProjectBuildSystem.adaScript.rawValue, AdaProjectBuildSystem.swiftpm.rawValue],
+                            selection: viewModel.buildSystemBinding,
+                            accessibilityID: "AdaEditor.Settings.BuildSystem",
+                            labels: ["adascript": "AdaScript", "swiftpm": "SwiftPM"],
+                            localizesValues: false
+                        )
+                        .frame(width: 168)
+                        .disabled(!editorViewModel.canChangeBuildTarget)
+                    }
+                    if let error = editorViewModel.projectBuildSystemError {
+                        Text(error)
+                            .font(.system(size: 11))
+                            .foregroundColor(.red)
+                            .accessibilityIdentifier("AdaEditor.Settings.BuildSystem.Error")
+                    }
+                }
                 settingsField(
                     editorViewModel.project?.name ?? "Game",
                     detail: "Display name used by the project and runtime window.",
@@ -1016,6 +1046,7 @@ struct EditorSettingsWindowView: View {
                 }
                 Spacer()
                 primaryButton(configuration.title, action: configuration.action)
+                    .disabled(viewModel.selectedSection == .project && viewModel.editorViewModel?.isChangingProjectBuildSystem == true)
             }
             .padding(.horizontal, 16)
             .frame(height: 64)

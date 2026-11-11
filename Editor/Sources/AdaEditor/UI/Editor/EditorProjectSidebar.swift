@@ -133,14 +133,24 @@ struct EditorProjectSidebar: View {
 
                     ScrollViewReader { proxy in
                         ScrollView(showsIndicators: true) {
-                            EditorProjectTreeRows(items: viewModel.visibleItems, order: viewModel.items.map(\.id), onSettled: {
-                                if let id = viewModel.revealedItemID { proxy.scrollTo(id, anchor: .center) }
-                            }) { item in
-                                AnyView(EditorProjectTreeSelectionRow(item: item, selection: viewModel.rowSelection(for: item)) { current in
-                                    projectTreeRow(current)
-                                })
+                            VStack(alignment: .leading, spacing: 0) {
+                                if viewModel.displayMode == .targets, viewModel.usesSwiftPM, viewModel.swiftPackage == nil {
+                                    Text(viewModel.swiftTargetsFailed
+                                         ? L10n.text("SwiftPM targets could not be loaded. See Build Output or switch to Files.")
+                                         : L10n.text("Loading SwiftPM targets…"))
+                                        .font(.system(size: 11))
+                                        .foregroundColor(theme.editorColors.muted)
+                                        .padding(8)
+                                }
+                                EditorProjectTreeRows(items: viewModel.visibleItems, order: viewModel.displayedItemOrder, onSettled: {
+                                    if let id = viewModel.revealedItemID { proxy.scrollTo(id, anchor: .center) }
+                                }) { item in
+                                    AnyView(EditorProjectTreeSelectionRow(item: item, selection: viewModel.rowSelection(for: item)) { current in
+                                        projectTreeRow(current)
+                                    })
+                                }
+                                .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                             }
-                            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                             .padding(8)
                         }
                         .accessibilityIdentifier("AdaEditor.ProjectTree.ScrollView")
@@ -258,14 +268,21 @@ struct EditorProjectSidebar: View {
     }
 
     private func projectTreeRowContent(_ item: EditorProjectSidebarViewModel.Item, isHovered: Bool) -> some View {
-        Button(action: { onOpenItem(item) }) {
+        let isSwiftTargetFolder = item.isFolder && item.targetPath != nil
+        return Button(action: {
+            if isSwiftTargetFolder {
+                viewModel.toggleFolder(item)
+            } else {
+                onOpenItem(item)
+            }
+        }) {
             HStack(spacing: 6) {
                 EditorProjectTreeChevron(expansion: item.isFolder && !viewModel.isCollapsed(item) ? 1 : 0)
                     .stroke(theme.editorColors.muted, lineWidth: 1.5)
                     .frame(width: 16, height: 18)
                     .opacity(item.isFolder ? 1 : 0)
                     .animation(.easeInOut(duration: Float(EditorProjectTreePresentation.duration)), value: viewModel.isCollapsed(item))
-                    .accessibilityIdentifier("AdaEditor.ProjectTree.Disclosure.\(item.relativePath)")
+                    .accessibilityIdentifier("AdaEditor.ProjectTree.Disclosure.\(item.navigationPath)")
                 if let language = textLanguage(for: item), let image = EditorLanguageLogo.image(for: language) {
                     image
                         .resizable()
@@ -291,50 +308,56 @@ struct EditorProjectSidebar: View {
             )
         }
         .buttonStyle(DefaultButtonStyle())
-        .contextMenu(onPresent: { viewModel.select(item) }) {
-            newFileAction
-            Button(item.isFolder ? (viewModel.isCollapsed(item) ? L10n.text("Expand") : L10n.text("Collapse")) : L10n.text("Open")) {
-                onOpenItem(item)
-            }
-            if item.kind == .scene {
-                Button(L10n.text("Open as Raw")) {
-                    onOpenRawItem(item)
+        .contextMenu(onPresent: { if !isSwiftTargetFolder { viewModel.select(item) } }) {
+            if isSwiftTargetFolder {
+                Button(viewModel.isCollapsed(item) ? L10n.text("Expand") : L10n.text("Collapse")) {
+                    viewModel.toggleFolder(item)
                 }
-            }
-            Divider()
-            Button(L10n.text("Reveal in Finder")) {
-                onRevealItem(item)
-            }
-            if !item.isFolder {
-                Button(L10n.text("Open in Default App")) {
-                    onOpenInDefaultApplication(item)
+            } else {
+                newFileAction
+                Button(item.isFolder ? (viewModel.isCollapsed(item) ? L10n.text("Expand") : L10n.text("Collapse")) : L10n.text("Open")) {
+                    onOpenItem(item)
                 }
-            }
-            Button(L10n.text("Open in Terminal")) {
-                onOpenInTerminal(item)
-            }
-            Button(L10n.text("Find in Folder...")) {
-                onFindInFolder(item)
-            }
-            Divider()
-            Button(L10n.text("Copy Path")) {
-                onCopyPath(item, false)
-            }
-            Button(L10n.text("Copy Relative Path")) {
-                onCopyPath(item, true)
-            }
-            if item.isFolder {
+                if item.kind == .scene {
+                    Button(L10n.text("Open as Raw")) {
+                        onOpenRawItem(item)
+                    }
+                }
                 Divider()
-                Button(L10n.text("Expand All")) {
-                    viewModel.expandAll()
+                Button(L10n.text("Reveal in Finder")) {
+                    onRevealItem(item)
                 }
-                Button(L10n.text("Collapse All")) {
-                    viewModel.collapseAll()
+                if !item.isFolder {
+                    Button(L10n.text("Open in Default App")) {
+                        onOpenInDefaultApplication(item)
+                    }
                 }
-            }
-            Divider()
-            Button(L10n.text("Delete"), role: .destructive) {
-                onDeleteItem(item)
+                Button(L10n.text("Open in Terminal")) {
+                    onOpenInTerminal(item)
+                }
+                Button(L10n.text("Find in Folder...")) {
+                    onFindInFolder(item)
+                }
+                Divider()
+                Button(L10n.text("Copy Path")) {
+                    onCopyPath(item, false)
+                }
+                Button(L10n.text("Copy Relative Path")) {
+                    onCopyPath(item, true)
+                }
+                if item.isFolder {
+                    Divider()
+                    Button(L10n.text("Expand All")) {
+                        viewModel.expandAll()
+                    }
+                    Button(L10n.text("Collapse All")) {
+                        viewModel.collapseAll()
+                    }
+                }
+                Divider()
+                Button(L10n.text("Delete"), role: .destructive) {
+                    onDeleteItem(item)
+                }
             }
         }
         .accessibilityIdentifier("AdaEditor.ProjectTree.\(item.title)")

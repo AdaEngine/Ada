@@ -3,7 +3,7 @@
     @testable import AdaCorePipelines
     import AdaECS
     @_spi(Internal) @testable import AdaRender
-    import AdaScene
+    @testable import AdaScene
     import AdaTransform
     import AdaUtils
     import Foundation
@@ -80,6 +80,11 @@
                     MeshLOD3DComponent(alternatives: [cube], maximumDistance: 60)
                     Transform(position: [1, 1.5, 1.5])
                 }
+                app.main.spawn("Distance-faded caster") {
+                    Mesh3DComponent(mesh: cube, materials: [singleSided])
+                    MeshLOD3DComponent(maximumDistance: 12, fadeDistance: 6)
+                    Transform(position: [0, 0.6, 1])
+                }
                 app.main.spawn("Instanced casters") {
                     Mesh3DInstancesComponent(mesh: cube, materials: [singleSided], instances: (0..<5).map {
                         Mesh3DInstance(id: UInt64($0), transform: Transform3D(translation: [Float($0) * 1.4 - 2.8, 0, -3]), color: [1, 1, 1, 0.9])
@@ -137,6 +142,25 @@
                     }
                 }
                 try await compare("static")
+
+                // The atlas still renders each frame, while the same camera and
+                // casters can reuse the prepared lists for all three cascades.
+                var directionalOnly = environment
+                directionalOnly.localShadows.isEnabled = false
+                camera.components[Environment3D.self] = directionalOnly
+                try await compare("directional-distance-fade")
+                for _ in 0..<2 { try await app.update() }
+                let lists = try #require(render.getResource(VisibleMesh3DLists.self))
+                #expect(lists.count(view: camera.id, pass: 0).candidates == 1, "Distance-only caster should take the directional GPU path")
+                let prepared = lists.preparedPassCount
+                let visited = try #require(render.getResource(Model3DExtractionCache.self)).sourceVisitCount
+                try await app.update()
+                let nextPrepared = try #require(render.getResource(VisibleMesh3DLists.self)).preparedPassCount
+                let nextVisited = try #require(render.getResource(Model3DExtractionCache.self)).sourceVisitCount
+                #expect(nextPrepared - prepared == 1, "An unchanged scene should prepare the main view only")
+                #expect(nextVisited == visited, "An unchanged render source should not be visited by extraction")
+                camera.components[Environment3D.self] = environment
+
                 for (index, light) in lights.enumerated() {
                     light.components[Transform.self] = Transform(position: [Float(index) * 3 - 1, 2.5, 2])
                 }
@@ -150,6 +174,19 @@
                 let incremental = try await frame(gpu: true)
                 let full = try await frame(gpu: false)
                 #expect(incremental.data == full.data, "A partly reused atlas must equal a full redraw")
+
+                let sources = try #require(render.getResource(ExtractedMesh3DSources.self)).meshes
+                let caster = try #require(sources.first { $0.castShadows && ShadowCasterRegistry3D.isEligible($0) })
+                let palette = try #require(render.getResource(Skinning3DUniforms.self)?.identityBuffer)
+                var registry = ShadowCasterRegistry3D()
+                registry.isEnabled = true
+                var materials = PBR3DUniforms()
+                materials.beginFrame()
+                registry.update(sources: [caster], materials: &materials, identityPalette: palette, device: device)
+                #expect(registry.hasCasters)
+                materials.beginFrame()
+                registry.update(sources: [], materials: &materials, identityPalette: palette, device: device, transformChanges: [])
+                #expect(!registry.hasCasters, "A one-frame external override must not seed canonical sparse updates")
             }
         }
     }

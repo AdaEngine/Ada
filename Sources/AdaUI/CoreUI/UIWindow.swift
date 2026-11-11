@@ -155,6 +155,9 @@ open class UIWindow: UIView {
 
     /// Called once when window did disapper from screen.
     open func windowDidDisappear() {
+        for case let overlay as UIWindowOverlayView in subviews {
+            overlay.closeWithWindow()
+        }
         onDidDisappear?()
     }
 

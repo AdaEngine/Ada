@@ -39,8 +39,8 @@ struct GPUShadowCullInputTests {
         #expect(view.plane0 == matrix.row(at: 3) + matrix.row(at: 0))
         #expect(view.plane5 == matrix.row(at: 3) - matrix.row(at: 2))
         #expect(view.culls == 1)
-        #expect(MemoryLayout<GPUShadowCullView>.stride == 112)
-        #expect(MemoryLayout<GPUShadowCaster>.stride == 48)
+        #expect(MemoryLayout<GPUShadowCullView>.stride == 128)
+        #expect(MemoryLayout<GPUShadowCaster>.stride == 64)
     }
 
     private static func input() -> GPUShadowCullInput {

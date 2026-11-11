@@ -47,6 +47,8 @@ AdaEngine is a game engine written in Swift for building 2D and 3D games and use
 
 [Ada Studio](Editor/README.md) is the companion editor for AdaEngine. Create projects, edit code and scenes, and run your games from a desktop or mobile workspace.
 
+See [Studio build targets and launch settings](Editor/Documentation/BuildExport.md) to configure local runs and exports.
+
 <table>
   <tr>
     <th>Ada Studio Desktop</th>

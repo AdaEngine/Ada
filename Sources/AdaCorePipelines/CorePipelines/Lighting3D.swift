@@ -1,5 +1,6 @@
 import AdaECS
 import AdaRender
+import AdaUtils
 import Math
 
 /// A directional light copied from the main world for 3D rendering.
@@ -127,11 +128,38 @@ public struct DirectionalShadowViewUniform: Sendable {
 
 /// Reusable GPU storage for the directional shadow pass.
 public struct DirectionalShadow3DScratch: Resource, Sendable {
+    struct PreparedCascade: Equatable, Sendable {
+        let sourceRevision: RID
+        let cameraView: Transform3D
+        let cameraProjection: Transform3D
+        let cascadeProjection: Transform3D
+        let atlasSize: SizeInt
+        let frustumCulling: Bool
+        let usesLOD: Bool
+        let distanceCulling: Bool
+    }
+
     public var view: BufferData<DirectionalShadowViewUniform>
     var cache = FrameUniformCache3D<DirectionalShadowViewUniform>()
     var gpuCull = GPUShadowCull3D()
+    var casterRegistry = ShadowCasterRegistry3D(supportsDistanceCulling: true)
+    var cpuCasters = DirectionalShadowCasters3D()
+    var preparedCascades: [Entity.ID: [Int: PreparedCascade]] = [:]
 
     public init() {
         self.view = BufferData(label: "Directional Shadow View", elements: [])
+    }
+
+    mutating func cullCasters(
+        camera: Entity.ID,
+        views: [GPUShadowCullView],
+        command: CommandBuffer,
+        device: RenderDevice
+    ) -> GPUShadowCullResult? {
+        guard gpuCull.isAvailable(camera: camera, registry: casterRegistry, viewCount: views.count, device: device) else {
+            casterRegistry.flushCopies(on: command)
+            return nil
+        }
+        return gpuCull.cull(camera: camera, registry: &casterRegistry, views: views, command: command, device: device)
     }
 }

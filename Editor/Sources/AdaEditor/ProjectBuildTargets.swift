@@ -18,7 +18,7 @@ public struct AdaProjectBuildTarget: Codable, Equatable, Identifiable, Sendable 
         self.build = project.build
         self.run = project.run
         self.runtime = project.runtime
-        self.startupScene = project.runtime.entry.scene ?? project.editor.startupScene
+        self.startupScene = project.preferredEditorScene
         self.resourceRoots = project.paths.resourceRoots
         self.product = product
     }
@@ -33,8 +33,26 @@ public struct AdaProjectBuildTarget: Codable, Equatable, Identifiable, Sendable 
 }
 
 extension AdaProject {
+    var preferredEditorScene: String? {
+        let runtimeScene = build.system.isAdaScript ? runtime.entry.scene : nil
+        return runtimeScene ?? editor.startupScene
+    }
+
     public var activeBuildTarget: AdaProjectBuildTarget? {
         buildTargets.first { $0.id == activeBuildTargetID }
+    }
+
+    mutating func setBuildSystem(_ system: AdaProjectBuildSystem) {
+        build.system = system
+        for index in buildTargets.indices {
+            buildTargets[index].build.system = system
+        }
+    }
+
+    func hasDifferentBuildFileSelection(from project: Self) -> Bool {
+        build.includedFiles != project.build.includedFiles
+            || build.excludedFiles != project.build.excludedFiles
+            || paths.resourceRoots != project.paths.resourceRoots
     }
 
     mutating func ensureBuildTargets(defaultName: String, product: String? = nil) {

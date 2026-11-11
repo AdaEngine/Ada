@@ -204,7 +204,8 @@ public struct LocalShadow3DRenderNode: RenderNode {
                 sources: candidates.meshes,
                 materials: &_materials.wrappedValue,
                 identityPalette: skinning.identityBuffer,
-                device: device.renderDevice
+                device: device.renderDevice,
+                transformChanges: candidates.transformChanges
             )
             let usesGPU = scratch.gpuCull.isAvailable(
                 camera: source.entityId,

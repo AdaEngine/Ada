@@ -21,6 +21,12 @@ native exports use per-target output subdirectories. Browser/phone target editin
 is not exposed. See [BuildExport.md](../../Documentation/BuildExport.md) and
 `EditorBuildTargetsTests`.
 
+Standalone desktop **Project Settings → Project → Build System** changes
+AdaScript/SwiftPM for the whole project after preflight. The switch preserves
+named targets and authored entry settings. SwiftPM desktop **Run** uses an
+executable product and does not require an editor scene. Multiple products
+require a selection in **Edit Build Targets…**.
+
 The shared desktop toolbar includes Movie Maker capture settings: project/current
 scene, FPS, resolution, duration, output path and audio. Preferences persist per
 project in `.ada/workspace/movie-maker.json`. Recording uses the engine's fixed-step
