@@ -2,6 +2,11 @@ import Foundation
 
 typealias EditorCloudAITransport = @Sendable (EditorCloudValue, @escaping @Sendable (EditorCloudValue) async throws -> Void) async throws -> Void
 
+struct EditorCloudAIConnection: Sendable {
+    let toolContract: Int64?
+    let generate: EditorCloudAITransport
+}
+
 /// Parses only our server's normalized SSE contract; upstream provider data stays on Cloud.
 struct EditorCloudAIStream {
     private(set) var complete = false

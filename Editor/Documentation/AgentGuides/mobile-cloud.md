@@ -74,11 +74,11 @@ Cloud settings show available/used/reserved credits and cycle activity. AI credi
 are separate from Cloud publishing Pro. Missing/disabled service and signed-out
 states do not imply a zero balance. Hosted Ada AI uses the shared Cloud account transport, Coder Next tool loop and server wallet. Desktop selects the built-in Ada AI entry; mobile selects Ada AI in Providers. Tool mutations require approval; Cloud conversations persist separately from external runtime sessions. Provider keys and settlement stay server-side, and external/BYOK agents remain independent.
 
-Native Ada AI exposes `editor.web.search/fetch/download` through its project-scoped
+Native Ada AI exposes `editor_web` with `search`, `fetch` and `download` through its project-scoped
 tool host. Ask/Plan allow search and page reading; Build also permits downloads
 through the existing write approval flow. External desktop agents retain the
 same tools through AdaMCP, and mobile agents through their host bridge. Browser
-Studio's separate registry still has no internet search/proxy. Coverage:
+Studio's hosted catalog omits these actions. Coverage:
 `EditorCloudWebToolTests`, `EditorCloudAgentTests`, `EditorWebToolTests`.
 
 Entry points: [EditorCloudAIClient.swift](../../Sources/AdaEditor/Cloud/EditorCloudAIClient.swift),

@@ -103,13 +103,21 @@ struct EditorCloudAgentTests {
                 })
         }
         let service = EditorCloudAgentService(
-            transportFactory: {
-                { input, receive in
+            connectionFactory: {
+                EditorCloudAIConnection(toolContract: 2) { input, receive in
                     let advertised = input["tools"].array.compactMap { $0["function"]["name"].string }
-                    #expect(Set(advertised) == ["editor_web_search", "editor_web_fetch"])
+                    #expect(input["toolContract"].int == 2)
+                    #expect(advertised.contains("editor_web"))
+                    let web = input["tools"].array.first { $0["function"]["name"].string == "editor_web" }
+                    #expect(web?["function"]["parameters"]["properties"]["action"]["enum"].array == ["search", "fetch"])
                     if await count.value == 0 {
-                        for name in advertised {
-                            try await receive(["type": "tool", "call": ["id": .string(name), "function": ["name": .string(name), "arguments": "{}"]]])
+                        let calls = [
+                            ("search", #"{"action":"search","arguments":{"query":"AdaEngine"}}"#),
+                            ("fetch", #"{"action":"fetch","arguments":{"url":"https://example.com"}}"#),
+                            ("download", #"{"action":"download","arguments":{"url":"https://example.com","destination":"Assets/a.png"}}"#),
+                        ]
+                        for (id, arguments) in calls {
+                            try await receive(["type": "tool", "call": ["id": .string(id), "function": ["name": "editor_web", "arguments": .string(arguments)]]])
                         }
                     } else {
                         try await receive(["type": "text", "text": "Found references"])
@@ -121,6 +129,104 @@ struct EditorCloudAgentTests {
             request(mode: mode), onEvent: { event in #expect(event.permission == nil) }, onProjectFileChanged: { _ in Issue.record("Research changed a file") })
         #expect(result.assistantText == "Found references")
         #expect(await count.value == 2)
+    }
+
+    @Test(arguments: [false, true])
+    @MainActor func groupedCatalogCoversAllNativeBindings(mobile: Bool) throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let host = EditorCloudToolHost(projectURL: root, mobile: mobile ? EditorMobileAgentToolService(projectURL: root) : nil)
+        let tools = try host.tools()
+        let platform: EditorCloudToolCatalog.Host = mobile ? .mobile : .desktop
+        let catalog = try EditorCloudToolCatalog.load()
+        #expect(catalog.families.count == 17)
+        let selection = catalog.selection(host: platform, planning: false)
+        let actions = selection.families.flatMap(\.actions)
+        let names = actions.compactMap { $0.bindings[platform.rawValue] }
+        #expect(names.count == Set(names).count)
+        #expect(Set(names) == Set(tools.map(\.name)))
+        for action in actions {
+            let tool = try #require(tools.first { $0.name == action.bindings[platform.rawValue] })
+            #expect(action.approval == !tool.readOnly)
+            if !tool.name.hasPrefix("editor_animation_"), tool.name != "editor_project_configure" {
+                let legacyRequired = tool.definition["function"]["parameters"]["required"].array.compactMap(\.string)
+                let groupedRequired = action.schema(for: platform)["required"].array.compactMap(\.string)
+                #expect(Set(legacyRequired).isSubset(of: Set(groupedRequired)), Comment(rawValue: tool.name))
+            }
+        }
+        let planning = catalog.selection(host: platform, planning: true).families.flatMap(\.actions)
+        #expect(planning.allSatisfy { !$0.approval })
+        let edit = try selection.resolve(name: "editor_model", input: [
+            "action": "edit_material", "arguments": ["path": "Assets/Cube.glb", "material": 0, "settingsJSON": #"{"roughnessFactor":0.5}"#]
+        ])
+        #expect(edit.approval)
+        #expect(try edit.legacyArguments()["material"].int == 0)
+    }
+
+    @Test func groupedProjectAndSceneResultsHaveCommonFields() throws {
+        let catalog = try EditorCloudToolCatalog.load()
+        let desktop = catalog.selection(host: .desktop, planning: true)
+        let mobile = catalog.selection(host: .mobile, planning: true)
+        let request: EditorCloudValue = ["action": "context", "arguments": [:]]
+        let desktopResult = try desktop.resolve(name: "editor_project", input: request).result(#"{"project":"Sample"}"#, host: .desktop)
+        let mobileResult = try mobile.resolve(name: "editor_project", input: request).result(#"{"project":{"project":{"name":"Sample"}}}"#, host: .mobile)
+        let decoder = JSONDecoder()
+        let desktopContext = try decoder.decode(EditorCloudValue.self, from: Data(desktopResult.utf8))
+        let mobileContext = try decoder.decode(EditorCloudValue.self, from: Data(mobileResult.utf8))
+        #expect(desktopContext["project"] == mobileContext["project"])
+        let list = try mobile.resolve(name: "editor_scene", input: ["action": "list", "arguments": ["scope": "project"]])
+        let listResult = try list.result(#"{"scenes":["Scenes/Main.ascn"]}"#, host: .mobile)
+        let scenes = try decoder.decode(EditorCloudValue.self, from: Data(listResult.utf8))
+        #expect(scenes["scenes"].array == [["path": "Scenes/Main.ascn"]])
+    }
+
+    @Test @MainActor func groupedFileCallsValidateBeforeApprovalAndDispatch() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let path = "Sources/Game.ada"
+        let url = root.appendingPathComponent(path)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "// original".write(to: url, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let tools = try EditorCloudToolHost(projectURL: root, mobile: EditorMobileAgentToolService(projectURL: root)).tools()
+        let rounds = Counter()
+        let approvals = Counter()
+        let service = EditorCloudAgentService(
+            host: .mobile,
+            connectionFactory: {
+                EditorCloudAIConnection(toolContract: 2) { input, receive in
+                    #expect(input["toolHost"].string == "mobile")
+                    await rounds.increment()
+                    if await rounds.value == 1 {
+                        for (id, args) in [
+                            ("invalid", #"{"action":"patch","arguments":{"path":"Sources/Game.ada","oldText":"original","newText":7}}"#),
+                            ("read", #"{"action":"read","arguments":{"path":"Sources/Game.ada"}}"#),
+                            ("patch", #"{"action":"patch","arguments":{"path":"Sources/Game.ada","oldText":"original","newText":"edited"}}"#),
+                            ("missing", #"{"action":"delete","arguments":{"path":"Sources/Game.ada"}}"#),
+                        ] {
+                            try await receive(["type": "tool", "call": ["id": .string(id), "function": ["name": "editor_files", "arguments": .string(args)]]])
+                        }
+                    } else {
+                        let results = input["messages"].array.filter { $0["role"].string == "tool" }
+                        #expect(results.first { $0["toolCallID"].string == "read" }?["content"].string?.contains("original") == true)
+                        try await receive(["type": "text", "text": "Done"])
+                    }
+                    try await receive(["type": "complete"])
+                }
+            },
+            toolsFactory: { _ in tools }
+        )
+        _ = try await service.send(
+            request(),
+            onEvent: { event in
+                if let permission = event.permission {
+                    #expect(permission.summary.contains("editor_files/patch"))
+                    await approvals.increment()
+                    await service.resolvePermission(requestID: permission.id, optionID: "allow")
+                }
+            },
+            onProjectFileChanged: { #expect($0 == path) }
+        )
+        #expect(await approvals.value == 1)
+        #expect(try String(contentsOf: url, encoding: .utf8) == "// edited")
     }
     @Test func incompleteResponseNeverRunsToolsOrAutomaticallyRetries() async {
         let count = Counter()

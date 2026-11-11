@@ -2223,6 +2223,7 @@
   "Project changed": "Project changed",
   "Destination exists": "Destination exists",
   "Tool not available in this mode": "Tool not available in this mode",
+  "Invalid tool arguments": "Invalid tool arguments",
   "Invalid component field": "Invalid component field",
   "Invalid AI catalog": "Invalid AI catalog",
   "Invalid annotations": "Invalid annotations",

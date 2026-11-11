@@ -550,13 +550,13 @@ final class EditorCloudAccount: NSObject {
         return result
     }
     /// A turn-scoped transport: switching accounts or servers invalidates every later tool round.
-    func hostedAIGenerator() async throws -> EditorCloudAITransport {
+    func hostedAIGenerator() async throws -> EditorCloudAIConnection {
         let revision = sessionRevision
         guard accountID != nil else { throw CloudError.message("Sign in to Ada Cloud to use AI credits.") }
         let catalog = try await aiCatalog()
         guard catalog.enabled, catalog.capabilities.contains("llm") else { throw CloudError.message("Ada AI is not available on this server yet.") }
         let providers = try await request("/ai/providers")
-        guard providers.array.contains(where: { $0["id"].string == "openrouter" && $0["hosted"].bool == true }) else {
+        guard let provider = providers.array.first(where: { $0["id"].string == "openrouter" && $0["hosted"].bool == true }) else {
             throw CloudError.message("Ada AI is not available on this server yet.")
         }
         let balance = try await aiClient().balance()
@@ -564,7 +564,7 @@ final class EditorCloudAccount: NSObject {
         guard balance.allowance > 0 else { throw CloudError.message("Cloud Pro includes 500 AI credits per month. Subscribe to use Ada AI.") }
         guard balance.available > 0 else { throw CloudError.message("Your AI credits are used up. They renew with your monthly Cloud Pro allowance.") }
         guard sessionRevision == revision else { throw EditorAIError.sessionChanged }
-        return { [weak self] input, receive in
+        return EditorCloudAIConnection(toolContract: provider["toolContract"].int) { [weak self] input, receive in
             guard let self else { throw EditorAIError.sessionChanged }
             try await self.generateHostedAI(input, revision: revision, receive: receive)
         }

@@ -531,7 +531,7 @@ struct MobileEditorRootView: View {
         Task { await service.resolvePermission(requestID: permission.id, optionID: choice) }
     }
 
-    private func submitPrompt(for id: UUID, a2uiSubmission: EditorAgentA2UISubmission? = nil, cloudAdmitted: EditorCloudAITransport? = nil) {
+    private func submitPrompt(for id: UUID, a2uiSubmission: EditorAgentA2UISubmission? = nil, cloudAdmitted: EditorCloudAIConnection? = nil) {
         var started = false, deferredAdmission = false
         defer {
             if !started, !deferredAdmission, let a2uiSubmission {
@@ -690,12 +690,16 @@ struct MobileEditorRootView: View {
                 )
                 defer { toolService.finish() }
                 if usesAda {
-                    let service = EditorCloudAgentService(transportFactory: {
-                        guard let cloudAdmitted else { throw EditorAIError.sessionChanged }
-                        return cloudAdmitted
-                    }, toolsFactory: { url in
-                        try await MainActor.run { try EditorCloudToolHost(projectURL: url, mobile: toolService).tools() }
-                    })
+                    let service = EditorCloudAgentService(
+                        host: .mobile,
+                        connectionFactory: {
+                            guard let cloudAdmitted else { throw EditorAIError.sessionChanged }
+                            return cloudAdmitted
+                        },
+                        toolsFactory: { url in
+                            try await MainActor.run { try EditorCloudToolHost(projectURL: url, mobile: toolService).tools() }
+                        }
+                    )
                     cloudAgent = service
                     let project = try ProjectSystem.loadProject(at: workspaceURL)
                     let request = EditorAgentRunRequest(project: project, projectURL: workspaceURL,

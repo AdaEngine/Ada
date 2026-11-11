@@ -18,11 +18,40 @@ Missing service is distinct from a real zero balance. Cloud Pro purchase/restore
 uses the existing subscription flow and SKU.
 
 Coder Next is text-only. Image attachments require another compatible provider.
-Native Cloud tool names are normalized from dots to underscores. Project files,
-docs, scene editing, build and Play use existing host tools. Mutations require
-permission; ask/plan modes advertise read-only tools. Shell and external agents
-are not part of this connection. File tools reject traversal, symbolic links and
-silent overwrites; open dirty documents must be saved first.
+When the server advertises tool contract 2, Ada AI uses a shared catalog of up to
+17 tool families. Each call names a family and provides an `action` and an
+`arguments` object. The model sees only the actions supported by the active host
+and mode. Studio falls back to the legacy contract for servers that have yet to
+advertise version 2. Existing clients can still use the legacy contract with
+updated servers.
+
+## Working with project tools
+
+For an edit, ask Ada AI to read a project file, change one known occurrence, and
+build the project. A typical sequence for a project with `Sources/Game.ada` is:
+
+| Tool | Arguments sent to the tool |
+| --- | --- |
+| `editor_files` | `{"action":"read","arguments":{"path":"Sources/Game.ada"}}` |
+| `editor_files` | `{"action":"patch","arguments":{"path":"Sources/Game.ada","oldText":"// original","newText":"// edited"}}` |
+| `editor_task` | `{"action":"build","arguments":{}}` |
+
+Choose `oldText` from the read result. The patch fails when the text is absent or
+ambiguous. Desktop reports a started build. Use `editor_task` with `status` and
+`output` to check its result. Mobile and Web return the compilation result in the
+build call. Verify gameplay separately in Play.
+
+In Ask or Plan, Studio offers inspection actions such as `editor_files/read`
+and omits `editor_files/patch`. In Build, approval identifies the action and
+its target. A Web session grant for a patch does not grant permission to replace
+or delete files. Native file tools reject traversal, symbolic links and silent
+overwrites. Save dirty native documents before editing them through Ada AI.
+
+The desktop agent can edit animation drafts, run project tests, and replay Play
+scenarios. Mobile offers isolated simulation and scene validation. Web can
+apply a project transaction or import a bundled example. Native hosts can
+search and fetch public web references, and approved Build actions can download
+assets. The external agent and Web BYOK catalogs use their own contracts.
 
 ## Accounting and recovery
 

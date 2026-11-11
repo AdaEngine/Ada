@@ -2223,6 +2223,7 @@
   "Project changed": "Открыт другой проект",
   "Destination exists": "Файл назначения уже существует",
   "Tool not available in this mode": "Инструмент недоступен в этом режиме",
+  "Invalid tool arguments": "Некорректные аргументы инструмента",
   "Invalid component field": "Некорректное поле компонента",
   "Invalid AI catalog": "Некорректный каталог ИИ",
   "Invalid annotations": "Некорректные аннотации",

@@ -349,26 +349,25 @@ export class Studio {
       r.error = "";
     });
   }
-  requestTool(name, args, signal) {
+  requestTool(name, args, signal, action) {
     const session =
       this.chat.sessions.find((s) => s.id === this.runningSessionID) ||
       this.session;
-    if (!writeTools.has(name)) return Promise.resolve();
+    if (!(action?.approval ?? writeTools.has(name))) return Promise.resolve();
+    const grant = action
+      ? JSON.stringify([this.workspace?.id, session.id, action.key])
+      : session.id + ":" + name;
     if (session.mode === "plan")
       return Promise.reject(
         new LocalizedError("Discuss mode does not allow project changes"),
       );
-    if (
-      session.permission !== "ask" ||
-      this.allowedTools.has(session.id + ":" + name)
-    )
+    if (session.permission !== "ask" || this.allowedTools.has(grant))
       return Promise.resolve();
     return new Promise((resolve, reject) => {
       const done = (choice) => {
         signal.removeEventListener("abort", cancel);
         this.permissionRequest = null;
-        if (choice === "session")
-          this.allowedTools.add(session.id + ":" + name);
+        if (choice === "session") this.allowedTools.add(grant);
         this.emit();
         choice
           ? resolve()

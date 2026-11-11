@@ -9,25 +9,33 @@ struct EditorCloudAgentTool: Sendable {
 
 /// The native tool loop uses the same server wallet and model as browser Studio.
 actor EditorCloudAgentService: EditorAgentServicing {
-    typealias TransportFactory = @Sendable () async throws -> EditorCloudAITransport
+    typealias ConnectionFactory = @Sendable () async throws -> EditorCloudAIConnection
     typealias ToolsFactory = @Sendable (URL) async throws -> [EditorCloudAgentTool]
-    private let transportFactory: TransportFactory
+    private let host: EditorCloudToolCatalog.Host
+    private let connectionFactory: ConnectionFactory
     private let toolsFactory: ToolsFactory
     private var turns: [String: Task<EditorAgentRunResult, Error>] = [:]
     private var permissions: [String: (String, CheckedContinuation<Bool, Never>)] = [:]
 
     init(
-        transportFactory: @escaping TransportFactory = { try await EditorCloudAccount.shared.hostedAIGenerator() },
+        host: EditorCloudToolCatalog.Host = .desktop,
+        connectionFactory: @escaping ConnectionFactory = { try await EditorCloudAccount.shared.hostedAIGenerator() },
         toolsFactory: @escaping ToolsFactory = { url in try await MainActor.run { try EditorCloudToolHost(projectURL: url).tools() } }
     ) {
-        self.transportFactory = transportFactory
+        self.host = host
+        self.connectionFactory = connectionFactory
         self.toolsFactory = toolsFactory
     }
+
+    init(transportFactory: @escaping @Sendable () async throws -> EditorCloudAITransport, toolsFactory: @escaping ToolsFactory) {
+        self.init(connectionFactory: { EditorCloudAIConnection(toolContract: nil, generate: try await transportFactory()) }, toolsFactory: toolsFactory)
+    }
+
     func connect(
         _ request: EditorAgentRunRequest, onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
         onProjectFileChanged: @escaping @Sendable (String) async -> Void
     ) async throws -> EditorAgentSessionConfiguration {
-        do { _ = try await transportFactory() } catch { throw await Self.localized(error) }
+        do { _ = try await connectionFactory() } catch { throw await Self.localized(error) }
         return .init(agentName: "Ada AI · Coder Next", selectors: [])
     }
     func send(
@@ -60,10 +68,20 @@ actor EditorCloudAgentService: EditorAgentServicing {
         guard !request.attachments.contains(where: { $0.mimeType.hasPrefix("image/") }) else {
             throw EditorAgentServiceError.providerFailure("Coder Next supports text. Choose a vision model to send images.")
         }
-        let transport = try await transportFactory()
+        let connection = try await connectionFactory()
         let planning = [.ask, .plan].contains(request.mode)
-        let tools = try await toolsFactory(request.projectURL).filter { !planning || ($0.readOnly && EditorCloudToolHost.planTools.contains($0.name)) }
-        guard tools.count <= 96, Set(tools.map(\.name)).count == tools.count else { throw EditorAIError.invalidResponse }
+        let selection = try connection.toolContract == Int64(EditorCloudToolCatalog.currentVersion)
+            ? EditorCloudToolCatalog.load().selection(host: host, planning: planning) : nil
+        let tools = try await toolsFactory(request.projectURL).filter {
+            if selection != nil {
+                return true
+            }
+            return $0.name == $0.name.lowercased() && (!planning || ($0.readOnly && EditorCloudToolHost.planTools.contains($0.name)))
+        }
+        guard Set(tools.map(\.name)).count == tools.count else { throw EditorAIError.invalidResponse }
+        let bindings = Dictionary(uniqueKeysWithValues: tools.map { ($0.name, $0) })
+        let definitions = selection?.definitions ?? tools.map(\.definition)
+        guard definitions.count <= 96 else { throw EditorAIError.invalidResponse }
         var messages = request.session.events.compactMap { event -> EditorCloudValue? in
             guard let message = event.message, [.user, .assistant].contains(message.role) else { return nil }
             let text = message.segments.compactMap(\.text).joined(separator: "\n")
@@ -71,24 +89,29 @@ actor EditorCloudAgentService: EditorAgentServicing {
             return ["role": .string(message.role.rawValue), "content": .string(text + (references.isEmpty ? "" : "\n\n" + references))]
         }
         if messages.last?["role"].string == "user" { messages.removeLast() }
-        messages.append(["role": "user", "content": .string(EditorAgentPromptContext.text(for: request))])
+        let prompt = EditorAgentPromptContext.text(for: request)
+        messages.append(["role": "user", "content": .string(selection.map { $0.guidance + "\n\n" + prompt } ?? prompt)])
         for _ in 0..<40 {
             try Task.checkCancellation()
             while messages.count > 2, try JSONEncoder().encode(messages).count > 90_000 {
                 messages.removeFirst()
                 while messages.first?["role"].string == "tool" { messages.removeFirst() }
             }
-            let input: EditorCloudValue = [
+            var input: EditorCloudValue = [
                 "operationID": .string(UUID().uuidString), "providerID": "openrouter", "model": "qwen/qwen3-coder-next",
-                "billingMode": "ada", "mode": planning ? "plan" : "build", "tools": .array(tools.map(\.definition)),
+                "billingMode": "ada", "mode": planning ? "plan" : "build", "tools": .array(definitions),
                 "messages": .array(messages + [["role": "user", "content": .string("Current request: " + String(request.prompt.prefix(4000)))]]),
             ]
+            if selection != nil {
+                input["toolContract"] = .integer(Int64(EditorCloudToolCatalog.currentVersion))
+                input["toolHost"] = .string(host.rawValue)
+            }
             guard try JSONEncoder().encode(input).count <= 180_000 else {
                 throw EditorAgentServiceError.providerFailure("The AI context is too large. Start a new conversation to continue.")
             }
             let response = Reply()
             let messageID = UUID().uuidString
-            try await transport(input) { event in
+            try await connection.generate(input) { event in
                 try Task.checkCancellation()
                 if let text = try await response.receive(event) {
                     await onEvent(.init(id: messageID, kind: .message, message: .init(role: .assistant, segments: [.init(kind: .text, text: text)])))
@@ -109,15 +132,23 @@ actor EditorCloudAgentService: EditorAgentServicing {
                 var toolEvent = EditorAgentEvent(
                     id: id, kind: .toolCall,
                     toolCall: .init(id: id, title: name.replacingOccurrences(of: "_", with: "."), kind: "tool", status: .inProgress, content: [], locations: []))
-                await onEvent(toolEvent)
                 let output: String
                 do {
-                    guard let tool = tools.first(where: { $0.name == name }), let raw = call["function"]["arguments"].string,
-                        case .object(let arguments) = try JSONDecoder().decode(EditorCloudValue.self, from: Data(raw.utf8))
+                    guard let raw = call["function"]["arguments"].string,
+                        case let .object(arguments) = try JSONDecoder().decode(EditorCloudValue.self, from: Data(raw.utf8))
                     else { throw EditorAIError.invalidResponse }
-                    if !tool.readOnly {
-                        let details: [String] = [name, request.project.project.name ?? request.projectURL.lastPathComponent,
-                            arguments["path"]?.string ?? arguments["destination"]?.string ?? ""]
+                    let action = try selection?.resolve(name: name, input: .object(arguments))
+                    guard let tool = bindings[action?.legacyName ?? name] else {
+                        throw EditorAIError.invalidResponse
+                    }
+                    let needsApproval = action?.approval ?? !tool.readOnly
+                    let target = action?.target ?? arguments["path"]?.string ?? arguments["destination"]?.string
+                    if let action {
+                        toolEvent.toolCall?.title = [action.key, target].compactMap { $0 }.joined(separator: " ")
+                    }
+                    await onEvent(toolEvent)
+                    if needsApproval {
+                        let details = [action?.key ?? name, request.project.project.name ?? request.projectURL.lastPathComponent, target ?? ""]
                         let permissionSummary = details.joined(separator: "\n")
                         guard request.project.ai.agent.permissionMode != .deny,
                             await permission(session: request.session.id, toolID: id, name: permissionSummary, onEvent: onEvent)
@@ -126,9 +157,11 @@ actor EditorCloudAgentService: EditorAgentServicing {
                         }
                     }
                     try Task.checkCancellation()
-                    output = try await tool.invoke(.object(arguments))
+                    let result = try await tool.invoke(action?.legacyArguments() ?? .object(arguments))
+                    output = try action?.result(result, host: host) ?? result
                     toolEvent.toolCall?.status = .completed
-                    if !tool.readOnly, let path = arguments["path"]?.string ?? (name == "editor_web_download" ? arguments["destination"]?.string : nil) {
+                    let changedPath = action?.target ?? arguments["path"]?.string ?? (name == "editor_web_download" ? arguments["destination"]?.string : nil)
+                    if needsApproval, let path = changedPath {
                         await onProjectFileChanged(path)
                     }
                 } catch is CancellationError { throw CancellationError() } catch {

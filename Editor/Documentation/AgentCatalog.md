@@ -70,6 +70,8 @@ saved yet. Subsequent projects cannot override the global selection; project met
 
 ## Built-in game building workflow
 
+For the hosted agent, see [Ada AI tools and permissions](CloudAI.md#working-with-project-tools).
+
 `ada-game-builder` is bundled with Studio for desktop and mobile agents. Every
 desktop prompt advertises discovered workflows; mobile prompts advertise the
 bundled catalog. Agents load matching instructions with `editor.skills.read`
