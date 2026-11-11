@@ -16,7 +16,7 @@ public struct PixelPerfectPipelines: Resource {
     public let sampler: Sampler
 
     public init(device: RenderDevice, outputPipeline: RenderPipeline) {
-        let shader = ShaderModule.loadRequiredBundled(at: "Shaders/FullScreenShader.glsl", from: .adaModule)
+        let shader = CorePipelineShaders.loadRequiredBuiltin("FullScreenShader")
         var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))
         descriptor.debugName = "Pixel Perfect Intermediate Pipeline"
         descriptor.backfaceCulling = false

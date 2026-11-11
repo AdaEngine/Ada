@@ -26,7 +26,7 @@ struct LocalShadow3DClear: Resource {
     let pipeline: RenderPipeline
 
     init(device: RenderDevice) {
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/shadow_clear_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("shadow_clear_3d")
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),

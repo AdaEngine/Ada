@@ -76,7 +76,7 @@ enum EditorBuildPlatform: String, CaseIterable, Hashable, Sendable {
             return [
                 EditorBuildToolField("ADA_WEB_SWIFT_EXECUTABLE", "Swift WASM executable", .executable),
                 EditorBuildToolField("ADA_WEB_SWIFT_SDK", "Swift WASM SDK identifier", .identifier),
-                EditorBuildToolField("TINT_EXECUTABLE", "Tint shader compiler", .executable)
+                EditorBuildToolField("ADAENGINE_SAGA_PACKAGE_PATH", "SAGA", .directory)
             ]
         case .macOS: return [swift] + apple + Array(native.dropFirst())
         case .iOS, .xr: return [swift] + apple

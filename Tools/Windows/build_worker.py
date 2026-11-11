@@ -52,7 +52,7 @@ def main():
     parser.add_argument("--mode", choices=["web", "android"], required=True)
     for name in ["engine", "package", "output", "product", "swift-sdk"]:
         parser.add_argument("--" + name, required=True)
-    for name in ["swift", "gravity", "scratch", "tint", "application-id", "label", "debug-keystore", "swan"]:
+    for name in ["swift", "gravity", "scratch", "saga", "application-id", "label", "debug-keystore", "swan"]:
         parser.add_argument("--" + name)
     parser.add_argument("--configuration", choices=["debug", "release"], default="release")
     parser.add_argument("--abi", choices=["arm64-v8a", "x86_64", "all"], default="arm64-v8a")
@@ -76,14 +76,8 @@ def main():
     os.chdir(package)
     if args.mode == "web":
         env.update(ADAENGINE_WEB_EXPORT="1", BUILD_WASM="1")
-        env["ADAENGINE_TINT_CACHE"] = str(HOME / "tint")
-        tint = args.tint
-        if tint and tint.lower().endswith(".exe"):
-            tint = None
-        if not tint:
-            result = subprocess.run([sys.executable, str(engine / "script/ensure_tint.py")], env=env, check=True, text=True, stdout=subprocess.PIPE)
-            tint = result.stdout.strip().splitlines()[-1]
-        env["TINT_EXECUTABLE"] = tint
+        if args.saga:
+            env["ADAENGINE_SAGA_PACKAGE_PATH"] = str(Path(args.saga).resolve())
         command = [swift, "package", "--disable-sandbox", "--scratch-path", scratch / "host",
                    "--allow-writing-to-package-directory", "--allow-network-connections", "all", "export-web",
                    "--product", args.product, "--output", args.output, "--scratch-path", scratch / "wasm",

@@ -139,7 +139,7 @@ struct AutoExposure3DViews: Resource {
     private var retired: [[RenderTexture]] = []
 
     init(device: RenderDevice) {
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/auto_exposure_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("auto_exposure_3d")
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),

@@ -2,6 +2,7 @@
 
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -44,28 +45,35 @@ class StageSDKTests(unittest.TestCase):
             root = Path(temporary)
             engine = root / "engine"
             compiler = root / "compiler"
+            saga = root / "SAGA"
             for base, files in [(engine, ["Package.swift", "LICENSE", "Sources/Runtime.swift", "Sources/.build/private", ".git/config", "script/ensure_tint.py", "Demos/Example/binary.glb"]),
+                                (saga, ["Package.swift", "Sources/SAGACompiler/Compiler.swift", "Sources/.build/private", ".git/config"]),
                                 (compiler, ["Package.swift", "LICENSE", "src/shared/header.h", "tools/aot_build.py", "binding/Runtime.swift"])]:
                 for name in files:
                     path = base / name
                     path.parent.mkdir(parents=True, exist_ok=True)
                     path.write_text(name)
-            host = compiler / "gravity"
+            host = compiler / ("gravity.exe" if os.name == "nt" else "gravity")
             host.write_text("#!/bin/sh\nexit 0\n")
             host.chmod(0o755)
             destination = root / "Moved Studio.app/Contents/Resources/BuildSDK"
-            sdk.stage(engine, compiler, destination)
+            with patch.object(sdk.subprocess, "run"):
+                sdk.stage(engine, compiler, destination)
             self.assertEqual(json.loads((destination / "sdk.json").read_text())["schemaVersion"], 1)
             self.assertTrue((destination / "AdaEngine/Sources/Runtime.swift").is_file())
             self.assertTrue((destination / "AdaEngine/script/ensure_tint.py").is_file())
-            self.assertTrue((destination / "AdaScript/gravity").is_file())
+            self.assertTrue((destination / "AdaScript" / host.name).is_file())
             self.assertTrue((destination / "AdaScript/LICENSE").is_file())
+            self.assertTrue((destination / "SAGA/Package.swift").is_file())
+            self.assertTrue((destination / "SAGA/Sources/SAGACompiler/Compiler.swift").is_file())
+            self.assertFalse((destination / "SAGA/Sources/.build").exists())
             self.assertFalse((destination / "AdaEngine/.git").exists())
             self.assertFalse((destination / "AdaEngine/Demos").exists())
             self.assertFalse((destination / "AdaEngine/Sources/.build").exists())
             self.assertFalse((engine / "sdk.json").exists())
             # A second stage replaces the complete SDK without accumulating nested copies.
-            sdk.stage(engine, compiler, destination)
+            with patch.object(sdk.subprocess, "run"):
+                sdk.stage(engine, compiler, destination)
             self.assertFalse((destination / "BuildSDK").exists())
 
     def test_sdk_includes_local_studio_core_package(self):
@@ -126,11 +134,12 @@ class StageSDKTests(unittest.TestCase):
                     path=base/name
                     path.parent.mkdir(parents=True,exist_ok=True)
                     path.write_text("fixture")
-            host=compiler/"gravity"
+            host=compiler/("gravity.exe" if os.name == "nt" else "gravity")
             host.write_text("#!/bin/sh\nexit 0\n")
             host.chmod(0o755)
             destination=root/"Studio.app/Contents/Resources/BuildSDK"
-            sdk.stage(engine,compiler,destination,swan)
+            with patch.object(sdk.subprocess, "run"):
+                sdk.stage(engine,compiler,destination,swan)
             moved=root/"Relocated/BuildSDK"
             moved.parent.mkdir()
             destination.rename(moved)

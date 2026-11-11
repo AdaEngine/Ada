@@ -14,10 +14,29 @@ python ada_tool.py install studio
 python ada_tool.py install studio --debug --launch
 ```
 
+## Local SAGA checkout
+
+Keep the SAGA repository beside AdaEngine. Native WebGPU builds and web export
+use SAGACompiler for GLSL-generated SPIR-V, including Shader Graph fragments.
+Set `ADAENGINE_SAGA_PACKAGE_PATH` to an absolute path if the checkout lives
+elsewhere or the AdaEngine source is staged for export. In WSL use the Linux
+path to the checkout. Windows release CI checks out SAGA beside AdaEngine;
+`ADAENGINE_SAGA_REF` can select a revision that contains the compiler fixes.
+
+```powershell
+$env:ADAENGINE_SAGA_PACKAGE_PATH = 'D:/Development/SAGA'
+$env:ADAENGINE_VALIDATE_WGSL = '1'
+swift test --filter WGSLShaderCompilerTests
+```
+
+The test suite translates fresh SPIR-V for both shader stages and verifies the
+WGSL entry point and binding reflection. GLSL source remains supported during
+the compiler migration.
+
 ## Install and run Studio
 
 Both configurations are Standalone distributions, including resources, runtime,
-Tint and the source BuildSDK. Installation without `--source` builds the current
+and the source BuildSDK. Installation without `--source` builds the current
 checkout; it does not download the latest GitHub release. Debug selects the
 debug compiler configuration and has its own installation directory and shortcut.
 
@@ -67,14 +86,14 @@ python ada_tool.py prepare --skip-system
 ```
 
 `doctor` does not install or download anything. It checks the selected Swift
-version, native build tools, Tint hash and a real SPIR-V conversion, Lore, WASM
+version, native build tools, the local SAGA checkout, Lore, WASM
 SDK/WSL, frontend tools and Cloud panel inputs according to the profile. JSON goes
 to stdout; diagnostic subprocess output goes to stderr. Exit codes: 0 ready,
 1 missing requirement or operation failure, 2 usage error, 130 interrupted.
 It cannot establish GPU/desktop/runtime correctness by inspecting dependencies.
 
 With no component arguments, `prepare` selects Studio, WASM and playground.
-It can download large toolchains and build Tint. System package managers may
+It can download large toolchains. System package managers may
 request administrator access. The command uses WinGet/Visual Studio 2022 on
 Windows, Homebrew on macOS and apt on Debian/Ubuntu. Install Homebrew and full
 Xcode first on macOS. For another Linux distribution, install the packages from
@@ -101,7 +120,7 @@ and WASM Swift 6.3.2. This does not change the Swift 6.2 language mode. Swiftly
 installs the selected Unix toolchain without changing the user's global default
 or `.swift-version`. The CLI saves its explicit executable path for later commands.
 The WASM SDK and Linux Dawn archive are checked against pinned SHA-256 values;
-Tint and Lore keep their own version/hash manifests. A compatible existing Node
+Lore keeps its own version/hash manifest. A compatible existing Node
 is reused; otherwise the pinned version is installed in the CLI cache with its
 official SHA-256 manifest. pnpm comes from the frontend's
 `packageManager` pin. Existing explicit native dependency overrides are retained.

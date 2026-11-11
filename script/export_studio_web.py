@@ -11,7 +11,6 @@ from pathlib import Path
 import re
 import shutil
 import subprocess
-import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -70,10 +69,6 @@ def main():
         if compiler:
             # The export plugin invokes `swift` itself; keep it on the requested toolchain.
             env['PATH'] = str(Path(compiler).resolve().parent) + os.pathsep + env.get('PATH', '')
-        if not env.get('TINT_EXECUTABLE'):
-            tint = subprocess.run([sys.executable, str(ROOT / 'script/ensure_tint.py')],
-                                  stdout=subprocess.PIPE, text=True, check=True, env=env)
-            env['TINT_EXECUTABLE'] = tint.stdout.strip().splitlines()[-1]
         if 'ADAENGINE_YAMS_PACKAGE_PATH' not in env:
             from ensure_wasi_yams import prepare as prepare_yams
             # Keep the package identity "yams" so transitive dependencies use the same local override.

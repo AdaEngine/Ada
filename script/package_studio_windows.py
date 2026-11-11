@@ -72,12 +72,9 @@ def smoke(directory):
     # Exercise the shipped executable with no Swift/toolchain/repository on PATH.
     # EOF is the ordinary MCP bridge shutdown path and needs neither GUI nor server.
     with tempfile.TemporaryDirectory(prefix="ada-release-smoke-") as work:
-        shader = Path(work) / "smoke.wgsl"
-        shader.write_text("@vertex fn main() -> @builtin(position) vec4<f32> { return vec4<f32>(0.0); }", encoding="utf-8")
         for command in [[directory / "AdaEditor.exe", "--editor-mcp-stdio"],
                         [directory / "adastudio.exe", "--help"],
-                        [directory / "BuildSDK/AdaScript/gravity.exe", "--help"],
-                        [directory / "AdaEngine_AdaRender.resources/tint.exe", shader, "--format", "wgsl"]]:
+                        [directory / "BuildSDK/AdaScript/gravity.exe", "--help"]]:
             result = subprocess.run([str(value) for value in command], input=b"", cwd=work,
                                     env=clean_environment(), capture_output=True, timeout=45)
             if result.returncode != 0:
@@ -88,7 +85,7 @@ def smoke(directory):
             raise RuntimeError(f"Packaged CLI version failed: {cli.stderr.decode(errors='replace')}")
 
 
-def package(binary_directory, compiler, tint, output, version, smoke_test=True, *, stage_only=False):
+def package(binary_directory, compiler, output, version, smoke_test=True, *, stage_only=False):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,79}", version):
         raise ValueError("Version must be a filename-safe release tag (1–80 characters).")
     metadata = json.loads(run("swiftc", "-print-target-info"))
@@ -114,7 +111,6 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
         for required in ["AdaEditor_AdaEditor.resources/Assets", "AdaEngine_AdaRender.resources"]:
             if not (directory / required).is_dir():
                 raise RuntimeError(f"Required SwiftPM resources are missing: {required}")
-        shutil.copy2(tint, directory / "AdaEngine_AdaRender.resources/tint.exe")
         spec = importlib.util.spec_from_file_location("stage_build_sdk", ROOT / "Editor/scripts/stage-build-sdk.py")
         sdk = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(sdk)
@@ -146,10 +142,9 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
                 shutil.copy2(dlss / name, directory)
         lore_sdk = Path(run("python", ROOT / "script/ensure_windows_lore.py"))
         search = [binary_directory, lore_sdk] + runtime + [Path(path) for path in os.environ.get("PATH", "").split(os.pathsep) if path]
-        binaries = list(directory.glob("*.dll")) + [directory / "AdaEditor.exe", directory / "adastudio.exe", directory / "BuildSDK/AdaScript/gravity.exe",
-                                                  directory / "AdaEngine_AdaRender.resources/tint.exe"]
+        binaries = list(directory.glob("*.dll")) + [directory / "AdaEditor.exe", directory / "adastudio.exe", directory / "BuildSDK/AdaScript/gravity.exe"]
         bundle_dependencies(directory, binaries, search)
-        for helper in [directory / "BuildSDK/AdaScript/gravity.exe", directory / "AdaEngine_AdaRender.resources/tint.exe"]:
+        for helper in [directory / "BuildSDK/AdaScript/gravity.exe"]:
             bundle_dependencies(helper.parent, [helper], [directory] + search)
 
         notices = directory / "ThirdPartyNotices"
@@ -157,9 +152,7 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
         lore_notices.mkdir(parents=True, exist_ok=True)
         for notice in ["LICENSE.txt", "THIRD-PARTY-NOTICES.txt"]:
             shutil.copy2(lore_sdk / notice, lore_notices / notice)
-        tint_pin = json.loads((ROOT / "Tools/Tint/toolchain.json").read_text())
-        dependencies = list((binary_directory.parent.parent / "checkouts").iterdir()) + [compiler,
-            tint.parent.parent.parent / tint_pin["revision"] / "source"]
+        dependencies = list((binary_directory.parent.parent / "checkouts").iterdir()) + [compiler]
         dependencies += list((ROOT / ".build-tools").glob("adamcp-*"))
         for dependency in dependencies:
             if dependency.is_dir():
@@ -178,7 +171,6 @@ def package(binary_directory, compiler, tint, output, version, smoke_test=True, 
         shutil.copy2(ROOT / "LICENSE", directory)
         for installer in ["install_studio_windows.ps1", "install_studio_windows.cmd"]:
             shutil.copy2(ROOT / "script" / installer, directory)
-        shutil.copy2(ROOT / "Tools/Tint/toolchain.json", directory / "tint-toolchain.json")
         (directory / "release.json").write_text(json.dumps({"version": version, "distribution": "standalone", "commit": run("git", "-C", ROOT, "rev-parse", "HEAD"),
                                                            "swift": metadata["compilerVersion"], "target": metadata["target"]["triple"]}, indent=2) + "\n")
         (directory / "README.txt").write_text(
@@ -220,12 +212,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bin", required=True, type=Path)
     parser.add_argument("--compiler-root", required=True, type=Path)
-    parser.add_argument("--tint", required=True, type=Path)
     parser.add_argument("--output", type=Path, default=ROOT / "dist")
     parser.add_argument("--version", required=True)
     parser.add_argument("--stage-only", action="store_true", help="Prepare and verify a complete standalone directory without creating a ZIP")
     args = parser.parse_args()
-    package(args.bin.resolve(), args.compiler_root.resolve(), args.tint.resolve(), args.output.resolve(), args.version, stage_only=args.stage_only)
+    package(args.bin.resolve(), args.compiler_root.resolve(), args.output.resolve(), args.version, stage_only=args.stage_only)
 
 
 if __name__ == "__main__":

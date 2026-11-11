@@ -20,8 +20,9 @@ public struct ScreenSpaceReflectionPipeline: Resource {
     }
 
     public init(device: RenderDevice, pathTracingPresentation: Bool) {
-        let shader = CorePipelineShaders.loadRequiredBundled(at: pathTracingPresentation
-            ? "Shaders/path_tracing_composite_3d.glsl" : "Shaders/screen_space_reflection.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin(
+            pathTracingPresentation ? "path_tracing_composite_3d" : "screen_space_reflection"
+        )
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),

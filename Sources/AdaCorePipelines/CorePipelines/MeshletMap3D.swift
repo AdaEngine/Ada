@@ -130,7 +130,8 @@ public struct MeshletMap3DResources: Resource {
         var defines: [String] = []
         if key.response { defines.append("MAP_RESPONSE") }
         if key.surface { defines.append("MAP_SURFACE") }
-        let shader = try ShaderModule.createBundled(at: "Shaders/meshlet_map_3d.glsl", from: .adaModule, defines: defines)
+        let path = ShaderModule.supportsBundledWESL ? "Shaders/meshlet_map_3d.wesl" : "Shaders/meshlet_map_3d.glsl"
+        let shader = try ShaderModule.createBundled(at: path, from: .adaModule, defines: defines)
         var vertex = VertexDescriptor()
         vertex.attributes[0] = .attribute(.vector4, name: "positionAndClusterID", bufferIndex: 0, offset: 0)
         vertex.layouts[0] = .init(stride: MemoryLayout<Vector4>.stride, stepFunction: .perVertex)

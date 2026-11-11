@@ -67,7 +67,7 @@ public final class ShaderModule: Asset, @unchecked Sendable {
     /// - Throws: An error if the shader module cannot be initialized from the decoder.
     public init(from decoder: AssetDecoder) throws {
         let filePath = decoder.assetMeta.filePath
-        let module = try ShaderCompiler(from: filePath).compileShaderModule()
+        let module = try Self.create(from: filePath)
         self.shaders = module.shaders
         self.reflectionData = module.reflectionData
     }
@@ -87,12 +87,34 @@ public final class ShaderModule: Asset, @unchecked Sendable {
 }
 
 extension ShaderModule {
+    /// Whether the active renderer can load bundled WESL shader modules.
+    public static var supportsBundledWESL: Bool {
+        #if canImport(WebGPU) && (WASM || (canImport(AdaWGSLCompiler) && !os(Android)))
+            return unsafe RenderEngine.shared.type == .webgpu
+        #else
+            return false
+        #endif
+    }
+
     /// Create a new shader module from a file url.
     ///
     /// - Parameter fileUrl: The file url to create the shader module from.
     /// - Returns: The shader module.
     public static func create(from fileUrl: URL) throws -> ShaderModule {
-        try ShaderCompiler(from: fileUrl).compileShaderModule()
+        #if canImport(AdaWGSLCompiler) && canImport(WebGPU) && !WASM && !os(Android)
+            if fileUrl.pathExtension.lowercased() == "wesl" {
+                return try createWESL(from: fileUrl)
+            }
+        #endif
+        #if WASM && canImport(WebGPU)
+            if fileUrl.pathExtension.lowercased() == "wesl" {
+                guard let module = try createWGSLModuleIfAvailable(at: fileUrl, reflectActiveBindings: true) else {
+                    throw ShaderModuleError.notFound(fileUrl.path + ".{vert,frag}.wgsl")
+                }
+                return module
+            }
+        #endif
+        return try ShaderCompiler(from: fileUrl).compileShaderModule()
     }
 
     /// Compile a bundled shader with every name in `defines` set to `1` in the vertex and fragment stages.
@@ -103,6 +125,25 @@ extension ShaderModule {
     public static func createBundled(at path: String, from bundle: Bundle, defines: [String]) throws -> ShaderModule {
         guard !defines.isEmpty else {
             return try loadBundled(at: path, from: bundle).asset
+        }
+        if path.hasSuffix(".wesl") {
+            guard let resourceURL = bundle.resourceURL else {
+                throw ShaderModuleError.notFound(path)
+            }
+            let url = resourceURL.appendingPathComponent(path)
+            let names = Set(defines).sorted()
+            #if WASM && canImport(WebGPU)
+                let baseURL = url.appendingPathExtension(names.joined(separator: "."))
+                guard let module = try createWGSLModuleIfAvailable(at: baseURL, reflectActiveBindings: true) else {
+                    throw ShaderModuleError.notFound(baseURL.path)
+                }
+                return module
+            #elseif canImport(AdaWGSLCompiler) && canImport(WebGPU) && !os(Android)
+                let features = Dictionary(uniqueKeysWithValues: names.map { ($0, true) })
+                return try createWESL(from: url, features: features)
+            #else
+                throw ShaderModuleError.notFound(path)
+            #endif
         }
         #if WASM
             #if canImport(WebGPU)
@@ -176,7 +217,9 @@ private enum ShaderModuleError: LocalizedError {
 
 #if WASM && canImport(WebGPU)
     extension ShaderModule {
-        private static func createWGSLModuleIfAvailable(at baseURL: URL) throws -> ShaderModule? {
+        private static func createWGSLModuleIfAvailable(
+            at baseURL: URL, reflectActiveBindings: Bool = false
+        ) throws -> ShaderModule? {
             let vertexURL = baseURL.appendingPathExtension("vert.wgsl")
             let fragmentURL = baseURL.appendingPathExtension("frag.wgsl")
 
@@ -191,18 +234,24 @@ private enum ShaderModuleError: LocalizedError {
                 return nil
             }
 
-            let vertexReflection = WGSLReflection.parse(from: vertexSource, stage: .vertex)
-            let fragmentReflection = WGSLReflection.parse(from: fragmentSource, stage: .fragment)
+            let vertexEntry = entryPoint(in: vertexSource, attribute: "vertex")
+            let fragmentEntry = entryPoint(in: fragmentSource, attribute: "fragment")
+            let vertexReflection = WGSLReflection.parse(
+                from: vertexSource, stage: .vertex, entryPoint: reflectActiveBindings ? vertexEntry : nil
+            )
+            let fragmentReflection = WGSLReflection.parse(
+                from: fragmentSource, stage: .fragment, entryPoint: reflectActiveBindings ? fragmentEntry : nil
+            )
             let vertexShader = try makeWGSLShader(
                 source: vertexSource,
                 stage: .vertex,
-                entryPoint: entryPoint(in: vertexSource, attribute: "vertex"),
+                entryPoint: vertexEntry,
                 reflectionData: vertexReflection
             )
             let fragmentShader = try makeWGSLShader(
                 source: fragmentSource,
                 stage: .fragment,
-                entryPoint: entryPoint(in: fragmentSource, attribute: "fragment"),
+                entryPoint: fragmentEntry,
                 reflectionData: fragmentReflection
             )
 
@@ -236,7 +285,7 @@ private enum ShaderModuleError: LocalizedError {
         }
 
         private static func entryPoint(in source: String, attribute: String) -> String {
-            let pattern = "@" + attribute + "\\s+fn\\s+([A-Za-z_][A-Za-z0-9_]*)"
+            let pattern = "@\\s*" + attribute + "\\s+fn\\s+([A-Za-z_][A-Za-z0-9_]*)"
             guard
                 let regex = try? NSRegularExpression(pattern: pattern),
                 let match = regex.firstMatch(in: source, range: NSRange(source.startIndex..., in: source)),

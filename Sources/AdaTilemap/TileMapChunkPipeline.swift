@@ -7,7 +7,7 @@ struct TileMapChunkPipeline: RenderPipelineConfigurator, WorldInitable {
     let shader: AssetHandle<ShaderModule>
 
     init(from _: World) {
-        shader = ShaderModule.loadRequiredBundled(at: "Assets/tilemap_chunk.glsl", from: .adaModule)
+        shader = ShaderModule.loadRequiredBuiltin(at: "Assets/tilemap_chunk", from: .adaModule)
     }
 
     func configurate(with _: RenderPipelineEmptyConfiguration) -> RenderPipelineDescriptor {

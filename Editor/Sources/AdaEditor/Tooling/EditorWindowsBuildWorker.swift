@@ -24,8 +24,9 @@ enum EditorWindowsBuildWorker {
         if let scratch { arguments += ["--scratch", linuxPath(scratch.path)] }
         if serve { arguments.append("--serve") }
         if let gravityRoot { arguments += ["--gravity", linuxPath(gravityRoot.path)] }
-        if let tint = environment["TINT_EXECUTABLE"], !tint.isEmpty {
-            arguments += ["--tint", linuxPath(tint)]
+        if let saga = environment["ADAENGINE_SAGA_PACKAGE_PATH"] ?? ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"],
+           !saga.isEmpty {
+            arguments += ["--saga", linuxPath(saga)]
         }
         return command(arguments, package: package, engineRoot: engineRoot)
     }

@@ -22,11 +22,13 @@ final class PortableTemporal3DUpscaler: TemporalUpscaler, @unchecked Sendable {
 
     init(device: RenderDevice, inputSize: SizeInt, outputSize: SizeInt, view: Entity.ID) {
         self.device = device; self.view = view; self.inputSize = inputSize; self.outputSize = outputSize
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/portable_temporal_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("portable_temporal_3d")
         var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment), debugName: "Portable temporal reconstruction",
             backfaceCulling: false, depthPixelFormat: .none)
         descriptor.colorAttachments = [.init(format: .rgba_16f), .init(format: .rgba_16f), .init(format: .r32f)]
+        // The R32Float history is read with textureLoad, so browsers need no float32 filtering feature.
+        descriptor.unfilterableTextureBindings = [0: [5]]
         pipeline = device.createRenderPipeline(from: descriptor)
         sampler = device.createSampler(from: .init(minFilter: .linear, magFilter: .linear, mipFilter: .notMipmapped))
         nearest = device.createSampler(from: .init(minFilter: .nearest, magFilter: .nearest, mipFilter: .notMipmapped))

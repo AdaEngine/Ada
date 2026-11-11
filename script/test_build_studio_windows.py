@@ -42,7 +42,7 @@ class WindowsBuildLoggingTests(unittest.TestCase):
         # Dependency setup is unrelated to logging. The production build script still
         # invokes the real SwiftPM/compiler on a real package, including its stderr.
         for name in ["ensure_windows_lore.py", "ensure_windows_icon.py",
-                     "ensure_windows_export_tools.py", "ensure_tint.py"]:
+                     "ensure_windows_export_tools.py"]:
             (self.scripts / name).write_text(
                 'import os\nprint(os.environ["ADA_STUDIO_LOGGING_TEST_SDK"])\n', encoding="utf-8")
         self.environment = os.environ.copy()

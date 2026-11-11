@@ -15,6 +15,12 @@ public extension ShaderModule {
         loadRequiredBundled(at: path, from: bundle, defines: [])
     }
 
+    /// Loads a migrated built-in shader using the format supported by the active renderer.
+    static func loadRequiredBuiltin(at path: String, from bundle: Bundle) -> AssetHandle<ShaderModule> {
+        let fileExtension = supportsBundledWESL ? "wesl" : "glsl"
+        return loadRequiredBundled(at: "\(path).\(fileExtension)", from: bundle)
+    }
+
     /// Loads a required built-in variant while preserving its vertex and fragment output contract.
     static func loadRequiredBundled(at path: String, from bundle: Bundle, defines: [String]) -> AssetHandle<ShaderModule> {
         do {

@@ -40,12 +40,18 @@ def copy_inputs(root, destination, names):
 
 
 def stage(engine, compiler, destination, swan=None):
+    saga_override = os.environ.get("ADAENGINE_SAGA_PACKAGE_PATH")
+    saga = Path(saga_override).resolve() if saga_override else engine.resolve().parent / "SAGA"
+    if saga_override and not (saga / "Package.swift").is_file():
+        raise RuntimeError(f"Local SAGA checkout is missing Package.swift: {saga}")
     destination.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=".ada-sdk-", dir=destination.parent) as temporary:
         staged = Path(temporary) / "BuildSDK"
         staged.mkdir()
         copy_inputs(engine, staged / "AdaEngine", ["Package.swift", "Package.resolved", ".swiftlint.yml", "LICENSE", "NOTICE",
                                                    "Sources", "Plugins", "Tools", "Tests", "Assets", "script", "Editor/StudioCore"])
+        if (saga / "Package.swift").is_file():
+            copy_inputs(saga, staged / "SAGA", ["Package.swift", "LICENSE", "NOTICE", "Sources", "Tests"])
         # These checked-in browser modules are required by the Web export plugin.
         # Ordinary generated dist directories remain excluded from the SDK.
         browser_runtime = Path("Plugins/AdaWebExportPlugin/BrowserWASIShim/dist")

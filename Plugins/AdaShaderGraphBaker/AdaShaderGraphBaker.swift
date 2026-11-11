@@ -2,6 +2,7 @@ import AdaAssets
 import AdaCorePipelines
 import AdaRender
 import AdaSprite
+import AdaWGSLCompiler
 import Foundation
 #if os(Windows)
 import CRT
@@ -24,7 +25,7 @@ struct AdaShaderGraphBaker {
 
     private static func bake() throws {
         let args = CommandLine.arguments
-        guard args.count == 3 else { throw BakeError.message("Usage: AdaShaderGraphBaker <GameAssets> <tint>") }
+        guard args.count == 2 else { throw BakeError.message("Usage: AdaShaderGraphBaker <GameAssets>") }
         let root = URL(fileURLWithPath: args[1]).standardizedFileURL
         let files = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey])?.allObjects as? [URL] ?? [])
             .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }.sorted { $0.path < $1.path }
@@ -92,7 +93,7 @@ struct AdaShaderGraphBaker {
                     compiler.setMacro("ADA_SHADER_GRAPH", value: "1", for: .fragment)
                     for macro in macros { compiler.setMacro(macro, value: "1", for: .fragment) }
                     let binary = try compiler.exportFragment()
-                    let wgsl = try tint(args[2], data: binary.data, entryPoint: binary.entryPoint)
+                    let wgsl = try AdaWGSLCompiler.compile(spirv: binary.data, entryPoint: binary.entryPoint, stage: .fragment)
                     fragments.append(.init(
                         source: source,
                         defines: Dictionary(uniqueKeysWithValues: macros.map { ($0, "1") }),
@@ -156,27 +157,6 @@ struct AdaShaderGraphBaker {
                 try collect(nested, graphs: &graphs, paths: &paths, references: &references, textureMasks: &textureMasks)
             }
         }
-    }
-
-    private static func tint(_ executable: String, data: Data, entryPoint: String) throws -> String {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let input = directory.appendingPathComponent("shader.spv")
-        let output = directory.appendingPathComponent("shader.wgsl")
-        let errors = directory.appendingPathComponent("errors.txt")
-        try data.write(to: input)
-        FileManager.default.createFile(atPath: errors.path, contents: nil)
-        let errorHandle = try FileHandle(forWritingTo: errors)
-        defer { try? errorHandle.close() }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = ["--format", "wgsl", "--allow-non-uniform-derivatives", "true", "-o", output.path, input.path]
-        process.standardError = errorHandle
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw BakeError.message(try String(contentsOf: errors, encoding: .utf8)) }
-        return try String(contentsOf: output, encoding: .utf8).replacingOccurrences(of: "fn main(", with: "fn \(entryPoint)(")
     }
 
     private enum BakeError: Error, CustomStringConvertible {

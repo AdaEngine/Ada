@@ -18,7 +18,8 @@ struct ScreenQuality3DPipelines: Resource {
         if let ao {
             return ao
         }
-        let pipeline = make("Shaders/ssao_3d.glsl", label: "SSAO 3D", device: device)
+        let shader = CorePipelineShaders.loadRequiredBuiltin("ssao_3d")
+        let pipeline = make(shader, label: "SSAO 3D", device: device)
         ao = pipeline
         return pipeline
     }
@@ -27,13 +28,13 @@ struct ScreenQuality3DPipelines: Resource {
         if let aa {
             return aa
         }
-        let pipeline = make("Shaders/fxaa_3d.glsl", label: "FXAA 3D", device: device)
+        let shader = CorePipelineShaders.loadRequiredBuiltin("fxaa_3d")
+        let pipeline = make(shader, label: "FXAA 3D", device: device)
         aa = pipeline
         return pipeline
     }
 
-    private func make(_ path: String, label: String, device: RenderDevice) -> RenderPipeline {
-        let shader = CorePipelineShaders.loadRequiredBundled(at: path)
+    private func make(_ shader: AssetHandle<ShaderModule>, label: String, device: RenderDevice) -> RenderPipeline {
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),

@@ -1,4 +1,4 @@
-#if canImport(CoreFoundation)
+#if canImport(CoreFoundation) && !os(WASI)
 import CoreFoundation
 #endif
 import Foundation
@@ -59,7 +59,7 @@ public enum StudioValue: Codable, Equatable, Sendable {
         if value is NSNull { return .null }
         if let number = value as? NSNumber {
             let kind = unsafe String(cString: number.objCType)
-            #if canImport(CoreFoundation)
+            #if canImport(CoreFoundation) && !os(WASI)
             if CFGetTypeID(number) == CFBooleanGetTypeID() { return .bool(number.boolValue) }
             #else
             if kind == "c" { return .bool(number.boolValue) }

@@ -1,3 +1,4 @@
+import AdaWGSLCompiler
 import Foundation
 import SPIRVCompiler
 #if os(Windows)
@@ -21,6 +22,10 @@ struct AdaShaderTranspilerTool {
 
     private static func run() throws {
         let options = try Options(arguments: CommandLine.arguments.dropFirst())
+        if options.input.pathExtension == "wesl" {
+            try compileWESL(options)
+            return
+        }
         let source = try String(contentsOf: options.input, encoding: .utf8)
         let stages = try GLSLProcessor.splitStages(in: source)
 
@@ -41,11 +46,7 @@ struct AdaShaderTranspilerTool {
             )
             let (entryPoint, mainSource) = GLSLProcessor.dropEntryPoint(in: processedSource)
             let spirv = try compileSPIRV(source: mainSource, stage: stageSource.stage, defines: options.defines)
-            let wgsl = try runTint(
-                tintExecutable: options.tintExecutable,
-                spirv: spirv,
-                entryPoint: entryPoint
-            )
+            let wgsl = try AdaWGSLCompiler.compile(spirv: spirv, entryPoint: entryPoint, stage: stageSource.stage.wgslStage)
             let stem = ([options.input.deletingPathExtension().lastPathComponent] + options.defines).joined(separator: ".")
             let output = options.outputDirectory
                 .appending(component: stem, directoryHint: .notDirectory)
@@ -55,6 +56,43 @@ struct AdaShaderTranspilerTool {
             try wgsl.write(to: output, atomically: true, encoding: .utf8)
             print(output.path())
         }
+    }
+
+    private static func compileWESL(_ options: Options) throws {
+        guard options.defines.isEmpty, options.moduleIncludes.isEmpty else {
+            throw ToolError.invalidArgument("Use --feature and --wesl-root for WESL sources.")
+        }
+        let input = options.input.standardizedFileURL
+        let root = (options.weslRoot ?? input.deletingLastPathComponent()).standardizedFileURL
+        let features = Dictionary(uniqueKeysWithValues: options.features.map { ($0, true) })
+        let artifact = try WESLHostCompiler.compile(sourceFile: input, packageRoot: root, features: features, dependencies: options.weslDependencies)
+        try FileManager.default.createDirectory(at: options.outputDirectory, withIntermediateDirectories: true)
+        if options.webStages {
+            var stages: Set<String> = []
+            for entry in artifact.entryPoints {
+                guard stages.insert(entry.stage).inserted else {
+                    throw ToolError.invalidArgument("A bundled WESL shader must have one entry point per active stage.")
+                }
+            }
+            let stem = ([input.lastPathComponent] + options.features).joined(separator: ".")
+            for stage in stages.sorted() {
+                let suffix = switch stage {
+                case "vertex": "vert"
+                case "fragment": "frag"
+                case "compute": "comp"
+                default: throw ToolError.invalidArgument("Unsupported WESL stage '\(stage)'.")
+                }
+                let output = options.outputDirectory.appendingPathComponent(stem)
+                    .appendingPathExtension(suffix).appendingPathExtension("wgsl")
+                try artifact.wgsl.write(to: output, atomically: true, encoding: .utf8)
+                print(output.path)
+            }
+            return
+        }
+        let stem = ([input.deletingPathExtension().lastPathComponent] + options.features).joined(separator: ".")
+        let output = options.outputDirectory.appendingPathComponent(stem).appendingPathExtension("wgsl")
+        try artifact.wgsl.write(to: output, atomically: true, encoding: .utf8)
+        print(output.path)
     }
 
     private static func compileSPIRV(source: String, stage: ShaderStage, defines: [String]) throws -> Data {
@@ -81,63 +119,28 @@ struct AdaShaderTranspilerTool {
         return Data(bytes: bytes, count: Int(binary.length))
     }
 
-    private static func runTint(tintExecutable: URL, spirv: Data, entryPoint: String) throws -> String {
-        let directory = FileManager.default.temporaryDirectory.appending(component: UUID().uuidString, directoryHint: .isDirectory)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
-        defer {
-            try? FileManager.default.removeItem(at: directory)
-        }
-        let temporaryFile = directory.appendingPathComponent("input.spv")
-        let outputFile = directory.appendingPathComponent("output.wgsl")
-        let errorFile = directory.appendingPathComponent("diagnostics.txt")
-        try spirv.write(to: temporaryFile)
-        try Data().write(to: errorFile)
 
-        let process = Process()
-        let standardError = try FileHandle(forWritingTo: errorFile)
-        defer { try? standardError.close() }
-        process.executableURL = tintExecutable
-        // GLSL materials may compute derivatives under data-dependent control flow.
-        // Preserve that source behavior when translating SPIR-V; Tint emits the
-        // corresponding WGSL derivative_uniformity diagnostic directive.
-        // A generated shader or diagnostic can exceed a pipe's buffer before the child exits.
-        process.arguments = ["--format", "wgsl", "--allow-non-uniform-derivatives", "true", "-o", outputFile.path(), temporaryFile.path()]
-        process.standardOutput = FileHandle.nullDevice
-        process.standardError = standardError
-        try process.run()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            let errorOutput = String(decoding: try Data(contentsOf: errorFile), as: UTF8.self)
-            throw ToolError.tintFailed(errorOutput.isEmpty ? "Tint exited with status \(process.terminationStatus)." : errorOutput)
-        }
-
-        let output = String(decoding: try Data(contentsOf: outputFile), as: UTF8.self)
-        guard !output.isEmpty else {
-            throw ToolError.tintFailed("Tint produced no WGSL output.")
-        }
-
-        let renamed = output.replacingOccurrences(of: "fn main(", with: "fn \(entryPoint)(")
-        return """
-        // Generated from GLSL by AdaShaderTranspilerTool.
-        \(renamed)
-        """
-    }
 }
 
 private struct Options {
     let input: URL
     let outputDirectory: URL
-    let tintExecutable: URL
     let moduleIncludes: [String: URL]
     let defines: [String]
+    let weslRoot: URL?
+    let weslDependencies: [String: URL]
+    let features: [String]
+    let webStages: Bool
 
     init(arguments: ArraySlice<String>) throws {
         var input: URL?
         var outputDirectory: URL?
-        var tintExecutable: URL?
         var moduleIncludes: [String: URL] = [:]
         var defines: Set<String> = []
+        var weslRoot: URL?
+        var weslDependencies: [String: URL] = [:]
+        var features: Set<String> = []
+        var webStages = false
         var iterator = arguments.makeIterator()
 
         while let argument = iterator.next() {
@@ -146,8 +149,19 @@ private struct Options {
                 input = try Self.nextURL(from: &iterator, for: argument)
             case "--output-directory":
                 outputDirectory = try Self.nextURL(from: &iterator, for: argument)
-            case "--tint":
-                tintExecutable = try Self.nextURL(from: &iterator, for: argument)
+            case "--wesl-root":
+                weslRoot = try Self.nextURL(from: &iterator, for: argument)
+            case "--wesl-dependency":
+                let value = try Self.nextValue(from: &iterator, for: argument)
+                let parts = value.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
+                guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty, weslDependencies[parts[0]] == nil else {
+                    throw ToolError.invalidArgument("--wesl-dependency expects a unique PackageName=/path/to/package")
+                }
+                weslDependencies[parts[0]] = URL(fileURLWithPath: parts[1])
+            case "--feature":
+                features.insert(try Self.nextValue(from: &iterator, for: argument))
+            case "--web-stages":
+                webStages = true
             case "--define":
                 let name = try Self.nextValue(from: &iterator, for: argument)
                 guard name.range(of: #"^[A-Z_][A-Z0-9_]*$"#, options: .regularExpression) != nil else {
@@ -174,15 +188,17 @@ private struct Options {
         guard let outputDirectory else {
             throw ToolError.invalidArgument("Missing --output-directory")
         }
-        guard let tintExecutable else {
-            throw ToolError.invalidArgument("Missing --tint")
+        if input.pathExtension != "wesl", weslRoot != nil || !weslDependencies.isEmpty || !features.isEmpty || webStages {
+            throw ToolError.invalidArgument("WESL options require a .wesl input.")
         }
-
         self.input = input
         self.outputDirectory = outputDirectory
-        self.tintExecutable = tintExecutable
         self.moduleIncludes = moduleIncludes
         self.defines = defines.sorted()
+        self.weslRoot = weslRoot
+        self.weslDependencies = weslDependencies
+        self.features = features.sorted()
+        self.webStages = webStages
     }
 
     private static func nextURL<I: IteratorProtocol>(from iterator: inout I, for argument: String) throws -> URL where I.Element == String {
@@ -445,6 +461,14 @@ private enum ShaderStage {
         }
     }
 
+    var wgslStage: AdaWGSLCompiler.Stage {
+        switch self {
+        case .vertex: .vertex
+        case .fragment: .fragment
+        case .compute: .compute
+        }
+    }
+
     var shadercStage: shaderc_stage {
         switch self {
         case .vertex:
@@ -465,7 +489,6 @@ private enum ToolError: LocalizedError, CustomStringConvertible {
     case includeNotFound(String)
     case includeCycle(String)
     case glslCompilationFailed(String)
-    case tintFailed(String)
 
     var errorDescription: String? {
         description
@@ -474,7 +497,10 @@ private enum ToolError: LocalizedError, CustomStringConvertible {
     var description: String {
         switch self {
         case .help:
-            "Usage: AdaShaderTranspilerTool --input shader.glsl --output-directory <dir> --tint <path> [--define NAME] [--module-include AdaEngine=<dir>]"
+            """
+            Usage: AdaShaderTranspilerTool --input shader.glsl --output-directory <dir> [--define NAME] [--module-include AdaEngine=<dir>]
+                   AdaShaderTranspilerTool --input shader.wesl --output-directory <dir> [--wesl-root <dir>] [--wesl-dependency name=<dir>] [--feature name]
+            """
         case .invalidArgument(let message):
             message
         case .glslangInitializationFailed:
@@ -487,8 +513,6 @@ private enum ToolError: LocalizedError, CustomStringConvertible {
             "Shader include cycle detected at \(path)."
         case .glslCompilationFailed(let message):
             "GLSL compilation failed: \(message)"
-        case .tintFailed(let message):
-            "Tint conversion failed: \(message)"
         }
     }
 }

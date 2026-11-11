@@ -32,20 +32,19 @@ struct ShaderGraphBakerTests {
     func realBakerHandlesInlineOverridesMissingResourcesAndUnicode() throws {
         let environment = ProcessInfo.processInfo.environment
         let executable = try #require(environment["ADAENGINE_SHADER_GRAPH_BAKER"])
-        let tint = try #require(environment["TINT_EXECUTABLE"])
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("Граф со пробелами " + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let scene = root.appendingPathComponent("Main.ascn")
         let archive = root.appendingPathComponent("shaders.shadergraphlib")
-        func run(_ tintPath: String = tint) throws -> (Int32, String) {
+        func run() throws -> (Int32, String) {
             let log = root.appendingPathComponent("baker.log")
             FileManager.default.createFile(atPath: log.path, contents: nil)
             let handle = try FileHandle(forWritingTo: log)
             defer { try? handle.close() }
             let process = Process()
             process.executableURL = URL(fileURLWithPath: executable)
-            process.arguments = [root.path, tintPath]
+            process.arguments = [root.path]
             process.standardOutput = handle
             process.standardError = handle
             try process.run()
@@ -82,9 +81,5 @@ struct ShaderGraphBakerTests {
         #expect(baked.graphs.isEmpty && baked.fragments.count == 2)
         #expect(baked.texturePaths == ["@res://цвет.png"])
         #expect(baked.fragments.allSatisfy { !$0.wgsl.isEmpty && !$0.entryPoint.isEmpty })
-        if let failingTint = environment["ADAENGINE_SHADER_GRAPH_FAILING_TINT"] {
-            let failure = try run(failingTint)
-            #expect(failure.0 != 0 && failure.1.contains("stderr complete"))
-        }
     }
 }

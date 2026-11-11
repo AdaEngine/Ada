@@ -404,6 +404,9 @@ enum ShaderCache {
         // Native WebGPU consumes SPIR-V directly; keep its device shader cache
         // separate from the previous GLES prototype and other shader profiles.
         static let shadersDirectoryName = "Shaders-Android-WebGPU-v1"
+        #elseif WEBGPU_ENABLED && !WASM
+        // The source hash manifest and compiled artifacts must use the same cache root.
+        static let shadersDirectoryName = "Shaders-SAGA-v1"
         #else
         static let shadersDirectoryName = "Shaders"
         #endif

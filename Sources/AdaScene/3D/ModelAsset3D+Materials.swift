@@ -1,6 +1,9 @@
 @_spi(Internal) import AdaAssets
 @_spi(Internal) import AdaRender
 import AdaUtils
+#if canImport(Dispatch)
+import Dispatch
+#endif
 import Foundation
 import Math
 import Synchronization
@@ -70,9 +73,11 @@ extension ModelAsset3D {
         }
         // Unbounded imports decode and mip all distinct textures in parallel up front. Bounded imports keep the
         // serial path so each texture is admitted by the decoded-byte budget before its pixels are decoded.
+        #if canImport(Dispatch)
         let jobs = remaining == nil ? parallelTextureJobs(result) : []
         let prefetcher = jobs.isEmpty ? nil : TexturePrefetcher(jobs: jobs, lookahead: parallelTextureWindow)
         defer { prefetcher?.cancel() }
+        #endif
         func texture(_ index: Int?, sRGB: Bool) throws -> Texture2D? {
             guard let index else {
                 return nil
@@ -103,8 +108,12 @@ extension ModelAsset3D {
                 guard baseBytes > 0, baseBytes <= available / factor else { throw ModelImportLimitError.decodedBudgetExceeded }
                 remaining = available - baseBytes * factor
             }
+            #if canImport(Dispatch)
             // Always consume a prefetched result so the bounded prefetcher can advance.
             let prefetched = try prefetcher?.take(key)
+            #else
+            let prefetched: [Image]? = nil
+            #endif
             if let value = importedTextures.withLock({ $0[sharedKey]?.value }) {
                 textures[key] = value
                 return value
@@ -212,6 +221,7 @@ extension ModelAsset3D {
         return try ImageMipmaps.make(from: image, colorSpace: sRGB ? .sRGB : .linear, includeMipmaps: sampler.mipFilter != .notMipmapped)
     }
 
+    #if canImport(Dispatch)
     private struct TextureJob: Sendable {
         let key: TextureKey
         let data: Data
@@ -320,6 +330,8 @@ extension ModelAsset3D {
             for _ in jobs.indices { slots.signal() }
         }
     }
+
+    #endif
 
     private static func samplerDescriptor(_ source: GLTFImportResult.Sampler) -> SamplerDescriptor {
         func address(_ value: Int) -> SamplerAddressMode {

@@ -98,7 +98,7 @@ struct DebugView3DPipelines: Resource {
         if let cached {
             return cached
         }
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/debug_view_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("debug_view_3d")
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),

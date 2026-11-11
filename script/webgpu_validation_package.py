@@ -25,7 +25,10 @@ if not args.include_sponza_demo:
     (sources / "SponzaCameraTests.swift").unlink(missing_ok=True)
 for relative in [
     "Tests/AdaUtilsTests/TintToolchainTests.swift",
-    "Tests/AdaRenderTests/TintShaderCompilerTests.swift",
+    "Tests/AdaRenderTests/WGSLShaderCompilerTests.swift",
+    "Tests/AdaRenderTests/WESLShaderModuleTests.swift",
+    "Tests/AdaEngineTests/WESLGradientPipelineTests.swift",
+    "Tests/AdaEngineTests/WESLUIPipelineTests.swift",
     "Tests/AdaRenderTests/WGSLReflectionTests.swift",
     "Tests/AdaRenderTests/ShaderGraphTests.swift",
     "Tests/AdaRenderTests/ShaderGraphProgramTests.swift",

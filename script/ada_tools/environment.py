@@ -3,7 +3,6 @@ import json
 import os
 from pathlib import Path
 import re
-import subprocess
 import sys
 import tempfile
 
@@ -289,22 +288,18 @@ def native_dependencies(ctx):
             if not ctx.dry:
                 import shutil
                 shutil.copy2(ctx.cache / "gravity/bin/gravity", Path(gravity) / "gravity")
-    # Preserve and validate explicit Tint overrides rather than silently replacing them.
-    tint = ctx.env.get("TINT_EXECUTABLE")
-    if tint:
-        if not ctx.dry:
-            from script.ensure_tint import verify
-            with tempfile.TemporaryDirectory(prefix="ada-tint-") as work:
-                verify(Path(tint), Path(work))
-    else:
-        ctx.set("TINT_EXECUTABLE", ctx.helper("ensure_tint.py", "--jobs", ctx.jobs))
 
 
 def wsl(ctx, arguments):
     if not ctx.which("wsl.exe") and not ctx.dry:
         raise ToolError("Install WSL 2 with Ubuntu 24.04: wsl --install -d Ubuntu-24.04; then run prepare wasm")
     root = ctx.run(["wsl.exe", "--exec", "wslpath", "-a", "-u", ctx.root], capture=True) or "/mnt/<drive>/AdaEngine"
-    return ctx.run(["wsl.exe", "--cd", root, "--exec", "python3", root + "/ada_tool.py", *arguments])
+    environment = []
+    if saga := ctx.env.get("ADAENGINE_SAGA_PACKAGE_PATH"):
+        if not saga.startswith("/"):
+            saga = ctx.run(["wsl.exe", "--exec", "wslpath", "-a", "-u", saga], capture=True) or saga
+        environment = ["env", f"ADAENGINE_SAGA_PACKAGE_PATH={saga}"]
+    return ctx.run(["wsl.exe", "--cd", root, "--exec", *environment, "python3", root + "/ada_tool.py", *arguments])
 
 
 def prepare(ctx, args):
@@ -318,7 +313,7 @@ def prepare(ctx, args):
         prepare_swift(ctx, args.skip_system)
     if "studio" in selected:
         native_dependencies(ctx)
-    elif "tint" in selected:
+    if "tint" in selected:
         ctx.set("TINT_EXECUTABLE", ctx.helper("ensure_tint.py", "--jobs", ctx.jobs))
     if "wasm" in selected:
         if ctx.host == "windows":
@@ -334,7 +329,6 @@ def prepare(ctx, args):
             existing = ctx.run([ctx.swift, "sdk", "list"], capture=True)
             if sdk["sdk"] not in existing.splitlines():
                 ctx.run([ctx.swift, "sdk", "install", sdk["url"], "--checksum", sdk["sha256"]])
-            ctx.set("TINT_EXECUTABLE", ctx.helper("ensure_tint.py", "--jobs", ctx.jobs))
     if "playground" in selected:
         prepare_node(ctx)
         pnpm(ctx, "install", "--frozen-lockfile")
@@ -365,21 +359,8 @@ def doctor(ctx, args):
         add("Swift", actual == expected, f"{actual or 'missing'}; expected {expected}", "python ada_tool.py prepare swift")
         for tool in ("git", "cmake", "ninja"):
             add(tool, ctx.which(tool), ctx.which(tool) or "missing", "python ada_tool.py prepare studio")
-        # ensure_tint --check creates directories; doctor instead hashes and smokes in a temporary directory.
-        from script.ensure_tint import PIN as tint_pin, verify
-        cache = Path(ctx.env.get("ADAENGINE_TINT_CACHE", ctx.root / ".build-tools/tint"))
-        tint = Path(ctx.env.get("TINT_EXECUTABLE", cache / "bin" / f"{ctx.arch}-{ctx.host}" / ("tint.exe" if ctx.host == "windows" else "tint")))
-        try:
-            from .context import sha256
-            if not ctx.env.get("TINT_EXECUTABLE"):
-                manifest = json.loads(tint.with_name("toolchain.json").read_text())
-                if manifest.get("revision") != tint_pin["revision"] or manifest.get("sha256") != sha256(tint):
-                    raise ToolError("Tint revision/hash mismatch")
-            with tempfile.TemporaryDirectory(prefix="ada-doctor-tint-") as work:
-                verify(tint, Path(work))
-            add("Tint", True, str(tint))
-        except (OSError, RuntimeError, ValueError, subprocess.CalledProcessError) as error:
-            add("Tint", False, str(error), "python ada_tool.py prepare tint")
+        saga = Path(ctx.env.get("ADAENGINE_SAGA_PACKAGE_PATH", ctx.root.parent / "SAGA"))
+        add("SAGA", (saga / "Package.swift").is_file(), str(saga), "Set ADAENGINE_SAGA_PACKAGE_PATH to the local SAGA checkout")
     if studio:
         if ctx.host == "windows":
             add("Windows architecture", ctx.arch == "x86_64", ctx.arch, "Studio packaging currently requires Windows x64")

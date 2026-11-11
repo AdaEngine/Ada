@@ -192,7 +192,7 @@ struct CameraEffects3DViews: Resource {
 
     mutating func pipeline(device: RenderDevice) -> RenderPipeline {
         if let renderPipeline { return renderPipeline }
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/camera_effects_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("camera_effects_3d")
         var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex), fragment: shader.asset.getShader(for: .fragment),
                                                   debugName: "Camera Effects 3D", backfaceCulling: false, depthPixelFormat: .none)
         descriptor.colorAttachments = [.init(format: .bgra8)]

@@ -4,7 +4,7 @@ import AdaRender
 import Math
 
 struct SpriteInstancedRenderPipeline: RenderPipelineConfigurator {
-    let shader = ShaderModule.loadRequiredBundled(at: "Assets/sprite_instanced.glsl", from: .adaModule)
+    let shader = ShaderModule.loadRequiredBuiltin(at: "Assets/sprite_instanced", from: .adaModule)
 
     func configurate(with _: RenderPipelineEmptyConfiguration) -> RenderPipelineDescriptor {
         var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))

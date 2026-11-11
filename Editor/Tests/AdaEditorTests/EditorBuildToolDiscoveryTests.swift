@@ -69,7 +69,7 @@ struct EditorBuildToolDiscoveryTests {
         defer { fixture.remove() }
         let tool = try fixture.executable("Tools/swift")
         var configuration = EditorBuildExportConfiguration()
-        let found = ["ADA_WEB_SWIFT_EXECUTABLE": tool.path, "TINT_EXECUTABLE": tool.path]
+        let found = ["ADA_WEB_SWIFT_EXECUTABLE": tool.path, "ADAENGINE_SAGA_PACKAGE_PATH": tool.path]
         #expect(configuration.applyDiscoveredTools(found, for: .web, unchangedSince: configuration) == 0)
         #expect(configuration.values.isEmpty)
     }

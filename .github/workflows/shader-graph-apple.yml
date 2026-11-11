@@ -33,6 +33,14 @@ jobs:
       ADAENGINE_SKIP_SWIFTLINT: '1'
     steps:
       - uses: actions/checkout@v4
+      - name: Check out the local SAGA compiler package
+        if: matrix.check == 'cpu-baker'
+        uses: actions/checkout@v4
+        with:
+          repository: SpectralDragon/SAGA
+          ref: ${{ vars.ADAENGINE_SAGA_REF }}
+          path: .build-tools/SAGA
+          persist-credentials: false
       - name: Check out the pinned local MCP dependency
         uses: actions/checkout@v4
         with:
@@ -41,6 +49,8 @@ jobs:
           path: .build-tools/apple-mcp
           persist-credentials: false
       - name: Build and run the production paths
+        env:
+          ADAENGINE_SAGA_PACKAGE_PATH: ${{ matrix.check == 'cpu-baker' && format('{0}/.build-tools/SAGA', github.workspace) || '' }}
         run: bash script/shader_graph_apple_validation.sh '${{ matrix.check }}' "$RUNNER_TEMP/shader-graph-evidence"
       - name: Upload logs and actual frames
         if: always()

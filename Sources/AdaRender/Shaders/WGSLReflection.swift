@@ -6,7 +6,7 @@ enum WGSLReflection {
         var reflection = ShaderReflectionData()
         let usedNames = entryPoint.map { reachableNames(in: source, entryPoint: $0) }
         let stageFlag = ShaderStageFlags(shaderStage: stage)
-        let pattern = #"@group\(\s*(\d+)u?\s*\)\s*@binding\(\s*(\d+)u?\s*\)\s*var(?:<([^>]+)>)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^;]+);"#
+        let pattern = #"@\s*group\s*\(\s*(\d+)u?\s*\)\s*@\s*binding\s*\(\s*(\d+)u?\s*\)\s*var(?:\s*<([^>]+)>)?\s+([A-Za-z_][A-Za-z0-9_]*)\s*:\s*([^;]+);"#
         guard let regex = try? NSRegularExpression(pattern: pattern) else {
             return reflection
         }
@@ -57,7 +57,8 @@ enum WGSLReflection {
                     descriptorSet: group,
                     arraySize: 1,
                     shaderStage: stageFlag,
-                    resourceAccess: .read
+                    resourceAccess: .read,
+                    isDepth: type.hasPrefix("texture_depth_") ? true : nil
                 )
                 reflection.resources[name] = resource
                 reflection.descriptorSets[group].sampledImages[binding] = resource
@@ -79,9 +80,9 @@ enum WGSLReflection {
         let name = declaration.prefix { !$0.isWhitespace && $0 != "<" }
         return switch name {
         case "texture_1d": .texture1D
-        case "texture_2d_array": .texture2DArray
+        case "texture_2d_array", "texture_depth_2d_array": .texture2DArray
         case "texture_3d": .texture3D
-        case "texture_cube": .textureCube
+        case "texture_cube", "texture_depth_cube": .textureCube
         default: .texture2D
         }
     }

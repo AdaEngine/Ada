@@ -72,7 +72,7 @@ try {
         $studioBin = (& $studioBuilder -Configuration release -ScratchPath $ScratchPath -Jobs $Jobs | Select-Object -Last 1).Trim()
         if ($LASTEXITCODE -ne 0) { throw 'Studio build failed.' }
         $SourcePath = (& python (Join-Path $PSScriptRoot 'package_studio_windows.py') `
-            --bin $studioBin --compiler-root $env:ADAENGINE_GRAVITY_PACKAGE_PATH --tint $env:TINT_EXECUTABLE `
+            --bin $studioBin --compiler-root $env:ADAENGINE_GRAVITY_PACKAGE_PATH `
             --output $studioBuild --version local-install --stage-only | Select-Object -Last 1).Trim()
         if ($LASTEXITCODE -ne 0) { throw 'Studio packaging failed.' }
     }

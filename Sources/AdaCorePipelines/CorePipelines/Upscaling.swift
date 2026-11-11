@@ -36,7 +36,7 @@ public struct UpscalePipeline: Resource {
     public let sampler: Sampler
 
     public init(device: RenderDevice) {
-        let spriteShader = ShaderModule.loadRequiredBundled(at: "Shaders/FullScreenShader.glsl", from: .adaModule)
+        let spriteShader = CorePipelineShaders.loadRequiredBuiltin("FullScreenShader")
 
         var descriptor = RenderPipelineDescriptor(vertex: spriteShader.asset.requiredShader(for: .vertex))
         descriptor.debugName = "Upscale Pipeline"

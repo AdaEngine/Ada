@@ -67,6 +67,8 @@ extension String {
     static let wgpuTrait = "WGPU_ENABLED"
 }
 
+let usesSAGACompiler = (!isHeadlessCIEnabled && isWGPUEnabled && !isAndroidBuildEnabled) || isWebExportEnabled
+
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS, .watchOS, .visionOS]
 
 var products: [Product] = [
@@ -284,23 +286,20 @@ var adaRenderDependencies: [Target.Dependency] = [
     "libpng",
     "CImageDecoder",
     .product(
-        name: "Subprocess",
-        package: "swift-subprocess",
-        condition: .when(platforms: [
-            .macOS,
-            .linux,
-            .windows
-        ], traits: [
-            .wgpuTrait
-        ])
-    ),
-    .product(
         name: "JavaScriptKit",
         package: "JavaScriptKit",
         condition: .when(platforms: [.wasi])
     ),
 ]
 
+if usesSAGACompiler && !isHeadlessCIEnabled {
+    adaRenderDependencies.append(
+        .target(
+            name: "AdaWGSLCompiler",
+            condition: .when(platforms: [.macOS, .linux, .windows], traits: [.wgpuTrait])
+        )
+    )
+}
 if !isHeadlessCIEnabled {
     adaRenderDependencies.append(
         .product(
@@ -792,7 +791,15 @@ targets.append(
     )
 )
 
+if usesSAGACompiler {
+    targets.append(.target(
+        name: "AdaWGSLCompiler",
+        dependencies: [.product(name: "SAGACompiler", package: "SAGA")]
+    ))
+}
+
 if isWebExportEnabled {
+    products.append(.library(name: "AdaWGSLCompiler", targets: ["AdaWGSLCompiler"]))
     products.append(.executable(name: "AdaShaderGraphBaker", targets: ["AdaShaderGraphBaker"]))
     products.append(
         .plugin(name: "AdaWebExportPlugin", targets: [
@@ -804,7 +811,7 @@ if isWebExportEnabled {
         .executableTarget(
             name: "AdaShaderTranspilerTool",
             dependencies: [
-                "SPIRVCompiler"
+                "SPIRVCompiler", "AdaWGSLCompiler"
             ],
             path: "Plugins/AdaShaderTranspilerTool"
         )
@@ -812,7 +819,7 @@ if isWebExportEnabled {
 
     targets.append(.executableTarget(
         name: "AdaShaderGraphBaker",
-        dependencies: ["AdaAssets", "AdaCorePipelines", "AdaRender", "AdaSprite"],
+        dependencies: ["AdaAssets", "AdaCorePipelines", "AdaRender", "AdaSprite", "AdaWGSLCompiler"],
         path: "Plugins/AdaShaderGraphBaker"
     ))
 
@@ -826,7 +833,7 @@ if isWebExportEnabled {
                 ),
                 permissions: [
                     .writeToPackageDirectory(reason: "Write the exported web app bundle to the requested output directory"),
-                    .allowNetworkConnections(scope: .all(), reason: "Download Dawn/Tint when Tint is not installed and shaders need WGSL generation")
+                    .allowNetworkConnections(scope: .all(), reason: "Resolve SwiftPM dependencies for the web build")
                 ]
             ),
             dependencies: [
@@ -1573,7 +1580,6 @@ package.dependencies += [
     .package(url: "https://github.com/apple/swift-numerics", from: "1.1.1"),
     .package(url: "https://github.com/apple/swift-atomics", from: "1.3.0"),
     .package(url: "https://github.com/the-swift-collective/zlib.git", from: "1.3.2"),
-    .package(url: "https://github.com/swiftlang/swift-subprocess.git", branch: "0.2.1"),
     .package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.7.3"),
     // TODO: SpectralDragon packages should move to AdaEngine
     ProcessInfo.processInfo.environment["ADAENGINE_YAMS_PACKAGE_PATH"].map { .package(name: "Yams", path: $0) }
@@ -1613,6 +1619,11 @@ if !isWebExportEnabled && !isAndroidBuildEnabled {
     )
 }
 
+if usesSAGACompiler {
+    let sagaPath = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"]
+        ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("SAGA").path
+    package.dependencies.append(.package(name: "SAGA", path: sagaPath))
+}
 if !isHeadlessCIEnabled {
     package.dependencies.append(
         ProcessInfo.processInfo.environment["ADAENGINE_SWAN_PACKAGE_PATH"].map { .package(name: "swan", path: $0) }

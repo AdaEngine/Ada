@@ -82,13 +82,12 @@ def distribution(ctx, args, binary, work):
     if ctx.host == "macos":
         return binary
     compiler = ctx.env["ADAENGINE_GRAVITY_PACKAGE_PATH"]
-    tint = ctx.env["TINT_EXECUTABLE"]
     if ctx.host == "windows":
         path = ctx.helper("package_studio_windows.py", "--bin", binary, "--compiler-root", compiler,
-                          "--tint", tint, "--output", work, "--version", "local-" + configuration(args), "--stage-only",
+                          "--output", work, "--version", "local-" + configuration(args), "--stage-only",
                           fallback=work / ("AdaStudio-local-" + configuration(args) + "-windows-x86_64"))
     else:
-        path = ctx.helper("package_studio_linux.py", "--binary-directory", binary, "--compiler", compiler, "--tint", tint,
+        path = ctx.helper("package_studio_linux.py", "--binary-directory", binary, "--compiler", compiler,
                           "--swan", ctx.env["ADAENGINE_SWAN_PACKAGE_PATH"], "--dawn", ctx.env["SWAN_LOCAL_DAWN"],
                           "--output", work, "--version", "local-" + configuration(args), fallback=work / "AdaStudio-local-linux")
     return Path(path)
