@@ -23,9 +23,18 @@ public class Material: Asset, Hashable, @unchecked Sendable {
 
     public let shaderSource: ShaderSource
 
+    private let linkedShaderModule: ShaderModule?
+
     /// Create a new material from shader source.
     public init(shaderSource: ShaderSource) {
         self.shaderSource = shaderSource
+        self.linkedShaderModule = nil
+    }
+
+    /// Internal complete-module path. Its identity must not alias an empty legacy source.
+    init(shaderSource: ShaderSource, linkedShaderModule: ShaderModule?) {
+        self.shaderSource = shaderSource
+        self.linkedShaderModule = linkedShaderModule
     }
 
     public required convenience init(from assetDecoder: AssetDecoder) throws {
@@ -34,6 +43,9 @@ public class Material: Asset, Hashable, @unchecked Sendable {
     }
 
     public func encodeContents(with encoder: AssetEncoder) throws {
+        guard linkedShaderModule == nil else {
+            throw AssetError.message("Linked-module materials require their original WESL asset and cannot encode empty shader sources.")
+        }
         try self.shaderSource.encodeContents(with: encoder)
     }
 
@@ -66,6 +78,12 @@ public class Material: Asset, Hashable, @unchecked Sendable {
 
     /// Supplies shader stages for a material, including materials loaded directly from runtime sources.
     open func makeShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
+        if let linkedShaderModule {
+            guard defines.isEmpty else {
+                throw AssetError.message("Linked-module materials must select feature variants before construction.")
+            }
+            return linkedShaderModule
+        }
         let compiler = ShaderCompiler(shaderSource: shaderSource)
         for define in defines {
             compiler.setMacro(define.name, value: define.value, for: .vertex)
@@ -77,11 +95,18 @@ public class Material: Asset, Hashable, @unchecked Sendable {
     // MARK: Hashable
 
     public static func == (lhs: Material, rhs: Material) -> Bool {
-        lhs.shaderSource == rhs.shaderSource
+        if lhs.linkedShaderModule != nil || rhs.linkedShaderModule != nil {
+            return lhs === rhs
+        }
+        return lhs.shaderSource == rhs.shaderSource
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(self.shaderSource)
+        if linkedShaderModule != nil {
+            hasher.combine(ObjectIdentifier(self))
+        } else {
+            hasher.combine(self.shaderSource)
+        }
     }
 
     // MARK: Mesh

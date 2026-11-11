@@ -66,6 +66,10 @@ struct AdaShaderTranspilerTool {
         let root = (options.weslRoot ?? input.deletingLastPathComponent()).standardizedFileURL
         let features = Dictionary(uniqueKeysWithValues: options.features.map { ($0, true) })
         let artifact = try WESLHostCompiler.compile(sourceFile: input, packageRoot: root, features: features, dependencies: options.weslDependencies)
+        if options.target != "wgsl" {
+            try compileNativeStages(artifact, options: options)
+            return
+        }
         try FileManager.default.createDirectory(at: options.outputDirectory, withIntermediateDirectories: true)
         if options.webStages {
             var stages: Set<String> = []
@@ -95,6 +99,29 @@ struct AdaShaderTranspilerTool {
         print(output.path)
     }
 
+    private static func compileNativeStages(_ module: WESLHostCompiler.Artifact, options: Options) throws {
+        guard let target = WESLBackendCompiler.Target(rawValue: options.target) else {
+            throw ToolError.invalidArgument("Unsupported WESL backend target")
+        }
+        var stages: Set<String> = []
+        for entry in module.entryPoints {
+            guard stages.insert(entry.stage).inserted else {
+                throw ToolError.invalidArgument("A bundled WESL shader must have one entry point per active stage.")
+            }
+        }
+        // Compile the complete batch before writing any output if a stage is unsupported.
+        let compiled = try WESLBackendCompiler.compile(module, to: target)
+        try FileManager.default.createDirectory(at: options.outputDirectory, withIntermediateDirectories: true)
+        let stem = ([options.input.deletingPathExtension().lastPathComponent] + options.features).joined(separator: ".")
+        let suffix = target == .spirv ? "spv" : "msl"
+        for entry in compiled {
+            let output = options.outputDirectory.appendingPathComponent(stem)
+                .appendingPathExtension(entry.fileExtension).appendingPathExtension(suffix)
+            try entry.data.write(to: output, options: .atomic)
+            print(output.path)
+        }
+    }
+
     private static func compileSPIRV(source: String, stage: ShaderStage, defines: [String]) throws -> Data {
         var error: UnsafePointer<CChar>?
         let source = source.insertingDefines(defines)
@@ -118,8 +145,6 @@ struct AdaShaderTranspilerTool {
 
         return Data(bytes: bytes, count: Int(binary.length))
     }
-
-
 }
 
 private struct Options {
@@ -131,6 +156,7 @@ private struct Options {
     let weslDependencies: [String: URL]
     let features: [String]
     let webStages: Bool
+    let target: String
 
     init(arguments: ArraySlice<String>) throws {
         var input: URL?
@@ -141,6 +167,7 @@ private struct Options {
         var weslDependencies: [String: URL] = [:]
         var features: Set<String> = []
         var webStages = false
+        var target = "wgsl"
         var iterator = arguments.makeIterator()
 
         while let argument = iterator.next() {
@@ -160,6 +187,11 @@ private struct Options {
                 weslDependencies[parts[0]] = URL(fileURLWithPath: parts[1])
             case "--feature":
                 features.insert(try Self.nextValue(from: &iterator, for: argument))
+            case "--target":
+                target = try Self.nextValue(from: &iterator, for: argument)
+                guard ["wgsl", "msl", "spirv"].contains(target) else {
+                    throw ToolError.invalidArgument("--target expects wgsl, msl, or spirv")
+                }
             case "--web-stages":
                 webStages = true
             case "--define":
@@ -191,6 +223,13 @@ private struct Options {
         if input.pathExtension != "wesl", weslRoot != nil || !weslDependencies.isEmpty || !features.isEmpty || webStages {
             throw ToolError.invalidArgument("WESL options require a .wesl input.")
         }
+        if target != "wgsl", input.pathExtension != "wesl" {
+            throw ToolError.invalidArgument("Native backend targets require a .wesl input.")
+        }
+        if webStages, target != "wgsl" {
+            throw ToolError.invalidArgument("--web-stages requires WGSL output")
+        }
+        self.target = target
         self.input = input
         self.outputDirectory = outputDirectory
         self.moduleIncludes = moduleIncludes
@@ -499,7 +538,7 @@ private enum ToolError: LocalizedError, CustomStringConvertible {
         case .help:
             """
             Usage: AdaShaderTranspilerTool --input shader.glsl --output-directory <dir> [--define NAME] [--module-include AdaEngine=<dir>]
-                   AdaShaderTranspilerTool --input shader.wesl --output-directory <dir> [--wesl-root <dir>] [--wesl-dependency name=<dir>] [--feature name]
+                   AdaShaderTranspilerTool --input shader.wesl --output-directory <dir> [--wesl-root <dir>] [--wesl-dependency name=<dir>] [--feature name] [--target wgsl|msl|spirv]
             """
         case .invalidArgument(let message):
             message

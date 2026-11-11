@@ -32,6 +32,10 @@ import AdaAssets
 /// When you declared material struct, you can pass it to the ``CustomMaterial`` object where main magic happens.
 ///
 public protocol ReflectedMaterial: ShaderBindable {
+    /// Optional complete module for materials whose stages are linked together (for example WESL).
+    /// Return nil to use the legacy stage-source path. Macro variants are not supported by this hook.
+    static func shaderModule() throws -> ShaderModule?
+
     /// Configure and pass shader source for custom material.
     /// - Returns: A shader sources for vertex shader.
     static func vertexShader() throws -> AssetHandle<ShaderSource>
@@ -63,4 +67,8 @@ public protocol ReflectedMaterial: ShaderBindable {
         fragment: Shader,
         vertexDescriptor: VertexDescriptor
     ) throws -> RenderPipelineDescriptor
+}
+
+extension ReflectedMaterial {
+    public static func shaderModule() throws -> ShaderModule? { nil }
 }

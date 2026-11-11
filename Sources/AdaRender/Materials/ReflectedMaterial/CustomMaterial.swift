@@ -118,6 +118,7 @@ public final class CustomMaterial<T: ReflectedMaterial>: Material, MaterialValue
 
     /// Contains all bindable properties founded in passed ``ReflectedMaterial``.
     private var bindableValues: [_ShaderBindProperty] = []
+    private let sourceLoadError: (any Error)?
 
     public convenience init(wrappedValue: T) {
         self.init(wrappedValue)
@@ -128,41 +129,47 @@ public final class CustomMaterial<T: ReflectedMaterial>: Material, MaterialValue
         self.material = material
 
         let shaderSource = ShaderSource()
+        var linkedModule: ShaderModule?
+        var sourceLoadError: (any Error)?
 
         do {
-            let vertexShaderSource = try T.vertexShader()
-            let fragmentShaderSource = try T.fragmentShader()
+            linkedModule = try T.shaderModule()
+            if linkedModule == nil {
+                let vertexShaderSource = try T.vertexShader()
+                let fragmentShaderSource = try T.fragmentShader()
 
-            guard let vertexSource = vertexShaderSource.asset.getSource(for: .vertex) else {
-                throw CustomMaterialError.missingShaderStage(.vertex, material: String(reflecting: T.self))
+                guard let vertexSource = vertexShaderSource.asset.getSource(for: .vertex) else {
+                    throw CustomMaterialError.missingShaderStage(.vertex, material: String(reflecting: T.self))
+                }
+
+                guard let fragmentSource = fragmentShaderSource.asset.getSource(for: .fragment) else {
+                    throw CustomMaterialError.missingShaderStage(.fragment, material: String(reflecting: T.self))
+                }
+
+                shaderSource.setSource(
+                    vertexSource,
+                    for: .vertex,
+                    fileURL: vertexShaderSource.asset.getSourceFileURL(for: .vertex)
+                )
+                shaderSource.setSource(
+                    fragmentSource,
+                    for: .fragment,
+                    fileURL: fragmentShaderSource.asset.getSourceFileURL(for: .fragment)
+                )
+
+                shaderSource.includeSearchPaths.append(contentsOf: vertexShaderSource.asset.includeSearchPaths)
+                shaderSource.includeSearchPaths.append(contentsOf: fragmentShaderSource.asset.includeSearchPaths)
             }
-
-            guard let fragmentSource = fragmentShaderSource.asset.getSource(for: .fragment) else {
-                throw CustomMaterialError.missingShaderStage(.fragment, material: String(reflecting: T.self))
-            }
-
-            shaderSource.setSource(
-                vertexSource,
-                for: .vertex,
-                fileURL: vertexShaderSource.asset.getSourceFileURL(for: .vertex)
-            )
-            shaderSource.setSource(
-                fragmentSource,
-                for: .fragment,
-                fileURL: fragmentShaderSource.asset.getSourceFileURL(for: .fragment)
-            )
-
-            shaderSource.includeSearchPaths.append(contentsOf: vertexShaderSource.asset.includeSearchPaths)
-            shaderSource.includeSearchPaths.append(contentsOf: fragmentShaderSource.asset.includeSearchPaths)
         } catch {
-            assertionFailure("[CustomMaterial] \(error)")
+            sourceLoadError = error
         }
 
         shaderSource.fileURL =
             try? ShaderCache
             .getCacheDirectory()
             .appending(path: String(reflecting: type(of: material)), directoryHint: .isDirectory)
-        super.init(shaderSource: shaderSource)
+        self.sourceLoadError = sourceLoadError
+        super.init(shaderSource: shaderSource, linkedShaderModule: linkedModule)
         self.reflectMaterial(from: material)
     }
 
@@ -178,6 +185,11 @@ public final class CustomMaterial<T: ReflectedMaterial>: Material, MaterialValue
         set {
             self.material[keyPath: keyPath] = newValue
         }
+    }
+
+    override public func makeShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
+        if let sourceLoadError { throw sourceLoadError }
+        return try super.makeShaderModule(defines: defines)
     }
 
     // MARK: - Mesh
