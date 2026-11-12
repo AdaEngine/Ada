@@ -293,6 +293,13 @@ actor EditorAdaScriptNativeExporter {
 
     @MainActor
     private static func convertScenes(at assets: URL, originalRoot: URL, sources: [AdaScriptSource]) throws {
+        if unsafe RenderEngine.shared == nil {
+            // CLI exports decode textured components without starting Studio's render world.
+            let previousBackend = unsafe RenderEngine.configurations.preferredBackend
+            defer { unsafe RenderEngine.configurations.preferredBackend = previousBackend }
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "Native scene export")))
+        }
         EditorComponentRegistry.registerBuiltIns()
         let schemas = try AdaScriptSchemaParser.parse(sources: sources).filter { $0.kind == .component }
         let nativeNames = Set(schemas.flatMap { [$0.name, $0.id] + $0.aliases })

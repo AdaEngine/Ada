@@ -41,10 +41,9 @@
                 source: """
                 import ada_engine::shadow_pcf::{adaDirectionalShadowPCF, adaDirectionalShadowPCSS};
                 @group(0) @binding(0) var atlasTexture: texture_2d<f32>;
-                @group(0) @binding(1) var atlasSampler: sampler;
                 @fragment fn main(@builtin(position) p: vec4f) -> @location(0) vec4f {
-                    let a = adaDirectionalShadowPCF(atlasTexture, atlasSampler, p.xy, p.zw, p.xy, p.zw, p.x);
-                    let b = adaDirectionalShadowPCSS(atlasTexture, atlasSampler, p.xy, p.zw, p.xy, p.zw, p.x, mat4x4f(), p, 2.0);
+                    let a = adaDirectionalShadowPCF(atlasTexture, p.xy, p.zw, p.xy, p.zw, p.x);
+                    let b = adaDirectionalShadowPCSS(atlasTexture, p.xy, p.zw, p.xy, p.zw, p.x, mat4x4f(), p, 2.0);
                     return vec4f(a, b, 0.0, 1.0);
                 }
                 """

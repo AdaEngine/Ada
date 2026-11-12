@@ -1,4 +1,5 @@
 import ada_engine::view::view;
+import ada_engine::shadow_pcf::adaNearestShadowDepth;
 
 // WESL port of particles_3d.glsl. Features: PARTICLE_INDIRECT adds the indirect coverage target (location 1) and
 // PARTICLE_REFLECTION_RESPONSE adds the reflection-response target (location 2).
@@ -28,7 +29,6 @@ struct ParticleShadowMatrices {
 @group(0) @binding(4) var<uniform> lighting: ParticleLighting;
 @group(0) @binding(5) var<uniform> shadowMatrices: ParticleShadowMatrices;
 @group(0) @binding(6) var u_ParticleShadows: texture_2d<f32>;
-@group(0) @binding(7) var u_ShadowSampler: sampler;
 
 struct ParticleVertex {
     @builtin(position) position: vec4f,
@@ -106,11 +106,12 @@ fn smokeShadow(light: SmokeLight, position: vec3f) -> f32 {
     let lo = (origin + vec2f(0.5)) * atlas.xy;
     let hi = (origin + vec2f(atlas.z - 0.5)) * atlas.xy;
     let uv = (origin + (ndc.xy * vec2f(0.5, -0.5) + vec2f(0.5)) * atlas.z) * atlas.xy;
+    let shadowSize = vec2i(textureDimensions(u_ParticleShadows));
     var visibility = 0.0;
     for (var y = 0; y < 2; y++) {
         for (var x = 0; x < 2; x++) {
             let offset = (vec2f(f32(x), f32(y)) - vec2f(0.5)) * atlas.xy;
-            let depth = textureSampleLevel(u_ParticleShadows, u_ShadowSampler, clamp(uv + offset, lo, hi), 0.0).r;
+            let depth = adaNearestShadowDepth(u_ParticleShadows, shadowSize, clamp(uv + offset, lo, hi));
             visibility += select(0.0, 1.0, ndc.z - light.innerShadow.y <= depth);
         }
     }

@@ -19,14 +19,17 @@
             debugErrors: Bool = false,
             transport: some BrowserTransport
         ) {
-            installBrowserTransport(transport)
             self.init(
                 capabilities: capabilities,
                 supportsPresentation: supportsPresentation,
                 shaderOutput: .wgsl,
                 debugErrors: debugErrors,
                 makeDevice: {
-                    let host = makeWebGPUHost(capabilities: capabilities, supportsPresentation: supportsPresentation)
+                    let host = makeWebGPUHost(
+                        capabilities: capabilities,
+                        supportsPresentation: supportsPresentation,
+                        transport: transport
+                    )
                     return try await Device.make(backend: BrowserComputeBackend(host: host))
                 }
             )

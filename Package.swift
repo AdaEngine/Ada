@@ -35,7 +35,12 @@ let isWebExportEnabled: Bool = {
 }()
 
 let isSAGANativeEnabled = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_NATIVE"] == "1" && !isWebExportEnabled
-let usesSwan = !isHeadlessCIEnabled && !isWebExportEnabled && !isSAGANativeEnabled
+#if os(macOS)
+let isSAGAMetalEnabled = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_METAL"] == "1" && !isWebExportEnabled
+#else
+let isSAGAMetalEnabled = false
+#endif
+let usesSwan = !isHeadlessCIEnabled && !isWebExportEnabled && !isSAGANativeEnabled && !isSAGAMetalEnabled
 
 // Local compiler development can override the checked-in, patched AdaScript runtime.
 let gravityDevelopmentPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
@@ -330,6 +335,15 @@ if isSAGANativeEnabled {
     swiftSettings.append(.define("SAGA_RENDER", .when(platforms: [.windows, .linux, .android])))
     swiftSettings.append(.define("SAGA_NATIVE", .when(platforms: [.windows, .linux, .android])))
     adaRenderDependencies.append(.target(name: "AdaWGSLCompiler", condition: .when(platforms: [.windows, .linux, .android])))
+}
+if isSAGAMetalEnabled {
+    let sagaMetalPlatforms: [Platform] = [.macOS, .iOS, .tvOS]
+    for product in ["SAGA", "SAGACompiler", "SAGAMetal"] {
+        adaRenderDependencies.append(.product(name: product, package: "SAGA", condition: .when(platforms: sagaMetalPlatforms)))
+    }
+    adaRenderDependencies.append(.target(name: "AdaWGSLCompiler", condition: .when(platforms: sagaMetalPlatforms)))
+    swiftSettings.append(.define("SAGA_RENDER", .when(platforms: sagaMetalPlatforms)))
+    swiftSettings.append(.define("SAGA_METAL", .when(platforms: sagaMetalPlatforms)))
 }
 if dlssBuildConfiguration != nil {
     adaRenderDependencies.append(.target(name: "CWebGPUDLSS", condition: .when(platforms: [.windows], traits: [.wgpuTrait])))
@@ -811,7 +825,7 @@ targets.append(
     )
 )
 
-if usesSAGACompiler || isSAGANativeEnabled {
+if usesSAGACompiler || isSAGANativeEnabled || isSAGAMetalEnabled {
     targets.append(.target(
         name: "AdaWGSLCompiler",
         dependencies: [.product(name: "SAGACompiler", package: "SAGA")]
@@ -1494,7 +1508,8 @@ targets += [
         resources: [
             .copy("Fixtures/Images")
         ],
-        swiftSettings: isSAGANativeEnabled ? [.define("SAGA_NATIVE")] : []
+        swiftSettings: (isSAGANativeEnabled ? [.define("SAGA_NATIVE")] : [])
+            + (isSAGAMetalEnabled ? [.define("SAGA_METAL", .when(platforms: [.macOS]))] : [])
     ),
     .testTarget(
         name: "AdaInputTests",
@@ -1640,7 +1655,7 @@ if !isWebExportEnabled && !isAndroidBuildEnabled {
     )
 }
 
-if usesSAGACompiler || isSAGANativeEnabled {
+if usesSAGACompiler || isSAGANativeEnabled || isSAGAMetalEnabled {
     let sagaPath = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"]
         ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("SAGA").path
     package.dependencies.append(.package(name: "SAGA", path: sagaPath))

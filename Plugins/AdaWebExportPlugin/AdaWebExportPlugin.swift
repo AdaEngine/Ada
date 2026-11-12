@@ -105,19 +105,21 @@ struct AdaWebExportPlugin: CommandPlugin {
         }
     }
 
-    /// Ships SAGA's JavaScript WebGPU host, which the browser renderer requires.
-    private func copySAGAWebHost(packageDirectory: URL, to output: URL) throws {
-        let environment = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"]
-        let saga = environment.map { URL(fileURLWithPath: $0, isDirectory: true) }
-            ?? packageDirectory.deletingLastPathComponent().appending(component: "SAGA", directoryHint: .isDirectory)
-        let source = saga.appending(components: "web", "webgpu.mjs")
-        guard FileManager.default.fileExists(atPath: source.path()) else {
-            throw ExportError.sagaCheckoutNotFound(saga.path())
+    /// Copies the JavaScript host from the package that provides the Swift host.
+    private func copySAGAWebHost(package: Package, to output: URL) throws {
+        guard let saga = package.dependencies.map(\.package).first(where: {
+            $0.products.contains { $0.name == "SAGAWebHost" }
+        }) else {
+            throw ExportError.sagaWebHostNotResolved
         }
-        try replaceItem(at: output.appending(component: "saga-webgpu.mjs", directoryHint: .notDirectory), with: source)
-        let golden = saga.appending(components: "web", "golden.mjs")
+        let host = saga.directoryURL.appending(components: "web", "webgpu.mjs")
+        guard FileManager.default.fileExists(atPath: host.path()) else {
+            throw ExportError.sagaWebHostAssetMissing(host.path())
+        }
+        try replaceItem(at: output.appending(component: "saga-webgpu.mjs"), with: host)
+        let golden = saga.directoryURL.appending(components: "web", "golden.mjs")
         if FileManager.default.fileExists(atPath: golden.path()) {
-            try replaceItem(at: output.appending(component: "saga-golden.mjs", directoryHint: .notDirectory), with: golden)
+            try replaceItem(at: output.appending(component: "saga-golden.mjs"), with: golden)
         }
     }
 
@@ -366,7 +368,7 @@ struct AdaWebExportPlugin: CommandPlugin {
             with: Self.assetsDirectory.appending(components: "Runtime", "BridgeJSCache", "bridge-js.js")
         )
         try copyBrowserWASIShim(packageDirectory: packageDirectory, to: options.outputDirectory)
-        try copySAGAWebHost(packageDirectory: packageDirectory, to: options.outputDirectory)
+        try copySAGAWebHost(package: package, to: options.outputDirectory)
         try copyLoaderAssets(to: options.outputDirectory)
 
         try indexHTML(product: options.product).write(
@@ -933,7 +935,8 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
     case javascriptKitRuntimeNotFound
     case unsafeScratchDirectory
     case browserWASIRuntimeNotFound
-    case sagaCheckoutNotFound(String)
+    case sagaWebHostNotResolved
+    case sagaWebHostAssetMissing(String)
 
     var errorDescription: String? {
         description
@@ -950,8 +953,10 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
             return "Web export requires an isolated --scratch-path; the shared .build directory cannot be used."
         case .browserWASIRuntimeNotFound:
             return "Web export is missing BrowserWASIShim/dist/index.js. Restore the bundled WASI runtime modules from the engine repository."
-        case .sagaCheckoutNotFound(let path):
-            return "Web export renders through SAGA but no SAGA checkout with web/webgpu.mjs was found at \(path). Clone SAGA next to the engine or set ADAENGINE_SAGA_PACKAGE_PATH."
+        case .sagaWebHostNotResolved:
+            return "Web export requires a SAGA dependency that provides the SAGAWebHost product."
+        case .sagaWebHostAssetMissing(let path):
+            return "The resolved SAGAWebHost package is missing a browser asset at \(path). Use a SAGA revision that ships the matching browser host."
         case .missingTarget:
             return "Missing required --product <ProductName> argument."
         case .missingValue(let argument):

@@ -4,6 +4,12 @@ Status: Proposed.
 
 This proposal supersedes the end state in [the initial SAGA migration design](saga-migration.md) and builds on the [built-in shader migration](wesl-builtin-shader-migration.md). The existing work in both checkouts is the starting point.
 
+## Starting point and cutover order
+
+- AdaEngine `514794db8` already has a shared SAGA adapter and a browser export that opens the SAGA host by default. The Vulkan backend has native window adapters, but the default on Windows, Linux, and Android still uses Swan/Dawn unless built with `ADAENGINE_SAGA_NATIVE=1`. Apple still uses AdaEngine's existing Metal backend. The browser smoke golden covers one scene; it does not establish parity across engines or platforms.
+- The local SAGA checkout at `cc2aacc` does not export `SAGAWebHost` or provide the `makePresentableDevice`, `addSurface`, and `removeSurface` Vulkan APIs required by this AdaEngine checkout. Identify and pin a compatible SAGA revision, or land and validate the missing API there, before switching native defaults. Verify the product graph and browser host assets from a clean checkout in CI.
+- Enable defaults platform by platform once the production build and presentation checks pass. Use Windows Vulkan and the existing browser smoke as the first verification targets; exercise Linux and Android on their own hosts and coordinate Apple separately. Keep the old native path available during verification. Remove it after the affected platforms pass their cutover checks.
+
 ## Runtime and platform ownership
 
 AdaRender retains its public rendering interfaces. SAGA owns GPU resources, shader compilation for its backends, submission and presentation. AdaRender adapts its encoders to SAGA command lists and preserves resource lifetimes across queued work, including resize, surface replacement, device shutdown and readback. Headless configurations continue to work without a graphics device.

@@ -25,13 +25,13 @@ extension TextFieldViewNode {
             self.selectWord(at: caretOffset)
             self.clearTapCandidate()
 
-            #if canImport(UIKit)
+            #if canImport(UIKit) && !os(tvOS)
                 self.showEditMenu(at: position)
             #endif
         } else {
             self.storeTapCandidate(at: position, time: time)
 
-            #if canImport(UIKit)
+            #if canImport(UIKit) && !os(tvOS)
                 if self.hasSelection {
                     self.showEditMenu(at: position)
                 } else {

@@ -8,7 +8,6 @@
 #if SAGA_RENDER && canImport(SAGACompiler)
     import AdaUtils
     import Foundation
-    import Logging
     import Math
     import SAGA
     import SAGACore
@@ -58,16 +57,24 @@
             self.builders = []
             let completed = completedHandlers
             let timing = timingHandlers
+            let hasCompletionHandlers = !completed.isEmpty || !timing.isEmpty
             let debugErrors = context.debugErrors
-            let logger = context.logger
             completedHandlers = []
             timingHandlers = []
-            context.queue.enqueue { device in
-                defer {
-                    timing.forEach { $0(nil) }
-                    completed.forEach { $0() }
+            let notifyCompletion: @Sendable () -> Void = {
+                timing.forEach { $0(nil) }
+                completed.forEach { $0() }
+            }
+            context.queue.enqueue(onUnavailable: hasCompletionHandlers ? notifyCompletion : nil) { device in
+                defer { notifyCompletion() }
+                guard !builders.isEmpty else {
+                    if hasCompletionHandlers {
+                        // Even an empty frame fence must retire after earlier device work.
+                        let fence = try await device.submitResourceUse([])
+                        try await fence.wait()
+                    }
+                    return
                 }
-                guard !builders.isEmpty else { return }
                 let commands = try builders.map { try $0() }
                 let ticket: CommandTicket
                 do {
@@ -79,8 +86,10 @@
                     }
                     throw error
                 }
+                if hasCompletionHandlers || debugErrors {
+                    try await ticket.wait()
+                }
                 if debugErrors {
-                    do { try await ticket.wait() } catch { print("[SAGA] submission failed: \(error)") }
                     for error in await device.takeUncapturedErrors() {
                         print("[SAGA] device error: \(error)")
                     }

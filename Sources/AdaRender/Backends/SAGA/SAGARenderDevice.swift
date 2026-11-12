@@ -16,6 +16,8 @@
         let context: SAGAContext
         weak var windows: (any SAGAWindowProvider)?
 
+        public var supportsFloat32TextureFiltering: Bool { context.capabilities.features.contains(.float32Filterable) }
+
         // The browser path starts without the optional GPU-driven features of the native backend.
         public var supportsInstancedVertexInputs: Bool { true }
         public var supportsSpatialUpscaling: Bool { false }

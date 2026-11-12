@@ -10,7 +10,13 @@ extension Render3DGPUTests {
         func recordsCameraPixelsAndCameraCut() async throws {
             let previousBackend = unsafe RenderEngine.configurations.preferredBackend
             defer { unsafe RenderEngine.configurations.preferredBackend = previousBackend }
-            unsafe RenderEngine.configurations.preferredBackend = GoldenFrame.activeBackend == .webgpu ? .webgpu : .metal
+            let backend = try #require(GoldenFrame.activeBackend)
+            let requestedBackend: RenderBackendType = switch backend {
+            case .metal: .metal
+            case .webgpu: .webgpu
+            case .saga: .saga
+            }
+            unsafe RenderEngine.configurations.preferredBackend = requestedBackend
             let root = FileManager.default.temporaryDirectory.appendingPathComponent("AdaMovieGPU-\(UUID())")
             defer { try? FileManager.default.removeItem(at: root) }
             var first: Entity?
@@ -32,6 +38,7 @@ extension Render3DGPUTests {
                     second?.components[Camera.self]?.isActive = true
                 }
             })
+            try #require(unsafe RenderEngine.shared.type == requestedBackend)
             let red = try Image(contentsOf: root.appendingPathComponent("gpu00000000.png"))
             let blue = try Image(contentsOf: root.appendingPathComponent("gpu00000001.png"))
             #expect(red.width == 37 && red.height == 19)

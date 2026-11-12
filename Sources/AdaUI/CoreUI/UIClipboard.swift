@@ -9,7 +9,7 @@ import Foundation
 
 #if canImport(AppKit)
     import AppKit
-#elseif canImport(UIKit)
+#elseif canImport(UIKit) && !os(tvOS)
     import UIKit
 #elseif os(Windows)
     import WinSDK
@@ -49,7 +49,7 @@ public enum UIClipboard {
                 return fallbackString
             }
             return nil
-        #elseif canImport(UIKit)
+        #elseif canImport(UIKit) && !os(tvOS)
             let pasteboard = UIPasteboard.general
             if let text = pasteboard.string {
                 return text
@@ -80,7 +80,7 @@ public enum UIClipboard {
             pasteboard.setString(value, forType: .string)
             fallbackString = value
             fallbackPasteboardChangeCount = pasteboard.changeCount
-        #elseif canImport(UIKit)
+        #elseif canImport(UIKit) && !os(tvOS)
             UIPasteboard.general.string = value
         #elseif os(Windows)
             let characters = Array(value.utf16) + [0]

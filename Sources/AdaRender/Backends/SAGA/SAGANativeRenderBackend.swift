@@ -125,11 +125,13 @@
 
         @MainActor
         func destroyWindow(_ windowId: WindowID) throws {
-            guard let binding = windows.withLock({ $0.removeValue(forKey: windowId) }) else { return }
+            guard let binding = windows.withLock({ $0.removeValue(forKey: windowId) }) else {
+                return
+            }
             let vulkan = self.vulkan
-            context.queue.enqueue { _ in
+            binding.window.retire { id in
                 defer { withExtendedLifetime(binding.lifetime) {} }
-                await vulkan.removeSurface(try binding.window.surface.get())
+                await vulkan.removeSurface(id)
             }
         }
 

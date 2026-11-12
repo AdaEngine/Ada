@@ -1,11 +1,11 @@
 import ada_engine::view::view;
 import ada_engine::tonemapping::adaLinearToSrgb;
-import ada_engine::shadow_pcf::{adaDirectionalShadowPCF, adaDirectionalShadowPCSS};
+import ada_engine::shadow_pcf::{adaDirectionalShadowPCF, adaDirectionalShadowPCSS, adaNearestShadowDepth};
 import ada_engine::baked_diffuse::adaBakedDiffuse;
 import ada_engine::distance_field::{adaDistanceFieldVisibility, distanceField};
 @if(ADA_MORPH) import ada_engine::morph::applyMorph;
 
-// WESL port of flat3d.glsl. Bindings, locations and feature names (ADA_*) are unchanged.
+// WESL port of flat3d.glsl. Retained resources keep their original binding slots.
 //
 // Differences from the GLSL that the port requires:
 //  * Derivatives are taken once, at the top of the fragment stage, in uniform control flow. Texture reads inside
@@ -114,7 +114,6 @@ struct SurfaceLighting3DUniform {
 @group(0) @binding(8) var u_MetallicRoughnessSampler: sampler;
 @group(0) @binding(9) var u_NormalSampler: sampler;
 @group(0) @binding(10) var u_DirectionalShadowTexture: texture_2d<f32>;
-@group(0) @binding(11) var u_DirectionalShadowSampler: sampler;
 @if(ADA_TERRAIN) @group(0) @binding(12) var u_TerrainNormal: texture_2d_array<f32>;
 @if(!ADA_TERRAIN) @group(0) @binding(12) var u_EmissiveTexture: texture_2d<f32>;
 @group(0) @binding(13) var u_EmissiveSampler: sampler;
@@ -151,12 +150,9 @@ struct Flat3DVertex {
     @location(6) textureCoordinate1: vec2f,
     @location(7) textureFlags: vec4f,
     @location(8) shadowFlags: vec4f,
-    @location(9) shadowPosition: vec4f,
-    @location(10) roughness: f32,
-    @location(11) metallic: f32,
-    @location(12) emissiveStrength: f32,
-    @location(13) emissiveLightThreshold: f32,
-    @location(14) @interpolate(flat) modelOrientation: f32,
+    // Roughness, metallic, emissive strength, and emissive light threshold share one interpolator.
+    @location(9) material: vec4f,
+    @location(10) @interpolate(flat) modelOrientation: f32,
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -249,11 +245,7 @@ fn flat3d_vertex(
     out.textureCoordinate1 = aTextureCoordinate1;
     out.textureFlags = aTextureFlags;
     out.shadowFlags = vec4f(aShadowFlags.x, max(0.0, aShadowFlags.y), aShadowFlags.z, aShadowFlags.w);
-    out.shadowPosition = select(vec4f(0.0), directional.u_ShadowViewProjection * worldPosition, aShadowFlags.x > 0.5);
-    out.roughness = clamp(aMaterial.x, 0.04, 1.0);
-    out.metallic = clamp(aMaterial.y, 0.0, 1.0);
-    out.emissiveStrength = max(aMaterial.z, 0.0);
-    out.emissiveLightThreshold = aMaterial.w;
+    out.material = vec4f(clamp(aMaterial.x, 0.04, 1.0), clamp(aMaterial.y, 0.0, 1.0), max(aMaterial.z, 0.0), aMaterial.w);
     out.modelOrientation = orientation;
     out.position = view.viewProjection * worldPosition;
     @if(ADA_WIREFRAME) {
@@ -672,12 +664,12 @@ fn cascadeVisibility(cascade: i32, normal: vec3f, lightDirection: vec3f) -> f32 
     let bias = directional.u_ShadowParameters.y + directional.u_ShadowParameters.z * (1.0 - max(dot(normal, lightDirection), 0.0));
     if surfaceLighting.u_ShadowFilter.x > 0.5 {
         return adaDirectionalShadowPCSS(
-            u_DirectionalShadowTexture, u_DirectionalShadowSampler,
+            u_DirectionalShadowTexture,
             uv, atlas.xy, minimum, maximum, projected.z - bias, shadowMatrix, surfaceLighting.u_ShadowFilter, count
         );
     }
     return adaDirectionalShadowPCF(
-        u_DirectionalShadowTexture, u_DirectionalShadowSampler, uv, atlas.xy, minimum, maximum, projected.z - bias
+        u_DirectionalShadowTexture, uv, atlas.xy, minimum, maximum, projected.z - bias
     );
 }
 
@@ -816,12 +808,11 @@ fn localShadowVisibility(light: LocalLight3D, lightDirection: vec3f, normal: vec
     let lo = (tileOrigin + vec2f(0.5)) * texel;
     let hi = (tileOrigin + vec2f(atlas.z - 0.5)) * texel;
     let bias = light.innerShadow.y + light.innerShadow.z * (1.0 - max(dot(normal, lightDirection), 0.0));
+    let shadowSize = vec2i(textureDimensions(u_LocalShadowTexture));
     var visibility = 0.0;
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
-            let stored = textureSampleLevel(
-                u_LocalShadowTexture, u_DirectionalShadowSampler, clamp(uv + vec2f(f32(x), f32(y)) * texel, lo, hi), 0.0
-            ).r;
+            let stored = adaNearestShadowDepth(u_LocalShadowTexture, shadowSize, clamp(uv + vec2f(f32(x), f32(y)) * texel, lo, hi));
             visibility += select(0.0, 1.0, ndc.z - bias <= stored);
         }
     }
@@ -1300,8 +1291,8 @@ fn ada_material_surface() -> AdaPBRSurface {
         discard;
     }
     let opacity = select(1.0, baseColor.a, pbr.u_SurfaceProperties.w > 1.5);
-    var roughness = Input.roughness;
-    var metallic = Input.metallic;
+    var roughness = Input.material.x;
+    var metallic = Input.material.y;
     if Input.textureFlags.y > 0.5 {
         let metallicRoughness = sampleMaterial(u_MetallicRoughnessTexture, u_MetallicRoughnessSampler, materialUV(pbr.u_UVSets.y, 1));
         roughness = clamp(roughness * metallicRoughness.g, 0.04, 1.0);
@@ -1529,8 +1520,9 @@ fn flat3d_fragment(input: Flat3DVertex, @builtin(front_facing) frontFacing: bool
     }
     g_ReflectionResponse *= mix(1.0, occlusion, pbr.u_SurfaceProperties.y);
     var emissiveVisibility = 1.0;
-    if Input.emissiveLightThreshold >= 0.0 {
-        emissiveVisibility = 1.0 - smoothstep(Input.emissiveLightThreshold, Input.emissiveLightThreshold + 0.16, normalLight);
+    let emissiveLightThreshold = Input.material.w;
+    if emissiveLightThreshold >= 0.0 {
+        emissiveVisibility = 1.0 - smoothstep(emissiveLightThreshold, emissiveLightThreshold + 0.16, normalLight);
     }
     var emissive = vec3f(0.0);
     @if(ADA_SHADER_GRAPH || ADA_TERRAIN) {
@@ -1538,7 +1530,7 @@ fn flat3d_fragment(input: Flat3DVertex, @builtin(front_facing) frontFacing: bool
     }
     @if(!ADA_SHADER_GRAPH && !ADA_TERRAIN) {
         emissive = srgbToLinear(sampleMaterial(u_EmissiveTexture, u_EmissiveSampler, materialUV(pbr.u_Emission.x, 4)).rgb)
-            * pbr.u_EmissiveFactor.rgb * Input.emissiveStrength * emissiveVisibility;
+            * pbr.u_EmissiveFactor.rgb * Input.material.z * emissiveVisibility;
     }
 
     out.color = vec4f(directLighting + ambient + emissive, opacity);

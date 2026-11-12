@@ -286,6 +286,14 @@ and complete Studio/GPU/WASM exports still need verification on their own hosts.
 
 Web exports render through SAGA. The export needs a SAGA checkout (`../SAGA`, or `ADAENGINE_SAGA_PACKAGE_PATH`) and
 ships its JavaScript WebGPU host as `saga-webgpu.mjs`; it fails with a clear message when the checkout is missing.
+The exporter copies `web/webgpu.mjs` from the SwiftPM dependency that provides `SAGAWebHost`.
+It also copies `web/golden.mjs` when available for frame comparisons. For migration builds, point
+the override at the companion checkout:
+
+```sh
+export ADAENGINE_SAGA_PACKAGE_PATH=/absolute/path/to/saga-companion
+```
+
 Add `?sagadebug` to the page URL to wait for every submission and print SAGA device errors and per-pipeline binding
 reports to the console. Web export uses JavaScriptKit's generic BridgeJS runtime and resolves SAGA without Swan or Dawn.
 
@@ -293,11 +301,50 @@ Golden-frame check: pack `Tests/WebGolden/SAGASmoke` into an exported `AdaWebPla
 `node script/web_golden_saga.mjs <bundle>` (needs `playwright-core` and a WebGPU Chromium; `--record` replaces the
 reference). Pass `--actual=<path.png>` to save the captured frame. See [the smoke scene README](../Tests/WebGolden/SAGASmoke/README.md).
 
+## SAGA Metal development
+
+To test AdaEngine with SAGA's Metal renderer on macOS, enable the package option and use a SAGA
+revision that supports adding Metal surfaces after device creation:
+
+```sh
+export ADAENGINE_SAGA_METAL=1
+export ADAENGINE_SAGA_PACKAGE_PATH=/absolute/path/to/saga-companion
+swift test --filter SAGAMetalWindowTests
+ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DGPUTests/SagaNative
+ADAENGINE_PIXEL_PERFECT_SAGA_SMOKE=1 swift test --filter PixelPerfectMetalTests
+```
+
+The window test requires a macOS desktop session with access to the Metal GPU. The renderer
+uses SAGA to compile linked WGSL to MSL and presents through the existing MetalKit views.
+
+To build the engine for Apple TV and the Apple TV Simulator, use Xcode with both tvOS SDKs
+installed. For SAGAMetal, use the environment settings above with a SAGA checkout that also
+declares tvOS support.
+
+```sh
+swift build --target AdaEngine --scratch-path .build-tools/tvos-simulator \
+  --triple arm64-apple-tvos18.0-simulator --sdk "$(xcrun --sdk appletvsimulator --show-sdk-path)"
+swift build --target AdaEngine --scratch-path .build-tools/tvos-device \
+  --triple arm64-apple-tvos18.0 --sdk "$(xcrun --sdk appletvos --show-sdk-path)"
+```
+
+To compare the same 3D scene on both Metal implementations, capture the legacy result and then
+run SAGA in a fresh test process. Use a dedicated output directory:
+
+```sh
+export ADAENGINE_COMPARE_SAGA_METAL=1
+export ADAENGINE_GOLDEN_OUTPUT=/absolute/path/to/metal-comparison
+mkdir -p "$ADAENGINE_GOLDEN_OUTPUT"
+ADAENGINE_GOLDEN_METAL=1 swift test --filter captureLegacyMetalReferenceForSAGA
+ADAENGINE_GOLDEN_SAGA=1 swift test --filter theLitSphereRowRendersWithTheWESLShaders
+```
+
 ## Native SAGA Vulkan development
 
 Set `ADAENGINE_SAGA_NATIVE=1` to build the Windows, Linux, or Android renderer
 against SAGA Vulkan. The native build uses the system Vulkan driver. The SwiftPM
 build resolves SAGA from the sibling checkout or `ADAENGINE_SAGA_PACKAGE_PATH`.
+Use a revision that supports attaching a Vulkan surface after device creation.
 Set `ADAENGINE_GOLDEN_SAGA=1` and `ADAENGINE_SAGA_WINDOWLESS=1` for the offscreen
 3D checks, then run `swift test --filter SagaNative`. Set `ADAENGINE_GOLDEN_OUTPUT`
 to an existing directory to collect the rendered PNGs.

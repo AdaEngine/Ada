@@ -177,7 +177,7 @@ final class TextFieldViewNode: ViewNode {
             self.mousePressStartPoint = nil
             self.touchPressStartPoint = nil
             self.clearTapCandidate()
-            #if canImport(UIKit)
+            #if canImport(UIKit) && !os(tvOS)
                 self.hideEditMenu()
             #endif
         }
@@ -290,7 +290,7 @@ final class TextFieldViewNode: ViewNode {
                 if self.isDoubleTouchTap {
                     self.selectWord(at: caretOffset)
                     self.clearTapCandidate()
-                    #if canImport(UIKit)
+                    #if canImport(UIKit) && !os(tvOS)
                         self.showEditMenu(at: localPoint)
                     #endif
                 } else {
@@ -1219,7 +1219,7 @@ extension TextFieldViewNode {
     }
 }
 
-#if canImport(UIKit)
+#if canImport(UIKit) && !os(tvOS)
     import UIKit
 
     extension TextFieldViewNode {
@@ -1240,7 +1240,7 @@ extension TextFieldViewNode {
         func hideEditMenu() {
             UIMenuController.shared.hideMenu()
             #if !os(visionOS)
-            UIMenuController.shared.setMenuVisible(false, animated: true)
+                UIMenuController.shared.setMenuVisible(false, animated: true)
             #endif
         }
     }

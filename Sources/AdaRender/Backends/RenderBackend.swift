@@ -17,7 +17,7 @@ public enum TriangleFillMode {
 public enum RenderBackendType: String, Sendable {
     case metal
     case webgpu
-    /// Native SAGA runtime (Vulkan); shaders arrive as SPIR-V.
+    /// Native SAGA runtime, using Metal on Apple platforms or Vulkan on other native targets.
     case saga
     case headless
 }
@@ -53,6 +53,8 @@ protocol RenderBackend: AnyObject, Sendable {
 
 /// The GPU device instance resposible for rendering and computing.
 public protocol RenderDevice: AnyObject, Sendable {
+    /// Whether 32-bit float textures support linear sampling on this device.
+    var supportsFloat32TextureFiltering: Bool { get }
     /// Whether vertex layouts can advance a buffer once per instance.
     /// Devices without this capability retain expanded vertex geometry.
     var supportsInstancedVertexInputs: Bool { get }
@@ -153,6 +155,7 @@ public protocol Drawable: AnyObject, Sendable {
 }
 
 extension RenderDevice {
+    public var supportsFloat32TextureFiltering: Bool { true }
     public var supportsInstancedVertexInputs: Bool { false }
     public func readImage(from texture: Texture) async throws -> Image? {
         getImage(from: texture)

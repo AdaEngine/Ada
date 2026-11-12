@@ -36,9 +36,15 @@ final class ResourceSlot<Value: Sendable>: Sendable {
 /// `enqueue` never blocks, so render code can create resources and record uploads
 /// synchronously while the SAGA device (an actor) is reached in the background.
 /// A failure in one item is reported and does not stop later items. A failure to
-/// create the context is reported once and every item is skipped.
+/// create the context is reported once. Device work is then skipped, and cleanup still runs.
 final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
     typealias Work = @Sendable (Context) async throws -> Void
+    typealias Cleanup = @Sendable () async throws -> Void
+
+    private enum Job: Sendable {
+        case device(Work, onUnavailable: Cleanup?)
+        case cleanup(Cleanup)
+    }
 
     /// `ADAENGINE_SAGA_TRACE=1` writes each job's origin to stderr as it starts and ends, to find a stalled job.
     private static var traces: Bool { ProcessInfo.processInfo.environment["ADAENGINE_SAGA_TRACE"] == "1" }
@@ -47,7 +53,7 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
     }
 
     private struct State {
-        var continuation: AsyncStream<(Work, String)>.Continuation?
+        var continuation: AsyncStream<(Job, String)>.Continuation?
         var pending = 0
         var idleWaiters: [CheckedContinuation<Void, Never>] = []
     }
@@ -60,31 +66,38 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
         onError: @escaping @Sendable (any Error) -> Void
     ) {
         self.onError = onError
-        let (stream, continuation) = AsyncStream<(Work, String)>.makeStream()
+        let (stream, continuation) = AsyncStream<(Job, String)>.makeStream()
         state.withLock { $0.continuation = continuation }
         Task { [weak self] in
             var resolved: Context?
             var contextFailed = false
             let tracing = Self.traces
             var sequence = 0
-            for await (work, origin) in stream {
+            for await (job, origin) in stream {
                 sequence += 1
                 if tracing { Self.trace("begin \(sequence) \(origin)") }
-                if resolved == nil, !contextFailed {
-                    do {
-                        resolved = try await context()
-                    } catch {
-                        contextFailed = true
-                        self?.onError(error)
+                do {
+                    switch job {
+                    case let .device(work, onUnavailable):
+                        if resolved == nil, !contextFailed {
+                            do {
+                                resolved = try await context()
+                            } catch {
+                                contextFailed = true
+                                self?.onError(error)
+                            }
+                        }
+                        if let resolved {
+                            try await work(resolved)
+                        } else {
+                            try await onUnavailable?()
+                        }
+                    case .cleanup(let cleanup):
+                        try await cleanup()
                     }
-                }
-                if let resolved {
-                    do {
-                        try await work(resolved)
-                    } catch {
-                        if tracing { Self.trace("FAILED \(sequence) \(origin): \(error)") }
-                        self?.onError(error)
-                    }
+                } catch {
+                    if tracing { Self.trace("FAILED \(sequence) \(origin): \(error)") }
+                    self?.onError(error)
                 }
                 if tracing { Self.trace("end \(sequence)") }
                 self?.finishOne()
@@ -96,19 +109,30 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
         state.withLock { $0.continuation?.finish() }
     }
 
-    func enqueue(_ work: @escaping Work, file: String = #fileID, line: Int = #line) {
-        let continuation = state.withLock { state -> AsyncStream<(Work, String)>.Continuation? in
+    func enqueue(onUnavailable: Cleanup? = nil, _ work: @escaping Work, file: String = #fileID, line: Int = #line) {
+        enqueue(.device(work, onUnavailable: onUnavailable), origin: "\(file):\(line)")
+    }
+
+    /// Runs in queue order without creating or requiring a device.
+    func enqueueCleanup(_ cleanup: @escaping Cleanup, file: String = #fileID, line: Int = #line) {
+        enqueue(.cleanup(cleanup), origin: "\(file):\(line)")
+    }
+
+    private func enqueue(_ job: Job, origin: String) {
+        let continuation = state.withLock { state -> AsyncStream<(Job, String)>.Continuation? in
             state.pending += 1
             return state.continuation
         }
-        continuation?.yield((work, "\(file):\(line)"))
+        continuation?.yield((job, origin))
     }
 
     /// Suspends until all work enqueued before the call has finished.
     func drain() async {
         await withCheckedContinuation { waiter in
             let resumeNow = state.withLock { state -> Bool in
-                if state.pending == 0 { return true }
+                if state.pending == 0 {
+                    return true
+                }
                 state.idleWaiters.append(waiter)
                 return false
             }
@@ -119,7 +143,9 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
     private func finishOne() {
         let waiters = state.withLock { state -> [CheckedContinuation<Void, Never>] in
             state.pending -= 1
-            guard state.pending == 0 else { return [] }
+            guard state.pending == 0 else {
+                return []
+            }
             defer { state.idleWaiters.removeAll() }
             return state.idleWaiters
         }

@@ -54,9 +54,13 @@
         }
 
         func getBrightness(for screen: Screen) -> Float {
-            MainActor.assumeIsolated {
-                Float((screen.systemScreen as? UIScreen)?.brightness ?? 0)
-            }
+            #if os(tvOS)
+                return 1
+            #else
+                return MainActor.assumeIsolated {
+                    Float((screen.systemScreen as? UIScreen)?.brightness ?? 0)
+                }
+            #endif
         }
     }
 

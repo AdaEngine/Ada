@@ -119,6 +119,12 @@ public final class RenderEngine: RenderBackend, Sendable {
                 return
             }
         #endif
+        #if SAGA_METAL && canImport(SAGAMetal)
+            if let sagaBackend = self.renderBackend as? SAGAMetalRenderBackend {
+                try sagaBackend.resizeWindow(windowId, newSize: newSize, scaleFactor: scaleFactor)
+                return
+            }
+        #endif
 
         try self.renderBackend.resizeWindow(windowId, newSize: newSize)
     }
@@ -178,7 +184,9 @@ extension RenderEngine {
                 fallthrough
             #endif
         case .saga:
-            #if SAGA_RENDER && SAGA_NATIVE && (os(Windows) || os(Linux) || os(Android)) && canImport(SAGAVulkan) && canImport(SAGACompiler)
+            #if SAGA_METAL && canImport(SAGAMetal)
+                renderBackend = try SAGAMetalRenderBackend()
+            #elseif SAGA_RENDER && SAGA_NATIVE && (os(Windows) || os(Linux) || os(Android)) && canImport(SAGAVulkan) && canImport(SAGACompiler)
                 renderBackend = try SAGANativeRenderBackend()
             #else
                 fallthrough
@@ -197,7 +205,9 @@ extension RenderEngine {
     }
 
     private static func defaultBackendType() -> RenderBackendType {
-        #if SAGA_RENDER && SAGA_NATIVE && canImport(SAGAVulkan)
+        #if SAGA_METAL && canImport(SAGAMetal)
+            return .saga
+        #elseif SAGA_RENDER && SAGA_NATIVE && canImport(SAGAVulkan)
             return .saga
         #elseif os(Android)
             return .webgpu

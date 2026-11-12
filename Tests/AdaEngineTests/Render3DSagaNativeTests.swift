@@ -6,17 +6,38 @@
     import Math
     import Testing
 
+    private let compareSagaWithMetal = ProcessInfo.processInfo.environment["ADAENGINE_COMPARE_SAGA_METAL"] == "1"
+
     extension Render3DGPUTests {
         /// Renders the real 3D pipeline (`flat3d.wesl` and the other WESL shaders) through SAGA's native runtime.
         /// Run with `ADAENGINE_GOLDEN_SAGA=1 ADAENGINE_SAGA_NATIVE=1 swift test --filter Render3DGPUTests/SagaNative`.
         @Suite("SAGA native")
         @MainActor
         struct SagaNative {
+            private static var legacyReference: URL {
+                GoldenFrame.outputDirectory.appendingPathComponent("legacy-metal-spheres.png")
+            }
+
+            #if os(macOS)
+                @Test(.enabled(if: compareSagaWithMetal && GoldenFrame.activeBackend == .metal))
+                func captureLegacyMetalReferenceForSAGA() async throws {
+                    let scene = try await DebugViews.makeScene()
+                    let image = try await scene.render(.none, frames: 4)
+                    try image.writePNG(to: Self.legacyReference)
+                }
+            #endif
+
             @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
             func theLitSphereRowRendersWithTheWESLShaders() async throws {
                 let scene = try await DebugViews.makeScene()
                 let image = try await scene.render(.none, frames: 4)
                 try image.writePNG(to: GoldenFrame.outputDirectory.appendingPathComponent("saga-native-spheres.png"))
+                if compareSagaWithMetal {
+                    let reference = try Image(contentsOf: Self.legacyReference)
+                    let comparison = GoldenFrame.compare(image, reference, tolerance: .metal)
+                    #expect(comparison.passes(.metal),
+                            "SAGA differs from the fresh Metal frame: \(comparison.differingPixels) pixels, max step \(comparison.largestStep)")
+                }
 
                 let background = Color(red: 0.55, green: 0.7, blue: 0.9)
                 func isBackground(_ color: Color) -> Bool {

@@ -26,6 +26,8 @@
             var size: SizeInt
             var scaleFactor: Float
             var backbuffer: SAGAGPUTexture?
+            var lastPresentation: SubmissionTicket?
+            var isRetired = false
         }
 
         private let state: Mutex<State>
@@ -55,7 +57,12 @@
         /// Returns the texture for the current frame, creating it after a resize.
         func currentBackbuffer() -> SAGAGPUTexture? {
             state.withLock { state in
-                if let backbuffer = state.backbuffer { return backbuffer }
+                guard !state.isRetired else {
+                    return nil
+                }
+                if let backbuffer = state.backbuffer {
+                    return backbuffer
+                }
                 let width = max(1, Int(Float(state.size.width) * state.scaleFactor))
                 let height = max(1, Int(Float(state.size.height) * state.scaleFactor))
                 let descriptor = TextureDescriptor(
@@ -70,6 +77,40 @@
                 return state.backbuffer
             }
         }
+
+        func present(_ backbuffer: SAGAGPUTexture) {
+            state.withLock { state in
+                guard !state.isRetired else {
+                    return
+                }
+                context.queue.enqueue { [self] device in
+                    let ticket = try await device.present(try backbuffer.slot.get(), surface: try surface.get())
+                    self.state.withLock { $0.lastPresentation = ticket }
+                }
+            }
+        }
+
+        func retire(_ removeSurface: @escaping @Sendable (UInt32) async -> Void) {
+            state.withLock { state in
+                guard !state.isRetired else {
+                    return
+                }
+                state.isRetired = true
+                context.queue.enqueueCleanup { [self] in
+                    guard let id = try? surface.get() else {
+                        return
+                    }
+                    let ticket = self.state.withLock { $0.lastPresentation }
+                    do {
+                        try await ticket?.wait()
+                    } catch {
+                        await removeSurface(id)
+                        throw error
+                    }
+                    await removeSurface(id)
+                }
+            }
+        }
     }
 
     final class SAGASwapchain: Swapchain, @unchecked Sendable {
@@ -82,30 +123,26 @@
         var drawablePixelFormat: PixelFormat { window.pixelFormat }
 
         func getNextDrawable(_: RenderDevice) -> (any Drawable)? {
-            guard let texture = window.currentBackbuffer() else { return nil }
-            return SAGADrawable(texture: texture, surface: window.surface, context: window.context)
+            guard let texture = window.currentBackbuffer() else {
+                return nil
+            }
+            return SAGADrawable(texture: texture, window: window)
         }
     }
 
     final class SAGADrawable: Drawable, @unchecked Sendable {
         let texture: any GPUTexture
         private let backbuffer: SAGAGPUTexture
-        private let context: SAGAContext
-        private let surface: ResourceSlot<UInt32>
+        private let window: SAGAWindow
 
-        init(texture: SAGAGPUTexture, surface: ResourceSlot<UInt32>, context: SAGAContext) {
+        init(texture: SAGAGPUTexture, window: SAGAWindow) {
             self.texture = texture
             self.backbuffer = texture
-            self.surface = surface
-            self.context = context
+            self.window = window
         }
 
         func present() throws {
-            let backbuffer = self.backbuffer
-            let surface = self.surface
-            context.queue.enqueue { device in
-                _ = try await device.present(try backbuffer.slot.get(), surface: try surface.get())
-            }
+            window.present(backbuffer)
         }
     }
 #endif
