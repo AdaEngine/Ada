@@ -56,3 +56,30 @@ The user explicitly selected removal of user-authored GLSL support. WESL/WGSL is
 - Build and exercise native WebGPU, browser WebGPU, Metal, and Android. Track unavailable hardware or unsupported SAGA output separately from passing checks.
 - Add regression tests for rejected GLSL assets and legacy source-only archives, graph-backed archive regeneration, SAGA reflection, and absence of production fallback/dependency wiring.
 - Update the existing [WESL DocC article](../../Sources/AdaEngine/AdaEngine.docc/Articles/Developers/WESLShaders.md) with built-in shader organization, variants, backend prerequisites, and a tested GLSL-to-WESL porting example. Explain the breaking change, manual source-only archive migration and graph rebaking; link it from `Sources/AdaEngine/AdaEngine.docc/AdaEngine.md`. Keep its DocC navigation and verify the docs build and example.
+
+## Implementation status (2026-11-12)
+
+Done and tested:
+
+- **Studio and UI passes:** `agent_activity.wesl` and `mobile_voice_orb.wesl` are WESL ports of the GLSL passes, and `ui_shadow.wesl` is now loaded by its material through `ReflectedMaterial.shaderModule()`. `BuiltInWESLShaderTests` links all three with the host compiler and checks entry points, the material uniform size (48, 48 and 32 bytes) and Metal stage output. The GLSL stage sources remain as the transitional fallback for backends without WESL support.
+- **Native SAGA backend:** `RenderBackendType.saga` consumes WESL modules (`consumesWGSL`) and compiles GLSL-derived SPIR-V directly. `ADAENGINE_SAGA_NATIVE=1` links `AdaWGSLCompiler` so `ShaderModule.supportsBundledWESL` is true there.
+- **Shader Graph generator:** `ShaderGraph.compileWGSL()` produces WGSL from the same lowered IR and shared analysis as `compileGLSL()` (identical parameter slots, texture bindings and source map). `ShaderGraphWGSLTests` links every math node across scalar and vector types, the noise graph and a textured graph, and checks bindings and uniform block size against the GLSL program. The existing GLSL graph tests still pass.
+
+Blocked, in order:
+
+1. **`flat3d`, `glass`, `particles_3d`, `path_tracing_3d`:** the PBR port must carry every material, skinning, terrain, wireframe, morph and meshlet variant and needs GPU reference comparison before the GLSL source can go. Not started.
+2. **`mesh2d` family and the two canvas materials:** `ReflectedMaterial.shaderModule()` does not support macro variants, which `mesh2d` selects with `VERTEX_*` defines. The hook needs conditional-feature variants first.
+3. **Shader Graph consumers:** `ShaderGraphPipeline`, the baker and the archive still embed GLSL in GLSL templates. The archive version must not change until the baker generates WGSL from the WESL templates in step 1, otherwise existing GLSL-baked archives would be mislabelled. At that point version 1 archives are rejected with a version-specific rebake error.
+4. **GLSL removal:** loaders, packaged GLSL resources and compiler dependencies go last, after backend evidence for each platform.
+
+## Shared helper modules (ported)
+
+`Tonemapping`, `ColorGrading`, `ShadowPCF`, `Morph`, `DistanceField3D` and `BakedDiffuse3D` now exist as WESL modules in
+`Sources/AdaRender/Assets/Shaders/WESL` (`tonemapping`, `color_grading`, `shadow_pcf`, `morph`, `distance_field`,
+`baked_diffuse`), imported as `ada_engine::<module>`. Textures and samplers that the GLSL headers expected as includer
+globals are function parameters. `Morph`, `DistanceField3D` and `BakedDiffuse3D` keep their fixed bindings and are gated by
+the `ADA_MORPH`, `ADA_LIGHTMAP` and `ADA_IRRADIANCE_GRID` features. `WESLLibraryModuleTests` links each through an entry
+shader and compiles it to MSL.
+
+Known linker issue: a library function parameter that has the same name as a global declared in the importing entry file
+(for example `lut`) fails with "Name ... is not imported". The tests use distinct global names; fix in SAGA's WESL linker.

@@ -2,6 +2,9 @@ import ada_engine::view::projectPosition;
 import package::mesh_visibility::{surface, meshOrientation, isVisibleFace, isVisibleFade, baseColorAlpha};
 @if(ADA_MORPH) import package::mesh_morph::morphPosition;
 
+// Shader Graph materials (ADA_SHADER_GRAPH) receive the generated graph source at this marker line.
+// ADA_GRAPH_SOURCE_MARKER
+
 struct MotionInput {
     @location(0) position: vec3f,
     @location(1) previousModel0: vec4f,
@@ -91,7 +94,16 @@ fn motion_fragment(input: MotionVertex, @builtin(front_facing) frontFacing: bool
         discard;
     }
     let mode = surface.surfaceProperties.w;
-    let alpha = input.colorFlags.x * baseColorAlpha(input.uv0, input.uv1);
+    var alpha = input.colorFlags.x;
+    @if(ADA_SHADER_GRAPH) {
+        if mode > 0.5 {
+            let graph = ada_graph_evaluate(input.uv0);
+            alpha *= graph.color.a * graph.alpha;
+        }
+    }
+    @if(!ADA_SHADER_GRAPH) {
+        alpha *= baseColorAlpha(input.uv0, input.uv1);
+    }
     if mode > 0.5 && mode < 1.5 && alpha < surface.surfaceProperties.z {
         discard;
     }

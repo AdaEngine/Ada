@@ -1,0 +1,237 @@
+{
+  "format": "ada.scene",
+  "schemaVersion": 1,
+  "engineVersion": "1.0.0",
+  "scene": {
+    "id": "mesh-terrain-workshop",
+    "name": "Mesh Terrain Workshop"
+  },
+  "entities": [
+    {
+      "id": "Camera",
+      "name": "Camera",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            11,
+            -19
+          ],
+          "rotation": [
+            0.258819,
+            0,
+            0,
+            0.965926
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaRender.Camera": {
+          "projection": "perspective",
+          "isActive": true,
+          "renderOrder": 0,
+          "backgroundColor": {
+            "red": 0.05,
+            "green": 0.07,
+            "blue": 0.1,
+            "alpha": 1
+          }
+        },
+        "AdaCorePipelines.Environment3D": {}
+      }
+    },
+    {
+      "id": "Sun",
+      "name": "Sun",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            4,
+            -3
+          ],
+          "rotation": [
+            0.2661003137748674,
+            -0.4155384462484667,
+            -0.1285411045311107,
+            0.8602299734049316
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.DirectionalLightComponent": {
+          "radiance": [
+            1,
+            1,
+            1
+          ],
+          "intensity": 3,
+          "castShadows": true,
+          "shadowDistance": 30,
+          "shadowBias": 0.0008,
+          "shadowSlopeBias": 0.003
+        }
+      }
+    },
+    {
+      "id": "c1",
+      "name": "Red cube",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            -4,
+            1,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Mesh3DComponent": {
+          "mesh": "Cube",
+          "size": 2,
+          "color": {
+            "red": 0.9,
+            "green": 0.2,
+            "blue": 0.2,
+            "alpha": 1
+          },
+          "metallic": 0,
+          "roughness": 0.5
+        }
+      }
+    },
+    {
+      "id": "c2",
+      "name": "Green sphere",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            1,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Mesh3DComponent": {
+          "mesh": "Sphere",
+          "size": 2,
+          "color": {
+            "red": 0.2,
+            "green": 0.8,
+            "blue": 0.3,
+            "alpha": 1
+          },
+          "metallic": 0,
+          "roughness": 0.5
+        }
+      }
+    },
+    {
+      "id": "c3",
+      "name": "Blue cube",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            4,
+            1,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Mesh3DComponent": {
+          "mesh": "Cube",
+          "size": 2,
+          "color": {
+            "red": 0.2,
+            "green": 0.3,
+            "blue": 0.9,
+            "alpha": 1
+          },
+          "metallic": 0,
+          "roughness": 0.5
+        }
+      }
+    },
+    {
+      "id": "floor",
+      "name": "Floor",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            -15,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Mesh3DComponent": {
+          "mesh": "Cube",
+          "size": 30,
+          "color": {
+            "red": 0.6,
+            "green": 0.6,
+            "blue": 0.6,
+            "alpha": 1
+          },
+          "metallic": 0,
+          "roughness": 0.8
+        }
+      }
+    }
+  ],
+  "editor": {
+    "selectedEntity": "Terrain",
+    "expandedEntities": []
+  }
+}

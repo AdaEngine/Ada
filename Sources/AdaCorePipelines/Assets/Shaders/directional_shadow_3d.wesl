@@ -1,6 +1,9 @@
 import package::mesh_visibility::{surface, meshOrientation, isVisibleFace, isVisibleFade, baseColorAlpha};
 @if(ADA_MORPH) import package::mesh_morph::morphPosition;
 
+// Shader Graph materials (ADA_SHADER_GRAPH) receive the generated graph source at this marker line.
+// ADA_GRAPH_SOURCE_MARKER
+
 struct ShadowInput {
     @location(0) position: vec3f,
     @location(2) uv0: vec2f,
@@ -68,8 +71,18 @@ fn directional_shadow_3d_fragment(input: ShadowVertex, @builtin(front_facing) fr
         discard;
     }
     let mode = surface.surfaceProperties.w;
-    if mode > 0.5 && mode < 1.5 && baseColorAlpha(input.uv0, input.uv1) * input.alpha < surface.surfaceProperties.z {
-        discard;
+    if mode > 0.5 && mode < 1.5 {
+        var alpha = 0.0;
+        @if(ADA_SHADER_GRAPH) {
+            let graph = ada_graph_evaluate(input.uv0);
+            alpha = graph.color.a * graph.alpha * input.alpha;
+        }
+        @if(!ADA_SHADER_GRAPH) {
+            alpha = baseColorAlpha(input.uv0, input.uv1) * input.alpha;
+        }
+        if alpha < surface.surfaceProperties.z {
+            discard;
+        }
     }
     return vec4f(input.position.z);
 }

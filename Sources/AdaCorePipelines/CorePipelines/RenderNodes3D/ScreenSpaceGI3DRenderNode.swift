@@ -102,7 +102,7 @@ struct ScreenSpaceGI3DViews: Resource {
     }
     mutating func getPipeline(_ device: RenderDevice) -> any RenderPipeline {
         if let pipeline { return pipeline }
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/screen_space_gi_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("screen_space_gi_3d")
         var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex), fragment: shader.asset.getShader(for: .fragment),
             debugName: "SSGI diffuse transport", backfaceCulling: false, depthPixelFormat: .none)
         descriptor.colorAttachments = [.init(format: .rgba_16f)]

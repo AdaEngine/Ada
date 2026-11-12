@@ -32,6 +32,9 @@ extension ShaderGraphProgram {
 
     /// Preserve virtual source numbers when composing a renderer's fragment template.
     public func inserting(in template: String) -> String {
+        if format == .wgsl {
+            return template.replacingOccurrences(of: "// ADA_GRAPH_SOURCE_MARKER", with: source)
+        }
         let marker = "#define ADA_GRAPH_SOURCE_MARKER 1"
         let line = template.components(separatedBy: marker).first?.filter { $0 == "\n" }.count ?? 0
         return template.replacingOccurrences(of: marker, with: "#line 1 101\n" + source + "\n#line \(line + 2) 0")

@@ -7,6 +7,7 @@
 
 import AdaAssets
 import AdaUtils
+import Synchronization
 
 // TODO: (Vlad) I think that `MaterialStorage` isn't great solution.
 
@@ -25,17 +26,26 @@ public class Material: Asset, Hashable, @unchecked Sendable {
 
     private let linkedShaderModule: ShaderModule?
 
+    /// Builds a complete module for one set of feature defines (for example WESL variants chosen by vertex layout).
+    typealias VariantModuleFactory = @Sendable ([ShaderDefine]) throws -> ShaderModule
+    private let variantModuleFactory: VariantModuleFactory?
+    private let variantModules = Mutex<[[ShaderDefine]: ShaderModule]>([:])
+
     /// Create a new material from shader source.
     public init(shaderSource: ShaderSource) {
         self.shaderSource = shaderSource
         self.linkedShaderModule = nil
+        self.variantModuleFactory = nil
     }
 
     /// Internal complete-module path. Its identity must not alias an empty legacy source.
-    init(shaderSource: ShaderSource, linkedShaderModule: ShaderModule?) {
+    init(shaderSource: ShaderSource, linkedShaderModule: ShaderModule?, variantModuleFactory: VariantModuleFactory? = nil) {
         self.shaderSource = shaderSource
         self.linkedShaderModule = linkedShaderModule
+        self.variantModuleFactory = variantModuleFactory
     }
+
+    private var isLinked: Bool { linkedShaderModule != nil || variantModuleFactory != nil }
 
     public required convenience init(from assetDecoder: AssetDecoder) throws {
         let shaderSource = try ShaderSource(from: assetDecoder)
@@ -43,7 +53,7 @@ public class Material: Asset, Hashable, @unchecked Sendable {
     }
 
     public func encodeContents(with encoder: AssetEncoder) throws {
-        guard linkedShaderModule == nil else {
+        guard !isLinked else {
             throw AssetError.message("Linked-module materials require their original WESL asset and cannot encode empty shader sources.")
         }
         try self.shaderSource.encodeContents(with: encoder)
@@ -78,6 +88,13 @@ public class Material: Asset, Hashable, @unchecked Sendable {
 
     /// Supplies shader stages for a material, including materials loaded directly from runtime sources.
     open func makeShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
+        if let variantModuleFactory {
+            let key = defines.sorted { $0.name < $1.name }
+            if let cached = variantModules.withLock({ $0[key] }) { return cached }
+            let module = try variantModuleFactory(key)
+            variantModules.withLock { $0[key] = module }
+            return module
+        }
         if let linkedShaderModule {
             guard defines.isEmpty else {
                 throw AssetError.message("Linked-module materials must select feature variants before construction.")
@@ -95,14 +112,14 @@ public class Material: Asset, Hashable, @unchecked Sendable {
     // MARK: Hashable
 
     public static func == (lhs: Material, rhs: Material) -> Bool {
-        if lhs.linkedShaderModule != nil || rhs.linkedShaderModule != nil {
+        if lhs.isLinked || rhs.isLinked {
             return lhs === rhs
         }
         return lhs.shaderSource == rhs.shaderSource
     }
 
     public func hash(into hasher: inout Hasher) {
-        if linkedShaderModule != nil {
+        if isLinked {
             hasher.combine(ObjectIdentifier(self))
         } else {
             hasher.combine(self.shaderSource)

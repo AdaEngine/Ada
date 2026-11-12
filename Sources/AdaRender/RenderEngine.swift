@@ -7,6 +7,9 @@
 
 import AdaUtils
 import Foundation
+#if SAGA_WEBGPU && canImport(JavaScriptKit)
+import JavaScriptKit
+#endif
 import Math
 import OrderedCollections
 
@@ -98,6 +101,18 @@ public final class RenderEngine: RenderBackend, Sendable {
 
     @MainActor
     public func resizeWindow(_ windowId: WindowID, newSize: SizeInt, scaleFactor: Float) throws {
+        #if SAGA_WEBGPU && canImport(SAGAWebHost) && canImport(JavaScriptKit) && canImport(SAGACompiler)
+            if let sagaBackend = self.renderBackend as? SAGARenderBackend {
+                try sagaBackend.resizeWindow(windowId, newSize: newSize, scaleFactor: scaleFactor)
+                return
+            }
+        #endif
+        #if SAGA_RENDER && SAGA_NATIVE && (os(Windows) || os(Linux) || os(Android)) && canImport(SAGAVulkan) && canImport(SAGACompiler)
+            if let sagaBackend = self.renderBackend as? SAGANativeRenderBackend {
+                try sagaBackend.resizeWindow(windowId, newSize: newSize, scaleFactor: scaleFactor)
+                return
+            }
+        #endif
         #if WEBGPU_ENABLED && canImport(WebGPU)
             if let webGPUBackend = self.renderBackend as? WebGPURenderBackend {
                 try webGPUBackend.resizeWindow(windowId, newSize: newSize, scaleFactor: scaleFactor)
@@ -138,16 +153,35 @@ extension RenderEngine {
         let renderBackend: RenderBackend
         switch preferredBackend {
         case .webgpu:
-            #if WEBGPU_ENABLED && canImport(WebGPU)
-                renderBackend = try WebGPURenderBackend.createBackend()
-            #else
-                #if os(Android)
-                    throw RenderEngineSetupError.androidWebGPUBackendUnavailable
-                #elseif WASM
-                    throw RenderEngineSetupError.browserWebGPUBackendUnavailable
+            #if WASM
+                #if SAGA_WEBGPU && canImport(SAGAWebHost) && canImport(JavaScriptKit) && canImport(SAGACompiler)
+                    // The browser renders through SAGA when the page opened its WebGPU host (`__adaSAGAHost`).
+                    if JSObject.global.__adaSAGAHost.object != nil {
+                        renderBackend = try SAGARenderBackend.createBackend()
+                    } else {
+                        #if WEBGPU_ENABLED && canImport(WebGPU)
+                            renderBackend = try WebGPURenderBackend.createBackend()
+                        #else
+                            throw RenderEngineSetupError.browserWebGPUBackendUnavailable
+                        #endif
+                    }
+                #elseif WEBGPU_ENABLED && canImport(WebGPU)
+                    renderBackend = try WebGPURenderBackend.createBackend()
                 #else
-                    fallthrough
+                    throw RenderEngineSetupError.browserWebGPUBackendUnavailable
                 #endif
+            #elseif WEBGPU_ENABLED && canImport(WebGPU)
+                renderBackend = try WebGPURenderBackend.createBackend()
+            #elseif os(Android)
+                throw RenderEngineSetupError.androidWebGPUBackendUnavailable
+            #else
+                fallthrough
+            #endif
+        case .saga:
+            #if SAGA_RENDER && SAGA_NATIVE && (os(Windows) || os(Linux) || os(Android)) && canImport(SAGAVulkan) && canImport(SAGACompiler)
+                renderBackend = try SAGANativeRenderBackend()
+            #else
+                fallthrough
             #endif
         case .metal:
             #if METAL
@@ -163,10 +197,12 @@ extension RenderEngine {
     }
 
     private static func defaultBackendType() -> RenderBackendType {
-        #if os(Android)
+        #if SAGA_RENDER && SAGA_NATIVE && canImport(SAGAVulkan)
+            return .saga
+        #elseif os(Android)
             return .webgpu
         #elseif WASM
-            #if WEBGPU_ENABLED && canImport(WebGPU)
+            #if WEBGPU_ENABLED
                 return .webgpu
             #else
                 return .headless

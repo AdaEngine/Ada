@@ -36,12 +36,18 @@ fn cascadeTransform(cascade: i32) -> mat4x4f {
     return fog.shadowViewProjection2;
 }
 
+fn loadNearestShadow(image: texture_2d<f32>, uv: vec2f) -> f32 {
+    let size = vec2i(textureDimensions(image, 0));
+    let pixel = clamp(vec2i(uv * vec2f(size)), vec2i(0), size - 1);
+    return textureLoad(image, pixel, 0).r;
+}
+
 fn shadowDepth(localUV: vec2f, cascade: i32) -> f32 {
     let count = max(fog.cascadeSplits.w, 1.0);
     let uv = vec2f((localUV.x + f32(cascade)) / count, localUV.y);
     let minimum = vec2f(f32(cascade) / count, 0.0) + fog.shadowAtlas.xy * 0.5;
     let maximum = vec2f(f32(cascade + 1) / count, 1.0) - fog.shadowAtlas.xy * 0.5;
-    return textureSampleLevel(directionalShadowImage, nearestSampler, clamp(uv, minimum, maximum), 0.0).r;
+    return loadNearestShadow(directionalShadowImage, clamp(uv, minimum, maximum));
 }
 
 fn outsideShadow(projected: vec3f, localUV: vec2f) -> bool {

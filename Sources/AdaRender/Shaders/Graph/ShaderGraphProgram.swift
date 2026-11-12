@@ -38,6 +38,13 @@ public struct ShaderGraphProgram: Hashable, Sendable {
     public let textures: [Texture]
     public let sourceMap: [Int: Location]
     public let usesTime: Bool
+    /// The language of ``source``. GLSL stays until every template that embeds graphs is ported to WESL.
+    public var format: SourceFormat = .glsl
+
+    public enum SourceFormat: String, Hashable, Sendable {
+        case glsl
+        case wgsl
+    }
 }
 
 extension ShaderGraph.ValueType {
@@ -54,8 +61,16 @@ extension ShaderGraph.ValueType {
 }
 
 extension ShaderGraph {
-    /// Generates GLSL without touching a GPU. User identifiers are never interpolated as shader code.
-    public func compileGLSL() throws -> ShaderGraphProgram {
+    /// Parameters, texture bindings and texture names derived from the lowered graph. Shared by every source
+    /// language so slots and bindings never differ between them.
+    struct Analysis {
+        var ir: ShaderGraphIR
+        var parameters: [ShaderGraphProgram.Parameter]
+        var textures: [ShaderGraphProgram.Texture]
+        var textureNames: [String: String]
+    }
+
+    func analyzed() throws -> Analysis {
         let ir = try lowered()
         let numeric = ir.instructions.filter { $0.operation == .parameter && $0.type != .texture2D }
         let ids = Set(numeric.compactMap(\.reference)).sorted()
@@ -79,6 +94,18 @@ extension ShaderGraph {
             }
             textureNames[node.nodeID] = "ada_graph_texture\(index)"
         }
+        return Analysis(ir: ir, parameters: parameters, textures: textures, textureNames: textureNames)
+    }
+}
+
+extension ShaderGraph {
+    /// Generates GLSL without touching a GPU. User identifiers are never interpolated as shader code.
+    public func compileGLSL() throws -> ShaderGraphProgram {
+        let analysis = try analyzed()
+        let ir = analysis.ir
+        let parameters = analysis.parameters
+        let textures = analysis.textures
+        let textureNames = analysis.textureNames
         var lines = [
             "layout(set = \(ShaderGraphProgram.resourceSet), binding = \(ShaderGraphProgram.uniformBinding)) uniform AdaGraphUniforms { vec4 ada_graph_values[\(parameters.count + 1)]; };"
         ]

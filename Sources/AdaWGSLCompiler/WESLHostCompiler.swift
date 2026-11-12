@@ -35,6 +35,28 @@ public enum WESLHostCompiler {
         return Artifact(wgsl: linked.wgsl, sources: linked.sources, entryPoints: entries)
     }
 
+    /// Links WESL source held in memory as a module of the package at `packageRoot`, so it can import that package's
+    /// modules and the dependencies. Shader Graph templates are generated this way.
+    public static func compile(
+        source: String,
+        packageRoot: URL,
+        features: [String: Bool] = [:],
+        dependencies: [String: URL] = [:]
+    ) throws -> Artifact {
+        guard dependencies["package"] == nil else {
+            throw WESLLinker.Failure("The name package is reserved for the current WESL package")
+        }
+        var roots = dependencies.mapValues { $0.resolvingSymlinksInPath().standardizedFileURL }
+        roots["package"] = packageRoot.resolvingSymlinksInPath().standardizedFileURL
+        let module = "package::ada_generated_entry"
+        var linker = WESLLinker(roots: roots, features: features)
+        linker.sourceOverrides[module] = source
+        let linked = try linker.link(module)
+        let validated = try IndependentShaderCompiler().parseAndValidate(.wgsl(linked.wgsl))
+        let entries = validated.module.entryPoints.map { EntryPoint(name: $0.name, stage: $0.stage.rawValue) }
+        return Artifact(wgsl: linked.wgsl, sources: linked.sources, entryPoints: entries)
+    }
+
     /// Links a file relative to an explicit shader package root.
     public static func compile(
         sourceFile: URL,

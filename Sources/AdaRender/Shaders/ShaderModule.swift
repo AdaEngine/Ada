@@ -89,8 +89,8 @@ public final class ShaderModule: Asset, @unchecked Sendable {
 extension ShaderModule {
     /// Whether the active renderer can load bundled WESL shader modules.
     public static var supportsBundledWESL: Bool {
-        #if canImport(WebGPU) && (WASM || (canImport(AdaWGSLCompiler) && !os(Android)))
-            return unsafe RenderEngine.shared.type == .webgpu
+        #if (WASM && WEBGPU_ENABLED) || ((SAGA_RENDER || (canImport(WebGPU) && !os(Android))) && canImport(AdaWGSLCompiler))
+            return unsafe RenderEngine.shared.type.consumesWGSL
         #else
             return false
         #endif
@@ -101,12 +101,12 @@ extension ShaderModule {
     /// - Parameter fileUrl: The file url to create the shader module from.
     /// - Returns: The shader module.
     public static func create(from fileUrl: URL) throws -> ShaderModule {
-        #if canImport(AdaWGSLCompiler) && canImport(WebGPU) && !WASM && !os(Android)
+        #if canImport(AdaWGSLCompiler) && (SAGA_RENDER || (canImport(WebGPU) && !os(Android))) && !WASM
             if fileUrl.pathExtension.lowercased() == "wesl" {
                 return try createWESL(from: fileUrl)
             }
         #endif
-        #if WASM && canImport(WebGPU)
+        #if WASM && WEBGPU_ENABLED
             if fileUrl.pathExtension.lowercased() == "wesl" {
                 guard let module = try createWGSLModuleIfAvailable(at: fileUrl, reflectActiveBindings: true) else {
                     throw ShaderModuleError.notFound(fileUrl.path + ".{vert,frag}.wgsl")
@@ -132,13 +132,13 @@ extension ShaderModule {
             }
             let url = resourceURL.appendingPathComponent(path)
             let names = Set(defines).sorted()
-            #if WASM && canImport(WebGPU)
+            #if WASM && WEBGPU_ENABLED
                 let baseURL = url.appendingPathExtension(names.joined(separator: "."))
                 guard let module = try createWGSLModuleIfAvailable(at: baseURL, reflectActiveBindings: true) else {
                     throw ShaderModuleError.notFound(baseURL.path)
                 }
                 return module
-            #elseif canImport(AdaWGSLCompiler) && canImport(WebGPU) && !os(Android)
+            #elseif canImport(AdaWGSLCompiler) && (SAGA_RENDER || (canImport(WebGPU) && !os(Android)))
                 let features = Dictionary(uniqueKeysWithValues: names.map { ($0, true) })
                 return try createWESL(from: url, features: features)
             #else
@@ -146,7 +146,7 @@ extension ShaderModule {
             #endif
         }
         #if WASM
-            #if canImport(WebGPU)
+            #if WEBGPU_ENABLED
                 if path == "Shaders/flat3d.glsl" {
                     let variants = Set(defines).intersection(["ADA_TERRAIN", "ADA_WIREFRAME"]).sorted()
                     if !variants.isEmpty, let resourceURL = bundle.resourceURL {
@@ -194,7 +194,7 @@ extension ShaderModule {
             throw ShaderModuleError.notFound(path)
         }
 
-        #if WASM && canImport(WebGPU)
+        #if WASM && WEBGPU_ENABLED
             if path.hasSuffix(".glsl"), let wgslModule = try createWGSLModuleIfAvailable(at: url.deletingPathExtension()) {
                 return AssetHandle(wgslModule)
             }
@@ -215,7 +215,7 @@ private enum ShaderModuleError: LocalizedError {
     }
 }
 
-#if WASM && canImport(WebGPU)
+#if WASM && WEBGPU_ENABLED
     extension ShaderModule {
         private static func createWGSLModuleIfAvailable(
             at baseURL: URL, reflectActiveBindings: Bool = false

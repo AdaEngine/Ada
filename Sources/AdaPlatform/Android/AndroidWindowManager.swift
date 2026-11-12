@@ -111,6 +111,7 @@
     final class AndroidRenderSurface: AndroidNativeWindowRenderSurface {
         private let lease: AndroidNativeWindowLease
         var nativeWindow: UnsafeMutableRawPointer { unsafe lease.pointer }
+        var nativeWindowLifetime: any Sendable { lease }
         var matchesCurrentNativeWindow: Bool {
             guard let current = unsafe ada_android_acquire_window() else { return false }
             defer { unsafe ada_android_release_window(current) }

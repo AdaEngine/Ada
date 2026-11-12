@@ -88,6 +88,12 @@ struct UIShadowMaterial: UIShaderMaterial {
         )
     }
 
+    /// The WESL module links both stages; the GLSL stage sources below remain only for backends without WESL support.
+    static func shaderModule() throws -> ShaderModule? {
+        guard ShaderModule.supportsBundledWESL else { return nil }
+        return try ShaderModule.createBundled(at: "Shaders/ui_shadow.wesl", from: .adaModule, defines: [])
+    }
+
     static func fragmentShader() throws -> AssetHandle<ShaderSource> {
         let relativePath = "Shaders/ui_shadow.glsl"
         #if WASM

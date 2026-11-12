@@ -141,12 +141,19 @@ extension Shader: UniqueHashable {
 }
 
 extension RenderBackendType {
+    /// Whether stages are consumed as WGSL: browser and native WebGPU, and the native SAGA runtime for WESL modules.
+    var consumesWGSL: Bool {
+        self == .webgpu || self == .saga
+    }
+
     var deviceLang: ShaderLanguage {
         switch self {
         case .headless:
             return .glsl
         case .webgpu:
             return .wgsl
+        case .saga:
+            return .glsl
         case .metal:
             return .msl
         }

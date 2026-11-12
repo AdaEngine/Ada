@@ -19,9 +19,10 @@ struct ShaderGraphArchiveTests {
 
     @Test func invalidArchivesDoNotInstall() throws {
         var archive = ShaderGraphArchive(graphs: [:], fragments: [], texturePaths: [])
-        archive.version = 2
-        #expect(throws: ShaderGraphDiagnostic.self) { try ShaderGraphRuntimeLibrary.install(archive) }
+        // A GLSL-era archive is rejected with an explicit migration message.
         archive.version = 1
+        #expect(throws: ShaderGraphDiagnostic.self) { try ShaderGraphRuntimeLibrary.install(archive) }
+        archive.version = ShaderGraphArchive.currentVersion
         archive.fragments = [.init(source: "", defines: [:], entryPoint: "main", wgsl: "", reflection: .init())]
         #expect(throws: ShaderGraphDiagnostic.self) { try ShaderGraphRuntimeLibrary.install(archive) }
         #expect(throws: ShaderGraphDiagnostic.self) { try ShaderGraphRuntimeLibrary.graph(at: "@res://missing-graph.shadergraph") }

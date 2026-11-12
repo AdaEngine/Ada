@@ -1,5 +1,5 @@
 import package::fullscreen::{FullscreenVertex, fullscreenVertex};
-import package::volumetric_fog_common::{fog, positionImage, nearestSampler, henyeyGreenstein, sunVisibility, sunShadowGap};
+import package::volumetric_fog_common::{loadNearestShadow, fog, positionImage, nearestSampler, henyeyGreenstein, sunVisibility, sunShadowGap};
 
 struct LocalLight3D {
     positionRange: vec4f,
@@ -76,7 +76,7 @@ fn localVisibility(light: LocalLight3D, world: vec3f) -> f32 {
     let origin = vec2f(f32(face), f32(slot)) * localShadow.atlas.z;
     var uv = (origin + (ndc.xy * vec2f(0.5, -0.5) + 0.5) * localShadow.atlas.z) * localShadow.atlas.xy;
     uv = clamp(uv, (origin + 0.5) * localShadow.atlas.xy, (origin + localShadow.atlas.z - 0.5) * localShadow.atlas.xy);
-    let stored = textureSampleLevel(localShadowImage, nearestSampler, uv, 0.0).r;
+    let stored = loadNearestShadow(localShadowImage, uv);
     return select(0.0, 1.0, ndc.z - light.innerShadow.y <= stored);
 }
 

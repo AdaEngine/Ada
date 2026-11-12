@@ -18,7 +18,16 @@ public struct ShaderGraphArchive: Codable, Sendable {
             self.wgsl = wgsl
             self.reflection = reflection
         }
+
+        /// Identifies the baked fragment by template name and the graph's generated WGSL.
+        public static func identity(template: String, graphSource: String) -> String {
+            template + "\n" + graphSource
+        }
     }
+
+    /// Version 2 fragments are linked from the WESL templates and identified by ``Fragment/identity(template:graphSource:)``.
+    /// Version 1 archives were baked from GLSL templates and cannot be used.
+    public static let currentVersion = 2
 
     public var version: Int
     public var graphs: [String: ShaderGraph]
@@ -26,7 +35,7 @@ public struct ShaderGraphArchive: Codable, Sendable {
     public var texturePaths: [String]
 
     public init(graphs: [String: ShaderGraph], fragments: [Fragment], texturePaths: [String]) {
-        version = 1
+        version = Self.currentVersion
         self.graphs = graphs
         self.fragments = fragments
         self.texturePaths = texturePaths
@@ -52,7 +61,11 @@ public final class ShaderGraphRuntimeLibrary: @unchecked Sendable {
     private var textures: [String: Texture2D] = [:]
 
     public static func install(_ archive: ShaderGraphArchive) throws {
-        guard archive.version == 1 else { throw ShaderGraphDiagnostic(code: .unsupportedVersion) }
+        guard archive.version == ShaderGraphArchive.currentVersion else {
+            throw ShaderGraphDiagnostic(
+                code: .unsupportedVersion,
+                nodeID: "Shader Graph archive version \(archive.version) was baked from GLSL templates; rebuild it with AdaShaderGraphBaker (version \(ShaderGraphArchive.currentVersion))")
+        }
         for graph in archive.graphs.values { _ = try graph.lowered() }
         guard archive.fragments.allSatisfy({ !$0.source.isEmpty && !$0.wgsl.isEmpty && !$0.entryPoint.isEmpty }) else {
             throw ShaderGraphDiagnostic(code: .invalidReference)

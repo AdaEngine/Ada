@@ -17,6 +17,8 @@ public enum TriangleFillMode {
 public enum RenderBackendType: String, Sendable {
     case metal
     case webgpu
+    /// Native SAGA runtime (Vulkan); shaders arrive as SPIR-V.
+    case saga
     case headless
 }
 

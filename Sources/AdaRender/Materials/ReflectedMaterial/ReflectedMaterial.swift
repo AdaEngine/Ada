@@ -36,6 +36,13 @@ public protocol ReflectedMaterial: ShaderBindable {
     /// Return nil to use the legacy stage-source path. Macro variants are not supported by this hook.
     static func shaderModule() throws -> ShaderModule?
 
+    /// Whether the material links a complete module per feature variant. Variants are chosen from
+    /// ``configureShaderDefines(keys:vertexDescriptor:)``, so vertex layout can select WESL conditional code.
+    static var usesVariantShaderModules: Bool { get }
+
+    /// Builds the complete module for one set of feature defines when ``usesVariantShaderModules`` is true.
+    static func variantShaderModule(defines: [ShaderDefine]) throws -> ShaderModule
+
     /// Configure and pass shader source for custom material.
     /// - Returns: A shader sources for vertex shader.
     static func vertexShader() throws -> AssetHandle<ShaderSource>
@@ -71,4 +78,8 @@ public protocol ReflectedMaterial: ShaderBindable {
 
 extension ReflectedMaterial {
     public static func shaderModule() throws -> ShaderModule? { nil }
+    public static var usesVariantShaderModules: Bool { false }
+    public static func variantShaderModule(defines _: [ShaderDefine]) throws -> ShaderModule {
+        throw AssetError.message("\(String(reflecting: self)) does not provide variant shader modules.")
+    }
 }

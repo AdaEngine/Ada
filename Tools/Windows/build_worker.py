@@ -92,12 +92,14 @@ def main():
                SWIFT_ANDROID_SDKS_PATH=str(Path.home() / ".swiftpm/swift-sdks"),
                ANDROID_HOME=str(HOME / "android-sdk"), ANDROID_NDK_HOME=str(HOME / "android-ndk-r28c"),
                JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64")
-    swan = Path(args.swan).resolve() if args.swan else HOME / "swan-android"
-    # A configured Swan must actually contain an Android artifact. The managed
-    # copy is prepared against the exact Dawn/binding revision by the setup tool.
-    if not (swan / "Dawn/dist/android.artifactbundle/info.json").is_file():
-        swan = HOME / "swan-android"
-    env.update(ADAENGINE_SWAN_PACKAGE_PATH=str(swan), SWAN_LOCAL_DAWN="Dawn/dist/android.artifactbundle")
+    if args.saga:
+        env.update(ADAENGINE_SAGA_NATIVE="1", ADAENGINE_SAGA_PACKAGE_PATH=str(Path(args.saga).resolve()))
+    else:
+        swan = Path(args.swan).resolve() if args.swan else HOME / "swan-android"
+        # The managed fallback matches the Dawn revision used by its Swan bindings.
+        if not (swan / "Dawn/dist/android.artifactbundle/info.json").is_file():
+            swan = HOME / "swan-android"
+        env.update(ADAENGINE_SWAN_PACKAGE_PATH=str(swan), SWAN_LOCAL_DAWN="Dawn/dist/android.artifactbundle")
     command = [sys.executable, engine / "Tools/Android/android.py", "build", "--package", package,
                "--product", args.product, "--application-id", args.application_id,
                "--label", args.label or args.product, "--abi", args.abi,

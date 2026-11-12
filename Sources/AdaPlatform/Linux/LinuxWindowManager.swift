@@ -120,7 +120,9 @@
             nativeWindows[window.id] = nil
             renderedSizes[window.id] = nil
             window.systemWindow = nil
-            native.destroy()
+            if unsafe RenderEngine.shared?.type != .saga {
+                native.destroy()
+            }
             unsafe XFlush(display.pointer)
         }
 

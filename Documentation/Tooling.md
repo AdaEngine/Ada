@@ -281,3 +281,25 @@ The suite covers real filesystem installation/upgrade/rollback, invalid inputs,
 archive traversal, hash failures, static HTTP routing and a small real SwiftPM
 build (when the pinned compiler is installed). Platform-specific installation
 and complete Studio/GPU/WASM exports still need verification on their own hosts.
+
+## Browser renderer (SAGA)
+
+Web exports render through SAGA. The export needs a SAGA checkout (`../SAGA`, or `ADAENGINE_SAGA_PACKAGE_PATH`) and
+ships its JavaScript WebGPU host as `saga-webgpu.mjs`; it fails with a clear message when the checkout is missing.
+Add `?sagadebug` to the page URL to wait for every submission and print SAGA device errors and per-pipeline binding
+reports to the console. Web export uses JavaScriptKit's generic BridgeJS runtime and resolves SAGA without Swan or Dawn.
+
+Golden-frame check: pack `Tests/WebGolden/SAGASmoke` into an exported `AdaWebPlayer` and run
+`node script/web_golden_saga.mjs <bundle>` (needs `playwright-core` and a WebGPU Chromium; `--record` replaces the
+reference). Pass `--actual=<path.png>` to save the captured frame. See [the smoke scene README](../Tests/WebGolden/SAGASmoke/README.md).
+
+## Native SAGA Vulkan development
+
+Set `ADAENGINE_SAGA_NATIVE=1` to build the Windows, Linux, or Android renderer
+against SAGA Vulkan. The native build uses the system Vulkan driver. The SwiftPM
+build resolves SAGA from the sibling checkout or `ADAENGINE_SAGA_PACKAGE_PATH`.
+Set `ADAENGINE_GOLDEN_SAGA=1` and `ADAENGINE_SAGA_WINDOWLESS=1` for the offscreen
+3D checks, then run `swift test --filter SagaNative`. Set `ADAENGINE_GOLDEN_OUTPUT`
+to an existing directory to collect the rendered PNGs.
+
+For Android APK exports and emulator setup, see [Native Android apps](../Tools/Android/README.md).

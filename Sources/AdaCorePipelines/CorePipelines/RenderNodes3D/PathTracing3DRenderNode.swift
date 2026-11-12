@@ -88,7 +88,7 @@ struct PathTracing3DViews: Resource {
 
     mutating func getPipeline(_ device: RenderDevice) -> any RenderPipeline {
         if let pipeline { return pipeline }
-        let shader = CorePipelineShaders.loadRequiredBundled(at:"Shaders/path_tracing_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("path_tracing_3d")
         var descriptor = RenderPipelineDescriptor(vertex:shader.asset.requiredShader(for:.vertex),fragment:shader.asset.getShader(for:.fragment),
             debugName:"World-space path tracing",backfaceCulling:false,depthPixelFormat:.none)
         descriptor.colorAttachments = [.init(format:.rgba_16f)]
@@ -186,7 +186,7 @@ public struct PathTracing3DRenderNode: RenderNode {
         for sun in suns where sun.intensity.isFinite && sun.intensity > 0 && LocalLighting3DMath.isFinite(sun.directionToLight)
             && sun.directionToLight.squaredLength > 0.000001 && LocalLighting3DMath.isFinite(sun.radiance) {
             let angle = finiteRenderValue(environment.shadows.lightAngularRadius,fallback:0.27,range:0...10)*Float.pi/180
-            lights += [Vector4(sun.directionToLight.normalized,0),Vector4(sun.radiance*sun.intensity,0),Vector4(0,0,0,sun.castsShadows ? 1 : 0),Vector4(0,0,tan(angle),0)]
+            lights += [Vector4(sun.directionToLight.normalized,0),Vector4(sun.radiance*sun.intensity,0),Vector4(0,0,0,sun.castsShadows ? 1 : 0),Vector4(0,0,Math.tanf(angle),0)]
         }
         for lamp in lighting.localLights where lamp.intensity.isFinite && lamp.intensity > 0 && lamp.range.isFinite && lamp.range > 0
             && LocalLighting3DMath.isFinite(lamp.position) && LocalLighting3DMath.isFinite(lamp.radiance) {

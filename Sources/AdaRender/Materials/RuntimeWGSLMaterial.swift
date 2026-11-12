@@ -3,7 +3,7 @@ import AdaUtils
 import Foundation
 import Math
 
-/// Source-backed WebGPU UI material. ABI 1 reserves group 0/binding 2 for the engine view transform;
+/// Source-backed WGSL UI material. ABI 1 reserves group 0/binding 2 for the engine view transform;
 /// group 1 contains `parameters: vec4<f32>` at 0, `image` at 1 and `imageSampler` at 2.
 /// Parameter state is protected by a lock; GPU updates follow the existing material render lifecycle.
 public final class RuntimeWGSLMaterial: Material, @unchecked Sendable {
@@ -41,8 +41,8 @@ public final class RuntimeWGSLMaterial: Material, @unchecked Sendable {
         if let module {
             return module
         }
-        guard unsafe RenderEngine.shared.type == .webgpu else {
-            throw RuntimeMaterialError.webGPURequired
+        guard unsafe RenderEngine.shared.type.consumesWGSL else {
+            throw RuntimeMaterialError.wgslRendererRequired
         }
         var vertexReflection = ShaderReflectionData()
         let view = ShaderResource.ShaderBuffer(name: "view", size: 192, shaderStage: .vertex, binding: 2, resourceAccess: .read, members: [:])
@@ -96,5 +96,5 @@ public final class RuntimeWGSLMaterial: Material, @unchecked Sendable {
         }
         """
 
-    private enum RuntimeMaterialError: Error { case explicitSourcesRequired, webGPURequired }
+    private enum RuntimeMaterialError: Error { case explicitSourcesRequired, wgslRendererRequired }
 }

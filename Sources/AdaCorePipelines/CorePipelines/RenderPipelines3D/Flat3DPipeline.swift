@@ -161,8 +161,18 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
     private let variants = PBR3DShaderVariants()
 
+    /// The WESL source where the renderer links it at runtime; the GLSL source otherwise.
+    /// The web export does not prelink flat3d variants yet, so WebAssembly keeps the GLSL path.
+    public static var shaderPath: String {
+        #if WASM
+            return "Shaders/flat3d.glsl"
+        #else
+            return ShaderModule.supportsBundledWESL ? "Shaders/flat3d.wesl" : "Shaders/flat3d.glsl"
+        #endif
+    }
+
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/flat3d.glsl", from: .adaModule)
+        self.shader = ShaderModule.loadRequiredBundled(at: Self.shaderPath, from: .adaModule)
     }
 
     public func configurate(with configuration: VertexDescriptor) -> RenderPipelineDescriptor {
@@ -234,7 +244,7 @@ final class PBR3DShaderVariants: @unchecked Sendable {
     private var variants: [Key: AssetHandle<ShaderModule>] = [:]
 
     func shader(
-        at path: String = "Shaders/flat3d.glsl",
+        at path: String = Flat3DPipeline.shaderPath,
         for features: PBRMaterial.ShaderFeatures,
         fallback: AssetHandle<ShaderModule>
     ) -> AssetHandle<ShaderModule> {

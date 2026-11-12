@@ -60,7 +60,10 @@ import Foundation
                     components.append(DirectionalLightComponent(radiance: color.isEmpty ? .one : Vector3(Float(color[0]), Float(color[1]), Float(color[2])),
                         intensity: Float(payload["intensity"].number ?? 1), castShadows: payload["castShadows"] != .bool(false)))
                 case "AdaScene.PointLightComponent": components.append(try decode(PointLightComponent.self, payload))
-                case "AdaRender.Environment3D": components.append(try decode(Environment3D.self, payload))
+                // The editor writes the native module name for built-in pipeline components.
+                case "AdaRender.Environment3D", "AdaCorePipelines.Environment3D": components.append(try decode(Environment3D.self, payload))
+                case "AdaScene.ScriptableComponents": components.append(try decode(ScriptableComponents.self, payload))
+                case "AdaUI.CompanionPanel": components.append(try decode(CompanionPanel.self, payload))
                 case "AdaPhysics.PhysicsBody2DComponent": components.append(try decode(PhysicsBody2DComponent.self, payload))
                 case "AdaAudio.AudioSource":
                     guard let source = payload["source"].string else { throw invalid("Audio source is required") }

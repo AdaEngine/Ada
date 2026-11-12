@@ -1,23 +1,6 @@
 {
-  "originHash" : "c981a41efd56a081537f4f7b35a4767b79479c5b3a8e43af7e82d33039e450f2",
+  "originHash" : "4b1808770d25128fb9314b0a6cce0de49d5e289af665b4258d341d7cc4b23af6",
   "pins" : [
-    {
-      "identity" : "swan",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AdaEngine/swan",
-      "state" : {
-        "revision" : "790df787281e9cf1c2358a11bb42b2ec2df01029"
-      }
-    },
-    {
-      "identity" : "swift-argument-parser",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-argument-parser.git",
-      "state" : {
-        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
-        "version" : "1.8.2"
-      }
-    },
     {
       "identity" : "swift-atomics",
       "kind" : "remoteSourceControl",
@@ -70,15 +53,6 @@
       "state" : {
         "revision" : "b45d1f2ed151d057b54504d653e0da5552844e34",
         "version" : "1.0.0"
-      }
-    },
-    {
-      "identity" : "swift-format",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swiftlang/swift-format.git",
-      "state" : {
-        "revision" : "d54c5be7afba3e5f52ae29e2371e444a3c2a49c1",
-        "version" : "603.0.0"
       }
     },
     {

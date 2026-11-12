@@ -25,6 +25,7 @@ public protocol RenderSurface {
     public protocol LinuxXlibRenderSurface: RenderSurface {
         var xlibDisplay: UnsafeMutableRawPointer { get }
         var xlibWindow: UInt64 { get }
+        var xlibWindowLifetime: any Sendable { get }
     }
 #endif
 
@@ -104,10 +105,11 @@ public protocol RenderSurface {
 #endif
 
 #if os(Android)
-    /// Android native window retained for the lifetime of its WebGPU surface.
+    /// Android native window retained for the lifetime of its GPU surface.
     @MainActor
     public protocol AndroidNativeWindowRenderSurface: RenderSurface {
         var nativeWindow: UnsafeMutableRawPointer { get }
+        var nativeWindowLifetime: any Sendable { get }
     }
 #endif
 

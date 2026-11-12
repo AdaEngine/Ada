@@ -34,6 +34,9 @@ let isWebExportEnabled: Bool = {
     return webExportValue.map(enabledValues.contains) == true
 }()
 
+let isSAGANativeEnabled = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_NATIVE"] == "1" && !isWebExportEnabled
+let usesSwan = !isHeadlessCIEnabled && !isWebExportEnabled && !isSAGANativeEnabled
+
 // Local compiler development can override the checked-in, patched AdaScript runtime.
 let gravityDevelopmentPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
 let gravityAOTDependencies: [Target.Dependency] = [
@@ -44,11 +47,7 @@ let gravityAOTDependencies: [Target.Dependency] = [
 import Darwin.C
 
 /// Only xcode can import AppleProductTypes and we can use it as checker
-#if canImport(AppleProductTypes)
-let isWGPUEnabled = isWebExportEnabled || isAndroidBuildEnabled // We can't build wgpu from xcode, except web export builds.
-#else
-let isWGPUEnabled = isWebExportEnabled || isAndroidBuildEnabled
-#endif
+let isWGPUEnabled = isWebExportEnabled || (isAndroidBuildEnabled && usesSwan)
 
 #else
 
@@ -60,14 +59,14 @@ import Glibc
 import WinSDK
 #endif
 
-let isWGPUEnabled = !isHeadlessCIEnabled
+let isWGPUEnabled = isWebExportEnabled || usesSwan
 #endif
 
 extension String {
     static let wgpuTrait = "WGPU_ENABLED"
 }
 
-let usesSAGACompiler = (!isHeadlessCIEnabled && isWGPUEnabled && !isAndroidBuildEnabled) || isWebExportEnabled
+let usesSAGACompiler = (usesSwan && isWGPUEnabled && !isAndroidBuildEnabled) || isWebExportEnabled
 
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS, .watchOS, .visionOS]
 
@@ -218,7 +217,9 @@ let wasmExecutableLinkerSettings: [LinkerSetting] = [
         "--export-if-defined=main",
         "-Xlinker",
         "--export-if-defined=__main_argc_argv"
-    ], .when(platforms: [.wasi]))
+    ], .when(platforms: [.wasi])),
+    // Debug builds use more stack while constructing the renderer and its shader pipelines.
+    .unsafeFlags(["-Xlinker", "-z", "-Xlinker", "stack-size=4194304"], .when(platforms: [.wasi], configuration: .debug))
 ]
 
 // MARK: Ada Engine SDK
@@ -256,7 +257,7 @@ var adaEngineDependencies: [Target.Dependency] = [
 // the renderer; this target shares its selected D3D12 device and textures.
 let dlssBuildConfiguration: [String: Any]? = {
     #if os(Windows)
-    guard !isHeadlessCIEnabled, ProcessInfo.processInfo.environment["ADAENGINE_DISABLE_DLSS"] != "1" else {
+    guard usesSwan, ProcessInfo.processInfo.environment["ADAENGINE_DISABLE_DLSS"] != "1" else {
         return nil
     }
     let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
@@ -292,24 +293,43 @@ var adaRenderDependencies: [Target.Dependency] = [
     ),
 ]
 
-if usesSAGACompiler && !isHeadlessCIEnabled {
+if usesSAGACompiler {
     adaRenderDependencies.append(
         .target(
             name: "AdaWGSLCompiler",
-            condition: .when(platforms: [.macOS, .linux, .windows], traits: [.wgpuTrait])
+            condition: .when(platforms: [.macOS, .linux, .windows])
         )
     )
 }
-if !isHeadlessCIEnabled {
+if usesSwan {
     adaRenderDependencies.append(
         .product(
             name: "WebGPU",
             package: "swan",
-            condition: .when(traits: [
+            // Browser builds render through SAGA; Swan only backs the native Dawn path.
+            condition: .when(platforms: applePlatforms + [.linux, .windows, .android], traits: [
                 .wgpuTrait
             ])
         )
     )
+}
+if isWebExportEnabled {
+    // Browser rendering runs through SAGA (see Documentation/Designs/saga-migration.md).
+    adaRenderDependencies.append(.product(name: "SAGAWebHost", package: "SAGA", condition: .when(platforms: [.wasi])))
+    adaRenderDependencies.append(.product(name: "SAGAWebGPU", package: "SAGA", condition: .when(platforms: [.wasi])))
+    adaRenderDependencies.append(.product(name: "SAGA", package: "SAGA", condition: .when(platforms: [.wasi])))
+    adaRenderDependencies.append(.product(name: "SAGACompiler", package: "SAGA", condition: .when(platforms: [.wasi])))
+    swiftSettings.append(.define("SAGA_WEBGPU", .when(platforms: [.wasi])))
+    swiftSettings.append(.define("SAGA_RENDER", .when(platforms: [.wasi])))
+}
+// Opt-in native SAGA renderer (Vulkan on Windows, Linux, and Android).
+if isSAGANativeEnabled {
+    for product in ["SAGA", "SAGACompiler", "SAGAVulkan"] {
+        adaRenderDependencies.append(.product(name: product, package: "SAGA", condition: .when(platforms: [.windows, .linux, .android])))
+    }
+    swiftSettings.append(.define("SAGA_RENDER", .when(platforms: [.windows, .linux, .android])))
+    swiftSettings.append(.define("SAGA_NATIVE", .when(platforms: [.windows, .linux, .android])))
+    adaRenderDependencies.append(.target(name: "AdaWGSLCompiler", condition: .when(platforms: [.windows, .linux, .android])))
 }
 if dlssBuildConfiguration != nil {
     adaRenderDependencies.append(.target(name: "CWebGPUDLSS", condition: .when(platforms: [.windows], traits: [.wgpuTrait])))
@@ -791,7 +811,7 @@ targets.append(
     )
 )
 
-if usesSAGACompiler {
+if usesSAGACompiler || isSAGANativeEnabled {
     targets.append(.target(
         name: "AdaWGSLCompiler",
         dependencies: [.product(name: "SAGACompiler", package: "SAGA")]
@@ -909,7 +929,7 @@ targets.append(
 )
 
 // MARK: Build Plugins
-if isWGPUEnabled {
+if isWGPUEnabled && usesSwan {
     products.append(.plugin(name: "WebGPUTintPlugin", targets: ["WebGPUTintPlugin"]))
     targets.append(
         .plugin(
@@ -1473,7 +1493,8 @@ targets += [
         ],
         resources: [
             .copy("Fixtures/Images")
-        ]
+        ],
+        swiftSettings: isSAGANativeEnabled ? [.define("SAGA_NATIVE")] : []
     ),
     .testTarget(
         name: "AdaInputTests",
@@ -1602,7 +1623,7 @@ for target in package.targets {
     }
 }
 #else
-// Swan checks in BridgeJS generated with this ABI; update both together.
+// Keep the bundled JavaScriptKit BridgeJS runtime at the same ABI version.
 package.dependencies.append(.package(url: "https://github.com/swiftwasm/JavaScriptKit.git", exact: "0.59.0"))
 #endif
 
@@ -1619,12 +1640,12 @@ if !isWebExportEnabled && !isAndroidBuildEnabled {
     )
 }
 
-if usesSAGACompiler {
+if usesSAGACompiler || isSAGANativeEnabled {
     let sagaPath = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"]
         ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("SAGA").path
     package.dependencies.append(.package(name: "SAGA", path: sagaPath))
 }
-if !isHeadlessCIEnabled {
+if usesSwan {
     package.dependencies.append(
         ProcessInfo.processInfo.environment["ADAENGINE_SWAN_PACKAGE_PATH"].map { .package(name: "swan", path: $0) }
             ?? .package(url: "https://github.com/AdaEngine/swan", revision: "790df787281e9cf1c2358a11bb42b2ec2df01029")

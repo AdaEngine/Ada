@@ -61,6 +61,11 @@ OpenGL/GLES backends. It strips debug data only from packaged copies.
 
 ## Build and run
 
+To try the native SAGA Vulkan path, set `ADAENGINE_SAGA_NATIVE=1` and place
+the SAGA checkout beside AdaEngine or set `ADAENGINE_SAGA_PACKAGE_PATH` to its
+absolute path. In this configuration the command-line APK builder uses SAGA and
+the system Vulkan loader. The Swift and Android SDK requirements still apply.
+
 From the AdaEngine repository root:
 
 ```sh

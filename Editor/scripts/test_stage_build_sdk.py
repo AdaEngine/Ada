@@ -47,7 +47,8 @@ class StageSDKTests(unittest.TestCase):
             compiler = root / "compiler"
             saga = root / "SAGA"
             for base, files in [(engine, ["Package.swift", "LICENSE", "Sources/Runtime.swift", "Sources/.build/private", ".git/config", "script/ensure_tint.py", "Demos/Example/binary.glb"]),
-                                (saga, ["Package.swift", "Sources/SAGACompiler/Compiler.swift", "Sources/.build/private", ".git/config"]),
+                                (saga, ["Package.swift", "Sources/SAGACompiler/Compiler.swift", "Sources/.build/private", ".git/config",
+                                        "web/webgpu.mjs", "web/golden.mjs", "web/node_modules/private"]),
                                 (compiler, ["Package.swift", "LICENSE", "src/shared/header.h", "tools/aot_build.py", "binding/Runtime.swift"])]:
                 for name in files:
                     path = base / name
@@ -67,6 +68,9 @@ class StageSDKTests(unittest.TestCase):
             self.assertTrue((destination / "SAGA/Package.swift").is_file())
             self.assertTrue((destination / "SAGA/Sources/SAGACompiler/Compiler.swift").is_file())
             self.assertFalse((destination / "SAGA/Sources/.build").exists())
+            self.assertTrue((destination / "SAGA/web/webgpu.mjs").is_file(), "The staged SDK must contain the SAGA WebGPU host")
+            self.assertTrue((destination / "SAGA/web/golden.mjs").is_file())
+            self.assertFalse((destination / "SAGA/web/node_modules").exists())
             self.assertFalse((destination / "AdaEngine/.git").exists())
             self.assertFalse((destination / "AdaEngine/Demos").exists())
             self.assertFalse((destination / "AdaEngine/Sources/.build").exists())

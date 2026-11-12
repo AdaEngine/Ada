@@ -26,8 +26,8 @@ extension MeshTerrainPopulation.CellPass {
     ) throws -> [MeshTerrainPlacement] {
         let step = max(rule.spacing * 0.75, 1 / max(1, rule.density).squareRoot())
         let input = Sample(rule: rule, patches: patches, influences: influences, coverage: coverage, exclusions: exclusions, halo: halo, step: step)
-        let low = (0..<3).map { Int(floor(halo.minimum[$0] / step)) }
-        let high = (0..<3).map { Int(ceil(halo.maximum[$0] / step)) }
+        let low = (0..<3).map { Int((halo.minimum[$0] / step).rounded(.down)) }
+        let high = (0..<3).map { Int((halo.maximum[$0] / step).rounded(.up)) }
         let seed = Self.hash(rule.id.uuidString.utf8.reduce(UInt64(0)) { $0 &* 131 &+ UInt64($1) } ^ rule.seed)
         var candidates: [Candidate] = []
         for axis in 0..<3 {
@@ -85,7 +85,7 @@ extension MeshTerrainPopulation.CellPass {
         guard coverageWeight > 0,
             try !excluded(point, clearance: rule.sourceExclusionDistance, sources: input.influences, ignoring: ignoredSource) else { return nil }
         let side = UInt64(normal[axis] < 0 ? 1 : 0)
-        let stratum = UInt64(bitPattern: Int64(floor(point[axis] / input.step)))
+        let stratum = UInt64(bitPattern: Int64((point[axis] / input.step).rounded(.down)))
         let id = Self.hash(lattice ^ stratum &* 0x94D049BB133111EB ^ UInt64(source) ^ side << 48)
         let probability = min(1, rule.density * coverageWeight * input.step * input.step / max(0.5, largest))
         guard Float(id & 0xFFFFFF) / Float(0x1000000) < probability else { return nil }

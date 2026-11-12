@@ -44,7 +44,11 @@ enum EditorWindowsBuildWorker {
         if let gravity = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"] {
             arguments += ["--gravity", linuxPath(gravity)]
         }
-        if let swan = configuration.environment["ADAENGINE_SWAN_PACKAGE_PATH"] {
+        if configuration.environment["ADAENGINE_SAGA_NATIVE"] == "1" {
+            let saga = configuration.environment["ADAENGINE_SAGA_PACKAGE_PATH"]
+                ?? engineRoot.deletingLastPathComponent().appendingPathComponent("SAGA").path
+            arguments += ["--saga", linuxPath(saga)]
+        } else if let swan = configuration.environment["ADAENGINE_SWAN_PACKAGE_PATH"] {
             arguments += ["--swan", linuxPath(swan)]
         }
         return command(arguments, package: package, engineRoot: engineRoot)

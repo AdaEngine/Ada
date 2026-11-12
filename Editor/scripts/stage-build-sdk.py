@@ -51,7 +51,7 @@ def stage(engine, compiler, destination, swan=None):
         copy_inputs(engine, staged / "AdaEngine", ["Package.swift", "Package.resolved", ".swiftlint.yml", "LICENSE", "NOTICE",
                                                    "Sources", "Plugins", "Tools", "Tests", "Assets", "script", "Editor/StudioCore"])
         if (saga / "Package.swift").is_file():
-            copy_inputs(saga, staged / "SAGA", ["Package.swift", "LICENSE", "NOTICE", "Sources", "Tests"])
+            copy_inputs(saga, staged / "SAGA", ["Package.swift", "LICENSE", "NOTICE", "Sources", "Tests", "web"])
         # These checked-in browser modules are required by the Web export plugin.
         # Ordinary generated dist directories remain excluded from the SDK.
         browser_runtime = Path("Plugins/AdaWebExportPlugin/BrowserWASIShim/dist")

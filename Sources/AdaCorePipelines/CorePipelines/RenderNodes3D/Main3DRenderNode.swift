@@ -306,7 +306,7 @@ public struct Main3DRenderNode: RenderNode {
                 contact: [contactEnabled ? 1 : 0, contact.rayLength, contact.thickness, contact.bias],
                 quality: [Float(contact.steps), contact.maxDistance, directionalLight.castsShadows ? 1 : 0, 0],
                 shadowFilter: [shadowSettings.filter == .pcss ? 1 : 0,
-                    tan(finiteRenderValue(shadowSettings.lightAngularRadius, fallback: 0.27, range: 0...10) * .pi / 180),
+                    Math.tanf(finiteRenderValue(shadowSettings.lightAngularRadius, fallback: 0.27, range: 0...10) * .pi / 180),
                     finiteRenderValue(shadowSettings.maximumPenumbraTexels, fallback: 16, range: 1...32),
                     finiteRenderValue(shadowSettings.blockerSearchTexels, fallback: 8, range: 1...32)]),
                 view: source.entityId, pass: uniformPass, device: renderDevice.renderDevice)

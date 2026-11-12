@@ -4,6 +4,9 @@ import Foundation
 struct WESLLinker {
     let roots: [String: URL]
     let features: [String: Bool]
+    /// Module source supplied in memory, by module path. It replaces (or stands in for) the module's file, so generated
+    /// source can import siblings from the package without being written under the package root.
+    var sourceOverrides: [String: String] = [:]
     private var modules: [String: Module] = [:]
     private var loading: Set<String> = []
     private var ordered: [String] = []
@@ -40,8 +43,16 @@ struct WESLLinker {
         guard loading.count < 128 else { throw Failure("WESL import nesting limit exceeded at \(path)") }
         guard loading.insert(path).inserted else { throw Failure("Cyclic WESL import: \(path)") }
         defer { loading.remove(path) }
-        let file = try moduleFile(path)
-        let raw = try tokenize(String(contentsOf: file, encoding: .utf8), file: file)
+        let file: URL
+        let text: String
+        if let override = sourceOverrides[path] {
+            file = (try? moduleFile(path)) ?? (roots["package"] ?? URL(fileURLWithPath: "/")).appendingPathComponent("generated.wesl")
+            text = override
+        } else {
+            file = try moduleFile(path)
+            text = try String(contentsOf: file, encoding: .utf8)
+        }
+        let raw = try tokenize(text, file: file)
         let conditions = WESLConditions(tokens: raw, features: features, file: file)
         let tokens = try conditions.expand()
         var cursor = 0

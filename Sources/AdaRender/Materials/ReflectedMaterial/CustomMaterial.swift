@@ -131,10 +131,14 @@ public final class CustomMaterial<T: ReflectedMaterial>: Material, MaterialValue
         let shaderSource = ShaderSource()
         var linkedModule: ShaderModule?
         var sourceLoadError: (any Error)?
+        var variantFactory: Material.VariantModuleFactory?
+        if T.usesVariantShaderModules {
+            variantFactory = { @Sendable defines in try T.variantShaderModule(defines: defines) }
+        }
 
         do {
             linkedModule = try T.shaderModule()
-            if linkedModule == nil {
+            if linkedModule == nil && variantFactory == nil {
                 let vertexShaderSource = try T.vertexShader()
                 let fragmentShaderSource = try T.fragmentShader()
 
@@ -169,7 +173,7 @@ public final class CustomMaterial<T: ReflectedMaterial>: Material, MaterialValue
             .getCacheDirectory()
             .appending(path: String(reflecting: type(of: material)), directoryHint: .isDirectory)
         self.sourceLoadError = sourceLoadError
-        super.init(shaderSource: shaderSource, linkedShaderModule: linkedModule)
+        super.init(shaderSource: shaderSource, linkedShaderModule: linkedModule, variantModuleFactory: variantFactory)
         self.reflectMaterial(from: material)
     }
 

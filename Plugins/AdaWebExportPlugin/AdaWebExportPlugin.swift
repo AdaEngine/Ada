@@ -105,6 +105,22 @@ struct AdaWebExportPlugin: CommandPlugin {
         }
     }
 
+    /// Ships SAGA's JavaScript WebGPU host, which the browser renderer requires.
+    private func copySAGAWebHost(packageDirectory: URL, to output: URL) throws {
+        let environment = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"]
+        let saga = environment.map { URL(fileURLWithPath: $0, isDirectory: true) }
+            ?? packageDirectory.deletingLastPathComponent().appending(component: "SAGA", directoryHint: .isDirectory)
+        let source = saga.appending(components: "web", "webgpu.mjs")
+        guard FileManager.default.fileExists(atPath: source.path()) else {
+            throw ExportError.sagaCheckoutNotFound(saga.path())
+        }
+        try replaceItem(at: output.appending(component: "saga-webgpu.mjs", directoryHint: .notDirectory), with: source)
+        let golden = saga.appending(components: "web", "golden.mjs")
+        if FileManager.default.fileExists(atPath: golden.path()) {
+            try replaceItem(at: output.appending(component: "saga-golden.mjs", directoryHint: .notDirectory), with: golden)
+        }
+    }
+
     private func detectWasmSDK() throws -> String {
         let output = try capture(
             executable: "/usr/bin/env",
@@ -345,12 +361,12 @@ struct AdaWebExportPlugin: CommandPlugin {
             at: options.outputDirectory.appending(component: "runtime.mjs", directoryHint: .notDirectory),
             with: runtime
         )
-        try writeBridgeJSRuntime(
-            packageDirectory: packageDirectory,
-            checkouts: checkouts,
-            to: options.outputDirectory.appending(component: "bridge-js.js", directoryHint: .notDirectory)
+        try replaceItem(
+            at: options.outputDirectory.appending(component: "bridge-js.js", directoryHint: .notDirectory),
+            with: Self.assetsDirectory.appending(components: "Runtime", "BridgeJSCache", "bridge-js.js")
         )
         try copyBrowserWASIShim(packageDirectory: packageDirectory, to: options.outputDirectory)
+        try copySAGAWebHost(packageDirectory: packageDirectory, to: options.outputDirectory)
         try copyLoaderAssets(to: options.outputDirectory)
 
         try indexHTML(product: options.product).write(
@@ -451,8 +467,7 @@ struct AdaWebExportPlugin: CommandPlugin {
         return exportedBundles
     }
 
-    /// A host tool must not inherit BUILD_WASM: Swan deliberately omits its
-    /// native Dawn module in that mode. Keep the CPU baker in its own host build.
+    /// Build the CPU baker for the host outside the WASM build environment.
     private func buildGraphBaker(packageDirectory: URL, scratch: URL?) throws -> URL {
         let engine = Self.assetsDirectory.deletingLastPathComponent().deletingLastPathComponent()
         let cache = (scratch ?? packageDirectory.appendingPathComponent(".build-web-export"))
@@ -742,174 +757,6 @@ struct AdaWebExportPlugin: CommandPlugin {
         throw ExportError.javascriptKitRuntimeNotFound
     }
 
-    private func writeBridgeJSRuntime(packageDirectory: URL, checkouts: URL, to output: URL) throws {
-        guard let skeleton = bridgeJSSkeleton(checkouts: checkouts) else {
-            try """
-            export async function createInstantiator() {
-              return {
-                addImports: () => {},
-                setInstance: () => {},
-                createExports: () => ({}),
-              };
-            }
-            """.write(to: output, atomically: true, encoding: .utf8)
-            return
-        }
-
-        if try cachedBridgeJSRuntime(checkouts: checkouts, skeleton: skeleton, output: output) {
-            Diagnostics.remark("Reused verified BridgeJS runtime for the Web Player")
-            return
-        }
-
-        let bridgeJSPackage = try bridgeJSPackageDirectory(checkouts: checkouts)
-        let bridgeJSTool = try bridgeJSToolExecutable(
-            bridgeJSPackage: bridgeJSPackage,
-            packageDirectory: packageDirectory
-        )
-        try runBridgeJSTool(
-            executable: bridgeJSTool,
-            skeleton: skeleton,
-            output: output,
-            workingDirectory: packageDirectory
-        )
-    }
-
-    private func cachedBridgeJSRuntime(checkouts: URL, skeleton: URL, output: URL) throws -> Bool {
-        let cacheRoot = Self.assetsDirectory.appending(
-            components: "Runtime", "BridgeJSCache",
-            directoryHint: .isDirectory
-        )
-        guard
-            let data = FileManager.default.contents(atPath: cacheRoot.appending(component: "manifest.json").path()),
-            let manifest = try? JSONDecoder().decode(CachedBridgeJSManifest.self, from: data),
-            manifest.schemaVersion == 1,
-            let expectedSkeleton = UInt64(manifest.skeletonFNV64, radix: 16),
-            let expectedRuntime = UInt64(manifest.runtimeFNV64, radix: 16),
-            let skeletonBytes = FileManager.default.contents(atPath: skeleton.path()),
-            let runtime = try? javascriptKitRuntime(checkouts: checkouts),
-            let runtimeBytes = FileManager.default.contents(atPath: runtime.path()),
-            cachedFNV64(skeletonBytes) == expectedSkeleton,
-            cachedFNV64(runtimeBytes) == expectedRuntime
-        else { return false }
-        let cached = cacheRoot.appending(component: "bridge-js.js", directoryHint: .notDirectory)
-        guard FileManager.default.fileExists(atPath: cached.path()) else { return false }
-        try replaceItem(at: output, with: cached)
-        // A copied cache can predate the previous export. Fresh mtime prevents HTTP
-        // conditional requests from retaining an older bridge at this same URL.
-        try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: output.path())
-        return true
-    }
-
-    private func cachedFNV64(_ data: Data) -> UInt64 {
-        var hash: UInt64 = 14_695_981_039_346_656_037
-        for byte in data {
-            hash ^= UInt64(byte)
-            hash &*= 1_099_511_628_211
-        }
-        return hash
-    }
-
-    private struct CachedBridgeJSManifest: Decodable {
-        let schemaVersion: Int
-        let skeletonFNV64: String
-        let runtimeFNV64: String
-    }
-
-    private func bridgeJSSkeleton(checkouts: URL) -> URL? {
-        var candidates: [URL] = []
-        if let localSwan = ProcessInfo.processInfo.environment["ADAENGINE_SWAN_PACKAGE_PATH"], !localSwan.isEmpty {
-            candidates.append(URL(fileURLWithPath: localSwan).appendingPathComponent("Sources/WebGPU/Wasm/Generated/JavaScript/BridgeJS.json"))
-        }
-        candidates += [
-            checkouts.appending(
-                components: "swan", "Sources", "WebGPU", "Wasm", "Generated", "JavaScript", "BridgeJS.json",
-                directoryHint: .notDirectory
-            ),
-            checkouts.appending(
-                components: "Swan", "Sources", "WebGPU", "Wasm", "Generated", "JavaScript", "BridgeJS.json",
-                directoryHint: .notDirectory
-            )
-        ]
-        return candidates.compactMap { $0 }.first(where: { FileManager.default.fileExists(atPath: $0.path()) })
-    }
-
-    private func bridgeJSPackageDirectory(checkouts: URL) throws -> URL {
-        let candidates = [
-            checkouts.appending(
-                components: "JavaScriptKit", "Plugins", "BridgeJS",
-                directoryHint: .isDirectory
-            ),
-            checkouts.appending(
-                components: "javascriptkit", "Plugins", "BridgeJS",
-                directoryHint: .isDirectory
-            )
-        ]
-        if let bridgeJSPackage = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path()) }) {
-            return bridgeJSPackage
-        }
-
-        let swanDirectoryCandidates = [
-            checkouts.appending(components: "swan", directoryHint: .isDirectory),
-            checkouts.appending(components: "Swan", directoryHint: .isDirectory)
-        ]
-        let swanDirectory = swanDirectoryCandidates.first(where: { FileManager.default.fileExists(atPath: $0.path()) })
-        if let swanDirectory {
-            let nestedBridgeJS = swanDirectory.appending(
-                components: ".build", "checkouts", "JavaScriptKit", "Plugins", "BridgeJS",
-                directoryHint: .isDirectory
-            )
-            if FileManager.default.fileExists(atPath: nestedBridgeJS.path()) {
-                return nestedBridgeJS
-            }
-        }
-
-        throw ExportError.bridgeJSPackageNotFound
-    }
-
-    private func bridgeJSToolExecutable(bridgeJSPackage: URL, packageDirectory: URL) throws -> URL {
-        if let existing = findBridgeJSToolExecutable(in: bridgeJSPackage) {
-            return existing
-        }
-
-        try run(
-            executable: "/usr/bin/env",
-            arguments: [
-                "swift",
-                "build",
-                "--disable-sandbox",
-                "--package-path",
-                bridgeJSPackage.path(),
-                "--product",
-                "BridgeJSToolInternal"
-            ],
-            workingDirectory: packageDirectory
-        )
-
-        guard let built = findBridgeJSToolExecutable(in: bridgeJSPackage) else {
-            throw ExportError.bridgeJSToolNotFound
-        }
-        return built
-    }
-
-    private func findBridgeJSToolExecutable(in bridgeJSPackage: URL) -> URL? {
-        let buildDirectory = bridgeJSPackage.appending(component: ".build", directoryHint: .isDirectory)
-        guard let enumerator = FileManager.default.enumerator(
-            at: buildDirectory,
-            includingPropertiesForKeys: [.isRegularFileKey, .isExecutableKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return nil
-        }
-
-        for case let url as URL in enumerator where url.lastPathComponent == "BridgeJSToolInternal" {
-            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isExecutableKey])
-            if values?.isRegularFile == true, values?.isExecutable == true {
-                return url
-            }
-        }
-        return nil
-    }
-
     private func serve(directory: URL) throws {
         Diagnostics.remark("Serving \(directory.path()) at http://127.0.0.1:8080")
         try run(
@@ -958,29 +805,6 @@ struct AdaWebExportPlugin: CommandPlugin {
         return output
     }
 
-    private func runBridgeJSTool(executable: URL, skeleton: URL, output: URL, workingDirectory: URL?) throws {
-        FileManager.default.createFile(atPath: output.path(), contents: nil)
-        let outputHandle = try FileHandle(forWritingTo: output)
-        defer {
-            try? outputHandle.close()
-        }
-
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = ["emit-js", skeleton.path()]
-        process.currentDirectoryURL = workingDirectory
-        process.standardOutput = outputHandle
-        process.environment = ProcessInfo.processInfo.environment.merging([
-            "ADAENGINE_WEB_EXPORT": "1",
-            "BUILD_WASM": "1"
-        ]) { _, new in new }
-        try process.run()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            throw ExportError.commandFailed("\(executable.path()) emit-js \(skeleton.path())", process.terminationStatus)
-        }
-    }
 }
 
 private struct ExportOptions {
@@ -1107,10 +931,9 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
     case commandFailed(String, Int32)
     case wasmNotFound(String, String)
     case javascriptKitRuntimeNotFound
-    case bridgeJSPackageNotFound
-    case bridgeJSToolNotFound
     case unsafeScratchDirectory
     case browserWASIRuntimeNotFound
+    case sagaCheckoutNotFound(String)
 
     var errorDescription: String? {
         description
@@ -1127,6 +950,8 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
             return "Web export requires an isolated --scratch-path; the shared .build directory cannot be used."
         case .browserWASIRuntimeNotFound:
             return "Web export is missing BrowserWASIShim/dist/index.js. Restore the bundled WASI runtime modules from the engine repository."
+        case .sagaCheckoutNotFound(let path):
+            return "Web export renders through SAGA but no SAGA checkout with web/webgpu.mjs was found at \(path). Clone SAGA next to the engine or set ADAENGINE_SAGA_PACKAGE_PATH."
         case .missingTarget:
             return "Missing required --product <ProductName> argument."
         case .missingValue(let argument):
@@ -1141,10 +966,6 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
             return "Could not find built \(product).wasm under \(buildDirectory)."
         case .javascriptKitRuntimeNotFound:
             return "Could not find JavaScriptKit runtime.mjs under .build/checkouts/JavaScriptKit."
-        case .bridgeJSPackageNotFound:
-            return "Could not find JavaScriptKit BridgeJS package under .build/checkouts."
-        case .bridgeJSToolNotFound:
-            return "Could not find built BridgeJSToolInternal executable."
         }
     }
 }
@@ -1439,6 +1260,11 @@ private func mainJS(product: String) -> String {
       });
       globalThis.__adaWebGPUAdapter = adapter;
       globalThis.__adaWebGPUDevice = device;
+      // The browser renders through SAGA. Presentation attaches to the engine canvas when its window is created.
+      updateLoader(66, "Opening SAGA WebGPU host…");
+      const { openWebGPU } = await import("./saga-webgpu.mjs");
+      globalThis.__adaSAGAHost = await openWebGPU(null, { deferCanvas: true });
+      globalThis.__adaSAGADebug = new URLSearchParams(location.search).has("sagadebug");
 
       async function makeResourcePreopenDirectories() {
         updateLoader(68, "Loading resources…");

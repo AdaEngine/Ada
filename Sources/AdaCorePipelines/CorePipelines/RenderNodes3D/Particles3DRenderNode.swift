@@ -141,7 +141,8 @@ struct Particles3DResources: Resource {
         var defines: [String] = []
         if attachments >= 2 { defines.append("PARTICLE_INDIRECT") }
         if attachments >= 3 { defines.append("PARTICLE_REFLECTION_RESPONSE") }
-        let shader = try ShaderModule.createBundled(at: "Shaders/particles_3d.glsl", from: .adaModule, defines: defines)
+        let path = ShaderModule.supportsBundledWESL ? "Shaders/particles_3d.wesl" : "Shaders/particles_3d.glsl"
+        let shader = try ShaderModule.createBundled(at: path, from: .adaModule, defines: defines)
         var vertex = VertexDescriptor()
         vertex.attributes[0] = .attribute(.vector4, name: "centerSize", bufferIndex: 0, offset: 0)
         vertex.attributes[1] = .attribute(.vector4, name: "color", bufferIndex: 0, offset: 16)
