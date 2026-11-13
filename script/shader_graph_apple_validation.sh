@@ -106,9 +106,18 @@ PY
     if ! xcrun simctl list devices booted | grep -Fq "$device"; then xcrun simctl boot "$device"; fi
     xcrun simctl bootstatus "$device" -b
     xcodegen generate --spec Editor/project.yml
-    xcodebuild -project Editor/AdaEditor.xcodeproj -scheme AdaEditor-iPadOS \
-      -configuration Debug -destination "id=$device" -derivedDataPath "$RUNNER_TEMP/ipad-build" \
-      CODE_SIGNING_ALLOWED=NO build
+    build_args=(-project Editor/AdaEditor.xcodeproj -scheme AdaEditor-iPadOS
+      -configuration Debug -destination "id=$device" -derivedDataPath "$RUNNER_TEMP/ipad-build"
+      CODE_SIGNING_ALLOWED=NO build)
+    build_status=0
+    xcodebuild "${build_args[@]}" || build_status=$?
+    # Xcode can abort while inserting package references during a cold resolution.
+    # Keep the fetched dependencies and retry the same build once.
+    if [[ "$build_status" == 134 ]]; then
+      xcodebuild "${build_args[@]}"
+    elif [[ "$build_status" != 0 ]]; then
+      exit "$build_status"
+    fi
     bundle="$RUNNER_TEMP/ipad-build/Build/Products/Debug-iphonesimulator/Ada Studio.app"
     xcrun simctl install "$device" "$bundle"
     console="$evidence/ipad-console.log"
