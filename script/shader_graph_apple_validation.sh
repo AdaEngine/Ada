@@ -10,6 +10,26 @@ exec > >(tee "$evidence/validation.log") 2>&1
 xcodebuild -version
 swift --version
 
+# The Xcode wrappers run the build tool from the exact SwiftTerm revision in Editor/Package.swift.
+if [[ "${GITHUB_ACTIONS:-}" == true && ( "$check" == ipad-simulator || "$check" == studio-web ) ]]; then
+  python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path.home() / "Library/org.swift.swiftpm/security/plugins.json"
+path.parent.mkdir(parents=True, exist_ok=True)
+approvals = json.loads(path.read_text()) if path.exists() else []
+approval = {
+    "packageIdentity": "swiftterm",
+    "targetName": "SwiftTermBuildInfoPlugin",
+    "fingerprint": "caa1bdd3f1396c5b0ed66121f299d1c8b42bc94c",
+}
+if approval not in approvals:
+    approvals.append(approval)
+    path.write_text(json.dumps(approvals) + "\n")
+PY
+fi
+
 case "$check" in
   cpu-baker)
     export ADAENGINE_HEADLESS=1 ADAENGINE_SKIP_WEBGPU_PLUGINS=1 ADAENGINE_WEB_EXPORT=1
