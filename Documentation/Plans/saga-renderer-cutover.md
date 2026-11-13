@@ -99,12 +99,20 @@ pending completion callbacks were dropped and an already-attached window surface
 The queue now runs cleanup in submission order without a device and completes skipped command
 callbacks. Both failure cases and the successful submission-retirement cases passed.
 
-## Default renderer rollout preview
+## Default renderer rollout
 
-The patch at `.build-tools/saga-metal-web-rollout.patch` is prepared on top of the current
-migration worktree. It selects SAGAMetal by default on macOS, iOS, and tvOS, pins SAGA for Metal
-and Web builds, and updates Apple CI and tooling. The legacy Metal switch and the local
-SAGA checkout override remain available during the transition. The patch applies cleanly.
+The rollout selects SAGAMetal by default on macOS, iOS, and tvOS, pins SAGA for Metal and
+Web builds, and updates Apple CI and tooling. The legacy Metal switch and the local SAGA
+checkout override remain available during the transition.
+The Apple validation job builds the default renderer for macOS and the Apple TV SDK.
+Its legacy Metal comparison explicitly selects that renderer.
+The iPad job checks out AdaEngine under its SwiftPM package identity and uses the pinned
+portable Sloppy runtime at `0d8fd03d0269a480b6af3fb4f40333c319e2c398`. The newer runtime
+checkout imports SloppyA2UI without declaring it in the portable package. Separating Apple
+and Android product conditions makes Xcode link the portable products into iPad Studio.
+The iPad simulator build succeeded with the pinned SAGA and Sloppy checkouts. On iPadOS
+Simulator 26.3, Studio compiled the SAGA UI, text and upscale pipelines and displayed the
+project launcher. The CI script waits for the upscale pipeline before taking a screenshot.
 
 Two isolated source copies resolved `8be633b5be0f747e0aa4e030fcad03c4ca17908f` through a local
 Git mirror with the canonical GitHub URL in their lockfiles. The macOS copy selected SAGAMetal
@@ -128,7 +136,31 @@ code-signing verification, its packaged CLI returned its version, and its window
 the Shader Graph project. SAGA logged the UI, text and sprite pipelines with the renderer
 override unset.
 
-GitHub does not currently resolve the candidate commit. Publish the candidate before applying
-the patch to the shared checkout or running hosted CI. The local tooling test suite reported
+The packaged CLI also reproduced a crash before the native player build. Scene conversion
+decoded textured components before a render device existed. The exporter now initializes a
+headless render device when invoked without Studio's render world. A second issue in the
+rollout preview suppressed SAGAMetal in native exports because the exporter disables Swan.
+The manifest now treats disabling Swan independently from headless CI. The packaged CLI
+exported the Shader Graph sprite fixture with the bundled SDK. The player resolved the
+pinned SAGA revision through the local mirror, launched without a renderer override, and
+presented the textured sprite through SAGAMetal.
+
+The packaged Studio also exported the same project to Web from its bundled SDK under
+`Ada Studio.app`. The export plugin now passes decoded filesystem paths to build tools and
+finds SAGA in the game's resolved transitive dependencies. The WASI build uses Swift
+Collections 1.4.1 with Swift 6.3.2 to avoid a runtime ABI trap. Debug game exports use
+AdaWebPlayer's 4 MiB stack budget. The Chromium WebGPU smoke passed with the pinned SAGA
+host assets, 1,924 orange sprite pixels in both captured frames, and frame submission
+continuing after a viewport resize. Chromium reported an unreachable-code shader warning.
+The CLI's default Release export also launched in Chromium. It presented the textured
+sprite before and after resizing, with SAGA's frame counter advancing from 4 to 12.
+Both exported JavaScript host assets match the pinned checkout byte for byte.
+The Apple workflow preview adds a `studio-web` job that builds standalone Studio and
+exports the Shader Graph fixture through its packaged CLI. The browser check verifies
+sprite pixels before and after a change to the SAGA surface size. It passed locally on
+both Debug and Release exports. The existing AdaWebPlayer golden also passed with
+mean error 0.46 and 1.41% bad pixels.
+
+The candidate is published on `AdaEngine/SAGA` at `codex/adaengine-metal-web`. The local tooling test suite reported
 one existing macOS installation fixture error when copying system file flags; the same test
 fails on the unchanged tooling. The WASM doctor check for the pinned dependency passed.

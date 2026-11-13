@@ -16,12 +16,11 @@ python ada_tool.py install studio --debug --launch
 
 ## Local SAGA checkout
 
-Keep the SAGA repository beside AdaEngine. Native WebGPU builds and web export
-use SAGACompiler for GLSL-generated SPIR-V, including Shader Graph fragments.
-Set `ADAENGINE_SAGA_PACKAGE_PATH` to an absolute path if the checkout lives
-elsewhere or the AdaEngine source is staged for export. In WSL use the Linux
-path to the checkout. Windows release CI checks out SAGA beside AdaEngine;
-`ADAENGINE_SAGA_REF` can select a revision that contains the compiler fixes.
+Apple builds with SAGAMetal and browser exports resolve a pinned SAGA revision
+through SwiftPM. Set `ADAENGINE_SAGA_PACKAGE_PATH` to an absolute path to
+develop against a local checkout. In WSL use the Linux path. Native Vulkan
+development and native WebGPU compiler builds use the sibling SAGA checkout
+unless this override is set.
 
 ```powershell
 $env:ADAENGINE_SAGA_PACKAGE_PATH = 'D:/Development/SAGA'
@@ -284,8 +283,7 @@ and complete Studio/GPU/WASM exports still need verification on their own hosts.
 
 ## Browser renderer (SAGA)
 
-Web exports render through SAGA. The export needs a SAGA checkout (`../SAGA`, or `ADAENGINE_SAGA_PACKAGE_PATH`) and
-ships its JavaScript WebGPU host as `saga-webgpu.mjs`; it fails with a clear message when the checkout is missing.
+Web exports render through the pinned SAGA package and ship its JavaScript WebGPU host as `saga-webgpu.mjs`.
 The exporter copies `web/webgpu.mjs` from the SwiftPM dependency that provides `SAGAWebHost`.
 It also copies `web/golden.mjs` when available for frame comparisons. For migration builds, point
 the override at the companion checkout:
@@ -303,13 +301,11 @@ reference). Pass `--actual=<path.png>` to save the captured frame. See [the smok
 
 ## SAGA Metal development
 
-To test AdaEngine with SAGA's Metal renderer on macOS, enable the package option and use a SAGA
-revision that supports adding Metal surfaces after device creation:
+AdaEngine selects SAGAMetal by default on macOS, iOS and tvOS. Set `ADAENGINE_SAGA_METAL=0`
+to use the legacy Metal backend during the transition. The following tests exercise SAGAMetal:
 
 ```sh
-export ADAENGINE_SAGA_METAL=1
-export ADAENGINE_SAGA_PACKAGE_PATH=/absolute/path/to/saga-companion
-swift test --filter SAGAMetalWindowTests
+ADAENGINE_SAGA_METAL_WINDOW_SMOKE=1 swift test --filter SAGAMetalWindowTests
 ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DGPUTests/SagaNative
 ADAENGINE_PIXEL_PERFECT_SAGA_SMOKE=1 swift test --filter PixelPerfectMetalTests
 ```

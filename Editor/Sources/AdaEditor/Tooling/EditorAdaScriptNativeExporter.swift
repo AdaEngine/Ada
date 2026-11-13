@@ -438,7 +438,26 @@ actor EditorAdaScriptNativeExporter {
             .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", exact: "0.59.0")
         ], targets: [
             \(nativeTarget)
-            .\(targetKind)(name: "AdaNativeGame", dependencies: [\(nativeDependency).product(name: "AdaEngine", package: "AdaEngine"), .product(name: "AdaMultiplayer", package: "AdaEngine"), .product(name: "GravityAOT", package: "gravity-lang"), .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))], resources: [.copy("GameAssets")], linkerSettings: [.unsafeFlags(["-Xclang-linker", "-mexec-model=reactor", "-Xlinker", "--export-if-defined=main", "-Xlinker", "--export-if-defined=__main_argc_argv"], .when(platforms: [.wasi])), .unsafeFlags(["-Xlinker", "--strip-debug"], .when(platforms: [.wasi], configuration: .release))])
+            .\(targetKind)(
+                name: "AdaNativeGame",
+                dependencies: [
+                    \(nativeDependency).product(name: "AdaEngine", package: "AdaEngine"),
+                    .product(name: "AdaMultiplayer", package: "AdaEngine"),
+                    .product(name: "GravityAOT", package: "gravity-lang"),
+                    .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))
+                ],
+                resources: [.copy("GameAssets")],
+                linkerSettings: [
+                    .unsafeFlags([
+                        "-Xclang-linker", "-mexec-model=reactor",
+                        "-Xlinker", "--export-if-defined=main",
+                        "-Xlinker", "--export-if-defined=__main_argc_argv"
+                    ], .when(platforms: [.wasi])),
+                    // Match AdaWebPlayer's debug stack budget during renderer startup.
+                    .unsafeFlags(["-Xlinker", "-z", "-Xlinker", "stack-size=4194304"], .when(platforms: [.wasi], configuration: .debug)),
+                    .unsafeFlags(["-Xlinker", "--strip-debug"], .when(platforms: [.wasi], configuration: .release))
+                ]
+            )
         ])
         """
     }

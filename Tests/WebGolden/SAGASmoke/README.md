@@ -14,3 +14,8 @@ The reference image is
 
 The same helpers are usable from any browser console on the page: `import("./saga-golden.mjs")` exposes
 `captureStable`, `checkGolden`, `compareFrames`, `frameToPng` and `frameFromPng`.
+
+To check a Web export of the Studio [Shader Graph fixture](../../../Editor/Tests/Fixtures/ShaderGraphSmoke),
+run `node script/web_golden_saga.mjs <export>/web --studio-export --actual=studio-web.png`.
+The check reads the orange sprite pixels from SAGA before and after a viewport resize and
+verifies that the resized surface presents another frame.

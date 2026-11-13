@@ -4,11 +4,15 @@ on:
   pull_request:
     branches: [main, develop]
     paths:
+      - 'Package.swift'
+      - 'Package.resolved'
       - 'Sources/**'
       - 'Editor/**'
       - 'Plugins/AdaShaderGraphBaker/**'
+      - 'Plugins/AdaWebExportPlugin/**'
       - 'Tests/**'
       - 'script/shader_graph*'
+      - 'script/web_golden_saga.mjs'
       - '.github/workflows/shader-graph-apple.yml'
   workflow_dispatch:
 
@@ -23,24 +27,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        check: [cpu-baker, metal-native, ipad-simulator]
+        check: [cpu-baker, saga-default, metal-native, ipad-simulator, studio-web]
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app
-      ADAENGINE_PACKAGE_PATH: ${{ github.workspace }}
-      ADAENGINE_GRAVITY_PACKAGE_PATH: ${{ github.workspace }}/Sources/gravity-lang
+      ADAENGINE_PACKAGE_PATH: ${{ github.workspace }}/AdaEngine
+      ADAENGINE_GRAVITY_PACKAGE_PATH: ${{ github.workspace }}/AdaEngine/Sources/gravity-lang
       ADA_MCP_LOCAL_PATH: ${{ github.workspace }}/.build-tools/apple-mcp
       ADAENGINE_DISABLE_SWAN: '1'
       ADAENGINE_SKIP_SWIFTLINT: '1'
     steps:
+      # AdaMCP's local dependency uses the checkout directory as its SwiftPM identity.
       - uses: actions/checkout@v4
-      - name: Check out the local SAGA compiler package
-        if: matrix.check == 'cpu-baker'
-        uses: actions/checkout@v4
         with:
-          repository: SpectralDragon/SAGA
-          ref: ${{ vars.ADAENGINE_SAGA_REF }}
-          path: .build-tools/SAGA
-          persist-credentials: false
+          path: AdaEngine
       - name: Check out the pinned local MCP dependency
         uses: actions/checkout@v4
         with:
@@ -48,9 +47,16 @@ jobs:
           ref: ed7bb9076f9f8c91e2584ca9b7201df0e03defb1
           path: .build-tools/apple-mcp
           persist-credentials: false
+      - name: Check out the pinned mobile runtime
+        if: matrix.check == 'ipad-simulator'
+        uses: actions/checkout@v4
+        with:
+          repository: TeamSloppy/Sloppy
+          ref: 0d8fd03d0269a480b6af3fb4f40333c319e2c398
+          path: Sloppy
+          persist-credentials: false
       - name: Build and run the production paths
-        env:
-          ADAENGINE_SAGA_PACKAGE_PATH: ${{ matrix.check == 'cpu-baker' && format('{0}/.build-tools/SAGA', github.workspace) || '' }}
+        working-directory: AdaEngine
         run: bash script/shader_graph_apple_validation.sh '${{ matrix.check }}' "$RUNNER_TEMP/shader-graph-evidence"
       - name: Upload logs and actual frames
         if: always()

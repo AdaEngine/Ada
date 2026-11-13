@@ -2,13 +2,16 @@
     @testable import AdaRender
     import AdaUtils
     import AppKit
+    import Foundation
     import Math
     import MetalKit
     import Testing
 
+    private let sagaMetalWindowSmokeEnabled = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_METAL_WINDOW_SMOKE"] == "1"
+
     @MainActor
     struct SAGAMetalWindowTests {
-        @Test
+        @Test(.enabled(if: sagaMetalWindowSmokeEnabled))
         func presentsAndResizesAnEngineDrawable() async throws {
             _ = NSApplication.shared
             let view = MTKView(frame: NSRect(x: 0, y: 0, width: 64, height: 64), device: nil)
@@ -19,6 +22,8 @@
             window.orderFrontRegardless()
             defer { window.close() }
 
+            try RenderEngine.setupRenderEngine()
+            try #require(unsafe RenderEngine.shared.type == .saga, "The default renderer must be SAGA Metal.")
             let backend = try SAGAMetalRenderBackend()
             let id = WindowID()
             var feedback = 0

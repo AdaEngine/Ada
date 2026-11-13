@@ -9,15 +9,11 @@ import PackageDescription
 import AppleProductTypes
 #endif
 
-let isHeadlessCIEnabled: Bool = {
-    let environment = ProcessInfo.processInfo.environment
-    let headlessValue = environment["ADAENGINE_HEADLESS"]?.lowercased()
-    let disableSwanValue = environment["ADAENGINE_DISABLE_SWAN"]?.lowercased()
-    let enabledValues: Set<String> = ["1", "true", "yes", "on"]
-
-    return headlessValue.map(enabledValues.contains) == true
-        || disableSwanValue.map(enabledValues.contains) == true
-}()
+let enabledEnvironmentValues: Set<String> = ["1", "true", "yes", "on"]
+let isHeadlessCIEnabled = ProcessInfo.processInfo.environment["ADAENGINE_HEADLESS"]
+    .map { enabledEnvironmentValues.contains($0.lowercased()) } == true
+let isSwanDisabled = ProcessInfo.processInfo.environment["ADAENGINE_DISABLE_SWAN"]
+    .map { enabledEnvironmentValues.contains($0.lowercased()) } == true
 
 let isAndroidBuildEnabled = ProcessInfo.processInfo.environment["ADAENGINE_ANDROID"] == "1"
 
@@ -29,18 +25,18 @@ let isECSBenchmarkEnabled = false
 
 let isWebExportEnabled: Bool = {
     let webExportValue = ProcessInfo.processInfo.environment["ADAENGINE_WEB_EXPORT"]?.lowercased()
-    let enabledValues: Set<String> = ["1", "true", "yes", "on"]
-
-    return webExportValue.map(enabledValues.contains) == true
+    return webExportValue.map(enabledEnvironmentValues.contains) == true
 }()
 
 let isSAGANativeEnabled = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_NATIVE"] == "1" && !isWebExportEnabled
 #if os(macOS)
-let isSAGAMetalEnabled = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_METAL"] == "1" && !isWebExportEnabled
+let sagaMetalOverride = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_METAL"]
+let isSAGAMetalEnabled = !isWebExportEnabled && !isAndroidBuildEnabled && !isSAGANativeEnabled
+    && (sagaMetalOverride.map { $0 == "1" } ?? !isHeadlessCIEnabled)
 #else
 let isSAGAMetalEnabled = false
 #endif
-let usesSwan = !isHeadlessCIEnabled && !isWebExportEnabled && !isSAGANativeEnabled && !isSAGAMetalEnabled
+let usesSwan = !isHeadlessCIEnabled && !isSwanDisabled && !isWebExportEnabled && !isSAGANativeEnabled && !isSAGAMetalEnabled
 
 // Local compiler development can override the checked-in, patched AdaScript runtime.
 let gravityDevelopmentPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
@@ -1609,7 +1605,10 @@ package.targets.append(.target(
 
 package.dependencies += [
     .package(path: "Editor/StudioCore"),
-    .package(url: "https://github.com/apple/swift-collections", from: "1.3.0"),
+    // The supported WASI SDK traps in _swift_stdlib_immortalize with Swift Collections 1.7.6.
+    isWebExportEnabled
+        ? .package(url: "https://github.com/apple/swift-collections", exact: "1.4.1")
+        : .package(url: "https://github.com/apple/swift-collections", from: "1.3.0"),
     .package(url: "https://github.com/apple/swift-log", from: "1.8.0"),
     .package(url: "https://github.com/apple/swift-distributed-tracing", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-service-context", from: "1.0.0"),
@@ -1656,9 +1655,18 @@ if !isWebExportEnabled && !isAndroidBuildEnabled {
 }
 
 if usesSAGACompiler || isSAGANativeEnabled || isSAGAMetalEnabled {
-    let sagaPath = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"]
-        ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("SAGA").path
-    package.dependencies.append(.package(name: "SAGA", path: sagaPath))
+    if let sagaPath = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"], !sagaPath.isEmpty {
+        package.dependencies.append(.package(name: "SAGA", path: sagaPath))
+    } else if isWebExportEnabled || isSAGAMetalEnabled {
+        package.dependencies.append(.package(
+            url: "https://github.com/AdaEngine/SAGA.git",
+            revision: "8be633b5be0f747e0aa4e030fcad03c4ca17908f"
+        ))
+    } else {
+        let sagaPath = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("SAGA").path
+        package.dependencies.append(.package(name: "SAGA", path: sagaPath))
+    }
 }
 if usesSwan {
     package.dependencies.append(

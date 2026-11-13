@@ -359,8 +359,12 @@ def doctor(ctx, args):
         add("Swift", actual == expected, f"{actual or 'missing'}; expected {expected}", "python ada_tool.py prepare swift")
         for tool in ("git", "cmake", "ninja"):
             add(tool, ctx.which(tool), ctx.which(tool) or "missing", "python ada_tool.py prepare studio")
-        saga = Path(ctx.env.get("ADAENGINE_SAGA_PACKAGE_PATH", ctx.root.parent / "SAGA"))
-        add("SAGA", (saga / "Package.swift").is_file(), str(saga), "Set ADAENGINE_SAGA_PACKAGE_PATH to the local SAGA checkout")
+        saga_override = ctx.env.get("ADAENGINE_SAGA_PACKAGE_PATH")
+        if saga_override or (studio and ctx.host != "macos"):
+            saga = Path(saga_override or ctx.root.parent / "SAGA")
+            add("SAGA", (saga / "Package.swift").is_file(), str(saga), "Set ADAENGINE_SAGA_PACKAGE_PATH to the local SAGA checkout")
+        else:
+            add("SAGA", True, "Revision managed by SwiftPM")
     if studio:
         if ctx.host == "windows":
             add("Windows architecture", ctx.arch == "x86_64", ctx.arch, "Studio packaging currently requires Windows x64")

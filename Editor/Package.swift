@@ -45,10 +45,11 @@ let hasSloppyRuntime = FileManager.default.fileExists(atPath: sloppyRuntimeURL.a
 let sloppyRuntimePackage: [Package.Dependency] = hasSloppyRuntime
     ? [.package(name: "SloppyRuntimePortable", path: sloppyRuntimeURL.path)]
     : []
+let sloppyRuntimePlatforms: [Platform] = isAndroidStudio ? [.android] : [.iOS, .visionOS]
 let sloppyRuntimeTarget: [Target.Dependency] = hasSloppyRuntime
     ? [
-        .product(name: "SloppyRuntime", package: "SloppyRuntimePortable", condition: .when(platforms: [.iOS, .visionOS, .android])),
-        .product(name: "Protocols", package: "SloppyRuntimePortable", condition: .when(platforms: [.iOS, .visionOS, .android])),
+        .product(name: "SloppyRuntime", package: "SloppyRuntimePortable", condition: .when(platforms: sloppyRuntimePlatforms)),
+        .product(name: "Protocols", package: "SloppyRuntimePortable", condition: .when(platforms: sloppyRuntimePlatforms)),
     ]
     : []
 // AdaMCP's dependency graph includes Git revisions, so SwiftPM requires a revision here.
