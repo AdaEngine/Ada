@@ -1660,7 +1660,7 @@ if usesSAGACompiler || isSAGANativeEnabled || isSAGAMetalEnabled {
     } else if isWebExportEnabled || isSAGAMetalEnabled {
         package.dependencies.append(.package(
             url: "https://github.com/AdaEngine/SAGA.git",
-            revision: "8be633b5be0f747e0aa4e030fcad03c4ca17908f"
+            revision: "5f04e009ce4a15ca4bfede6d7df7b14225d020cf"
         ))
     } else {
         let sagaPath = URL(fileURLWithPath: #filePath)
