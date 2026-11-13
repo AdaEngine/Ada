@@ -1,5 +1,6 @@
 #if canImport(AdaWGSLCompiler) && !os(WASI) && !os(Android)
     import AdaWGSLCompiler
+    @testable import AdaRender
     import Foundation
     import Testing
 
@@ -140,6 +141,25 @@
             #expect(!plain.contains("indirect") && !plain.contains("reflectionResponse"))
             #expect(indirect.contains("indirect") && !indirect.contains("reflectionResponse"))
             #expect(both.contains("indirect") && both.contains("reflectionResponse"))
+        }
+
+        /// `@Uniform(propertyName:)` finds its buffer by the reflected variable name, so the WESL variable must carry the
+        /// property name. A mismatch silently leaves the material's uniform buffer zeroed.
+        @Test func colorCanvasMaterialUniformIsNamedAfterItsProperty() throws {
+            let expectation = try #require(Self.expectations.first { $0.path.hasSuffix("color_canvas_material.wesl") })
+            let module = try link(expectation, features: ["VERTEX_POSITIONS"])
+            let reflection = WGSLReflection.parse(from: module.wgsl, stage: .fragment, entryPoint: "color_canvas_mesh_fragment")
+            #expect(reflection.shaderBuffers["ColorCanvasMaterial"]?.binding == 0)
+            #expect(reflection.shaderBuffers["material"] == nil)
+        }
+
+        @Test func circleCanvasMaterialUniformIsNamedAfterItsProperty() throws {
+            let expectation = try #require(Self.expectations.first { $0.path.hasSuffix("circle_canvas_material.wesl") })
+            let module = try link(expectation, features: ["VERTEX_POSITIONS", "VERTEX_UVS"])
+            let reflection = WGSLReflection.parse(from: module.wgsl, stage: .fragment, entryPoint: "circle_canvas_mesh_fragment")
+            #expect(reflection.shaderBuffers["CircleCanvasMaterial"]?.binding == 0)
+            #expect(reflection.shaderBuffers["CircleCanvasMaterial"]?.size == 32)
+            #expect(reflection.shaderBuffers["material"] == nil)
         }
 
         @Test(arguments: expectations)

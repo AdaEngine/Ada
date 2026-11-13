@@ -11,7 +11,7 @@ const root = fileURLToPath(new URL("../../..", import.meta.url));
 
 test("the real native snapshot is current, complete and preserves unsafe integer values as text", async () => {
   const value = await nativeAgentContract(root);
-  assert.equal(value.components.length, 12);
+  assert.equal(value.components.length, 13);
   assert.equal(value.input.bindings.length, 146);
   assert.equal(value.runtimeAPI, 4);
   const space = value.input.bindings.find(
@@ -56,7 +56,7 @@ test("frontend export refuses a stale native source, malformed fingerprint and d
   };
   await writeFile(sourcePath, "current source");
   await writeFile(destination, JSON.stringify(value));
-  assert.equal((await nativeAgentContract(folder)).components.length, 12);
+  assert.equal((await nativeAgentContract(folder)).components.length, 13);
   await writeFile(sourcePath, "changed source");
   await assert.rejects(
     nativeAgentContract(folder),

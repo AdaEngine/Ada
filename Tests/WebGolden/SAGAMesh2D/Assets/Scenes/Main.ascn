@@ -1,0 +1,123 @@
+{
+  "format": "ada.scene",
+  "schemaVersion": 1,
+  "engineVersion": "1.0.0",
+  "scene": {
+    "id": "saga-mesh2d",
+    "name": "SAGA Mesh 2D"
+  },
+  "entities": [
+    {
+      "id": "Camera",
+      "name": "Camera",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaRender.Camera": {
+          "projection": "orthographic",
+          "isActive": true,
+          "renderOrder": 0,
+          "backgroundColor": {
+            "red": 0,
+            "green": 0,
+            "blue": 0,
+            "alpha": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "quad",
+      "name": "Red Quad",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            -150,
+            0,
+            2
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaRender.Visibility": {
+          "value": "visible"
+        },
+        "AdaSprite.Mesh2D": {
+          "mesh": "Quad",
+          "size": 200,
+          "color": {
+            "red": 1,
+            "green": 0,
+            "blue": 0,
+            "alpha": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "circle",
+      "name": "Green Circle",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            150,
+            0,
+            2
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaRender.Visibility": {
+          "value": "visible"
+        },
+        "AdaSprite.Mesh2D": {
+          "mesh": "Circle",
+          "size": 200,
+          "color": {
+            "red": 0,
+            "green": 1,
+            "blue": 0,
+            "alpha": 1
+          }
+        }
+      }
+    }
+  ]
+}

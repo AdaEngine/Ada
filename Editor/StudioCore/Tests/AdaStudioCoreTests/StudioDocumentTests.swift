@@ -15,6 +15,11 @@ struct StudioDocumentTests {
         }
     }
 
+    @Test func webPlayerAcceptsTheStudio2DMeshComponent() {
+        // Studio authors 2D meshes as AdaSprite.Mesh2D; Web Run rejects scene components missing from this set.
+        #expect(StudioRuntimeCapabilities.components.contains("AdaSprite.Mesh2D"))
+    }
+
     @Test func agentProjectSourcePaths() {
         for path in ["AGENTS.md", "DESIGN.md", "PLAN.md", "PROGRESS.md", "Docs/Context.txt", "Tests/Rules.ada", ".ada/skills/my-game/SKILL.md", "Assets/Generated/Tree.vox"] {
             #expect(StudioSnapshot.validPath(path))

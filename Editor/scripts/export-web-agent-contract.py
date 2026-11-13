@@ -32,7 +32,7 @@ def sources():
         'Sources/AdaScriptCompilerCore/AdaScriptAPICatalog.swift',
         'Sources/AdaScriptCompilerCore/AdaScriptAnalysisModels.swift',
     ]
-    paths += [str(path.relative_to(ROOT)) for path in
+    paths += [path.relative_to(ROOT).as_posix() for path in
               (EDITOR / 'Sources/AdaEditor').glob('Editor*Descriptor*.swift')]
     paths += ['Editor/Sources/AdaEditor/EditorComponentRegistry.swift']
     paths += ['Editor/Sources/AdaEditor/EditorComponentFieldCoding.swift',
@@ -41,9 +41,9 @@ def sources():
     # descriptor. Invalidate the snapshot rather than silently keeping old shapes.
     for module in ['AdaInput', 'AdaScriptCompilerCore', 'AdaScripting', 'AdaTransform', 'AdaSprite',
                    'AdaScene', 'AdaRender', 'AdaCorePipelines', 'AdaAudio', 'AdaPhysics', 'Math', 'AdaTilemap']:
-        paths += [str(path.relative_to(ROOT)) for path in
+        paths += [path.relative_to(ROOT).as_posix() for path in
                   (ROOT / 'Sources' / module).rglob('*.swift')]
-    paths += [str(path.relative_to(ROOT)) for path in
+    paths += [path.relative_to(ROOT).as_posix() for path in
               (EDITOR / 'Sources/AdaEditor/Assets/Examples').rglob('*') if path.is_file() and path.name != '.DS_Store']
     return sorted(set(paths))
 

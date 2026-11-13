@@ -13,7 +13,7 @@ globalThis.fetch = async () => Response.json({ contract });
 test("built-in schemas and API member lookup stay available when the current scene is broken", async () => {
   const studio = { snapshot: { files: [] }, preview: { ready: false } };
   const components = await knowledge(studio, "editor_components_describe", {});
-  assert.equal(components.total, 12);
+  assert.equal(components.total, 13);
   assert.equal(components.projectComponentsAvailable, false);
   assert.ok(
     components.components.find(
@@ -121,6 +121,6 @@ test("missing Player support is reported explicitly while native built-ins remai
   };
   const result = await knowledge(studio, "editor_components_describe", {});
   assert.equal(result.projectComponentsAvailable, false);
-  assert.equal(result.total, 12);
+  assert.equal(result.total, 13);
   assert.match(result.diagnostic, /Update AdaPlayer/);
 });

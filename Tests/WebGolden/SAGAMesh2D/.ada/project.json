@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 3,
+  "project": {
+    "name": "SAGAMesh2D",
+    "displayName": "SAGA Mesh 2D"
+  },
+  "paths": {
+    "sources": "Sources",
+    "assets": "Assets",
+    "resourceRoots": [
+      "Assets"
+    ]
+  },
+  "build": {
+    "system": "adascript"
+  },
+  "runtime": {
+    "entry": {
+      "scene": "Assets/Scenes/Main.ascn"
+    },
+    "moduleName": "SAGAMesh2D",
+    "plugins": {
+      "preset": "game2d",
+      "presetVersion": 1,
+      "enable": [],
+      "disable": []
+    }
+  },
+  "editor": {
+    "startupScene": "Assets/Scenes/Main.ascn"
+  }
+}

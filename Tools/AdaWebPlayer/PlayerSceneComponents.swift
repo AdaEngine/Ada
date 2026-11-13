@@ -50,6 +50,7 @@ import Foundation
                     let mode = payload["imageMode"] == .null ? SpriteImageMode.stretch : try decode(SpriteImageMode.self, payload["imageMode"])
                     components.append(Sprite(texture: texture, tintColor: tint, flipX: payload["flipX"] == .bool(true), flipY: payload["flipY"] == .bool(true), size: size, anchor: anchor, imageMode: mode))
                 case "AdaScene.Mesh3DComponent": components.append(try mesh(payload))
+                case "AdaSprite.Mesh2D": components.append(try mesh2D(payload))
                 case "AdaScene.Model3DSource":
                     guard let source = payload["source"].string else { throw invalid("Model source is required") }
                     _ = try resource(source, project: project, directory: directory)
@@ -85,6 +86,22 @@ import Foundation
     }
     private static func decode<T: Decodable>(_ type: T.Type, _ value: StudioValue) throws -> T { try JSONDecoder().decode(type, from: value.encoded()) }
     private static func invalid(_ text: String) -> AdaWebPlayerProjectError { .invalid(text) }
+
+    /// Ada Studio's 2D mesh: a generated primitive drawn with a flat-color canvas material.
+    private static func mesh2D(_ payload: StudioValue) throws -> Mesh2D {
+        guard let engine = unsafe RenderEngine.shared else { throw invalid("Renderer unavailable") }
+        // A present key of the wrong type must fail, not fall back to the default.
+        if payload["mesh"] != .null, payload["mesh"].string == nil { throw invalid("2D mesh 'mesh' must be a string") }
+        if payload["size"] != .null, payload["size"].number == nil { throw invalid("2D mesh 'size' must be a number") }
+        let spec = try AdaWebPlayerMesh2D(mesh: payload["mesh"].string, size: payload["size"].number)
+        let size = Float(spec.size), device = engine.renderDevice
+        let mesh = switch spec.primitive {
+        case .quad: Mesh.generate(from: Quad(size: Vector2(size, size)), renderDevice: device)
+        case .circle: Mesh.generateCircle(radius: size / 2, renderDevice: device)
+        }
+        let color = payload["color"] == .null ? Color.white : try decode(Color.self, payload["color"])
+        return Mesh2D(mesh: mesh, materials: [CustomMaterial(ColorCanvasMaterial(color: color))])
+    }
 
     private static func mesh(_ payload: StudioValue) throws -> Mesh3DComponent {
         guard let engine = unsafe RenderEngine.shared else { throw invalid("Renderer unavailable") }

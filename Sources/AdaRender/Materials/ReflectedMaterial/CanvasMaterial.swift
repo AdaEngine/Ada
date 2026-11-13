@@ -37,12 +37,8 @@ private func canvasVariantModule(at path: String, defines: [ShaderDefine]) throw
 }
 
 extension CanvasMaterial {
-    // The browser keeps the staged GLSL variants until the exporter prelinks these WESL variants.
-    #if WASM
-        public static var usesVariantShaderModules: Bool { false }
-    #else
-        public static var usesVariantShaderModules: Bool { ShaderModule.supportsBundledWESL }
-    #endif
+    // The browser loads the WGSL variants the exporter prelinks from these WESL sources.
+    public static var usesVariantShaderModules: Bool { ShaderModule.supportsBundledWESL }
 
     public static func variantShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
         try canvasVariantModule(at: "Shaders/mesh2d/mesh2d.wesl", defines: defines)
@@ -133,14 +129,42 @@ public struct ColorCanvasMaterial: CanvasMaterial {
 
 /// Circle material will render circle on mesh.
 struct CircleCanvasMaterial: CanvasMaterial {
-    @Uniform(binding: 0, propertyName: "u_Thickness")
-    var thickness: Float
+    /// The shader's `CircleCanvasMaterial` block. Padding keeps `color` on the 16-byte boundary the shader expects.
+    struct Parameters {
+        var fade: Float
+        var thickness: Float
+        private var padding: SIMD2<Float> = .zero
+        var color: Color
 
-    @Uniform(binding: 0, propertyName: "u_Fade")
-    var fade: Float
+        init(fade: Float, thickness: Float, color: Color) {
+            self.fade = fade
+            self.thickness = thickness
+            self.color = color
+        }
+    }
 
-    @Uniform(binding: 0, propertyName: "u_Color")
-    var color: Color
+    // The whole block is written under the block's name; individual members cannot be addressed by name.
+    @Uniform(binding: 0, propertyName: "CircleCanvasMaterial")
+    var parameters: Parameters
+
+    init(thickness: Float, fade: Float, color: Color) {
+        self.parameters = Parameters(fade: fade, thickness: thickness, color: color)
+    }
+
+    var thickness: Float {
+        get { parameters.thickness }
+        set { parameters.thickness = newValue }
+    }
+
+    var fade: Float {
+        get { parameters.fade }
+        set { parameters.fade = newValue }
+    }
+
+    var color: Color {
+        get { parameters.color }
+        set { parameters.color = newValue }
+    }
 
     public static func variantShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
         try canvasVariantModule(at: "Shaders/Materials/circle_canvas_material.wesl", defines: defines)

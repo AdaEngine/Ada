@@ -61,7 +61,7 @@ public enum StudioRuntimeCapabilities {
     public static let communityPackageAPI = 2
     public static let components: Set<String> = [
         "AdaTransform.Transform", "AdaRender.Visibility", "AdaRender.Camera", "AdaSprite.Sprite",
-        "AdaTilemap.TileMapComponent", "AdaScene.Mesh3DComponent", "AdaScene.Model3DSource",
+        "AdaTilemap.TileMapComponent", "AdaSprite.Mesh2D", "AdaScene.Mesh3DComponent", "AdaScene.Model3DSource",
         "AdaScene.DirectionalLightComponent", "AdaScene.PointLightComponent", "AdaRender.Environment3D",
         "AdaPhysics.PhysicsBody2DComponent", "AdaAudio.AudioSource"
     ]

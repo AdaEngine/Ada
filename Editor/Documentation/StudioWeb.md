@@ -59,6 +59,26 @@ transactions as manual changes. Undo preserves the conversation. Scene preview
 installs component schemas without running gameplay systems; Game runs gameplay.
 The inspector edits authored component values, including position/quaternion/scale.
 Unknown runtime components fail with a diagnostic before scene entities spawn.
+
+### 2D meshes in the browser Player
+
+The browser Player renders the same 2D mesh component that Studio authors, `AdaSprite.Mesh2D`. Add it to an entity
+that also has a Transform, and use an orthographic camera:
+
+```json
+"AdaSprite.Mesh2D": { "mesh": "Circle", "size": 200, "color": { "red": 0, "green": 1, "blue": 0, "alpha": 1 } }
+```
+
+| Field | Values | Default |
+| --- | --- | --- |
+| `mesh` | `Quad` or `Circle` | `Quad` |
+| `size` | Edge length or diameter in world units; finite, above 0 and at most 100 000 | 64 |
+| `color` | `red`, `green`, `blue`, `alpha` | white |
+
+The mesh is drawn with a flat-color canvas material. `Cube`, `Sphere` and `Plane` belong to the 3D mesh component
+and are rejected on a 2D mesh. An invalid `mesh`, `size` or `color` fails scene loading with a diagnostic before any
+entity spawns. One minimal scene, a red quad beside a green circle, is the browser check in
+`Tests/WebGolden/SAGAMesh2D`; run `node script/web_golden_saga.mjs <bundle> --mesh2d` against an exported player.
 Scene selection uses the object hierarchy or viewport bounds picking; the inspector edits supported transforms,
 materials and camera properties. Move/rotate/scale gizmos update the live world during
 a drag and commit one document transaction on release. Escape/pointer cancellation

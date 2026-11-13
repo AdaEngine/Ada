@@ -42,6 +42,7 @@ enum EditorAgentWebContract {
         "AdaRender.Visibility": ["value"],
         "AdaRender.Camera": ["projection", "isActive", "renderOrder", "backgroundColor"],
         "AdaSprite.Sprite": ["texture", "tintColor", "size", "flipX", "flipY", "anchor", "imageMode"],
+        "AdaSprite.Mesh2D": ["mesh", "size", "color"],
         "AdaScene.Mesh3DComponent": ["mesh", "size", "color", "metallic", "roughness", "castShadows", "receiveShadows"],
         "AdaScene.Model3DSource": ["source", "animation", "autoplay", "repeats"],
         "AdaScene.DirectionalLightComponent": ["radiance", "intensity", "castShadows"],

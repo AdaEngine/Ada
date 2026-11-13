@@ -116,8 +116,9 @@ try {
   if (!response.ok) throw new Error('Game manifest is missing.');
   const project = await response.json();
   if (project.entryScene) {
-    let settingsResponse = await fetch('./game/.ada/project.json', { cache: 'no-store' });
-    if (!settingsResponse.ok) settingsResponse = await fetch('./game/runtime-settings.json', { cache: 'no-store' });
+    // Packaged players ship runtime-settings.json; the Swift project layout keeps the same data in .ada/project.json.
+    let settingsResponse = await fetch('./game/runtime-settings.json', { cache: 'no-store' });
+    if (!settingsResponse.ok) settingsResponse = await fetch('./game/.ada/project.json', { cache: 'no-store' });
     if (!settingsResponse.ok) throw new Error('Game runtime settings are missing.');
     const settings = await settingsResponse.json();
     const plugins = settings.runtime?.plugins;

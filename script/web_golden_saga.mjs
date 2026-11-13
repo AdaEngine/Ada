@@ -2,6 +2,7 @@
 //
 //   node script/web_golden_saga.mjs <web-player-bundle> [--record]
 //   node script/web_golden_saga.mjs <studio-web-bundle> --studio-export [--actual=<png>]
+//   node script/web_golden_saga.mjs <mesh2d-bundle> --mesh2d [--actual=<png>]
 //
 // <web-player-bundle> is an `AdaWebPlayer` export packed with Tests/WebGolden/SAGASmoke (see the README next to it).
 // The bundle must contain `saga-golden.mjs` and `saga-webgpu.mjs` (shipped by the export plugin).
@@ -20,7 +21,9 @@ import { fileURLToPath } from "node:url";
 const args = process.argv.slice(2);
 const record = args.includes("--record");
 const studioExport = args.includes("--studio-export");
-if (record && studioExport) throw new Error("The Studio export smoke has no golden to record");
+const mesh2D = args.includes("--mesh2d");
+if (record && (studioExport || mesh2D)) throw new Error("The Studio export and 2D mesh smokes have no golden to record");
+if (studioExport && mesh2D) throw new Error("Pass either --studio-export or --mesh2d");
 const bundle = args.find(arg => !arg.startsWith("--"));
 if (!bundle) throw new Error("Pass the exported web player bundle directory");
 const actualPath = args.find(arg => arg.startsWith("--actual="))?.slice("--actual=".length);
@@ -59,6 +62,8 @@ try {
     const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
     const pageErrors = [];
     page.on("console", message => { if (message.type() === "error") console.error("[page]", message.text()); });
+    // The browser's own 404 console line omits the URL; report it so a missing asset can be traced.
+    page.on("response", response => { if (response.status() >= 400) console.error("[http]", response.status(), response.url()); });
     page.on("pageerror", error => {
         pageErrors.push(error.message);
         console.error("[page]", error.stack);
@@ -90,6 +95,11 @@ try {
         assert.deepEqual(pageErrors, []);
         if (actualPath) await page.screenshot({ path: actualPath });
         console.log(JSON.stringify({ initial, resized }));
+    } else if (mesh2D) {
+        const result = await captureMesh2D(page);
+        assert.deepEqual(pageErrors, []);
+        if (actualPath) await page.screenshot({ path: actualPath });
+        console.log(JSON.stringify(result));
     } else if (record) {
         const base64 = await page.evaluate(async () => {
             const golden = await import("./saga-golden.mjs");
@@ -137,5 +147,31 @@ async function captureStudioSprite(page) {
     });
     assert.ok(result.width > 0 && result.height > 0, "SAGA did not report a drawable surface");
     assert.ok(result.spritePixels > 25, "No orange Shader Graph sprite in the presented frame");
+    return result;
+}
+
+// The 2D mesh smoke asserts colors instead of comparing a reference image: a saturated red quad must cover part of
+// the left half only, a saturated green circle part of the right half only, and nothing else may be drawn.
+async function captureMesh2D(page) {
+    const result = await page.evaluate(async () => {
+        const host = globalThis.__adaSAGAHost;
+        const { captureStable } = await import("./saga-golden.mjs");
+        const frame = await captureStable(host, { width: 320, height: 200 });
+        const counts = { redLeft: 0, redRight: 0, greenLeft: 0, greenRight: 0, other: 0 };
+        for (let index = 0; index < frame.pixels.length; index += 4) {
+            const red = frame.pixels[index], green = frame.pixels[index + 1], blue = frame.pixels[index + 2];
+            const left = (index / 4) % frame.width < frame.width / 2;
+            if (red > 200 && green < 60 && blue < 60) counts[left ? "redLeft" : "redRight"]++;
+            else if (green > 200 && red < 60 && blue < 60) counts[left ? "greenLeft" : "greenRight"]++;
+            else if (red > 40 || green > 40 || blue > 40) counts.other++;
+        }
+        return { width: frame.width, height: frame.height, ...counts };
+    });
+    const covered = result.width * result.height;
+    assert.ok(result.redLeft > covered * 0.02, `Red quad missing on the left: ${JSON.stringify(result)}`);
+    assert.ok(result.greenRight > covered * 0.02, `Green circle missing on the right: ${JSON.stringify(result)}`);
+    assert.equal(result.redRight + result.greenLeft, 0, `Mesh drawn on the wrong side: ${JSON.stringify(result)}`);
+    // Anti-aliased edges are allowed, but not a stray fill.
+    assert.ok(result.other < covered * 0.02, `Unexpected pixels: ${JSON.stringify(result)}`);
     return result;
 }

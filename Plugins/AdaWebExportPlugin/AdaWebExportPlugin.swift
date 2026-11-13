@@ -13,6 +13,17 @@ struct AdaWebExportPlugin: CommandPlugin {
     private static let renderBundle = "AdaEngine_AdaRender.resources"
     private static let flat3DBundle = "AdaEngine_AdaCorePipelines.resources"
     private static let flat3DVariants = [["ADA_TERRAIN"], ["ADA_WIREFRAME"], ["ADA_TERRAIN", "ADA_WIREFRAME"]]
+    /// Vertex layouts a 2D mesh can have, in the sorted order the runtime uses to name a shipped variant.
+    private static let canvasMeshVariants = [
+        ["VERTEX_POSITIONS"],
+        ["VERTEX_POSITIONS", "VERTEX_UVS"],
+        ["VERTEX_COLORS", "VERTEX_POSITIONS"],
+        ["VERTEX_NORMALS", "VERTEX_POSITIONS"],
+        ["VERTEX_COLORS", "VERTEX_POSITIONS", "VERTEX_UVS"],
+        ["VERTEX_NORMALS", "VERTEX_POSITIONS", "VERTEX_UVS"],
+        ["VERTEX_COLORS", "VERTEX_NORMALS", "VERTEX_POSITIONS"],
+        ["VERTEX_COLORS", "VERTEX_NORMALS", "VERTEX_POSITIONS", "VERTEX_UVS"],
+    ]
 
     func performCommand(context: PluginContext, arguments: [String]) async throws {
         let options: ExportOptions
@@ -577,6 +588,14 @@ struct AdaWebExportPlugin: CommandPlugin {
                 case "Shaders/meshlet_map_3d.wesl": [["MAP_RESPONSE"], ["MAP_SURFACE"], ["MAP_RESPONSE", "MAP_SURFACE"]]
                 default: []
                 }
+            } else if resourceBundle.source.lastPathComponent == Self.renderBundle {
+                variants = switch shaderURL.relativePath(from: resourceBundle.source) {
+                case "Shaders/mesh2d/mesh2d.wesl",
+                     "Shaders/Materials/color_canvas_material.wesl",
+                     "Shaders/Materials/circle_canvas_material.wesl":
+                    Self.canvasMeshVariants
+                default: []
+                }
             } else {
                 variants = []
             }
@@ -1000,6 +1019,7 @@ private func indexHTML(product: String) -> String {
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>\(product)</title>
+      <link rel="icon" href="data:,">
       <style>
         :root {
           color-scheme: light dark;

@@ -254,19 +254,18 @@ extension Material {
         }
     }
 
+    /// The complete shader module for a vertex layout. It comes from the material so variant materials (WESL) and
+    /// source materials (compiled with the layout's defines) both work.
+    func makeMesh2dShaderModule(for materialKey: MaterialMesh2dKey) throws -> ShaderModule {
+        try self.makeShaderModule(defines: materialKey.defines)
+    }
+
     private func createPipeline(
         for materialKey: MaterialMesh2dKey,
         device: RenderDevice
     ) -> (RenderPipeline, ShaderModule)? {
-        let compiler = ShaderCompiler(shaderSource: self.shaderSource)
-
-        for define in materialKey.defines {
-            compiler.setMacro(define.name, value: define.value, for: .vertex)
-            compiler.setMacro(define.name, value: define.value, for: .fragment)
-        }
-
         do {
-            let shaderModule = try compiler.compileShaderModule()
+            let shaderModule = try self.makeMesh2dShaderModule(for: materialKey)
 
             guard let pipelineDesc = self.configureRenderPipeline(for: materialKey.vertexDescritor, keys: materialKey.keys, shaderModule: shaderModule) else {
                 return nil

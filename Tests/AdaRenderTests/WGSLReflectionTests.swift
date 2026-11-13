@@ -21,6 +21,59 @@ struct WGSLReflectionTests {
         #expect(WGSLReflection.parse(from: source, stage: .fragment).shaderBuffers.count == 3)
     }
 
+    @Test func uniformBufferSizesFollowTheWGSLUniformLayout() {
+        let source = """
+            struct View { projection: mat4x4f, viewProjection: mat4x4f, viewMatrix: mat4x4f, }
+            struct Mesh { model: mat4x4<f32>, inverse: mat4x4<f32>, }
+            struct Circle { fade: f32, thickness: f32, color: vec4f, }
+            struct Padded { a: vec3f, b: f32, }
+            struct Shifted { a: f32, b: vec3f, }
+            struct Outer { inner: Circle, tint: vec2f, }
+            struct Lights { count: u32, values: array<vec4f, 4>, }
+            @group(0) @binding(0) var<uniform> circle: Circle;
+            @group(0) @binding(1) var<uniform> padded: Padded;
+            @group(0) @binding(2) var<uniform> view: View;
+            @group(0) @binding(3) var<uniform> mesh: Mesh;
+            @group(0) @binding(4) var<uniform> shifted: Shifted;
+            @group(0) @binding(5) var<uniform> outer: Outer;
+            @group(0) @binding(6) var<uniform> lights: Lights;
+            @group(0) @binding(7) var<uniform> color: vec4f;
+            @group(0) @binding(8) var<uniform> unknown: Missing;
+            """
+        let sizes = WGSLReflection.parse(from: source, stage: .fragment).shaderBuffers.mapValues(\.size)
+        #expect(sizes["circle"] == 32)
+        #expect(sizes["padded"] == 16)
+        #expect(sizes["view"] == 192)
+        #expect(sizes["mesh"] == 128)
+        #expect(sizes["shifted"] == 32)
+        #expect(sizes["outer"] == 48)
+        #expect(sizes["lights"] == 80)
+        #expect(sizes["color"] == 16)
+        // A type that cannot be resolved keeps the previous behavior instead of guessing.
+        #expect(sizes["unknown"] == 0)
+    }
+
+    @Test func uniformLayoutIgnoresCommentsAndFallsBackForUnsupportedMembers() {
+        let source = """
+            struct Commented {
+                fade: f32, // thickness: f32
+                /* block: vec4f, */ color: vec4f, // trailing: f32
+            }
+            struct Attributed { @size(32) a: f32, }
+            struct Half { a: f16, b: vec3<f16>, }
+            struct Nested { first: Commented, second: Commented, }
+            @group(0) @binding(0) var<uniform> commented: Commented;
+            @group(0) @binding(1) var<uniform> attributed: Attributed;
+            @group(0) @binding(2) var<uniform> half: Half;
+            @group(0) @binding(3) var<uniform> nested: Nested;
+            """
+        let sizes = WGSLReflection.parse(from: source, stage: .fragment).shaderBuffers.mapValues(\.size)
+        #expect(sizes["commented"] == 32)
+        #expect(sizes["attributed"] == 0)
+        #expect(sizes["half"] == 16)
+        #expect(sizes["nested"] == 64)
+    }
+
     @Test(arguments: ["0", "0u", " 0u "])
     func recognizesTintUnsignedBindings(group: String) {
         let source = """
