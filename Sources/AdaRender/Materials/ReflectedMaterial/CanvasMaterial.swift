@@ -32,7 +32,22 @@ private func loadBundledCanvasShaderSource(
 /// This material can be render Meshes in 2D world.
 public protocol CanvasMaterial: ReflectedMaterial {}
 
+private func canvasVariantModule(at path: String, defines: [ShaderDefine]) throws -> ShaderModule {
+    try ShaderModule.createBundled(at: path, from: Bundle.adaModule, defines: defines.map { $0.name })
+}
+
 extension CanvasMaterial {
+    // The browser keeps the staged GLSL variants until the exporter prelinks these WESL variants.
+    #if WASM
+        public static var usesVariantShaderModules: Bool { false }
+    #else
+        public static var usesVariantShaderModules: Bool { ShaderModule.supportsBundledWESL }
+    #endif
+
+    public static func variantShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
+        try canvasVariantModule(at: "Shaders/mesh2d/mesh2d.wesl", defines: defines)
+    }
+
     public static func vertexShader() throws -> AssetHandle<ShaderSource> {
         return try loadBundledCanvasShaderSource(
             at: "Shaders/mesh2d/mesh2d.glsl#vert",
@@ -104,6 +119,10 @@ public struct ColorCanvasMaterial: CanvasMaterial {
         self.color = color
     }
 
+    public static func variantShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
+        try canvasVariantModule(at: "Shaders/Materials/color_canvas_material.wesl", defines: defines)
+    }
+
     public static func fragmentShader() throws -> AssetHandle<ShaderSource> {
         return try loadBundledCanvasShaderSource(
             at: "Shaders/Materials/color_canvas_material.glsl",
@@ -122,6 +141,10 @@ struct CircleCanvasMaterial: CanvasMaterial {
 
     @Uniform(binding: 0, propertyName: "u_Color")
     var color: Color
+
+    public static func variantShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
+        try canvasVariantModule(at: "Shaders/Materials/circle_canvas_material.wesl", defines: defines)
+    }
 
     public static func fragmentShader() throws -> AssetHandle<ShaderSource> {
         return try loadBundledCanvasShaderSource(

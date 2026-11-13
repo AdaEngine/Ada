@@ -16,6 +16,8 @@ struct GoldenFrame {
     enum Backend: String, CaseIterable {
         case metal
         case webgpu
+        /// SAGA's native Vulkan/WebGPU runtime (`ADAENGINE_SAGA_NATIVE=1` builds).
+        case saga
     }
 
     struct Tolerance: Sendable, Equatable {
@@ -35,13 +37,16 @@ struct GoldenFrame {
         if environment["ADAENGINE_GOLDEN_WEBGPU"] == "1" {
             return .webgpu
         }
+        if environment["ADAENGINE_GOLDEN_SAGA"] == "1" {
+            return .saga
+        }
         return environment["ADAENGINE_GOLDEN_METAL"] == "1" ? .metal : nil
     }
 
     static var isEnabled: Bool { activeBackend != nil }
 
     static func tolerance(for backend: Backend) -> Tolerance {
-        backend == .webgpu ? .webgpu : .metal
+        backend == .metal ? .metal : .webgpu
     }
 
     /// Tolerance for comparing two renders of the active backend with each other or with its references.

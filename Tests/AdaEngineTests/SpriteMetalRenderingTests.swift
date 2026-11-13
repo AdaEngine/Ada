@@ -53,7 +53,8 @@ struct SpriteMetalRenderingTests {
         #expect(image.getPixel(x: 0, y: 0) == .red)
         #expect(image.getPixel(x: 2, y: 1) == .red)
         let samplingOnly = Texture2D(image: Image(width: 1, height: 1, color: .white))
-        #expect(try await device.readImage(from: samplingOnly) == nil)
+        let sampledImage = try #require(try await device.readImage(from: samplingOnly))
+        #expect(sampledImage.getPixel(x: 0, y: 0) == .white)
     }
 
     #if os(macOS)

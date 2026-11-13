@@ -113,6 +113,13 @@ struct MobileVoiceOrbMaterial: UIShaderMaterial {
         parameters = MobileVoiceOrbParameters(geometry: Vector4(1, 1, 8, 0), style: Vector4(1, 0, 0, 0))
     }
 
+    static func shaderModule() throws -> ShaderModule? {
+        guard ShaderModule.supportsBundledWESL,
+              let url = Bundle.editor.url(forResource: "mobile_voice_orb", withExtension: "wesl", subdirectory: "Assets/Shaders")
+        else { return nil }
+        return try ShaderModule.create(from: url)
+    }
+
     static func fragmentShader() throws -> AssetHandle<ShaderSource> {
         guard let url = Bundle.editor.url(forResource: "mobile_voice_orb", withExtension: "glsl", subdirectory: "Assets/Shaders") else {
             throw CocoaError(.fileNoSuchFile)

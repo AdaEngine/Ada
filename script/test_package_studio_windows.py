@@ -22,13 +22,13 @@ class WindowsPackagingTests(unittest.TestCase):
             marker = installed / "user-file.txt"
             marker.write_text("keep", encoding="utf-8")
             with self.assertRaises(FileExistsError):
-                packaging.package(Path("missing"), Path("missing"), Path("missing"), output, "local", stage_only=True)
+                packaging.package(Path("missing"), Path("missing"), output, "local", stage_only=True)
             self.assertEqual(marker.read_text(encoding="utf-8"), "keep")
 
     def test_version_cannot_escape_output_directory(self):
         for version in ["../escape", "v1/a", "v1\\a", "", "a" * 81]:
             with self.subTest(version=version), self.assertRaises(ValueError):
-                packaging.package(Path("missing"), Path("missing"), Path("missing"), Path("missing"), version)
+                packaging.package(Path("missing"), Path("missing"), Path("missing"), version)
 
     @unittest.skipUnless(os.name == "nt", "PE imports and runtime loading require Windows")
     def test_pe_import_closure_runs_after_relocation_without_system_dll_copies(self):

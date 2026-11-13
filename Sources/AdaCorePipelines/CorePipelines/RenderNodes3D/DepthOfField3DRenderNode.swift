@@ -116,7 +116,7 @@ struct DepthOfField3DViews: Resource {
     private var retired: [RenderTexture] = []
 
     init(device: RenderDevice) {
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/depth_of_field_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("depth_of_field_3d")
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),

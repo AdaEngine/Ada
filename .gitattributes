@@ -2,6 +2,7 @@
 *.vert text eol=lf
 *.glsl text eol=lf
 *.sh text eol=lf
+/Tools/Lore/*.patch text eol=lf
 
 /Sources/AdaEngine/AdaEngine.docc/*.png -diff -merge
 /Sources/AdaEngine/AdaEngine.docc/*.jpg -diff -merge

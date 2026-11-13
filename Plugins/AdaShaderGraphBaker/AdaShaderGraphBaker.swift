@@ -2,6 +2,7 @@ import AdaAssets
 import AdaCorePipelines
 import AdaRender
 import AdaSprite
+import AdaWGSLCompiler
 import Foundation
 #if os(Windows)
 import CRT
@@ -24,7 +25,7 @@ struct AdaShaderGraphBaker {
 
     private static func bake() throws {
         let args = CommandLine.arguments
-        guard args.count == 3 else { throw BakeError.message("Usage: AdaShaderGraphBaker <GameAssets> <tint>") }
+        guard args.count == 2 else { throw BakeError.message("Usage: AdaShaderGraphBaker <GameAssets>") }
         let root = URL(fileURLWithPath: args[1]).standardizedFileURL
         let files = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey])?.allObjects as? [URL] ?? [])
             .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }.sorted { $0.path < $1.path }
@@ -53,7 +54,7 @@ struct AdaShaderGraphBaker {
         var seen = Set<String>()
         for (path, graph) in graphs.sorted(by: { $0.key < $1.key }) + inline.enumerated().map({ ("inline:\($0.offset)", $0.element) }) {
             do {
-                let program = try graph.compileGLSL()
+                let program = try graph.compileWGSL()
                 for texture in program.textures {
                     guard let texturePath = texture.path else { continue }
                     let resolved: String
@@ -62,44 +63,39 @@ struct AdaShaderGraphBaker {
                     } else { throw BakeError.message("Texture needs a packaged resource path: \(texturePath)") }
                     paths.insert(resolved)
                 }
-                let templates: [(String, [String])]
+                // Every template the runtime may pair this graph with, linked from the same WESL the native renderer uses.
+                var templates: [(name: String, source: String, root: URL, macros: [String])] = []
                 if graph.target == .sprite {
-                    templates = try [false, true].map { (try SpriteGraphPipeline.fragmentTemplate(instanced: $0), []) }
+                    let root = SpriteGraphPipeline.weslPackageRoot
+                    for instanced in [false, true] {
+                        templates.append((instanced ? "sprite_instanced" : "sprite", try SpriteGraphPipeline.weslTemplate(instanced: instanced), root, []))
+                    }
                 } else {
-                    var variants: [(String, [String])] = []
+                    let root = ShaderGraph3DPipeline.weslPackageRoot
+                    let surface = try ShaderGraph3DPipeline.weslTemplate()
                     for mask in textureMasks.sorted() {
                         for layers: UInt32 in 0..<8 {
                             for morph: UInt32 in [0, 1 << 11] {
                                 let features = ShaderGraphBakeVariants.features(textureMask: mask, layers: layers, morph: morph != 0)
-                                variants.append((try ShaderGraph3DPipeline.fragmentTemplate(), features.enablingMacros))
+                                templates.append(("flat3d", surface, root, features.enablingMacros))
                             }
                         }
                     }
                     for name in ["directional_shadow_3d", "motion_3d"] {
+                        let text = try ShaderGraph3DPipeline.weslTemplate(path: "Shaders/\(name).wesl")
                         for morph in [false, true] {
-                            variants.append((try ShaderGraph3DPipeline.fragmentTemplate(path: "Shaders/\(name).glsl"), morph ? ["ADA_MORPH"] : []))
+                            templates.append((name, text, root, morph ? ["ADA_MORPH"] : []))
                         }
                     }
-                    templates = variants
                 }
-                for (template, macros) in templates {
-                    let source = program.inserting(in: template)
-                    let identity = source + "\u{0}" + macros.sorted().joined(separator: ",")
+                for template in templates {
+                    let fragment = try ShaderGraphArchive.Fragment.bake(
+                        template: template.name, templateSource: template.source, program: program,
+                        packageRoot: template.root, macros: template.macros
+                    )
+                    let identity = fragment.source + "\u{0}" + template.macros.sorted().joined(separator: ",")
                     guard seen.insert(identity).inserted else { continue }
-                    let shader = ShaderSource()
-                    shader.setSource(source, for: .fragment)
-                    let compiler = ShaderCompiler(shaderSource: shader)
-                    compiler.setMacro("ADA_SHADER_GRAPH", value: "1", for: .fragment)
-                    for macro in macros { compiler.setMacro(macro, value: "1", for: .fragment) }
-                    let binary = try compiler.exportFragment()
-                    let wgsl = try tint(args[2], data: binary.data, entryPoint: binary.entryPoint)
-                    fragments.append(.init(
-                        source: source,
-                        defines: Dictionary(uniqueKeysWithValues: macros.map { ($0, "1") }),
-                        entryPoint: binary.entryPoint,
-                        wgsl: wgsl,
-                        reflection: binary.reflection
-                    ))
+                    fragments.append(fragment)
                 }
             } catch { throw BakeError.message("Shader Graph \(path) [\(graph.target.rawValue)]: \(error)") }
         }
@@ -156,27 +152,6 @@ struct AdaShaderGraphBaker {
                 try collect(nested, graphs: &graphs, paths: &paths, references: &references, textureMasks: &textureMasks)
             }
         }
-    }
-
-    private static func tint(_ executable: String, data: Data, entryPoint: String) throws -> String {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let input = directory.appendingPathComponent("shader.spv")
-        let output = directory.appendingPathComponent("shader.wgsl")
-        let errors = directory.appendingPathComponent("errors.txt")
-        try data.write(to: input)
-        FileManager.default.createFile(atPath: errors.path, contents: nil)
-        let errorHandle = try FileHandle(forWritingTo: errors)
-        defer { try? errorHandle.close() }
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: executable)
-        process.arguments = ["--format", "wgsl", "--allow-non-uniform-derivatives", "true", "-o", output.path, input.path]
-        process.standardError = errorHandle
-        try process.run()
-        process.waitUntilExit()
-        guard process.terminationStatus == 0 else { throw BakeError.message(try String(contentsOf: errors, encoding: .utf8)) }
-        return try String(contentsOf: output, encoding: .utf8).replacingOccurrences(of: "fn main(", with: "fn \(entryPoint)(")
     }
 
     private enum BakeError: Error, CustomStringConvertible {

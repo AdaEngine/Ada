@@ -279,7 +279,10 @@
                         device.createBindGroupLayout(
                             descriptor: WebGPU.GPUBindGroupLayoutDescriptor(
                                 label: "\(descriptor.debugName) Bind Group Layout \(index)",
-                                entries: makeBindGroupLayoutEntries(from: descriptorSet)
+                                entries: makeBindGroupLayoutEntries(
+                                    from: descriptorSet,
+                                    unfilterableTextureBindings: descriptor.unfilterableTextureBindings[index] ?? []
+                                )
                             )
                         )
                     }
@@ -302,7 +305,8 @@
             }
 
             private static func makeBindGroupLayoutEntries(
-                from descriptorSet: ShaderResource.DescriptorSet
+                from descriptorSet: ShaderResource.DescriptorSet,
+                unfilterableTextureBindings: Set<Int>
             ) -> [WebGPU.GPUBindGroupLayoutEntry] {
                 var entries: [WebGPU.GPUBindGroupLayoutEntry] = []
 
@@ -317,12 +321,18 @@
                 }
 
                 for (binding, texture) in descriptorSet.sampledImages {
+                    let sampleType: WebGPU.GPUTextureSampleType
+                    if texture.isDepth == true {
+                        sampleType = .depth
+                    } else {
+                        sampleType = unfilterableTextureBindings.contains(binding) ? .unfilterableFloat : .float
+                    }
                     entries.append(
                         WebGPU.GPUBindGroupLayoutEntry(
                             binding: binding,
                             visibility: texture.shaderStage.toWebGPU,
                             texture: WebGPU.GPUTextureBindingLayout(
-                                sampleType: .float,
+                                sampleType: sampleType,
                                 viewDimension: texture.textureType.toWebGPUTextureViewDimension,
                                 multisampled: false
                             )

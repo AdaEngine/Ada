@@ -315,7 +315,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• Terrain\n• visionOS Windowed Mode",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• Terrain\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
         "level": 0,
         "links": [
           {
@@ -361,6 +361,10 @@
           {
             "title": "visionOS Windowed Mode",
             "destination": "VisionOSWindowed"
+          },
+          {
+            "title": "Compile modular WESL shaders",
+            "destination": "WESLShaders"
           }
         ]
       }
@@ -4620,6 +4624,199 @@
       {
         "kind": "text",
         "text": "Run with `ADAENGINE_STALL_PROBE=1` to print slow operations, including `App.Update.*` and `Schedule.*`\nspans for each world. With pipelining on, the scene's update on the main thread shrinks to its simulation\nand extraction while its render world appears as a separate span. The Sponza technical example also\nprints per-second frame statistics with `ADAENGINE_SPONZA_FRAME_LOG=1`.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "WESLShaders",
+    "title": "Compile modular WESL shaders",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/WESLShaders.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Link local shader modules and compile feature variants to WGSL with the AdaEngine host tool.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "AdaEngine links the modules in Swift and validates the result with the local SAGACompiler. The shader syntax follows the WESL specification snapshot.",
+        "level": 0,
+        "links": [
+          {
+            "title": "WESL specification snapshot",
+            "destination": "https://github.com/webgpu-tools/wesl-spec/tree/37bf3f3a2164781040e7a42fc6529cb34e2c059b"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Link two shader files",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Save a helper as `shaders/common.wesl`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "fn shade() -> vec4f { return vec4f(1); }",
+        "language": "wgsl",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Save the entry module as `shaders/main.wesl`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import package::common::shade as baseColor;\n\n@if(textured)\n@group(0) @binding(0) var image: texture_2d<f32>;\n\n@fragment fn fragmentMain() -> @location(0) vec4f {\n    @if(textured)\n    return textureLoad(image, vec2i(0), 0) * baseColor();\n    @else\n    return baseColor();\n}",
+        "language": "wgsl",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Enable the host export tools and compile both variants.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "export ADAENGINE_WEB_EXPORT=1\nswift run AdaShaderTranspilerTool --input shaders/main.wesl --output-directory compiled\nswift run AdaShaderTranspilerTool --input shaders/main.wesl --output-directory compiled --feature textured",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In PowerShell, set the variable with `$env:ADAENGINE_WEB_EXPORT = '1'`.\nThe tool writes `compiled/main.wgsl` and `compiled/main.textured.wgsl`. The textured variant declares a texture at group 0, binding 0. Use `--wesl-root` when the main module lives below the package root. Use `--wesl-dependency name=directory` to register a package for imports starting with `name::`. Inside that dependency, `package::` refers to its own root.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "On SAGA and native WebGPU builds with WESL support, `ShaderModule.create(from:)` loads the default variant from a `.wesl` file. Use `ShaderModule.createWESL(from:packageRoot:features:)` to supply a package root or enable features. A shader module can have one entry point per active stage. The browser uses linked WGSL, and SAGA compiles the same linked source to MSL for Metal or SPIR-V for Vulkan. SAGAMetal is the default renderer on macOS, iOS, and tvOS.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "When porting a GLSL material, move its sampler and texture into separate WGSL bindings and pass vertex outputs explicitly between stages. The fragment example above uses `textureLoad` for integer texel coordinates. For normalized, filtered sampling, declare a `sampler` at a separate binding and use `textureSample(image, imageSampler, uv)`. Update the material's binding numbers to match the WESL declarations and compile every feature combination the material uses.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The built-in quad, circle, line, and linear gradient use WESL on WebGPU. The sprite, instanced sprite, Spine, text, and tilemap pipelines also use WESL on WebGPU. These shaders import the shared view projection from `ada_engine::view`. The runtime and web exporter register this package from the AdaRender shader resources. The 2D composite, point, and directional lighting passes share their fullscreen vertex stage through `light2d_fullscreen.wgsl`. Web export links their default variants on the host and packages the WGSL stages for browser startup. In automatic web export, the entry file's directory is the local package root. Backends without WESL support load the corresponding GLSL shaders.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Fullscreen presentation, local shadow atlas clears, and temporal tone mapping use a common fullscreen vertex module. The temporal tone mapping pass imports the output transform and color grading modules. Sky motion, FXAA, SSAO, the 3D debug view, and temporal output depth also use the fullscreen module. The depth pass and portable temporal reconstruction use depth texture bindings and integer texel loads. Reconstruction reads its R32Float history without filtering. Bloom, automatic exposure, depth of field, and camera effects use the same fullscreen vertex module. Camera effects also use the shared display dithering function.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The screen-space reflection pass and path-tracing composite import environment fog, exposure, bloom, and grading from the shared composite module.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Directional shadows and motion vectors use WESL base shaders and `ADA_MORPH` variants. They share mesh morphing, face and fade visibility, and base-color alpha sampling. Web export packages the linked variant with its feature name, for example `directional_shadow_3d.wesl.ADA_MORPH.vert.wgsl`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Dynamic irradiance probe updates use integer texel reads for transport, history, and the local shadow atlas.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The meshlet map exports the base shader and the three combinations of its reflection response and surface attachments.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The linker reports linking errors with the affected file path. This initial implementation supports explicit local imports and conditional declarations. It rejects cyclic imports and local names that shadow linked bindings. Web export emits named variants for built-in pipelines that declare them. Caching linked artifacts and remapping compiler diagnostics to the original source are pending.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Emit native backend code with SAGA",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The host tool can compile linked WESL directly through SAGA to Metal source or binary SPIR-V.\nEnable the host tools with `ADAENGINE_WEB_EXPORT=1`, then use the same source package and feature flags:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "swift run AdaShaderTranspilerTool --input shaders/main.wesl --output-directory compiled --target msl\nswift run AdaShaderTranspilerTool --input shaders/main.wesl --output-directory compiled --target spirv --feature textured",
+        "language": "sh",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For the fragment-only example above these commands write `main.frag.msl` and\n`main.textured.frag.spv`. Vertex and compute stages use `.vert` and `.comp` suffixes.\nSPIR-V output is a little-endian binary module, not a GLSL string or a WGSL sidecar.\nThe default target remains WGSL. `--web-stages` is only valid with WGSL output.\nA bundled module must have at most one entry point of each stage; the tool compiles every stage\nbefore writing the native batch, so a compiler failure does not publish a partial batch.\nFilesystem failures during writing can still leave individual completed files.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For in-process integration, `WESLBackendCompiler.compile(_:to:)` takes the artifact returned by\n`WESLHostCompiler.compile` and returns each emitted stage, its source and generated entry-point names,\nits code bytes and its full SAGA render/compute reflection. Use the reflected Metal buffer, texture\nand sampler indices: WGSL binding numbers are not necessarily Metal resource slots.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Custom `ReflectedMaterial` types may override `shaderModule()` to supply a complete module instead of\nseparate legacy vertex/fragment sources. The default returns `nil`, preserving the current source path.\n`CustomMaterial` retains a supplied module and uses per-instance material identity; it does not recompile\nits stages as GLSL. Such a module must already have the correct reflection and selected feature variant:\npassing shader defines afterward is rejected, and serializing a module-backed material without its\noriginal source is unsupported. Hook loading failures propagate when creating the material's module.\nThe native WebGPU WESL loader now reads SAGA-validated IR for uniform-buffer\nreachability and minimum byte sizes, including matrix padding. This layout query does not regenerate\nWGSL: it follows function calls and global references in the selected entry's IR and uses validated\nstruct spans and array strides (with WGSL scalar/vector/matrix sizes for non-struct roots). `WESLBackendCompiler.webGPUUniformBuffers`\nexposes those logical group/binding layouts without substituting Metal slots. Uniform binding arrays\nare rejected until a runtime adapter exists. If a reflected uniform cannot be matched by the transitional\nname parser, loading fails rather than allocating a zero-sized buffer.\nThis is not complete reflection integration: resource names, member metadata and non-uniform resources\nstill depend on the existing parser; material property-name mapping and browser sidecar metadata remain pending.\nThe new UI shadow source is therefore not yet selected by the production shadow material.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "These command-line native outputs are code-generation artifacts, **not ready-to-load material packages**.\nThe command does not serialize the runtime reflection, cache identity, vertex-stream mapping or pipeline state.\nThe existing runtime still selects GLSL on backends without an integrated WESL loader.\nEmitting or compiling Metal source does not prove draw-time binding correctness or pixel parity.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Full GLSL removal is an in-progress breaking migration",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The approved destination is WESL/WGSL input, SAGA compilation and reflection, and no first-party GLSL fallback.\nThis is not yet a completed cutover: user GLSL inputs remain supported by the old production loader until\nits replacement and backend verification land. Do not delete working project assets based only on the new tool option.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "When porting a shader, replace GLSL stage pragmas with WGSL entry-point attributes and use explicit\nWESL imports instead of preprocessor includes. Port compile-time interface changes to WESL conditions,\nkeep buffer byte layouts and material bindings aligned with the host types, then compile and exercise every variant.\nFor example, the shared `shade` helper and `@fragment` entry point above replace a GLSL include and\nfragment `main`; `@if(textured)` replaces a structural preprocessor condition, not a runtime branch.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Graph-backed Shader Graph assets will be regenerated through the new generator. Archives retaining only\nGLSL source will require a manual WESL/WGSL port and rebake; no automatic lossless source conversion is promised.\nThe final loader diagnostic and archive-version migration are still pending implementation.",
         "level": 0,
         "links": []
       }

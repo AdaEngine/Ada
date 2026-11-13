@@ -39,6 +39,9 @@ public struct ShaderGraphMaterialSource: Codable, Hashable, Sendable {
 /// are replaced rather than overwritten, preserving values used by in-flight commands.
 public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
     public let program: ShaderGraphProgram
+    /// The authored graph, retained so the WGSL form can be generated for WESL templates.
+    let graph: ShaderGraph
+    private var cachedWGSLProgram: ShaderGraphProgram?
     let pipelineStorage = ShaderGraphPipelineStorage()
     private let lock = NSLock()
     private var source: ShaderGraphMaterialSource
@@ -115,6 +118,7 @@ public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
             throw ShaderGraphDiagnostic(code: .invalidReference)
         }
         program = try graph.compileGLSL()
+        self.graph = graph
         self.source = source
         for (id, value) in source.values { try validate(value, for: id) }
         for id in source.textures.keys where !program.textures.contains(where: { $0.parameterID == id }) {
@@ -135,14 +139,15 @@ public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
     public func makeInstance() -> ShaderGraphMaterial {
         lock.lock()
         defer { lock.unlock() }
-        let instance = ShaderGraphMaterial(program: program, source: source, textures: loadedTextures, resourceBasePath: resourceBasePath, resourceRootPath: resourceRootPath)
+        let instance = ShaderGraphMaterial(program: program, graph: graph, source: source, textures: loadedTextures, resourceBasePath: resourceBasePath, resourceRootPath: resourceRootPath)
         instance.time = time
         instance.automaticTime = automaticTime
         return instance
     }
 
-    private init(program: ShaderGraphProgram, source: ShaderGraphMaterialSource, textures: [Int: Texture2D], resourceBasePath: String?, resourceRootPath: String?) {
+    private init(program: ShaderGraphProgram, graph: ShaderGraph, source: ShaderGraphMaterialSource, textures: [Int: Texture2D], resourceBasePath: String?, resourceRootPath: String?) {
         self.program = program
+        self.graph = graph
         self.source = source
         self.loadedTextures = textures
         self.resourceBasePath = resourceBasePath
@@ -151,6 +156,22 @@ public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
 
     public func encode(to encoder: any Encoder) throws {
         try descriptor.encode(to: encoder)
+    }
+
+    /// The same graph as WGSL for WESL templates. Parameter slots and bindings equal ``program``'s, so a material binds
+    /// identically whichever form a pipeline compiles.
+    func wgslProgram() throws -> ShaderGraphProgram {
+        lock.lock()
+        if let cachedWGSLProgram {
+            lock.unlock()
+            return cachedWGSLProgram
+        }
+        lock.unlock()
+        let compiled = try graph.compileWGSL()
+        lock.lock()
+        cachedWGSLProgram = compiled
+        lock.unlock()
+        return compiled
     }
 
     public func value(for id: String) -> [Float]? {

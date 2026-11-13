@@ -34,6 +34,7 @@
 
         var xlibDisplay: UnsafeMutableRawPointer { unsafe UnsafeMutableRawPointer(display.pointer) }
         var xlibWindow: UInt64 { UInt64(handle) }
+        var xlibWindowLifetime: any Sendable { self }
         var scaleFactor: Float { 1 }
         var prefferedPixelFormat: PixelFormat { .bgra8 }
 

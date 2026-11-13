@@ -1,21 +1,21 @@
 {
-  "originHash" : "c981a41efd56a081537f4f7b35a4767b79479c5b3a8e43af7e82d33039e450f2",
+  "originHash" : "72f5945e6b7791063c3f024ee00cf8ac9c73053598433b2246e931725fa45f89",
   "pins" : [
     {
-      "identity" : "swan",
+      "identity" : "javascriptkit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AdaEngine/swan",
+      "location" : "https://github.com/swiftwasm/JavaScriptKit.git",
       "state" : {
-        "revision" : "790df787281e9cf1c2358a11bb42b2ec2df01029"
+        "revision" : "991755e698a7516eac571e6f6a65c04c907ce5ed",
+        "version" : "0.59.0"
       }
     },
     {
-      "identity" : "swift-argument-parser",
+      "identity" : "saga",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-argument-parser.git",
+      "location" : "https://github.com/AdaEngine/SAGA.git",
       "state" : {
-        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
-        "version" : "1.8.2"
+        "revision" : "8be633b5be0f747e0aa4e030fcad03c4ca17908f"
       }
     },
     {
@@ -73,15 +73,6 @@
       }
     },
     {
-      "identity" : "swift-format",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swiftlang/swift-format.git",
-      "state" : {
-        "revision" : "d54c5be7afba3e5f52ae29e2371e444a3c2a49c1",
-        "version" : "603.0.0"
-      }
-    },
-    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log",
@@ -118,30 +109,12 @@
       }
     },
     {
-      "identity" : "swift-subprocess",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swiftlang/swift-subprocess.git",
-      "state" : {
-        "branch" : "0.2.1",
-        "revision" : "44922dfe46380cd354ca4b0208e717a3e92b13dd"
-      }
-    },
-    {
       "identity" : "swift-syntax",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swiftlang/swift-syntax",
       "state" : {
         "revision" : "79e4b74a295b6eb74a8b585e3a39d29e70c1dbd1",
         "version" : "603.0.2"
-      }
-    },
-    {
-      "identity" : "swift-system",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/apple/swift-system",
-      "state" : {
-        "revision" : "869129b7bf4ecc57b97d0193ad29690ca2134750",
-        "version" : "1.8.1"
       }
     },
     {

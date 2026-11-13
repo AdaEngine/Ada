@@ -3,29 +3,50 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-check="${1:?Expected cpu-baker, metal-native or ipad-simulator}"
+check="${1:?Expected cpu-baker, saga-default, metal-native, ipad-simulator or studio-web}"
 evidence="${2:?Expected an evidence directory}"
 mkdir -p "$evidence"
 exec > >(tee "$evidence/validation.log") 2>&1
 xcodebuild -version
 swift --version
 
+# The Xcode wrappers run the build tool from the exact SwiftTerm revision in Editor/Package.swift.
+if [[ "${GITHUB_ACTIONS:-}" == true && ( "$check" == ipad-simulator || "$check" == studio-web ) ]]; then
+  python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path.home() / "Library/org.swift.swiftpm/security/plugins.json"
+path.parent.mkdir(parents=True, exist_ok=True)
+approvals = json.loads(path.read_text()) if path.exists() else []
+approval = {
+    "packageIdentity": "swiftterm",
+    "targetName": "SwiftTermBuildInfoPlugin",
+    "fingerprint": "caa1bdd3f1396c5b0ed66121f299d1c8b42bc94c",
+}
+if approval not in approvals:
+    approvals.append(approval)
+    path.write_text(json.dumps(approvals) + "\n")
+PY
+fi
+
 case "$check" in
   cpu-baker)
-    export ADAENGINE_HEADLESS=1 ADAENGINE_SKIP_WEBGPU_PLUGINS=1
-    export TINT_EXECUTABLE
-    TINT_EXECUTABLE="$(python3 script/ensure_tint.py)"
-    python3 script/ensure_tint.py --check
+    export ADAENGINE_HEADLESS=1 ADAENGINE_SKIP_WEBGPU_PLUGINS=1 ADAENGINE_WEB_EXPORT=1
     package="$(python3 script/shader_graph_validation_package.py "$RUNNER_TEMP/cpu-validation-package")"
     scratch="$RUNNER_TEMP/cpu-validation-build"
-    swift build --package-path "$package" --scratch-path "$scratch" --jobs 3 --product AdaShaderGraphBaker
-    swift build --package-path "$package" --scratch-path "$scratch" --jobs 3 --product FailingShaderCompiler
+    swift build --package-path "$package" --scratch-path "$scratch" --jobs 3 --product ShaderGraphValidationBaker
     bin="$(swift build --package-path "$package" --scratch-path "$scratch" --show-bin-path)"
-    ADAENGINE_SHADER_GRAPH_BAKER="$bin/AdaShaderGraphBaker" \
-      ADAENGINE_SHADER_GRAPH_FAILING_TINT="$bin/FailingShaderCompiler" \
+    ADAENGINE_SHADER_GRAPH_BAKER="$bin/ShaderGraphValidationBaker" \
       swift test --package-path "$package" --scratch-path "$scratch" --jobs 3 --no-parallel
     ;;
+  saga-default)
+    swift build --scratch-path "$RUNNER_TEMP/saga-default-build" --jobs 3 --target AdaEngine
+    swift build --scratch-path "$RUNNER_TEMP/saga-tvos-build" --jobs 3 --target AdaEngine \
+      --triple arm64-apple-tvos18.0 --sdk "$(xcrun --sdk appletvos --show-sdk-path)"
+    ;;
   metal-native)
+    export ADAENGINE_SAGA_METAL=0
     make -C Sources/gravity-lang -j 3 gravity
     package="$(python3 script/webgpu_validation_package.py "$RUNNER_TEMP/metal-validation-package")"
     # Preserve the failing gate's status while still exercising native export.
@@ -85,18 +106,58 @@ PY
     if ! xcrun simctl list devices booted | grep -Fq "$device"; then xcrun simctl boot "$device"; fi
     xcrun simctl bootstatus "$device" -b
     xcodegen generate --spec Editor/project.yml
-    xcodebuild -project Editor/AdaEditor.xcodeproj -scheme AdaEditor-iPadOS \
-      -configuration Debug -destination "id=$device" -derivedDataPath "$RUNNER_TEMP/ipad-build" \
-      CODE_SIGNING_ALLOWED=NO build
+    build_args=(-project Editor/AdaEditor.xcodeproj -scheme AdaEditor-iPadOS
+      -configuration Debug -destination "id=$device" -derivedDataPath "$RUNNER_TEMP/ipad-build"
+      CODE_SIGNING_ALLOWED=NO build)
+    build_status=0
+    xcodebuild "${build_args[@]}" || build_status=$?
+    # Xcode can abort while inserting package references during a cold resolution.
+    # Keep the fetched dependencies and retry the same build once.
+    if [[ "$build_status" == 134 ]]; then
+      xcodebuild "${build_args[@]}"
+    elif [[ "$build_status" != 0 ]]; then
+      exit "$build_status"
+    fi
     bundle="$RUNNER_TEMP/ipad-build/Build/Products/Debug-iphonesimulator/Ada Studio.app"
     xcrun simctl install "$device" "$bundle"
-    xcrun simctl launch --terminate-running-process "$device" org.adaengine.editor
-    sleep 12
+    console="$evidence/ipad-console.log"
+    SIMCTL_CHILD_ADAENGINE_SAGA_DEBUG=1 SIMCTL_CHILD_NSUnbufferedIO=YES \
+      xcrun simctl launch --console --terminate-running-process "$device" org.adaengine.editor >"$console" 2>&1 &
+    launch_pid=$!
+    trap 'kill "$launch_pid" 2>/dev/null || true' EXIT
+    for attempt in {1..90}; do
+      if grep -Fq "[SAGA] pipeline 'Upscale Pipeline'" "$console"; then break; fi
+      if ! kill -0 "$launch_pid" 2>/dev/null; then break; fi
+      sleep 2
+    done
+    grep -F "[SAGA] pipeline 'Upscale Pipeline'" "$console"
+    sleep 2
     xcrun simctl io "$device" screenshot "$evidence/ipad-studio.png"
     xcrun simctl spawn "$device" launchctl list | grep org.adaengine.editor
     xcrun simctl spawn "$device" log show --last 2m --style compact \
       --predicate 'process == "AdaEditor"' > "$evidence/ipad-runtime.log"
     xcrun simctl terminate "$device" org.adaengine.editor
+    ;;
+  studio-web)
+    python3 ada_tool.py prepare wasm
+    version="$(python3 -c 'import json; print(json.load(open("Tools/ada-toolchain.json"))["wasm"]["version"])')"
+    sdk="$(python3 -c 'import json; print(json.load(open("Tools/ada-toolchain.json"))["wasm"]["sdk"])')"
+    swift="$(swiftly run "+$version" swift -print-target-info | python3 -c \
+      'import json, pathlib, sys; print(pathlib.Path(json.load(sys.stdin)["paths"]["runtimeResourcePath"]).parents[1] / "bin/swift")')"
+    export PATH="${swift%/*}:$PATH"
+    build="$RUNNER_TEMP/studio-web-build"
+    python3 ada_tool.py build studio --debug --scratch-path "$build"
+    cli="$build/Build/Products/Debug/Ada Studio.app/Contents/MacOS/adastudio"
+    project="$RUNNER_TEMP/Shader Graph Smoke"
+    ditto Editor/Tests/Fixtures/ShaderGraphSmoke "$project"
+    output="$RUNNER_TEMP/studio-web-export"
+    "$cli" export --target web --project "$project" --output "$output" \
+      --scratch-path "$RUNNER_TEMP/studio-web-swiftpm" --swift "$swift" --swift-sdk "$sdk" --format json > "$evidence/export.json"
+    playwright="$RUNNER_TEMP/studio-web-playwright"
+    npm install --prefix "$playwright" --no-audit --no-fund playwright-core@1.58.2
+    "$playwright/node_modules/.bin/playwright-core" install chromium
+    SAGA_PLAYWRIGHT="$playwright/node_modules/playwright-core" \
+      node script/web_golden_saga.mjs "$output/web" --studio-export --actual="$evidence/studio-web.png"
     ;;
   *) echo "Unknown Apple validation mode: $check" >&2; exit 2 ;;
 esac

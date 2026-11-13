@@ -172,6 +172,17 @@ if __name__=="__main__":
     unittest.main()
 
 class AndroidWebGPUSetupTests(unittest.TestCase):
+    def test_saga_build_uses_the_checkout_without_requiring_dawn(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            checkout=Path(temporary)/"SAGA checkout"
+            checkout.mkdir()
+            (checkout/"Package.swift").write_text("// fixture")
+            from unittest.mock import patch
+            with patch.dict("os.environ",{"ADAENGINE_SAGA_NATIVE":"1","ADAENGINE_SAGA_PACKAGE_PATH":str(checkout)},clear=True):
+                env=android.build_env()
+            self.assertEqual(env.get("ADAENGINE_DISABLE_SWAN"),"1","SAGA builds must disable Swan")
+            self.assertEqual(env["ADAENGINE_SAGA_PACKAGE_PATH"],str(checkout.resolve()))
+
     def test_requires_explicit_android_dawn_setup(self):
         args=android.parser().parse_args(["build"])
         with self.assertRaisesRegex(android.AndroidError,"ADAENGINE_SWAN_PACKAGE_PATH"):

@@ -117,10 +117,12 @@ struct DynamicIrradiance3DViews: Resource {
     var nearest: (any Sampler)?
     mutating func getPipeline(_ device: RenderDevice) -> any RenderPipeline {
         if let pipeline { return pipeline }
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/dynamic_irradiance_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("dynamic_irradiance_3d")
         var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex), fragment: shader.asset.getShader(for: .fragment),
             debugName: "World probe relighting", backfaceCulling: false, depthPixelFormat: .none)
         descriptor.colorAttachments = [.init(format: .rgba_16f)]
+        // Probe inputs and the R32Float shadow atlas are fetched by integer texel coordinate.
+        descriptor.unfilterableTextureBindings = [0: [0, 1, 2, 3, 6, 26]]
         let result = device.createRenderPipeline(from: descriptor)
         pipeline = result; nearest = device.createSampler(from: .init(minFilter: .nearest, magFilter: .nearest, mipFilter: .notMipmapped))
         return result

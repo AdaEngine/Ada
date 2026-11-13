@@ -52,7 +52,7 @@ def main():
     parser.add_argument("--mode", choices=["web", "android"], required=True)
     for name in ["engine", "package", "output", "product", "swift-sdk"]:
         parser.add_argument("--" + name, required=True)
-    for name in ["swift", "gravity", "scratch", "tint", "application-id", "label", "debug-keystore", "swan"]:
+    for name in ["swift", "gravity", "scratch", "saga", "application-id", "label", "debug-keystore", "swan"]:
         parser.add_argument("--" + name)
     parser.add_argument("--configuration", choices=["debug", "release"], default="release")
     parser.add_argument("--abi", choices=["arm64-v8a", "x86_64", "all"], default="arm64-v8a")
@@ -76,14 +76,8 @@ def main():
     os.chdir(package)
     if args.mode == "web":
         env.update(ADAENGINE_WEB_EXPORT="1", BUILD_WASM="1")
-        env["ADAENGINE_TINT_CACHE"] = str(HOME / "tint")
-        tint = args.tint
-        if tint and tint.lower().endswith(".exe"):
-            tint = None
-        if not tint:
-            result = subprocess.run([sys.executable, str(engine / "script/ensure_tint.py")], env=env, check=True, text=True, stdout=subprocess.PIPE)
-            tint = result.stdout.strip().splitlines()[-1]
-        env["TINT_EXECUTABLE"] = tint
+        if args.saga:
+            env["ADAENGINE_SAGA_PACKAGE_PATH"] = str(Path(args.saga).resolve())
         command = [swift, "package", "--disable-sandbox", "--scratch-path", scratch / "host",
                    "--allow-writing-to-package-directory", "--allow-network-connections", "all", "export-web",
                    "--product", args.product, "--output", args.output, "--scratch-path", scratch / "wasm",
@@ -98,12 +92,14 @@ def main():
                SWIFT_ANDROID_SDKS_PATH=str(Path.home() / ".swiftpm/swift-sdks"),
                ANDROID_HOME=str(HOME / "android-sdk"), ANDROID_NDK_HOME=str(HOME / "android-ndk-r28c"),
                JAVA_HOME="/usr/lib/jvm/java-17-openjdk-amd64")
-    swan = Path(args.swan).resolve() if args.swan else HOME / "swan-android"
-    # A configured Swan must actually contain an Android artifact. The managed
-    # copy is prepared against the exact Dawn/binding revision by the setup tool.
-    if not (swan / "Dawn/dist/android.artifactbundle/info.json").is_file():
-        swan = HOME / "swan-android"
-    env.update(ADAENGINE_SWAN_PACKAGE_PATH=str(swan), SWAN_LOCAL_DAWN="Dawn/dist/android.artifactbundle")
+    if args.saga:
+        env.update(ADAENGINE_SAGA_NATIVE="1", ADAENGINE_SAGA_PACKAGE_PATH=str(Path(args.saga).resolve()))
+    else:
+        swan = Path(args.swan).resolve() if args.swan else HOME / "swan-android"
+        # The managed fallback matches the Dawn revision used by its Swan bindings.
+        if not (swan / "Dawn/dist/android.artifactbundle/info.json").is_file():
+            swan = HOME / "swan-android"
+        env.update(ADAENGINE_SWAN_PACKAGE_PATH=str(swan), SWAN_LOCAL_DAWN="Dawn/dist/android.artifactbundle")
     command = [sys.executable, engine / "Tools/Android/android.py", "build", "--package", package,
                "--product", args.product, "--application-id", args.application_id,
                "--label", args.label or args.product, "--abi", args.abi,

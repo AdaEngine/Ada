@@ -403,7 +403,9 @@ class MacOSCLIInstallationTests(unittest.TestCase):
             source = root / "Source Кириллица & spaces.app"
             destination = root / "Applications/Ada Studio Debug.app"
             (source / "Contents/MacOS").mkdir(parents=True)
-            shutil.copy2("/bin/echo", source / "Contents/MacOS/Ada Studio")
+            executable = source / "Contents/MacOS/Ada Studio"
+            executable.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+            executable.chmod(0o755)
             (source / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "org.adaengine.editor",
                                                                        "CFBundleExecutable": "Ada Studio"}))
             result = subprocess.run([sys.executable, str(ROOT / "ada_tool.py"), "install", "studio", "--debug", "--source", str(source),

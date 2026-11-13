@@ -46,9 +46,17 @@ def tool(path):
 
 def build_env():
     env = os.environ.copy()
-    env.update(ADAENGINE_ANDROID="1", SWAN_RUNTIME_ONLY="1")
-    env.pop("ADAENGINE_DISABLE_SWAN", None)
+    env["ADAENGINE_ANDROID"] = "1"
     env.pop("ADAENGINE_HEADLESS", None)
+    if env.get("ADAENGINE_SAGA_NATIVE") == "1":
+        checkout = Path(env.get("ADAENGINE_SAGA_PACKAGE_PATH") or ROOT.parent / "SAGA").expanduser().resolve()
+        if not (checkout / "Package.swift").is_file():
+            raise AndroidError(f"SAGA checkout not found at {checkout}. Set ADAENGINE_SAGA_PACKAGE_PATH.")
+        env["ADAENGINE_SAGA_PACKAGE_PATH"] = str(checkout)
+        env["ADAENGINE_DISABLE_SWAN"] = "1"
+    else:
+        env.pop("ADAENGINE_DISABLE_SWAN", None)
+        env["SWAN_RUNTIME_ONLY"] = "1"
     if not env.get("JAVA_HOME"):
         candidates = [Path("/Applications/Android Studio.app/Contents/jbr/Contents/Home")]
         jdk = next((path for path in candidates if (path/"bin/java").exists()), None)
@@ -235,7 +243,8 @@ def select_swift_sdks(args,bundle):
 def build(args):
     validate_options(args)
     env=build_env()
-    validate_webgpu(args,env)
+    if env.get("ADAENGINE_SAGA_NATIVE") != "1":
+        validate_webgpu(args,env)
     sdk=sdk_path(args)
     tools=sdk/"build-tools"/args.build_tools
     swift_roots,bundle=swift_sdk_root(args)
@@ -363,7 +372,10 @@ def main():
         else:
             validate_options(args)
             env=build_env()
-            print("Dawn WebGPU:",validate_webgpu(args,env))
+            if env.get("ADAENGINE_SAGA_NATIVE") == "1":
+                print("SAGA Vulkan:",env["ADAENGINE_SAGA_PACKAGE_PATH"])
+            else:
+                print("Dawn WebGPU:",validate_webgpu(args,env))
             print(run(swift_command(args)+["--version"],env=env,capture=True).strip())
             print("Swift SDK:",swift_sdk_root(args)[1])
             print("NDK:",ndk_host(ndk_path(args)))

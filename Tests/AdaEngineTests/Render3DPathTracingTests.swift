@@ -13,7 +13,7 @@ import Testing
 @Suite("Path tracing settings and BVH")
 struct Render3DPathTracingSettingsTests {
     #if canImport(WebGPU) && !WASM && !os(Android)
-    @Test(.enabled(if:ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_TINT"] == "1"))
+    @Test(.enabled(if:ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"))
     func pathShadersCompileFreshWithoutAGPU() async throws {
         let root = URL(fileURLWithPath:#filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         for name in ["path_tracing_3d.glsl","path_tracing_composite_3d.glsl"] {

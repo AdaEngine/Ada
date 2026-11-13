@@ -64,11 +64,18 @@
             WGPUVisibilityProcessor(context: context)
         }
 
+        // The browser build keeps CPU-culled shadow lists: the compute processor traps in WASM.
+        #if WASM
+        public var supportsGPUShadowCull: Bool { false }
+
+        public func createGPUShadowCullProcessor() -> (any GPUShadowCullProcessor)? { nil }
+        #else
         public var supportsGPUShadowCull: Bool { true }
 
         public func createGPUShadowCullProcessor() -> (any GPUShadowCullProcessor)? {
             WGPUShadowCullProcessor(context: context)
         }
+        #endif
 
         /// Native only: the draws read GPU-written counts and select instances through `firstInstance`.
         /// `ADAENGINE_SHADOW_MESHLETS=0` keeps whole-part shadow culling.

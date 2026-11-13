@@ -60,9 +60,6 @@ if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
     }
 }
 
-$studioTint = & python (Join-Path $studioRoot 'script/ensure_tint.py') --jobs $Jobs
-if ($LASTEXITCODE -ne 0) { throw 'Tint setup failed. Check Python, CMake, Ninja and the C++ toolchain.' }
-$env:TINT_EXECUTABLE = ($studioTint | Select-Object -Last 1).Trim()
 
 # Debug also prepares the package tests. Release ships the ordinary executable
 # without enabling testable imports in production modules.

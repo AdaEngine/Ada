@@ -53,6 +53,11 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
       if !value.isEmpty { values[key] = value }
     }
     for (key, value) in preferences ?? [:] where !value.isEmpty { values[key] = value }
+    if environment["ADAENGINE_SAGA_NATIVE"] == "1" {
+      values["ADAENGINE_SAGA_NATIVE"] = "1"
+      values["ADAENGINE_SAGA_PACKAGE_PATH"] = environment["ADAENGINE_SAGA_PACKAGE_PATH"]
+        ?? engineRoot?.deletingLastPathComponent().appendingPathComponent("SAGA").path
+    }
     #if os(iOS) || os(tvOS) || os(visionOS)
       let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
     #else
@@ -142,7 +147,7 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
     #else
     let required = [
       "SWIFT_ANDROID_SWIFT", "SWIFT_ANDROID_SDKS_PATH", "ANDROID_HOME", "ANDROID_NDK_HOME",
-      "ADAENGINE_SWAN_PACKAGE_PATH",
+      environment["ADAENGINE_SAGA_NATIVE"] == "1" ? "ADAENGINE_SAGA_PACKAGE_PATH" : "ADAENGINE_SWAN_PACKAGE_PATH",
     ]
     #endif
     for key in required {

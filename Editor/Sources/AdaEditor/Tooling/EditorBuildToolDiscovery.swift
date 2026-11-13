@@ -68,7 +68,7 @@ actor EditorBuildToolDiscovery {
         found["SWIFT_EXECUTABLE"] = first("SWIFT_EXECUTABLE", [value("SWIFT_EXECUTABLE")].compactMap { $0 } + executables("swift") + swiftPaths)
         found["CMAKE_EXECUTABLE"] = first("CMAKE_EXECUTABLE", [value("CMAKE_EXECUTABLE")].compactMap { $0 } + executables("cmake") + cmakePaths)
         found["NINJA_EXECUTABLE"] = first("NINJA_EXECUTABLE", [value("NINJA_EXECUTABLE")].compactMap { $0 } + executables("ninja") + ninjaPaths)
-        found["TINT_EXECUTABLE"] = first("TINT_EXECUTABLE", [value("TINT_EXECUTABLE")].compactMap { $0 } + executables("tint"))
+        found["ADAENGINE_SAGA_PACKAGE_PATH"] = first("ADAENGINE_SAGA_PACKAGE_PATH", [value("ADAENGINE_SAGA_PACKAGE_PATH")].compactMap { $0 })
         found["ANDROID_HOME"] = first("ANDROID_HOME", [value("ANDROID_HOME"), value("ANDROID_SDK_ROOT")].compactMap { $0 } + androidPaths)
         found["JAVA_HOME"] = first("JAVA_HOME", [value("JAVA_HOME")].compactMap { $0 } + javaPaths + executables("java").map {
             url($0).deletingLastPathComponent().deletingLastPathComponent().path
@@ -87,7 +87,7 @@ actor EditorBuildToolDiscovery {
         found["VCToolsInstallDir"] = first("VCToolsInstallDir", [value("VCToolsInstallDir")].compactMap { $0 }
             + visualStudios.flatMap { children($0.appendingPathComponent("VC/Tools/MSVC")).map(\.path) })
         // The Windows exporter owns a Linux toolchain inside WSL. Never fill its
-        // compiler fields with native Windows Swift, SDK or Tint paths.
+        // compiler fields with native Windows Swift or SDK paths.
         #else
         found["CC"] = first("CC", [value("CC")].compactMap { $0 } + executables("clang"))
         found["ADA_WEB_SWIFT_EXECUTABLE"] = first("ADA_WEB_SWIFT_EXECUTABLE", [value("ADA_WEB_SWIFT_EXECUTABLE")].compactMap { $0 } + swiftPaths.filter { $0.contains("6.3.2") })
@@ -115,7 +115,8 @@ actor EditorBuildToolDiscovery {
         case "ANDROID_NDK_HOME": return directory.boolValue && fileManager.fileExists(atPath: root.appendingPathComponent("source.properties").path)
         case "WindowsSdkDir": return directory.boolValue && fileManager.fileExists(atPath: root.appendingPathComponent("Include").path)
         case "VCToolsInstallDir": return directory.boolValue && fileManager.fileExists(atPath: root.appendingPathComponent("include").path)
-        case "SWIFT_EXECUTABLE", "CMAKE_EXECUTABLE", "NINJA_EXECUTABLE", "TINT_EXECUTABLE", "CC", "SWIFT_ANDROID_SWIFT", "ADA_WEB_SWIFT_EXECUTABLE", "GRADLE_EXECUTABLE":
+        case "ADAENGINE_SAGA_PACKAGE_PATH": return directory.boolValue && fileManager.fileExists(atPath: root.appendingPathComponent("Package.swift").path)
+        case "SWIFT_EXECUTABLE", "CMAKE_EXECUTABLE", "NINJA_EXECUTABLE", "CC", "SWIFT_ANDROID_SWIFT", "ADA_WEB_SWIFT_EXECUTABLE", "GRADLE_EXECUTABLE":
             return !directory.boolValue && fileManager.isExecutableFile(atPath: path)
         default: return directory.boolValue
         }

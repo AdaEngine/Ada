@@ -10,7 +10,7 @@ import AdaRender
 import AdaUtils
 import Math
 
-/// GPU uniform for ``light2d_point.glsl`` (std140 layout).
+/// GPU uniform for the point light pass. Matches the shader's 16-byte-aligned fields.
 public struct PointLightUBOGPU: Sendable {
     public var invViewProjection: Transform3D
     public var lightXYRadius: Vector4
@@ -30,7 +30,7 @@ public struct PointLightUBOGPU: Sendable {
     }
 }
 
-/// GPU uniform for ``light2d_directional.glsl``.
+/// GPU uniform for the directional light pass.
 public struct DirectionalLightUBOGPU: Sendable {
     public var lightRGBEnergy: Vector4
     public var flags: Vector4
@@ -50,7 +50,7 @@ public struct Light2DRenderPipelines: Resource {
     public let sampler: Sampler
 
     public init(device: RenderDevice) {
-        let compositeShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_composite.glsl", from: .adaModule)
+        let compositeShader = Self.loadLightShader("composite")
         var compositeDesc = RenderPipelineDescriptor(
             vertex: compositeShader.asset.requiredShader(for: .vertex),
             fragment: compositeShader.asset.getShader(for: .fragment),
@@ -63,7 +63,7 @@ public struct Light2DRenderPipelines: Resource {
         ]
         self.compositePipeline = device.createRenderPipeline(from: compositeDesc)
 
-        let pointShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_point.glsl", from: .adaModule)
+        let pointShader = Self.loadLightShader("point")
         var pointDesc = RenderPipelineDescriptor(
             vertex: pointShader.asset.requiredShader(for: .vertex),
             fragment: pointShader.asset.getShader(for: .fragment),
@@ -83,7 +83,7 @@ public struct Light2DRenderPipelines: Resource {
         ]
         self.pointLightPipeline = device.createRenderPipeline(from: pointDesc)
 
-        let dirShader = ShaderModule.loadRequiredBundled(at: "Assets/light2d_directional.glsl", from: .adaModule)
+        let dirShader = Self.loadLightShader("directional")
         var dirDesc = RenderPipelineDescriptor(
             vertex: dirShader.asset.requiredShader(for: .vertex),
             fragment: dirShader.asset.getShader(for: .fragment),
@@ -94,7 +94,7 @@ public struct Light2DRenderPipelines: Resource {
         dirDesc.colorAttachments = pointDesc.colorAttachments
         self.directionalLightPipeline = device.createRenderPipeline(from: dirDesc)
 
-        let quadShader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/quad.glsl")
+        let quadShader = CorePipelineShaders.loadRequiredBuiltin("quad")
         var shadowDesc = RenderPipelineDescriptor(
             vertex: quadShader.asset.requiredShader(for: .vertex),
             fragment: quadShader.asset.getShader(for: .fragment),
@@ -114,5 +114,9 @@ public struct Light2DRenderPipelines: Resource {
         self.shadowFinPipeline = device.createRenderPipeline(from: shadowDesc)
 
         self.sampler = device.createSampler(from: SamplerDescriptor())
+    }
+
+    private static func loadLightShader(_ pass: String) -> AssetHandle<ShaderModule> {
+        ShaderModule.loadRequiredBuiltin(at: "Assets/light2d_\(pass)", from: .adaModule)
     }
 }

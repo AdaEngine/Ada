@@ -244,7 +244,7 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
                     device: renderDevice,
                     variant: "pbr:\(isMotion):\(isContact):\(configuration.blended):\(configuration.temporalDepth):\(configuration.features.rawValue)",
                     features: configuration.features,
-                    template: isContact ? "Shaders/directional_shadow_3d.glsl" : (isMotion ? "Shaders/motion_3d.glsl" : "Shaders/flat3d.glsl")
+                    template: ShaderGraph3DPipeline.surfaceTemplatePath(isContact ? "directional_shadow_3d" : (isMotion ? "motion_3d" : "flat3d"))
                 )
             } catch {
                 graph.reportCompilationError(error)

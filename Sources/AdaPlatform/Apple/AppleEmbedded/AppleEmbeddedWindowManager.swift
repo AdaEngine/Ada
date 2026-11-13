@@ -120,11 +120,13 @@
             systemWindow.rootViewController = gameViewController
             systemWindow.backgroundColor = .black
 
-            if Self.supportsPointerInteraction() {
-                let pointerInteraction = UIPointerInteraction(delegate: systemWindow)
-                systemWindow.addInteraction(pointerInteraction)
-                systemWindow.pointerInteraction = pointerInteraction
-            }
+            #if !os(tvOS)
+                if Self.supportsPointerInteraction() {
+                    let pointerInteraction = UIPointerInteraction(delegate: systemWindow)
+                    systemWindow.addInteraction(pointerInteraction)
+                    systemWindow.pointerInteraction = pointerInteraction
+                }
+            #endif
 
             window.systemWindow = systemWindow
             window.minSize = frame.size
@@ -265,12 +267,13 @@
         private(set) var mouseMode: Input.MouseMode = .visible
 
         override func updateCursor() {
-            guard let window = self.activeWindow?.systemWindow as? _AdaUIWindow else {
-                return
-            }
+            #if !os(tvOS)
+                guard let window = self.activeWindow?.systemWindow as? _AdaUIWindow else {
+                    return
+                }
 
-            // Causes the interaction to update the pointer in response to an event.
-            window.pointerInteraction?.invalidate()
+                window.pointerInteraction?.invalidate()
+            #endif
         }
 
         override func setCursorImage(
@@ -324,13 +327,15 @@
             _AdaEngineViewController.idiom(from: .current)
         }
 
-        private static func supportsPointerInteraction() -> Bool {
-            #if os(iOS)
-                detectIdiom() == .pad
-            #else
-                true
-            #endif
-        }
+        #if !os(tvOS)
+            private static func supportsPointerInteraction() -> Bool {
+                #if os(iOS)
+                    detectIdiom() == .pad
+                #else
+                    true
+                #endif
+            }
+        #endif
 
         private func attachWindowToSceneIfNeeded(_ window: UIKit.UIWindow, preferredScene: UIWindowScene? = nil) {
             let scene: UIWindowScene
@@ -353,7 +358,7 @@
         }
     }
 
-    final class _AdaUIWindow: UIKit.UIWindow, SystemWindow, UIPointerInteractionDelegate {
+    final class _AdaUIWindow: UIKit.UIWindow, SystemWindow {
         public var title: String = ""
 
         public var size: Size {
@@ -380,7 +385,9 @@
             }
         }
 
-        weak var pointerInteraction: UIPointerInteraction?
+        #if !os(tvOS)
+            weak var pointerInteraction: UIPointerInteraction?
+        #endif
         private var windowManager: AppleEmbeddedWindowManager?
 
         init(frame: CGRect, windowManager: AppleEmbeddedWindowManager) {
@@ -436,32 +443,24 @@
             }
         #endif
 
-        // MARK: - UIPointerInteractionDelegate
+    }
 
-        func pointerInteraction(_: UIPointerInteraction, styleFor _: UIPointerRegion) -> UIPointerStyle? {
-            if windowManager?.getMouseMode() == .hidden {
+    #if !os(tvOS)
+        extension _AdaUIWindow: UIPointerInteractionDelegate {
+            func pointerInteraction(_: UIPointerInteraction, styleFor _: UIPointerRegion) -> UIPointerStyle? {
+                if windowManager?.getMouseMode() == .hidden {
+                    return UIPointerStyle.hidden()
+                }
+
+                let cursorShape = windowManager?.getCursorShape() ?? .arrow
+
+                if cursorShape != .iBeam, #available(iOS 15.0, visionOS 1.0, *) {
+                    return UIPointerStyle.system()
+                }
                 return UIPointerStyle.hidden()
             }
-
-            var style: UIPointerStyle
-
-            let cursorShape = windowManager?.getCursorShape() ?? .arrow
-
-            switch cursorShape {
-            case .iBeam:
-                style = UIPointerStyle.hidden()
-            default:
-                if #available(iOS 15.0, visionOS 1.0, *) {
-                    style = UIPointerStyle.system()
-                } else {
-                    // Fallback on earlier versions
-                    style = UIPointerStyle.hidden()
-                }
-            }
-
-            return style
         }
-    }
+    #endif
 
     final class _AdaEngineViewController: UIViewController {
         var renderView: MetalView

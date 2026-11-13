@@ -24,8 +24,9 @@ enum EditorWindowsBuildWorker {
         if let scratch { arguments += ["--scratch", linuxPath(scratch.path)] }
         if serve { arguments.append("--serve") }
         if let gravityRoot { arguments += ["--gravity", linuxPath(gravityRoot.path)] }
-        if let tint = environment["TINT_EXECUTABLE"], !tint.isEmpty {
-            arguments += ["--tint", linuxPath(tint)]
+        if let saga = environment["ADAENGINE_SAGA_PACKAGE_PATH"] ?? ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"],
+           !saga.isEmpty {
+            arguments += ["--saga", linuxPath(saga)]
         }
         return command(arguments, package: package, engineRoot: engineRoot)
     }
@@ -43,7 +44,11 @@ enum EditorWindowsBuildWorker {
         if let gravity = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"] {
             arguments += ["--gravity", linuxPath(gravity)]
         }
-        if let swan = configuration.environment["ADAENGINE_SWAN_PACKAGE_PATH"] {
+        if configuration.environment["ADAENGINE_SAGA_NATIVE"] == "1" {
+            let saga = configuration.environment["ADAENGINE_SAGA_PACKAGE_PATH"]
+                ?? engineRoot.deletingLastPathComponent().appendingPathComponent("SAGA").path
+            arguments += ["--saga", linuxPath(saga)]
+        } else if let swan = configuration.environment["ADAENGINE_SWAN_PACKAGE_PATH"] {
             arguments += ["--swan", linuxPath(swan)]
         }
         return command(arguments, package: package, engineRoot: engineRoot)

@@ -10,6 +10,7 @@ import PackagePlugin
 struct AdaWebExportPlugin: CommandPlugin {
     // Runtime files belong to the plugin package, including when used by a dependent game.
     private static var assetsDirectory: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent() }
+    private static let renderBundle = "AdaEngine_AdaRender.resources"
     private static let flat3DBundle = "AdaEngine_AdaCorePipelines.resources"
     private static let flat3DVariants = [["ADA_TERRAIN"], ["ADA_WIREFRAME"], ["ADA_TERRAIN", "ADA_WIREFRAME"]]
 
@@ -37,13 +38,14 @@ struct AdaWebExportPlugin: CommandPlugin {
         guard buildDirectory.resolvingSymlinksInPath().standardizedFileURL != sharedBuild else {
             throw ExportError.unsafeScratchDirectory
         }
-        try prepareBuildDirectory(buildDirectory, packageDirectory: context.package.directoryURL)
+        try FileManager.default.createDirectory(at: buildDirectory, withIntermediateDirectories: true)
+        try detachLegacyDependencyLinks(in: buildDirectory)
         try restorePortableDependencyPatches(in: buildDirectory)
         // Resolve first so platform-compatibility patches run on actual private
         // checkouts, including a cold scratch directory with no Yams checkout.
         try run(
             executable: "/usr/bin/env",
-            arguments: ["swift", "package", "resolve", "--scratch-path", buildDirectory.path(), "--disable-sandbox", "--disable-keychain"],
+            arguments: ["swift", "package", "resolve", "--scratch-path", buildDirectory.path(percentEncoded: false), "--disable-sandbox", "--disable-keychain"],
             workingDirectory: context.package.directoryURL
         )
         try prepareDependenciesForWASI(in: buildDirectory)
@@ -55,7 +57,7 @@ struct AdaWebExportPlugin: CommandPlugin {
                 "swift",
                 "build",
                 "--scratch-path",
-                buildDirectory.path(),
+                buildDirectory.path(percentEncoded: false),
                 "--disable-sandbox",
                 "--skip-update",
                 "--disable-build-manifest-caching",
@@ -76,7 +78,7 @@ struct AdaWebExportPlugin: CommandPlugin {
                 "-Xcc",
                 Self.assetsDirectory.appending(
                     components: "Compatibility", "AdaScriptWASI.h"
-                ).path()
+                ).path(percentEncoded: false)
             ],
             workingDirectory: context.package.directoryURL
         )
@@ -96,11 +98,41 @@ struct AdaWebExportPlugin: CommandPlugin {
             shaderTranspiler: try context.tool(named: "AdaShaderTranspilerTool").url
         )
 
-        Diagnostics.remark("Exported AdaEngine web app to \(options.outputDirectory.path())")
+        Diagnostics.remark("Exported AdaEngine web app to \(options.outputDirectory.path(percentEncoded: false))")
 
         if options.serve {
             try serve(directory: options.outputDirectory)
         }
+    }
+
+    /// Copies the JavaScript host from the package that provides the Swift host.
+    private func copySAGAWebHost(package: Package, to output: URL) throws {
+        guard let saga = sagaWebHostPackage(in: package) else {
+            throw ExportError.sagaWebHostNotResolved
+        }
+        let host = saga.directoryURL.appending(components: "web", "webgpu.mjs")
+        guard FileManager.default.fileExists(atPath: host.path(percentEncoded: false)) else {
+            throw ExportError.sagaWebHostAssetMissing(host.path(percentEncoded: false))
+        }
+        try replaceItem(at: output.appending(component: "saga-webgpu.mjs"), with: host)
+        let golden = saga.directoryURL.appending(components: "web", "golden.mjs")
+        if FileManager.default.fileExists(atPath: golden.path(percentEncoded: false)) {
+            try replaceItem(at: output.appending(component: "saga-golden.mjs"), with: golden)
+        }
+    }
+
+    private func sagaWebHostPackage(in root: Package) -> Package? {
+        // A game depends on AdaEngine directly and SAGA transitively.
+        var pending = [root]
+        var visited: Set<URL> = []
+        while let package = pending.popLast() {
+            guard visited.insert(package.directoryURL).inserted else { continue }
+            if package.products.contains(where: { $0.name == "SAGAWebHost" }) {
+                return package
+            }
+            pending.append(contentsOf: package.dependencies.reversed().map(\.package))
+        }
+        return nil
     }
 
     private func detectWasmSDK() throws -> String {
@@ -142,7 +174,7 @@ struct AdaWebExportPlugin: CommandPlugin {
             includingPropertiesForKeys: [.isRegularFileKey],
             options: [.skipsHiddenFiles]
         ) else {
-            throw ExportError.wasmNotFound(product, buildDirectory.path())
+            throw ExportError.wasmNotFound(product, buildDirectory.path(percentEncoded: false))
         }
 
         let candidates = enumerator.compactMap { item -> URL? in
@@ -159,26 +191,21 @@ struct AdaWebExportPlugin: CommandPlugin {
         }
 
         guard let wasm = candidates.sorted(by: { $0.path.count < $1.path.count }).last else {
-            throw ExportError.wasmNotFound(product, buildDirectory.path())
+            throw ExportError.wasmNotFound(product, buildDirectory.path(percentEncoded: false))
         }
 
         return wasm
     }
 
-    private func prepareBuildDirectory(_ buildDirectory: URL, packageDirectory: URL) throws {
-        let fileManager = FileManager.default
-        try fileManager.createDirectory(at: buildDirectory, withIntermediateDirectories: true)
-
-        let packageBuildDirectory = packageDirectory.appending(component: ".build", directoryHint: .isDirectory)
-        // Artifact and workspace-state paths can point into an unrelated host
-        // scratch build. Let the isolated WASM build resolve those itself.
+    private func detachLegacyDependencyLinks(in buildDirectory: URL) throws {
+        let manager = FileManager.default
+        let scratchPrefix = buildDirectory.path.hasSuffix("/") ? buildDirectory.path : buildDirectory.path + "/"
         for name in ["checkouts", "repositories"] {
-            let source = packageBuildDirectory.appending(component: name)
-            let destination = buildDirectory.appending(component: name)
-            guard fileManager.fileExists(atPath: source.path()), !fileManager.fileExists(atPath: destination.path()) else {
-                continue
-            }
-            try fileManager.createSymbolicLink(at: destination, withDestinationURL: source)
+            let link = buildDirectory.appendingPathComponent(name)
+            guard let destination = try? manager.destinationOfSymbolicLink(atPath: link.path) else { continue }
+            let target = destination.hasPrefix("/") ? URL(fileURLWithPath: destination) : buildDirectory.appendingPathComponent(destination)
+            guard !target.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(scratchPrefix) else { continue }
+            try manager.removeItem(at: link)
         }
     }
 
@@ -186,13 +213,13 @@ struct AdaWebExportPlugin: CommandPlugin {
         let fileManager = FileManager.default
         let checkouts = buildDirectory.appending(component: "checkouts", directoryHint: .isDirectory)
         let source = checkouts.appending(components: "Yams", "Sources", "Yams", "Representer.swift")
-        guard fileManager.fileExists(atPath: source.path()) else { return }
+        guard fileManager.fileExists(atPath: source.path(percentEncoded: false)) else { return }
         let original = try String(contentsOf: source, encoding: .utf8)
         let expression = "String(format: \"%.*g\", DBL_DECIMAL_DIG, value)"
 
         // The pinned Yams formatter uses a C macro that Foundation does not export on WASI.
         // Double.significandBitCount is 52; IEEE binary64 round-trips with 17 decimal digits.
-        // Work only on a private copy: prepareBuildDirectory may have linked shared checkouts.
+        // Older export scratch directories may still point to shared checkouts.
         let resolvedCheckouts = checkouts.resolvingSymlinksInPath().standardizedFileURL
         let scratchRoot = buildDirectory.resolvingSymlinksInPath().standardizedFileURL.path
         if !resolvedCheckouts.path.hasPrefix(scratchRoot.hasSuffix("/") ? scratchRoot : scratchRoot + "/") {
@@ -210,7 +237,7 @@ struct AdaWebExportPlugin: CommandPlugin {
             Diagnostics.remark("Applied portable floating-point precision to the isolated Yams web-build checkout")
         }
         let vmSource = checkouts.appending(components: "gravity-lang", "binding", "GravitySwift", "GravityVirtualMachine.swift")
-        guard fileManager.fileExists(atPath: vmSource.path()) else { return }
+        guard fileManager.fileExists(atPath: vmSource.path(percentEncoded: false)) else { return }
         let vmOriginal = try String(contentsOf: vmSource, encoding: .utf8)
         // Corelibs Foundation takes unsigned byte buffers, unlike Darwin's C-imported initializer.
         let vmUpdated = vmOriginal
@@ -244,11 +271,16 @@ struct AdaWebExportPlugin: CommandPlugin {
         for (relative, patched, original) in replacements {
             let file = checkouts.appendingPathComponent(relative)
             guard file.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(base),
-                  FileManager.default.fileExists(atPath: file.path()) else { continue }
+                  FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) else { continue }
             let content = try String(contentsOf: file, encoding: .utf8)
             guard content.contains(patched), let checkout = relative.split(separator: "/").first else { continue }
             let sourcePath = relative.split(separator: "/").dropFirst().joined(separator: "/")
-            let committed = try capture(executable: "/usr/bin/env", arguments: ["git", "-C", checkouts.appendingPathComponent(String(checkout)).path(), "show", "HEAD:" + sourcePath], workingDirectory: nil)
+            let checkoutPath = checkouts.appendingPathComponent(String(checkout)).path(percentEncoded: false)
+            let committed = try capture(
+                executable: "/usr/bin/env",
+                arguments: ["git", "-C", checkoutPath, "show", "HEAD:" + sourcePath],
+                workingDirectory: nil
+            )
             if committed.contains(original) { try content.replacingOccurrences(of: patched, with: original).write(to: file, atomically: true, encoding: .utf8) }
         }
     }
@@ -313,10 +345,9 @@ struct AdaWebExportPlugin: CommandPlugin {
                     return URL(fileURLWithPath: String(file.path[..<range.upperBound]))
                 }
             for root in Set(roots) {
-                let tint = try tintExecutable(packageDirectory: packageDirectory)
                 let baker = try graphBaker ?? buildGraphBaker(packageDirectory: packageDirectory, scratch: options.scratchDirectory)
                 graphBaker = baker
-                _ = try WebExportSupport.captureStandardOutput(executable: baker.path, arguments: [root.path, tint.path], workingDirectory: packageDirectory)
+                _ = try WebExportSupport.captureStandardOutput(executable: baker.path, arguments: [root.path], workingDirectory: packageDirectory)
                 let archive = root.appendingPathComponent("shaders.shadergraphlib")
                 if fileManager.fileExists(atPath: archive.path) {
                     let relative = archive.relativePath(from: bundle.destination)
@@ -338,8 +369,8 @@ struct AdaWebExportPlugin: CommandPlugin {
 
         let assetsSource = packageDirectory.appending(component: "Assets", directoryHint: .isDirectory)
         let assetsDestination = options.outputDirectory.appending(component: "Assets", directoryHint: .isDirectory)
-        if fileManager.fileExists(atPath: assetsSource.path()) {
-            if fileManager.fileExists(atPath: assetsDestination.path()) {
+        if fileManager.fileExists(atPath: assetsSource.path(percentEncoded: false)) {
+            if fileManager.fileExists(atPath: assetsDestination.path(percentEncoded: false)) {
                 try fileManager.removeItem(at: assetsDestination)
             }
             try fileManager.copyItem(at: assetsSource, to: assetsDestination)
@@ -349,12 +380,12 @@ struct AdaWebExportPlugin: CommandPlugin {
             at: options.outputDirectory.appending(component: "runtime.mjs", directoryHint: .notDirectory),
             with: runtime
         )
-        try writeBridgeJSRuntime(
-            packageDirectory: packageDirectory,
-            checkouts: checkouts,
-            to: options.outputDirectory.appending(component: "bridge-js.js", directoryHint: .notDirectory)
+        try replaceItem(
+            at: options.outputDirectory.appending(component: "bridge-js.js", directoryHint: .notDirectory),
+            with: Self.assetsDirectory.appending(components: "Runtime", "BridgeJSCache", "bridge-js.js")
         )
         try copyBrowserWASIShim(packageDirectory: packageDirectory, to: options.outputDirectory)
+        try copySAGAWebHost(package: package, to: options.outputDirectory)
         try copyLoaderAssets(to: options.outputDirectory)
 
         try indexHTML(product: options.product).write(
@@ -401,7 +432,7 @@ struct AdaWebExportPlugin: CommandPlugin {
             directoryHint: .isDirectory
         )
         let shimDestinationDirectory = outputDirectory.appending(component: "browser-wasi-shim", directoryHint: .isDirectory)
-        if fileManager.fileExists(atPath: shimDestinationDirectory.path()) {
+        if fileManager.fileExists(atPath: shimDestinationDirectory.path(percentEncoded: false)) {
             try fileManager.removeItem(at: shimDestinationDirectory)
         }
         try fileManager.copyItem(at: shimSourceDirectory, to: shimDestinationDirectory)
@@ -409,7 +440,7 @@ struct AdaWebExportPlugin: CommandPlugin {
 
     private func replaceItem(at destination: URL, with source: URL) throws {
         let fileManager = FileManager.default
-        if fileManager.fileExists(atPath: destination.path()) {
+        if fileManager.fileExists(atPath: destination.path(percentEncoded: false)) {
             try fileManager.removeItem(at: destination)
         }
         try fileManager.copyItem(at: source, to: destination)
@@ -437,7 +468,7 @@ struct AdaWebExportPlugin: CommandPlugin {
         }.sorted { $0.lastPathComponent < $1.lastPathComponent }
 
         let resourcesDirectory = outputDirectory.appending(component: "resources", directoryHint: .isDirectory)
-        if fileManager.fileExists(atPath: resourcesDirectory.path()) {
+        if fileManager.fileExists(atPath: resourcesDirectory.path(percentEncoded: false)) {
             try fileManager.removeItem(at: resourcesDirectory)
         }
         try fileManager.createDirectory(at: resourcesDirectory, withIntermediateDirectories: true)
@@ -445,7 +476,7 @@ struct AdaWebExportPlugin: CommandPlugin {
         var exportedBundles: [ResourceBundleExport] = []
         for source in resourceBundles {
             let destination = resourcesDirectory.appending(component: source.lastPathComponent, directoryHint: .isDirectory)
-            if fileManager.fileExists(atPath: destination.path()) {
+            if fileManager.fileExists(atPath: destination.path(percentEncoded: false)) {
                 try fileManager.removeItem(at: destination)
             }
             try fileManager.copyItem(at: source, to: destination)
@@ -455,8 +486,7 @@ struct AdaWebExportPlugin: CommandPlugin {
         return exportedBundles
     }
 
-    /// A host tool must not inherit BUILD_WASM: Swan deliberately omits its
-    /// native Dawn module in that mode. Keep the CPU baker in its own host build.
+    /// Build the CPU baker for the host outside the WASM build environment.
     private func buildGraphBaker(packageDirectory: URL, scratch: URL?) throws -> URL {
         let engine = Self.assetsDirectory.deletingLastPathComponent().deletingLastPathComponent()
         let cache = (scratch ?? packageDirectory.appendingPathComponent(".build-web-export"))
@@ -496,32 +526,27 @@ struct AdaWebExportPlugin: CommandPlugin {
         shaderTranspiler: URL,
         requiresAllShaders: Bool
     ) throws -> [ResourceManifestEntry] {
-        let shaderURLs = try resourceBundles
-            .flatMap { bundle in
-                try regularFiles(in: bundle.source)
+        let files: [URL] = try resourceBundles.flatMap { try regularFiles(in: $0.source) }
+        let shaders = files.filter { file in
+            switch file.pathExtension {
+            case "wesl": true
+            case "glsl": containsShaderStagePragma(file)
+            default: false
             }
-            .filter { $0.pathExtension == "glsl" && containsShaderStagePragma($0) }
-            .sorted { $0.path() < $1.path() }
+        }
+        let shaderURLs = shaders.sorted { $0.path(percentEncoded: false) < $1.path(percentEncoded: false) }
         guard !shaderURLs.isEmpty else {
-            Diagnostics.remark("No GLSL shader resources need WGSL generation")
+            Diagnostics.remark("No shader resources need WGSL generation")
             return []
         }
 
-        if requiresAllShaders,
-            let cached = try cachedWGSLShaders(
-                resourceBundles: resourceBundles,
-                outputDirectory: outputDirectory,
-                packageDirectory: packageDirectory
-            ) {
-            Diagnostics.remark("Reused \(cached.count) verified WGSL shaders for the Web Player")
-            return cached
-        }
-
-        let tintExecutable = try self.tintExecutable(packageDirectory: packageDirectory)
         let moduleIncludeArguments = shaderModuleIncludeArguments(
             resourceBundles: resourceBundles,
             packageDirectory: packageDirectory
         )
+
+        let weslDependencies = shaderLibrary("WESL", resourceBundles: resourceBundles, packageDirectory: packageDirectory)
+            .map { ["--wesl-dependency", "ada_engine=\($0.path(percentEncoded: false))"] } ?? []
 
         var entries: [ResourceManifestEntry] = []
         for shaderURL in shaderURLs {
@@ -533,21 +558,34 @@ struct AdaWebExportPlugin: CommandPlugin {
 
             var arguments = [
                 "--input",
-                shaderURL.path(),
+                shaderURL.path(percentEncoded: false),
                 "--output-directory",
-                shaderOutputDirectory.path(),
-                "--tint",
-                tintExecutable.path()
+                shaderOutputDirectory.path(percentEncoded: false)
             ]
-            arguments.append(contentsOf: moduleIncludeArguments)
+            if shaderURL.pathExtension == "wesl" {
+                arguments.append("--web-stages")
+                arguments.append(contentsOf: weslDependencies)
+            } else {
+                arguments.append(contentsOf: moduleIncludeArguments)
+            }
 
-            let needsVariants = resourceBundle.source.lastPathComponent == Self.flat3DBundle
-                && shaderURL.relativePath(from: resourceBundle.source) == "Shaders/flat3d.glsl"
-            for defines in [[]] + (needsVariants ? Self.flat3DVariants : []) {
+            let variants: [[String]]
+            if resourceBundle.source.lastPathComponent == Self.flat3DBundle {
+                variants = switch shaderURL.relativePath(from: resourceBundle.source) {
+                case "Shaders/flat3d.glsl": Self.flat3DVariants
+                case "Shaders/directional_shadow_3d.wesl", "Shaders/motion_3d.wesl": [["ADA_MORPH"]]
+                case "Shaders/meshlet_map_3d.wesl": [["MAP_RESPONSE"], ["MAP_SURFACE"], ["MAP_RESPONSE", "MAP_SURFACE"]]
+                default: []
+                }
+            } else {
+                variants = []
+            }
+            let variantFlag = shaderURL.pathExtension == "wesl" ? "--feature" : "--define"
+            for defines in [[]] + variants {
                 do {
                     let generatedOutput = try WebExportSupport.captureStandardOutput(
-                        executable: shaderTranspiler.path(),
-                        arguments: arguments + defines.flatMap { ["--define", $0] },
+                        executable: shaderTranspiler.path(percentEncoded: false),
+                        arguments: arguments + defines.flatMap { [variantFlag, $0] },
                         workingDirectory: packageDirectory
                     )
                     let generatedEntries = generatedOutput
@@ -555,14 +593,14 @@ struct AdaWebExportPlugin: CommandPlugin {
                         .map(String.init)
                         .compactMap { outputPath -> ResourceManifestEntry? in
                             let outputURL = URL(fileURLWithPath: outputPath)
-                            guard FileManager.default.fileExists(atPath: outputURL.path()) else {
+                            guard FileManager.default.fileExists(atPath: outputURL.path(percentEncoded: false)) else {
                                 return nil
                             }
                             let absoluteBuildURL = shaderURL
                                 .deletingLastPathComponent()
                                 .appending(component: outputURL.lastPathComponent, directoryHint: .notDirectory)
                             return ResourceManifestEntry(
-                                path: absoluteBuildURL.path(),
+                                path: absoluteBuildURL.path(percentEncoded: false),
                                 // The WGSL exists in the export, not in the SwiftPM resource bundle.
                                 url: browserRelativeURL(forRelativePath: outputURL.relativePath(from: outputDirectory))
                             )
@@ -575,85 +613,12 @@ struct AdaWebExportPlugin: CommandPlugin {
             }
         }
 
-        Diagnostics.remark("Generated \(entries.count) WGSL shader resources with Tint")
+        Diagnostics.remark("Generated \(entries.count) WGSL shader resources with SAGACompiler")
         return entries
-    }
-
-    private func cachedWGSLShaders(
-        resourceBundles: [ResourceBundleExport],
-        outputDirectory: URL,
-        packageDirectory: URL
-    ) throws -> [ResourceManifestEntry]? {
-        let cacheRoot = Self.assetsDirectory.appending(
-            components: "Runtime", "WGSLCache",
-            directoryHint: .isDirectory
-        )
-        guard
-            let manifestData = FileManager.default.contents(atPath: cacheRoot.appending(component: "manifest.json").path()),
-            let manifest = try? JSONDecoder().decode(CachedShaderManifest.self, from: manifestData),
-            manifest.schemaVersion == 1
-        else { return nil }
-        if resourceBundles.contains(where: { $0.source.lastPathComponent == Self.flat3DBundle }) {
-            let requiredVariants = Self.flat3DVariants.flatMap { defines in
-                let stem = Self.flat3DBundle + "/Shaders/flat3d." + defines.joined(separator: ".")
-                return [stem + ".vert.wgsl", stem + ".frag.wgsl"]
-            }
-            guard Set(requiredVariants).isSubset(of: manifest.wgslPaths) else { return nil }
-        }
-
-        var currentSources: [String: URL] = [:]
-        for bundle in resourceBundles {
-            for source in try regularFiles(in: bundle.source) where source.pathExtension == "glsl" {
-                let key = bundle.source.lastPathComponent + "/" + source.relativePath(from: bundle.source)
-                currentSources[key] = source
-            }
-        }
-        guard Set(currentSources.keys) == Set(manifest.glslHashes.keys),
-            currentSources.allSatisfy({ key, source in
-                guard let expected = manifest.glslHashes[key].flatMap({ UInt64($0, radix: 16) }),
-                    let bytes = FileManager.default.contents(atPath: source.path())
-                else { return false }
-                var hash: UInt64 = 14_695_981_039_346_656_037
-                for byte in bytes {
-                    hash ^= UInt64(byte)
-                    hash &*= 1_099_511_628_211
-                }
-                return hash == expected
-            })
-        else {
-            Diagnostics.remark("Precompiled WGSL cache does not match current GLSL sources; using Tint")
-            return nil
-        }
-
-        let bundlesByName = Dictionary(uniqueKeysWithValues: resourceBundles.map { ($0.source.lastPathComponent, $0) })
-        var entries: [ResourceManifestEntry] = []
-        for path in manifest.wgslPaths {
-            let parts = path.split(separator: "/", omittingEmptySubsequences: false)
-            guard parts.count >= 2, parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }),
-                let bundle = bundlesByName[String(parts[0])]
-            else { return nil }
-            let relative = parts.dropFirst().joined(separator: "/")
-            let cached = cacheRoot.appending(path: path, directoryHint: .notDirectory)
-            guard FileManager.default.fileExists(atPath: cached.path()) else { return nil }
-            let destination = bundle.destination.appending(path: relative, directoryHint: .notDirectory)
-            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try replaceItem(at: destination, with: cached)
-            entries.append(ResourceManifestEntry(
-                path: bundle.source.appending(path: relative, directoryHint: .notDirectory).path(),
-                url: browserRelativeURL(forRelativePath: destination.relativePath(from: outputDirectory))
-            ))
-        }
-        return entries
-    }
-
-    private struct CachedShaderManifest: Decodable {
-        let schemaVersion: Int
-        let glslHashes: [String: String]
-        let wgslPaths: [String]
     }
 
     private func containsShaderStagePragma(_ url: URL) -> Bool {
-        guard let data = FileManager.default.contents(atPath: url.path()),
+        guard let data = FileManager.default.contents(atPath: url.path(percentEncoded: false)),
               let source = String(data: data, encoding: .utf8) else {
             return false
         }
@@ -681,108 +646,21 @@ struct AdaWebExportPlugin: CommandPlugin {
     }
 
     private func shaderModuleIncludeArguments(resourceBundles: [ResourceBundleExport], packageDirectory: URL) -> [String] {
-        let candidates = resourceBundles.map {
-            $0.source.appending(components: "Shaders", "Public", directoryHint: .isDirectory)
-        } + [
+        shaderLibrary("Public", resourceBundles: resourceBundles, packageDirectory: packageDirectory)
+            .map { ["--module-include", "AdaEngine=\($0.path(percentEncoded: false))"] } ?? []
+    }
+
+    private func shaderLibrary(_ folder: String, resourceBundles: [ResourceBundleExport], packageDirectory: URL) -> URL? {
+        let bundled = resourceBundles.first { $0.source.lastPathComponent == Self.renderBundle }?
+            .source.appending(components: "Shaders", folder, directoryHint: .isDirectory)
+        let candidates = [
+            bundled,
             packageDirectory.appending(
-                components: "Sources", "AdaRender", "Assets", "Shaders", "Public",
+                components: "Sources", "AdaRender", "Assets", "Shaders", folder,
                 directoryHint: .isDirectory
             )
         ]
-
-        guard let publicShaders = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path()) }) else {
-            return []
-        }
-
-        return [
-            "--module-include",
-            "AdaEngine=\(publicShaders.path())"
-        ]
-    }
-
-    private func tintExecutable(packageDirectory: URL) throws -> URL {
-        if let override = ProcessInfo.processInfo.environment["TINT_EXECUTABLE"], !override.isEmpty {
-            let executable = URL(fileURLWithPath: override)
-            if FileManager.default.isExecutableFile(atPath: executable.path()) {
-                Diagnostics.remark("Using Tint compiler from TINT_EXECUTABLE: \(executable.path())")
-                return executable
-            }
-            throw ExportError.tintNotFound(override)
-        }
-
-        if let executable = builtTintExecutable(packageDirectory: packageDirectory) {
-            Diagnostics.remark("Using Tint compiler from project tool cache: \(executable.path())")
-            return executable
-        }
-
-        if let executable = findExecutableInPATH(named: .tintBinaryName) {
-            Diagnostics.remark("Using Tint compiler from PATH: \(executable.path())")
-            return executable
-        }
-
-        Diagnostics.remark("Tint compiler was not found locally; building Dawn/Tint before WGSL generation")
-        try buildTintCompiler(packageDirectory: packageDirectory)
-
-        if let executable = builtTintExecutable(packageDirectory: packageDirectory) {
-            Diagnostics.remark("Using newly built Tint compiler: \(executable.path())")
-            return executable
-        }
-
-        if let executable = findExecutableInPATH(named: .tintBinaryName) {
-            Diagnostics.remark("Using Tint compiler from PATH: \(executable.path())")
-            return executable
-        }
-
-        let expectedExecutable = packageDirectory.appending(
-            components: ".build", "plugins", "WebGPUTintPlugin", "outputs", "bin", .tintBinaryPlatform, .tintBinaryName,
-            directoryHint: .notDirectory
-        )
-        throw ExportError.tintNotFound(expectedExecutable.path())
-    }
-
-    private func builtTintExecutable(packageDirectory: URL) -> URL? {
-        let cache = ProcessInfo.processInfo.environment["ADAENGINE_TINT_CACHE"].map { URL(fileURLWithPath: $0) }
-            ?? packageDirectory.appendingPathComponent(".build-tools/tint")
-        let verifiedTool = cache.appendingPathComponent("bin/\(String.tintBinaryPlatform)/\(String.tintBinaryName)")
-        if FileManager.default.isExecutableFile(atPath: verifiedTool.path) {
-            return verifiedTool
-        }
-        let executable = packageDirectory.appending(
-            components: ".build", "plugins", "WebGPUTintPlugin", "outputs", "bin", .tintBinaryPlatform, .tintBinaryName,
-            directoryHint: .notDirectory
-        )
-        if FileManager.default.isExecutableFile(atPath: executable.path()) { return executable }
-        // SwiftPM 6 uses plugins/outputs/<package>/<plugin> for dependent plugins.
-        let plugins = packageDirectory.appending(components: ".build", "plugins")
-        guard let files = FileManager.default.enumerator(at: plugins, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { return nil }
-        return files.compactMap { $0 as? URL }.first {
-            $0.lastPathComponent == .tintBinaryName && $0.pathComponents.contains("WebGPUTintPlugin")
-                && FileManager.default.isExecutableFile(atPath: $0.path())
-        }
-    }
-
-    private func findExecutableInPATH(named name: String) -> URL? {
-        let paths = ProcessInfo.processInfo.environment["PATH"]?.split(separator: ":").map(String.init) ?? []
-        return paths
-            .map { URL(fileURLWithPath: $0).appending(component: name, directoryHint: .notDirectory) }
-            .first { FileManager.default.isExecutableFile(atPath: $0.path()) }
-    }
-
-    private func buildTintCompiler(packageDirectory: URL) throws {
-        try run(
-            executable: "/usr/bin/env",
-            arguments: [
-                "swift",
-                "package",
-                "--disable-sandbox",
-                "plugin",
-                "--allow-network-connections",
-                "all",
-                "--allow-writing-to-package-directory",
-                "build-tint"
-            ],
-            workingDirectory: packageDirectory
-        )
+        return candidates.compactMap { $0 }.first(where: { FileManager.default.fileExists(atPath: $0.path(percentEncoded: false)) })
     }
 
     private func manifestEntries(forResourceBundle bundle: ResourceBundleExport) throws -> [ResourceManifestEntry] {
@@ -892,185 +770,17 @@ struct AdaWebExportPlugin: CommandPlugin {
                 directoryHint: .notDirectory
             )
         ]
-        if let runtime = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path()) }) {
+        if let runtime = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path(percentEncoded: false)) }) {
             return runtime
         }
         throw ExportError.javascriptKitRuntimeNotFound
     }
 
-    private func writeBridgeJSRuntime(packageDirectory: URL, checkouts: URL, to output: URL) throws {
-        guard let skeleton = bridgeJSSkeleton(checkouts: checkouts) else {
-            try """
-            export async function createInstantiator() {
-              return {
-                addImports: () => {},
-                setInstance: () => {},
-                createExports: () => ({}),
-              };
-            }
-            """.write(to: output, atomically: true, encoding: .utf8)
-            return
-        }
-
-        if try cachedBridgeJSRuntime(checkouts: checkouts, skeleton: skeleton, output: output) {
-            Diagnostics.remark("Reused verified BridgeJS runtime for the Web Player")
-            return
-        }
-
-        let bridgeJSPackage = try bridgeJSPackageDirectory(checkouts: checkouts)
-        let bridgeJSTool = try bridgeJSToolExecutable(
-            bridgeJSPackage: bridgeJSPackage,
-            packageDirectory: packageDirectory
-        )
-        try runBridgeJSTool(
-            executable: bridgeJSTool,
-            skeleton: skeleton,
-            output: output,
-            workingDirectory: packageDirectory
-        )
-    }
-
-    private func cachedBridgeJSRuntime(checkouts: URL, skeleton: URL, output: URL) throws -> Bool {
-        let cacheRoot = Self.assetsDirectory.appending(
-            components: "Runtime", "BridgeJSCache",
-            directoryHint: .isDirectory
-        )
-        guard
-            let data = FileManager.default.contents(atPath: cacheRoot.appending(component: "manifest.json").path()),
-            let manifest = try? JSONDecoder().decode(CachedBridgeJSManifest.self, from: data),
-            manifest.schemaVersion == 1,
-            let expectedSkeleton = UInt64(manifest.skeletonFNV64, radix: 16),
-            let expectedRuntime = UInt64(manifest.runtimeFNV64, radix: 16),
-            let skeletonBytes = FileManager.default.contents(atPath: skeleton.path()),
-            let runtime = try? javascriptKitRuntime(checkouts: checkouts),
-            let runtimeBytes = FileManager.default.contents(atPath: runtime.path()),
-            cachedFNV64(skeletonBytes) == expectedSkeleton,
-            cachedFNV64(runtimeBytes) == expectedRuntime
-        else { return false }
-        let cached = cacheRoot.appending(component: "bridge-js.js", directoryHint: .notDirectory)
-        guard FileManager.default.fileExists(atPath: cached.path()) else { return false }
-        try replaceItem(at: output, with: cached)
-        // A copied cache can predate the previous export. Fresh mtime prevents HTTP
-        // conditional requests from retaining an older bridge at this same URL.
-        try FileManager.default.setAttributes([.modificationDate: Date()], ofItemAtPath: output.path())
-        return true
-    }
-
-    private func cachedFNV64(_ data: Data) -> UInt64 {
-        var hash: UInt64 = 14_695_981_039_346_656_037
-        for byte in data {
-            hash ^= UInt64(byte)
-            hash &*= 1_099_511_628_211
-        }
-        return hash
-    }
-
-    private struct CachedBridgeJSManifest: Decodable {
-        let schemaVersion: Int
-        let skeletonFNV64: String
-        let runtimeFNV64: String
-    }
-
-    private func bridgeJSSkeleton(checkouts: URL) -> URL? {
-        var candidates: [URL] = []
-        if let localSwan = ProcessInfo.processInfo.environment["ADAENGINE_SWAN_PACKAGE_PATH"], !localSwan.isEmpty {
-            candidates.append(URL(fileURLWithPath: localSwan).appendingPathComponent("Sources/WebGPU/Wasm/Generated/JavaScript/BridgeJS.json"))
-        }
-        candidates += [
-            checkouts.appending(
-                components: "swan", "Sources", "WebGPU", "Wasm", "Generated", "JavaScript", "BridgeJS.json",
-                directoryHint: .notDirectory
-            ),
-            checkouts.appending(
-                components: "Swan", "Sources", "WebGPU", "Wasm", "Generated", "JavaScript", "BridgeJS.json",
-                directoryHint: .notDirectory
-            )
-        ]
-        return candidates.first(where: { FileManager.default.fileExists(atPath: $0.path()) })
-    }
-
-    private func bridgeJSPackageDirectory(checkouts: URL) throws -> URL {
-        let candidates = [
-            checkouts.appending(
-                components: "JavaScriptKit", "Plugins", "BridgeJS",
-                directoryHint: .isDirectory
-            ),
-            checkouts.appending(
-                components: "javascriptkit", "Plugins", "BridgeJS",
-                directoryHint: .isDirectory
-            )
-        ]
-        if let bridgeJSPackage = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path()) }) {
-            return bridgeJSPackage
-        }
-
-        let swanDirectoryCandidates = [
-            checkouts.appending(components: "swan", directoryHint: .isDirectory),
-            checkouts.appending(components: "Swan", directoryHint: .isDirectory)
-        ]
-        let swanDirectory = swanDirectoryCandidates.first(where: { FileManager.default.fileExists(atPath: $0.path()) })
-        if let swanDirectory {
-            let nestedBridgeJS = swanDirectory.appending(
-                components: ".build", "checkouts", "JavaScriptKit", "Plugins", "BridgeJS",
-                directoryHint: .isDirectory
-            )
-            if FileManager.default.fileExists(atPath: nestedBridgeJS.path()) {
-                return nestedBridgeJS
-            }
-        }
-
-        throw ExportError.bridgeJSPackageNotFound
-    }
-
-    private func bridgeJSToolExecutable(bridgeJSPackage: URL, packageDirectory: URL) throws -> URL {
-        if let existing = findBridgeJSToolExecutable(in: bridgeJSPackage) {
-            return existing
-        }
-
-        try run(
-            executable: "/usr/bin/env",
-            arguments: [
-                "swift",
-                "build",
-                "--disable-sandbox",
-                "--package-path",
-                bridgeJSPackage.path(),
-                "--product",
-                "BridgeJSToolInternal"
-            ],
-            workingDirectory: packageDirectory
-        )
-
-        guard let built = findBridgeJSToolExecutable(in: bridgeJSPackage) else {
-            throw ExportError.bridgeJSToolNotFound
-        }
-        return built
-    }
-
-    private func findBridgeJSToolExecutable(in bridgeJSPackage: URL) -> URL? {
-        let buildDirectory = bridgeJSPackage.appending(component: ".build", directoryHint: .isDirectory)
-        guard let enumerator = FileManager.default.enumerator(
-            at: buildDirectory,
-            includingPropertiesForKeys: [.isRegularFileKey, .isExecutableKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return nil
-        }
-
-        for case let url as URL in enumerator where url.lastPathComponent == "BridgeJSToolInternal" {
-            let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isExecutableKey])
-            if values?.isRegularFile == true, values?.isExecutable == true {
-                return url
-            }
-        }
-        return nil
-    }
-
     private func serve(directory: URL) throws {
-        Diagnostics.remark("Serving \(directory.path()) at http://127.0.0.1:8080")
+        Diagnostics.remark("Serving \(directory.path(percentEncoded: false)) at http://127.0.0.1:8080")
         try run(
             executable: "/usr/bin/env",
-            arguments: ["python3", "-m", "http.server", "8080", "--directory", directory.path()],
+            arguments: ["python3", "-m", "http.server", "8080", "--directory", directory.path(percentEncoded: false)],
             workingDirectory: directory
         )
     }
@@ -1114,29 +824,6 @@ struct AdaWebExportPlugin: CommandPlugin {
         return output
     }
 
-    private func runBridgeJSTool(executable: URL, skeleton: URL, output: URL, workingDirectory: URL?) throws {
-        FileManager.default.createFile(atPath: output.path(), contents: nil)
-        let outputHandle = try FileHandle(forWritingTo: output)
-        defer {
-            try? outputHandle.close()
-        }
-
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = ["emit-js", skeleton.path()]
-        process.currentDirectoryURL = workingDirectory
-        process.standardOutput = outputHandle
-        process.environment = ProcessInfo.processInfo.environment.merging([
-            "ADAENGINE_WEB_EXPORT": "1",
-            "BUILD_WASM": "1"
-        ]) { _, new in new }
-        try process.run()
-        process.waitUntilExit()
-
-        guard process.terminationStatus == 0 else {
-            throw ExportError.commandFailed("\(executable.path()) emit-js \(skeleton.path())", process.terminationStatus)
-        }
-    }
 }
 
 private struct ExportOptions {
@@ -1254,40 +941,6 @@ private extension URL {
     }
 }
 
-private extension String {
-    static var tintBinaryPlatform: String {
-        #if arch(arm64)
-        #if os(macOS)
-        return "arm64-macos"
-        #elseif os(Linux)
-        return "arm64-linux"
-        #elseif os(Windows)
-        return "arm64-windows"
-        #else
-        return ""
-        #endif
-        #else
-        #if os(macOS)
-        return "x86_64-macos"
-        #elseif os(Linux)
-        return "x86_64-linux"
-        #elseif os(Windows)
-        return "x86_64-windows"
-        #else
-        return ""
-        #endif
-        #endif
-    }
-
-    static var tintBinaryName: String {
-        #if os(Windows)
-        "tint.exe"
-        #else
-        "tint"
-        #endif
-    }
-}
-
 private enum ExportError: LocalizedError, CustomStringConvertible {
     case help
     case missingTarget
@@ -1297,11 +950,10 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
     case commandFailed(String, Int32)
     case wasmNotFound(String, String)
     case javascriptKitRuntimeNotFound
-    case bridgeJSPackageNotFound
-    case bridgeJSToolNotFound
-    case tintNotFound(String)
     case unsafeScratchDirectory
     case browserWASIRuntimeNotFound
+    case sagaWebHostNotResolved
+    case sagaWebHostAssetMissing(String)
 
     var errorDescription: String? {
         description
@@ -1318,6 +970,10 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
             return "Web export requires an isolated --scratch-path; the shared .build directory cannot be used."
         case .browserWASIRuntimeNotFound:
             return "Web export is missing BrowserWASIShim/dist/index.js. Restore the bundled WASI runtime modules from the engine repository."
+        case .sagaWebHostNotResolved:
+            return "Web export requires a SAGA dependency that provides the SAGAWebHost product."
+        case .sagaWebHostAssetMissing(let path):
+            return "The resolved SAGAWebHost package is missing a browser asset at \(path). Use a SAGA revision that ships the matching browser host."
         case .missingTarget:
             return "Missing required --product <ProductName> argument."
         case .missingValue(let argument):
@@ -1332,12 +988,6 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
             return "Could not find built \(product).wasm under \(buildDirectory)."
         case .javascriptKitRuntimeNotFound:
             return "Could not find JavaScriptKit runtime.mjs under .build/checkouts/JavaScriptKit."
-        case .bridgeJSPackageNotFound:
-            return "Could not find JavaScriptKit BridgeJS package under .build/checkouts."
-        case .bridgeJSToolNotFound:
-            return "Could not find built BridgeJSToolInternal executable."
-        case .tintNotFound(let path):
-            return "Tint binary not found at \(path). Install `tint`, set TINT_EXECUTABLE, or run `python3 script/ensure_tint.py` before exporting web builds."
         }
     }
 }
@@ -1597,6 +1247,7 @@ private func mainJS(product: String) -> String {
       const requiredLimits = {
         maxSampledTexturesPerShaderStage: Math.min(32, adapter.limits.maxSampledTexturesPerShaderStage),
         maxSamplersPerShaderStage: Math.min(32, adapter.limits.maxSamplersPerShaderStage),
+        maxColorAttachmentBytesPerSample: Math.min(48, adapter.limits.maxColorAttachmentBytesPerSample),
       };
       updateLoader(64, "Creating WebGPU device…");
       const device = await adapter.requestDevice({ requiredFeatures, requiredLimits });
@@ -1631,6 +1282,11 @@ private func mainJS(product: String) -> String {
       });
       globalThis.__adaWebGPUAdapter = adapter;
       globalThis.__adaWebGPUDevice = device;
+      // The browser renders through SAGA. Presentation attaches to the engine canvas when its window is created.
+      updateLoader(66, "Opening SAGA WebGPU host…");
+      const { openWebGPU } = await import("./saga-webgpu.mjs");
+      globalThis.__adaSAGAHost = await openWebGPU(null, { deferCanvas: true });
+      globalThis.__adaSAGADebug = new URLSearchParams(location.search).has("sagadebug");
 
       async function makeResourcePreopenDirectories() {
         updateLoader(68, "Loading resources…");

@@ -77,6 +77,8 @@ public enum ShaderResource {
         public let arraySize: Int
         public internal(set) var shaderStage: ShaderStageFlags
         public let resourceAccess: ResourceAccess
+        // Optional so reflection cached before depth bindings were supported still decodes.
+        var isDepth: Bool? = nil
     }
 
     /// Describe reflected shader buffer information. That shader buffer contains members (properties)

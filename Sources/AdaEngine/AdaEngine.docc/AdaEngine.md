@@ -45,3 +45,4 @@ For more details and guides, check out the tutorials below.
 - <doc:PipelinedRendering>
 - <doc:Terrain>
 - <doc:VisionOSWindowed>
+- <doc:WESLShaders>

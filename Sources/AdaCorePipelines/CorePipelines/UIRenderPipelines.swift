@@ -17,6 +17,11 @@ public enum CorePipelineShaders {
         try ShaderModule.loadBundled(at: path, from: .adaModule)
     }
 
+    /// Loads a migrated built-in shader using the active backend's supported format.
+    public static func loadRequiredBuiltin(_ name: String) -> AssetHandle<ShaderModule> {
+        ShaderModule.loadRequiredBuiltin(at: "Shaders/\(name)", from: .adaModule)
+    }
+
     public static func loadRequiredBundled(at path: String) -> AssetHandle<ShaderModule> {
         ShaderModule.loadRequiredBundled(at: path, from: .adaModule)
     }
@@ -29,7 +34,7 @@ public struct QuadPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/quad.glsl", from: .adaModule)
+        self.shader = CorePipelineShaders.loadRequiredBuiltin("quad")
     }
 
     public func configurate(
@@ -64,7 +69,7 @@ public struct LinearGradientPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/gradient.glsl", from: .adaModule)
+        self.shader = CorePipelineShaders.loadRequiredBuiltin("gradient")
     }
 
     public func configurate(
@@ -99,7 +104,7 @@ public struct CirclePipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/circle.glsl", from: .adaModule)
+        self.shader = CorePipelineShaders.loadRequiredBuiltin("circle")
     }
 
     public func configurate(
@@ -136,7 +141,7 @@ public struct LinePipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/line.glsl", from: .adaModule)
+        self.shader = CorePipelineShaders.loadRequiredBuiltin("line")
     }
 
     public func configurate(

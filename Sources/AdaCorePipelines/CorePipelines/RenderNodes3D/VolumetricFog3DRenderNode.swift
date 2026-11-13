@@ -157,7 +157,7 @@ struct VolumetricFog3DViews: Resource {
     private var retired: [RenderTexture] = []
 
     init(device: RenderDevice) {
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/volumetric_fog_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("volumetric_fog_3d")
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),
@@ -166,17 +166,19 @@ struct VolumetricFog3DViews: Resource {
             depthPixelFormat: .none
         )
         descriptor.colorAttachments = [.init(format: .rgba_16f)]
+        descriptor.unfilterableTextureBindings = [0: [1]]
         pipeline = device.createRenderPipeline(from: descriptor)
         nearest = device.createSampler(from: .init(minFilter: .nearest, magFilter: .nearest, mipFilter: .notMipmapped))
     }
 
     mutating func localLightingPipeline(device: RenderDevice) -> any RenderPipeline {
         if let localPipeline { return localPipeline }
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/local_volumetric_fog_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("local_volumetric_fog_3d")
         var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment), debugName: "Local volumetric fog",
             backfaceCulling: false, depthPixelFormat: .none)
         descriptor.colorAttachments = [.init(format: .rgba_16f)]
+        descriptor.unfilterableTextureBindings = [0: [1, 26]]
         let pipeline = device.createRenderPipeline(from: descriptor)
         localPipeline = pipeline
         return pipeline

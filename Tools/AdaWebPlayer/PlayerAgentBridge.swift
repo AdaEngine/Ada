@@ -131,7 +131,7 @@ final class PlayerAgentBridge {
                 switch name {
                 case "AdaPhysics.PhysicsBody2DComponent": _ = try JSONDecoder().decode(PhysicsBody2DComponent.self, from: data)
                 case "AdaScene.PointLightComponent": _ = try JSONDecoder().decode(PointLightComponent.self, from: data)
-                case "AdaRender.Environment3D": _ = try JSONDecoder().decode(Environment3D.self, from: data)
+                case "AdaRender.Environment3D", "AdaCorePipelines.Environment3D": _ = try JSONDecoder().decode(Environment3D.self, from: data)
                 case "AdaSprite.Sprite":
                     struct SpriteValues: Decodable { let anchor: SpriteAnchor; let imageMode: SpriteImageMode }
                     _ = try JSONDecoder().decode(SpriteValues.self, from: data)

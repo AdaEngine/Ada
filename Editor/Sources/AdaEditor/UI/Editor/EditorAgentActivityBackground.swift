@@ -258,6 +258,13 @@ struct EditorAgentGlowMaterial: UIShaderMaterial {
         parameters = EditorAgentGlowParameters(color: .clear, geometry: Vector4(1, 1, 0, 42), style: Vector4(0, 0.065, 14, 1))
     }
 
+    static func shaderModule() throws -> ShaderModule? {
+        guard ShaderModule.supportsBundledWESL,
+              let url = Bundle.editor.url(forResource: "agent_activity", withExtension: "wesl", subdirectory: "Assets/Shaders")
+        else { return nil }
+        return try ShaderModule.create(from: url)
+    }
+
     static func fragmentShader() throws -> AssetHandle<ShaderSource> {
         guard let url = Bundle.editor.url(forResource: "agent_activity", withExtension: "glsl", subdirectory: "Assets/Shaders") else {
             throw EditorAgentGlowResourceError.missingShader

@@ -70,7 +70,7 @@ struct SpineRenderData: Resource {
     mutating func pipeline(blend: SpineDraw.BlendMode, premultiplied: Bool, device: RenderDevice) -> RenderPipeline {
         let key = PipelineKey(blend: blend.rawValue, premultiplied: premultiplied)
         if let pipeline = pipelines[key] { return pipeline }
-        let shader = shaderModule ?? ShaderModule.loadRequiredBundled(at: "Assets/spine.glsl", from: .module)
+        let shader = shaderModule ?? ShaderModule.loadRequiredBuiltin(at: "Assets/spine", from: .module)
         shaderModule = shader
         var descriptor = RenderPipelineDescriptor(vertex: shader.asset.requiredShader(for: .vertex))
         descriptor.fragment = shader.asset.getShader(for: .fragment)

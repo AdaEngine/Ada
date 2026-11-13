@@ -42,7 +42,7 @@ struct Render3DMeshletSettingsTests {
     }
 
     #if canImport(WebGPU) && !WASM && !os(Android)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_TINT"] == "1"), arguments: [0, 1, 2, 3])
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"), arguments: [0, 1, 2, 3])
     func mapShadersCompileFreshForEveryAttachmentLayout(variant: Int) async throws {
         let root = ProcessInfo.processInfo.environment["ADAENGINE_SHADER_SOURCE_ROOT"].map { URL(fileURLWithPath: $0) }
             ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

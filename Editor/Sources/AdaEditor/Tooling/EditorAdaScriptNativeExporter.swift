@@ -293,6 +293,13 @@ actor EditorAdaScriptNativeExporter {
 
     @MainActor
     private static func convertScenes(at assets: URL, originalRoot: URL, sources: [AdaScriptSource]) throws {
+        if unsafe RenderEngine.shared == nil {
+            // CLI exports decode textured components without starting Studio's render world.
+            let previousBackend = unsafe RenderEngine.configurations.preferredBackend
+            defer { unsafe RenderEngine.configurations.preferredBackend = previousBackend }
+            unsafe RenderEngine.configurations.preferredBackend = .headless
+            RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "Native scene export")))
+        }
         EditorComponentRegistry.registerBuiltIns()
         let schemas = try AdaScriptSchemaParser.parse(sources: sources).filter { $0.kind == .component }
         let nativeNames = Set(schemas.flatMap { [$0.name, $0.id] + $0.aliases })
@@ -431,7 +438,26 @@ actor EditorAdaScriptNativeExporter {
             .package(url: "https://github.com/swiftwasm/JavaScriptKit.git", exact: "0.59.0")
         ], targets: [
             \(nativeTarget)
-            .\(targetKind)(name: "AdaNativeGame", dependencies: [\(nativeDependency).product(name: "AdaEngine", package: "AdaEngine"), .product(name: "AdaMultiplayer", package: "AdaEngine"), .product(name: "GravityAOT", package: "gravity-lang"), .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))], resources: [.copy("GameAssets")], linkerSettings: [.unsafeFlags(["-Xclang-linker", "-mexec-model=reactor", "-Xlinker", "--export-if-defined=main", "-Xlinker", "--export-if-defined=__main_argc_argv"], .when(platforms: [.wasi])), .unsafeFlags(["-Xlinker", "--strip-debug"], .when(platforms: [.wasi], configuration: .release))])
+            .\(targetKind)(
+                name: "AdaNativeGame",
+                dependencies: [
+                    \(nativeDependency).product(name: "AdaEngine", package: "AdaEngine"),
+                    .product(name: "AdaMultiplayer", package: "AdaEngine"),
+                    .product(name: "GravityAOT", package: "gravity-lang"),
+                    .product(name: "JavaScriptKit", package: "JavaScriptKit", condition: .when(platforms: [.wasi]))
+                ],
+                resources: [.copy("GameAssets")],
+                linkerSettings: [
+                    .unsafeFlags([
+                        "-Xclang-linker", "-mexec-model=reactor",
+                        "-Xlinker", "--export-if-defined=main",
+                        "-Xlinker", "--export-if-defined=__main_argc_argv"
+                    ], .when(platforms: [.wasi])),
+                    // Match AdaWebPlayer's debug stack budget during renderer startup.
+                    .unsafeFlags(["-Xlinker", "-z", "-Xlinker", "stack-size=4194304"], .when(platforms: [.wasi], configuration: .debug)),
+                    .unsafeFlags(["-Xlinker", "--strip-debug"], .when(platforms: [.wasi], configuration: .release))
+                ]
+            )
         ])
         """
     }

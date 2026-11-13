@@ -181,7 +181,7 @@ public final class ShaderCompiler {
                 return shader
             }
 
-            #if canImport(WebGPU)
+            #if canImport(WebGPU) || (WASM && WEBGPU_ENABLED)
                 if unsafe RenderEngine.shared.type.deviceLang == .wgsl {
                     guard let wgslSource = self.shaderSource.getWGSLSource(for: stage) else {
                         let sourcePath = self.shaderSource.getSourceFileURL(for: stage)?.path ?? "<unknown>"
@@ -215,6 +215,17 @@ public final class ShaderCompiler {
                 } catch {
                     self.logger.warning("Failed to save reflection: \(error)")
                 }
+                return shader
+            }
+        #endif
+
+        #if SAGA_RENDER && !WASM
+            // SAGA consumes SPIR-V directly and derives its bindings from the compiled stage.
+            if unsafe RenderEngine.shared.type == .saga {
+                let shader = try Shader(spirv: binary, compiler: self)
+                let spirvCompiler = try SpirvCompiler(spriv: binary.data, stage: stage, deviceLang: .glsl)
+                shader.reflectionData = spirvCompiler.reflection()
+                try shader.compile()
                 return shader
             }
         #endif

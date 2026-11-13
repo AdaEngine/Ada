@@ -21,7 +21,7 @@ public struct DirectionalShadow3DPipeline: RenderPipelineConfigurator {
     private let variants = PBR3DShaderVariants()
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: "Shaders/directional_shadow_3d.glsl", from: .adaModule)
+        self.shader = CorePipelineShaders.loadRequiredBuiltin("directional_shadow_3d")
     }
 
     /// The pipeline for a part without morph targets.
@@ -31,7 +31,11 @@ public struct DirectionalShadow3DPipeline: RenderPipelineConfigurator {
 
     public func configurate(with shadowConfiguration: Shadow3DConfiguration) -> RenderPipelineDescriptor {
         let shader = shadowConfiguration.morph
-            ? variants.shader(at: "Shaders/directional_shadow_3d.glsl", for: .morph, fallback: self.shader)
+            ? variants.shader(
+                at: ShaderModule.supportsBundledWESL ? "Shaders/directional_shadow_3d.wesl" : "Shaders/directional_shadow_3d.glsl",
+                for: .morph,
+                fallback: self.shader
+            )
             : self.shader
         var configuration = shadowConfiguration.vertex
         configureSkinningAttributes(&configuration)

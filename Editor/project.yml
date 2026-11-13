@@ -83,6 +83,7 @@ targets:
         basedOnDependencyAnalysis: false
         inputFiles:
           - $(BUILT_PRODUCTS_DIR)/AdaEditor
+          - $(SRCROOT)/scripts/relocate-macos-executable.sh
           - $(BUILT_PRODUCTS_DIR)/AdaEditor_AdaEditor.bundle
           - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaUI.bundle
           - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaA2UI.bundle
@@ -121,6 +122,7 @@ targets:
           mkdir -p "${destination_binary:h}"
           /usr/bin/ditto "${source_binary}" "${destination_binary}"
           /bin/chmod +x "${destination_binary}"
+          /bin/bash "${SRCROOT}/scripts/relocate-macos-executable.sh" "${destination_binary}" "${BUILT_PRODUCTS_DIR}"
           mkdir -p "${destination_resources:h}"
           /usr/bin/ditto "${source_resources}" "${destination_resources}"
           /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
@@ -167,6 +169,7 @@ targets:
         basedOnDependencyAnalysis: false
         inputFiles:
           - $(BUILT_PRODUCTS_DIR)/AdaEditor
+          - $(SRCROOT)/scripts/relocate-macos-executable.sh
           - $(BUILT_PRODUCTS_DIR)/AdaEditor_AdaEditor.bundle
           - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaUI.bundle
           - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaA2UI.bundle
@@ -207,13 +210,14 @@ targets:
           mkdir -p "${destination_binary:h}"
           /usr/bin/ditto "${source_binary}" "${destination_binary}"
           /bin/chmod +x "${destination_binary}"
+          /bin/bash "${SRCROOT}/scripts/relocate-macos-executable.sh" "${destination_binary}" "${BUILT_PRODUCTS_DIR}"
           mkdir -p "${destination_resources:h}"
           /usr/bin/ditto "${source_resources}" "${destination_resources}"
           /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
           /usr/bin/ditto "${source_a2ui_resources}" "${destination_a2ui_resources}"
           /usr/bin/ditto "${source_spine_resources}" "${destination_spine_resources}"
           cli_binary="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/MacOS/adastudio"
-          /usr/bin/ditto "${source_binary}" "${cli_binary}"
+          /usr/bin/ditto "${destination_binary}" "${cli_binary}"
           /bin/chmod +x "${cli_binary}"
           /usr/bin/python3 "${SRCROOT}/scripts/stage-build-sdk.py" \
             --engine-root "${SRCROOT}/.." \

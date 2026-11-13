@@ -13,7 +13,7 @@ public struct SpriteRenderPipeline: RenderPipelineConfigurator {
     public let spriteShader: AssetHandle<ShaderModule>
 
     public init() {
-        self.spriteShader = ShaderModule.loadRequiredBundled(at: "Assets/sprite.glsl", from: .adaModule)
+        self.spriteShader = ShaderModule.loadRequiredBuiltin(at: "Assets/sprite", from: .adaModule)
     }
 }
 

@@ -53,6 +53,8 @@ struct WGSLReflectionTests {
             @group(0) @binding(1) var terrain: texture_2d_array<f32>;
             @group(0) @binding(2) var sky: texture_cube<f32>;
             @group(0) @binding(3) var volume: texture_3d<f32>;
+            @group(0) @binding(4) var depth: texture_depth_2d;
+            @group(0) @binding(5) var depthLayers: texture_depth_2d_array;
             """
         let reflection = WGSLReflection.parse(from: source, stage: .fragment)
         let images = reflection.descriptorSets.first?.sampledImages
@@ -60,5 +62,9 @@ struct WGSLReflectionTests {
         #expect(images?[1]?.textureType == .texture2DArray)
         #expect(images?[2]?.textureType == .textureCube)
         #expect(images?[3]?.textureType == .texture3D)
+        #expect(images?[0]?.isDepth == nil)
+        #expect(images?[4]?.isDepth == true)
+        #expect(images?[5]?.isDepth == true)
+        #expect(images?[5]?.textureType == .texture2DArray)
     }
 }

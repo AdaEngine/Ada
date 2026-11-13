@@ -88,7 +88,7 @@ struct EditorBuildExportSettingsTests {
         settings.values[EditorBuildPlatform.web.rawValue] = [
             "ADA_WEB_SWIFT_EXECUTABLE": "/Tools/WASM/swift",
             "ADA_WEB_SWIFT_SDK": "custom-wasm-sdk",
-            "TINT_EXECUTABLE": "/Tools/Tint/tint"
+            "ADAENGINE_SAGA_PACKAGE_PATH": "/Tools/SAGA"
         ]
         let service = SwiftPMWorkspaceService()
         let root = URL(fileURLWithPath: "/tmp/Game")
@@ -100,11 +100,11 @@ struct EditorBuildExportSettingsTests {
         #expect(web.executablePath.lowercased().hasSuffix("wsl.exe"))
         #expect(web.arguments.contains("/Tools/WASM/swift"))
         #expect(web.arguments.contains("custom-wasm-sdk"))
-        #expect(web.arguments.contains("/Tools/Tint/tint"))
+        #expect(web.arguments.contains("/Tools/SAGA"))
         #else
         #expect(web.executablePath == "/Tools/WASM/swift")
         #expect(web.arguments.suffix(2) == ["--swift-sdk", "custom-wasm-sdk"])
-        #expect(web.environment["TINT_EXECUTABLE"] == "/Tools/Tint/tint")
+        #expect(web.environment["ADAENGINE_SAGA_PACKAGE_PATH"] == "/Tools/SAGA")
         #expect(web.environment["BUILD_WASM"] == "1")
         #endif
         #expect(web.environment["DEVELOPER_DIR"] == nil)

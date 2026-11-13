@@ -191,10 +191,13 @@ final class FontAtlasGenerator: Sendable {
     // MARK: - Private
 
     private func makeTextureAtlas(from data: Data, width: Int, height: Int) -> Texture2D {
+        let supportsFloat32Filtering = unsafe RenderEngine.shared.renderDevice.supportsFloat32TextureFiltering
+        // Keep cached atlas data at its original precision and convert only the GPU upload.
+        let pixels = supportsFloat32Filtering ? data : Self.halfPrecisionPixels(from: data)
         let image = Image(
             width: width,
             height: height,
-            data: data
+            data: pixels
         )
 
         var textSamplerDesc = SamplerDescriptor()
@@ -205,7 +208,7 @@ final class FontAtlasGenerator: Sendable {
         let descriptor = TextureDescriptor(
             width: width,
             height: height,
-            pixelFormat: .rgba_32f,
+            pixelFormat: supportsFloat32Filtering ? .rgba_32f : .rgba_16f,
             textureUsage: [.read],
             textureType: .texture2D,
             mipmapLevel: 0,
@@ -214,6 +217,17 @@ final class FontAtlasGenerator: Sendable {
         )
 
         return Texture2D(descriptor: descriptor)
+    }
+
+    private static func halfPrecisionPixels(from data: Data) -> Data {
+        let stride = MemoryLayout<Float>.stride
+        let components = unsafe data.withUnsafeBytes { bytes in
+            (0..<(bytes.count / stride)).map { index in
+                let component = unsafe bytes.loadUnaligned(fromByteOffset: index * stride, as: Float.self)
+                return Float16(component).bitPattern
+            }
+        }
+        return unsafe components.withUnsafeBufferPointer { unsafe Data(buffer: $0) }
     }
 
     private func makeAtlasDescriptor(from fontDescriptor: FontDescriptor) -> font_atlas_descriptor {

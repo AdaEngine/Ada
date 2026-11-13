@@ -14,10 +14,28 @@ python ada_tool.py install studio
 python ada_tool.py install studio --debug --launch
 ```
 
+## Local SAGA checkout
+
+Apple builds with SAGAMetal and browser exports resolve a pinned SAGA revision
+through SwiftPM. Set `ADAENGINE_SAGA_PACKAGE_PATH` to an absolute path to
+develop against a local checkout. In WSL use the Linux path. Native Vulkan
+development and native WebGPU compiler builds use the sibling SAGA checkout
+unless this override is set.
+
+```powershell
+$env:ADAENGINE_SAGA_PACKAGE_PATH = 'D:/Development/SAGA'
+$env:ADAENGINE_VALIDATE_WGSL = '1'
+swift test --filter WGSLShaderCompilerTests
+```
+
+The test suite translates fresh SPIR-V for both shader stages and verifies the
+WGSL entry point and binding reflection. GLSL source remains supported during
+the compiler migration.
+
 ## Install and run Studio
 
 Both configurations are Standalone distributions, including resources, runtime,
-Tint and the source BuildSDK. Installation without `--source` builds the current
+and the source BuildSDK. Installation without `--source` builds the current
 checkout; it does not download the latest GitHub release. Debug selects the
 debug compiler configuration and has its own installation directory and shortcut.
 
@@ -67,14 +85,14 @@ python ada_tool.py prepare --skip-system
 ```
 
 `doctor` does not install or download anything. It checks the selected Swift
-version, native build tools, Tint hash and a real SPIR-V conversion, Lore, WASM
+version, native build tools, the local SAGA checkout, Lore, WASM
 SDK/WSL, frontend tools and Cloud panel inputs according to the profile. JSON goes
 to stdout; diagnostic subprocess output goes to stderr. Exit codes: 0 ready,
 1 missing requirement or operation failure, 2 usage error, 130 interrupted.
 It cannot establish GPU/desktop/runtime correctness by inspecting dependencies.
 
 With no component arguments, `prepare` selects Studio, WASM and playground.
-It can download large toolchains and build Tint. System package managers may
+It can download large toolchains. System package managers may
 request administrator access. The command uses WinGet/Visual Studio 2022 on
 Windows, Homebrew on macOS and apt on Debian/Ubuntu. Install Homebrew and full
 Xcode first on macOS. For another Linux distribution, install the packages from
@@ -101,7 +119,7 @@ and WASM Swift 6.3.2. This does not change the Swift 6.2 language mode. Swiftly
 installs the selected Unix toolchain without changing the user's global default
 or `.swift-version`. The CLI saves its explicit executable path for later commands.
 The WASM SDK and Linux Dawn archive are checked against pinned SHA-256 values;
-Tint and Lore keep their own version/hash manifests. A compatible existing Node
+Lore keeps its own version/hash manifest. A compatible existing Node
 is reused; otherwise the pinned version is installed in the CLI cache with its
 official SHA-256 manifest. pnpm comes from the frontend's
 `packageManager` pin. Existing explicit native dependency overrides are retained.
@@ -262,3 +280,69 @@ The suite covers real filesystem installation/upgrade/rollback, invalid inputs,
 archive traversal, hash failures, static HTTP routing and a small real SwiftPM
 build (when the pinned compiler is installed). Platform-specific installation
 and complete Studio/GPU/WASM exports still need verification on their own hosts.
+
+## Browser renderer (SAGA)
+
+Web exports render through the pinned SAGA package and ship its JavaScript WebGPU host as `saga-webgpu.mjs`.
+The exporter copies `web/webgpu.mjs` from the SwiftPM dependency that provides `SAGAWebHost`.
+It also copies `web/golden.mjs` when available for frame comparisons. For migration builds, point
+the override at the companion checkout:
+
+```sh
+export ADAENGINE_SAGA_PACKAGE_PATH=/absolute/path/to/saga-companion
+```
+
+Add `?sagadebug` to the page URL to wait for every submission and print SAGA device errors and per-pipeline binding
+reports to the console. Web export uses JavaScriptKit's generic BridgeJS runtime and resolves SAGA without Swan or Dawn.
+
+Golden-frame check: pack `Tests/WebGolden/SAGASmoke` into an exported `AdaWebPlayer` and run
+`node script/web_golden_saga.mjs <bundle>` (needs `playwright-core` and a WebGPU Chromium; `--record` replaces the
+reference). Pass `--actual=<path.png>` to save the captured frame. See [the smoke scene README](../Tests/WebGolden/SAGASmoke/README.md).
+
+## SAGA Metal development
+
+AdaEngine selects SAGAMetal by default on macOS, iOS and tvOS. Set `ADAENGINE_SAGA_METAL=0`
+to use the legacy Metal backend during the transition. The following tests exercise SAGAMetal:
+
+```sh
+ADAENGINE_SAGA_METAL_WINDOW_SMOKE=1 swift test --filter SAGAMetalWindowTests
+ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DGPUTests/SagaNative
+ADAENGINE_PIXEL_PERFECT_SAGA_SMOKE=1 swift test --filter PixelPerfectMetalTests
+```
+
+The window test requires a macOS desktop session with access to the Metal GPU. The renderer
+uses SAGA to compile linked WGSL to MSL and presents through the existing MetalKit views.
+
+To build the engine for Apple TV and the Apple TV Simulator, use Xcode with both tvOS SDKs
+installed. For SAGAMetal, use the environment settings above with a SAGA checkout that also
+declares tvOS support.
+
+```sh
+swift build --target AdaEngine --scratch-path .build-tools/tvos-simulator \
+  --triple arm64-apple-tvos18.0-simulator --sdk "$(xcrun --sdk appletvsimulator --show-sdk-path)"
+swift build --target AdaEngine --scratch-path .build-tools/tvos-device \
+  --triple arm64-apple-tvos18.0 --sdk "$(xcrun --sdk appletvos --show-sdk-path)"
+```
+
+To compare the same 3D scene on both Metal implementations, capture the legacy result and then
+run SAGA in a fresh test process. Use a dedicated output directory:
+
+```sh
+export ADAENGINE_COMPARE_SAGA_METAL=1
+export ADAENGINE_GOLDEN_OUTPUT=/absolute/path/to/metal-comparison
+mkdir -p "$ADAENGINE_GOLDEN_OUTPUT"
+ADAENGINE_GOLDEN_METAL=1 swift test --filter captureLegacyMetalReferenceForSAGA
+ADAENGINE_GOLDEN_SAGA=1 swift test --filter theLitSphereRowRendersWithTheWESLShaders
+```
+
+## Native SAGA Vulkan development
+
+Set `ADAENGINE_SAGA_NATIVE=1` to build the Windows, Linux, or Android renderer
+against SAGA Vulkan. The native build uses the system Vulkan driver. The SwiftPM
+build resolves SAGA from the sibling checkout or `ADAENGINE_SAGA_PACKAGE_PATH`.
+Use a revision that supports attaching a Vulkan surface after device creation.
+Set `ADAENGINE_GOLDEN_SAGA=1` and `ADAENGINE_SAGA_WINDOWLESS=1` for the offscreen
+3D checks, then run `swift test --filter SagaNative`. Set `ADAENGINE_GOLDEN_OUTPUT`
+to an existing directory to collect the rendered PNGs.
+
+For Android APK exports and emulator setup, see [Native Android apps](../Tools/Android/README.md).

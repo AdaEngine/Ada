@@ -8,7 +8,6 @@ configuration="${ADA_STUDIO_CONFIGURATION:-release}"
 version="${ADA_STUDIO_VERSION:-development-$(date +%Y%m%d-%H%M%S)}"
 : "${ADAENGINE_SWAN_PACKAGE_PATH:?Prepare Linux Swan first; see Documentation/Linux.md}"
 : "${SWAN_LOCAL_DAWN:?Set SWAN_LOCAL_DAWN to the Linux Dawn artifact relative to Swan}"
-: "${TINT_EXECUTABLE:?Set TINT_EXECUTABLE to the pinned Linux Tint executable}"
 export ADAENGINE_GRAVITY_PACKAGE_PATH="${ADAENGINE_GRAVITY_PACKAGE_PATH:-$root/Sources/gravity-lang}"
 export ADAENGINE_PACKAGE_PATH="$root"
 export ADAENGINE_SKIP_SWIFTLINT=1
@@ -27,7 +26,7 @@ swift build --package-path "$root/Editor" --scratch-path "$scratch" -c "$configu
 binary="$(swift build --package-path "$root/Editor" --scratch-path "$scratch" -c "$configuration" --show-bin-path)"
 compiler="$ADAENGINE_GRAVITY_PACKAGE_PATH"
 distribution="$(python3 "$root/script/package_studio_linux.py" \
-    --binary-directory "$binary" --compiler "$compiler" --tint "$TINT_EXECUTABLE" \
+    --binary-directory "$binary" --compiler "$compiler" \
     --swan "$ADAENGINE_SWAN_PACKAGE_PATH" --dawn "$SWAN_LOCAL_DAWN" \
     --output "$cache/distributions" --version "$version" | tail -n 1)"
 exec "$distribution/ada-studio" "$@"

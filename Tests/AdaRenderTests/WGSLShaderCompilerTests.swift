@@ -1,14 +1,13 @@
 #if canImport(WebGPU) && !os(WASI) && !os(Android)
 @testable import AdaRender
-import AdaUtils
 import Foundation
 import Testing
 
 @MainActor
-@Suite("Real Tint SPIR-V to WGSL")
-struct TintShaderCompilerTests {
+@Suite("Real SPIR-V to WGSL")
+struct WGSLShaderCompilerTests {
     @Test(
-        .enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_TINT"] == "1"),
+        .enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"),
         arguments: ["flat3d.glsl", "directional_shadow_3d.glsl", "motion_3d.glsl"]
     )
     func compilesFreshReflectedMeshPasses(shader: String) async throws {
@@ -27,7 +26,7 @@ struct TintShaderCompilerTests {
         }
     }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_TINT"] == "1"), arguments: ["glass.glsl", "gradient.glsl"])
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"), arguments: ["glass.glsl", "gradient.glsl"])
     func compilesFreshGlassBlur(shader: String) async throws {
         unsafe RenderEngine.configurations.preferredBackend = .webgpu
         try RenderEngine.setupRenderEngine()
@@ -44,13 +43,12 @@ struct TintShaderCompilerTests {
         }
     }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_TINT"] == "1"))
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"))
     func compilesFreshShader() async throws {
         unsafe RenderEngine.configurations.preferredBackend = .webgpu
         try RenderEngine.setupRenderEngine()
-        _ = try #require(TintToolchain.executable(), "Tint is required for this dev validation. Run script/ensure_tint.py.")
-        // Exercise native filesystem paths, including spaces, when invoking Tint.
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("tint shader-\(UUID())")
+        // Exercise native filesystem paths, including spaces, when loading shader source.
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("fresh shader-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let file = root.appendingPathComponent("fresh.glsl")
@@ -64,7 +62,14 @@ struct TintShaderCompilerTests {
         """.write(to: file, atomically: true, encoding: .utf8)
         let compiler = try ShaderCompiler(from: file)
         let spirv = try compiler.compileSpirvBin(for: .vertex, ignoreCache: true)
-        let result = try await WGSLShaderCompiler().compile(spirvData: spirv.data, entryPoint: "sprite_validation", stage: .vertex, defines: [])
+        let result: DeviceCompiledShader
+        do {
+            result = try await WGSLShaderCompiler().compile(spirvData: spirv.data, entryPoint: "sprite_validation", stage: .vertex, defines: [])
+        } catch {
+            let compilationError: (any Error)? = error
+            #expect(compilationError == nil, "Fresh shader compilation failed: \(error)")
+            return
+        }
         #expect(result.language == .wgsl)
         #expect(result.source.contains("@vertex"))
         #expect(result.source.contains("fn sprite_validation("))

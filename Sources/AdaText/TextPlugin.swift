@@ -39,8 +39,7 @@ public struct TextPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
 
     public init() {
-        self.shader = (try? ShaderModule.loadBundled(at: "Assets/text.glsl", from: .adaModule))
-            .unwrap(message: "Bundled text shader is missing.")
+        self.shader = ShaderModule.loadRequiredBuiltin(at: "Assets/text", from: .adaModule)
     }
 
     public func configurate(
@@ -74,7 +73,7 @@ public struct TextPipeline: RenderPipelineConfigurator {
 }
 
 /// Vertex data for rendering text glyphs.
-/// Matches the layout expected by text.glsl shader.
+/// Matches the text shader's vertex layout.
 public struct GlyphVertexData: Sendable {
     /// Position in world space (vec4).
     public let position: Vector4

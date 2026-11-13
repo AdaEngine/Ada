@@ -253,6 +253,9 @@ public struct RenderPipelineDescriptor: Sendable {
     /// The color attachments.
     public var colorAttachments: [RenderPipelineColorAttachmentDescriptor] = []
 
+    /// Texture bindings that are read without filtering, keyed by bind group and slot.
+    package var unfilterableTextureBindings: [Int: Set<Int>] = [:]
+
     /// Initialize a new render pipeline descriptor.
     ///
     /// - Parameter vertex: The vertex shader.

@@ -42,6 +42,11 @@ jobs:
         with:
           # AdaMCP references the local package identity AdaEngine.
           path: AdaEngine
+      - uses: actions/checkout@v4
+        with:
+          repository: SpectralDragon/SAGA
+          ref: ${{ vars.ADAENGINE_SAGA_REF }}
+          path: SAGA
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -53,11 +58,6 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
-      - name: Cache verified Tint
-        uses: actions/cache@v4
-        with:
-          path: AdaEngine/.build-tools/tint
-          key: tint-windows-x64-${{ hashFiles('AdaEngine/Tools/Tint/toolchain.json', 'AdaEngine/script/ensure_tint.py') }}
       - name: Test portable dependency packaging
         run: |
           python script/test_build_studio_windows.py
@@ -69,7 +69,6 @@ jobs:
           $studioBin = (& ./script/build_studio_windows.ps1 -Configuration release -Jobs 2 | Select-Object -Last 1).Trim()
           "bin=$studioBin" >> $env:GITHUB_OUTPUT
           "gravity=$env:ADAENGINE_GRAVITY_PACKAGE_PATH" >> $env:GITHUB_OUTPUT
-          "tint=$env:TINT_EXECUTABLE" >> $env:GITHUB_OUTPUT
       - name: Test installed SDK discovery
         run: |
           # Compile the actual production locators without testable app imports.
@@ -81,11 +80,10 @@ jobs:
         env:
           STUDIO_BIN: ${{ steps.build.outputs.bin }}
           STUDIO_GRAVITY: ${{ steps.build.outputs.gravity }}
-          STUDIO_TINT: ${{ steps.build.outputs.tint }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
           $studioVersion = if ($env:RELEASE_TAG) { $env:RELEASE_TAG } else { "ci-$($env:GITHUB_SHA.Substring(0, 12))" }
-          python script/package_studio_windows.py --bin "$env:STUDIO_BIN" --compiler-root "$env:STUDIO_GRAVITY" --tint "$env:STUDIO_TINT" --version "$studioVersion"
+          python script/package_studio_windows.py --bin "$env:STUDIO_BIN" --compiler-root "$env:STUDIO_GRAVITY" --version "$studioVersion"
           if ($LASTEXITCODE -ne 0) { throw 'Studio packaging failed.' }
       - name: Upload ZIP and SHA-256
         uses: actions/upload-artifact@v4

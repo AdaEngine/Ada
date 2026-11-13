@@ -16,10 +16,11 @@ public struct Motion3DPipeline: RenderPipelineConfigurator {
     public init() {}
 
     public func configurate(with configuration: PBR3DConfiguration) -> RenderPipelineDescriptor {
-        let plain = CorePipelineShaders.loadRequiredBundled(at: "Shaders/motion_3d.glsl")
+        let plain = CorePipelineShaders.loadRequiredBuiltin("motion_3d")
         // Only the morph feature matters to the motion shader; the shading layers do not.
         let morph = configuration.features.intersection(.morph)
-        let shader = morph.isEmpty ? plain : variants.shader(at: "Shaders/motion_3d.glsl", for: morph, fallback: plain)
+        let path = ShaderModule.supportsBundledWESL ? "Shaders/motion_3d.wesl" : "Shaders/motion_3d.glsl"
+        let shader = morph.isEmpty ? plain : variants.shader(at: path, for: morph, fallback: plain)
         var descriptor = base.configurate(with: configuration.vertex)
         descriptor.vertex = shader.asset.requiredShader(for: .vertex)
         descriptor.fragment = shader.asset.getShader(for: .fragment)
@@ -84,7 +85,7 @@ struct Temporal3DPipelines: Resource {
         if let sky {
             return sky
         }
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/sky_motion_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("sky_motion_3d")
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),
@@ -102,7 +103,7 @@ struct Temporal3DPipelines: Resource {
         if let toneMap {
             return toneMap
         }
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/temporal_tonemap_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("temporal_tonemap_3d")
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),
@@ -120,7 +121,7 @@ struct Temporal3DPipelines: Resource {
         if let depth {
             return depth
         }
-        let shader = CorePipelineShaders.loadRequiredBundled(at: "Shaders/temporal_depth_3d.glsl")
+        let shader = CorePipelineShaders.loadRequiredBuiltin("temporal_depth_3d")
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),
             fragment: shader.asset.getShader(for: .fragment),
