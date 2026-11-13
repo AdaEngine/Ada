@@ -51,7 +51,7 @@
                 heightFade: heightFade,
                 surfaceMode: surfaceMode
             )
-            let requested: RenderBackendType = GoldenFrame.activeBackend == .webgpu ? .webgpu : .metal
+            let requested: RenderBackendType = GoldenFrame.activeBackend == .saga ? .saga : .metal
             unsafe RenderEngine.configurations.preferredBackend = requested
             try RenderEngine.setupRenderEngine()
             let engine = try #require(unsafe RenderEngine.shared)

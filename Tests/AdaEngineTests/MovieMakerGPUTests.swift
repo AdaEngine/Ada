@@ -13,7 +13,6 @@ extension Render3DGPUTests {
             let backend = try #require(GoldenFrame.activeBackend)
             let requestedBackend: RenderBackendType = switch backend {
             case .metal: .metal
-            case .webgpu: .webgpu
             case .saga: .saga
             }
             unsafe RenderEngine.configurations.preferredBackend = requestedBackend

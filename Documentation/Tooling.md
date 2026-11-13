@@ -78,7 +78,7 @@ python ada_tool.py doctor --profile studio
 python ada_tool.py doctor --profile wasm --json
 python ada_tool.py doctor --profile playground --cloud-panels /path/to/adawebsite/dist-panels
 python ada_tool.py prepare studio
-python ada_tool.py prepare swift tint
+python ada_tool.py prepare swift
 python ada_tool.py prepare wasm
 python ada_tool.py prepare playground
 python ada_tool.py prepare --skip-system
@@ -98,13 +98,11 @@ Windows, Homebrew on macOS and apt on Debian/Ubuntu. Install Homebrew and full
 Xcode first on macOS. For another Linux distribution, install the packages from
 [Linux.md](Linux.md) yourself and pass `--skip-system`.
 
-Windows requires MSVC 14.44+ / Visual Studio 2022 17.14+ for the pinned Dawn
-library's STL symbols. `doctor` and builds reject older toolsets before compiling;
+Windows requires MSVC 14.44+ / Visual Studio 2022 17.14+ (the pinned minimum).
+`doctor` and builds reject older toolsets before compiling;
 `prepare studio` upgrades an existing VS 2022 Build Tools installation when needed.
 That machine-wide update uses the standard Windows UAC prompt when the CLI is
 running without administrator rights; confirm it manually. Restarts are deferred.
-The [Microsoft STL 17.14 implementation](https://github.com/microsoft/STL/blob/vs-2022-17.14/stl/src/vector_algorithms.cpp)
-provides the vectorized string-search symbol required by this Dawn binary.
 
 `--skip-system` skips apt/brew/winget prerequisite packages. Swift and other
 selected tools are still installed; WinGet is needed if Windows Swift is missing.
@@ -118,7 +116,7 @@ following existing project validation: Windows native Swift 6.3.1, macOS/Linux
 and WASM Swift 6.3.2. This does not change the Swift 6.2 language mode. Swiftly
 installs the selected Unix toolchain without changing the user's global default
 or `.swift-version`. The CLI saves its explicit executable path for later commands.
-The WASM SDK and Linux Dawn archive are checked against pinned SHA-256 values;
+The WASM SDK archive is checked against a pinned SHA-256 value;
 Lore keeps its own version/hash manifest. A compatible existing Node
 is reused; otherwise the pinned version is installed in the CLI cache with its
 official SHA-256 manifest. pnpm comes from the frontend's
@@ -146,9 +144,6 @@ python ada_tool.py build studio --debug --scratch-path /path/to/isolated-build
 `build engine` compiles the AdaEngine target. `build studio` prepares native
 dependencies and builds the app; it prints the binary directory or macOS `.app`.
 Use `install studio` for a complete runnable distribution on Windows/Linux.
-On Windows, a build linked with the DLSS bridge (`script/build_dlss.py`) copies NVIDIA's
-`nvngx_dlss.dll`, `nvngx_dlssd.dll` and license next to the executable, and the packager includes them;
-see [DLSS](DLSS.md).
 Build logs are saved in the host CLI cache. Build stages appear in the terminal
 as they run; the last 30 log lines are also printed when compilation finishes.
 A failing compiler exits nonzero with the log location. Default builds use their
@@ -193,22 +188,6 @@ threshold print tab-separated `ADA_STALL` lines with their duration.
 Besides engine phases (`App.Update.*`, `RenderNode.*`, `WGPU.*`), Studio reports
 `Studio.OpenFile`, `Studio.SceneDecode`, `Studio.Highlight` and
 `Studio.ProjectTree.Refresh` (columns: start ms, duration ms, phase, bytes, count).
-
-### WebGPU pipeline cache
-
-Native WebGPU (Dawn) builds keep translated and compiled shaders on disk, so a
-pipeline variant compiled once is not compiled again on the next launch. The first
-launch on a machine, and the first launch after a driver, Dawn or shader change,
-still compiles; `WGPU.CreateRenderPipeline.*` stall lines show those compiles.
-
-- Location: `%LOCALAPPDATA%/AdaEngine/PipelineCache/<adapter>` on Windows and the
-  user caches directory elsewhere (for example `~/Library/Caches` on macOS), one
-  folder per GPU, backend and driver.
-- At startup the current folder is trimmed to 512 MB, least recently used entries
-  first, and adapter folders unused for 30 days (for example after a driver update)
-  are removed. Deleting the cache is always safe.
-- `ADAENGINE_PIPELINE_CACHE=0` disables it (for measuring cold compiles);
-  `ADAENGINE_PIPELINE_CACHE_DIR=<path>` stores it elsewhere.
 
 ### GPU-driven shadows
 
@@ -337,10 +316,12 @@ ADAENGINE_GOLDEN_SAGA=1 swift test --filter theLitSphereRowRendersWithTheWESLSha
 
 ## Native SAGA Vulkan development
 
-Set `ADAENGINE_SAGA_NATIVE=1` to build the Windows, Linux, or Android renderer
-against SAGA Vulkan. The native build uses the system Vulkan driver. The SwiftPM
-build resolves SAGA from the sibling checkout or `ADAENGINE_SAGA_PACKAGE_PATH`.
-Use a revision that supports attaching a Vulkan surface after device creation.
+Windows, Linux and Android render through SAGA Vulkan; there is no flag to select it and no other native
+renderer (Swan, Dawn and Tint are removed). The native build uses the system Vulkan driver. The SwiftPM
+build resolves SAGA from the sibling checkout or `ADAENGINE_SAGA_PACKAGE_PATH`. It needs a revision that
+supports attaching a Vulkan surface after device creation (`makePresentableDevice`, `addSurface`,
+`removeSurface`); no published SAGA revision has that API yet, so a reproducible pin is pending.
+Headless builds (`ADAENGINE_HEADLESS=1`) link no renderer and need no SAGA.
 Set `ADAENGINE_GOLDEN_SAGA=1` and `ADAENGINE_SAGA_WINDOWLESS=1` for the offscreen
 3D checks, then run `swift test --filter SagaNative`. Set `ADAENGINE_GOLDEN_OUTPUT`
 to an existing directory to collect the rendered PNGs.

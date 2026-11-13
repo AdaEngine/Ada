@@ -47,22 +47,24 @@ fn adaDirectionalShadowPCSS(
             depthSum += depth;
         }
     }
-    if blockers < 0.5 {
-        return 1.0;
+    // No early return: a data-dependent exit would make every later derivative operation in the caller non-uniform.
+    var result = 1.0;
+    if blockers >= 0.5 {
+        let depthRow = vec3f(shadowMatrix[0].z, shadowMatrix[1].z, shadowMatrix[2].z);
+        let separation = max(receiverDepth - depthSum / blockers, 0.0) / max(length(depthRow), 0.000001);
+        let worldToUV = 0.5 * vec2f(
+            length(vec3f(shadowMatrix[0].x, shadowMatrix[1].x, shadowMatrix[2].x)) / cascadeCount,
+            length(vec3f(shadowMatrix[0].y, shadowMatrix[1].y, shadowMatrix[2].y))
+        );
+        let radius = clamp(separation * settings.y * worldToUV, texel, texel * settings.z);
+        var visibility = 0.0;
+        for (var i = 0; i < 24; i++) {
+            let angle = f32(i) * 2.39996323;
+            let disk = vec2f(cos(angle), sin(angle)) * sqrt((f32(i) + 0.5) / 24.0);
+            let depth = adaNearestShadowDepth(shadowTexture, size, clamp(uv + disk * radius, minimum, maximum));
+            visibility += select(0.0, 1.0, receiverDepth <= depth);
+        }
+        result = visibility / 24.0;
     }
-    let depthRow = vec3f(shadowMatrix[0].z, shadowMatrix[1].z, shadowMatrix[2].z);
-    let separation = max(receiverDepth - depthSum / blockers, 0.0) / max(length(depthRow), 0.000001);
-    let worldToUV = 0.5 * vec2f(
-        length(vec3f(shadowMatrix[0].x, shadowMatrix[1].x, shadowMatrix[2].x)) / cascadeCount,
-        length(vec3f(shadowMatrix[0].y, shadowMatrix[1].y, shadowMatrix[2].y))
-    );
-    let radius = clamp(separation * settings.y * worldToUV, texel, texel * settings.z);
-    var visibility = 0.0;
-    for (var i = 0; i < 24; i++) {
-        let angle = f32(i) * 2.39996323;
-        let disk = vec2f(cos(angle), sin(angle)) * sqrt((f32(i) + 0.5) / 24.0);
-        let depth = adaNearestShadowDepth(shadowTexture, size, clamp(uv + disk * radius, minimum, maximum));
-        visibility += select(0.0, 1.0, receiverDepth <= depth);
-    }
-    return visibility / 24.0;
+    return result;
 }

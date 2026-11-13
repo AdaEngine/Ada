@@ -7,16 +7,23 @@ import Testing
 /// Compares rendered frames against checked-in reference PNGs.
 ///
 /// References live in `GoldenFrames/<backend>/<name>.png` next to the tests. Select the backend with
-/// `ADAENGINE_GOLDEN_METAL=1` or `ADAENGINE_GOLDEN_WEBGPU=1` (WebGPU runs through `script/validate_webgpu.sh`).
+/// `ADAENGINE_GOLDEN_METAL=1` or `ADAENGINE_GOLDEN_SAGA=1` (SAGA native runs through `script/validate_saga_native.py`).
 /// Set `ADAENGINE_GOLDEN_RECORD=1` to (re)write references from the current output,
 /// `ADAENGINE_GOLDEN_REFERENCES=<dir>` to read or write references somewhere other than next to the tests, and
 /// `ADAENGINE_GOLDEN_OUTPUT=<dir>` to choose where actual and difference images go on a mismatch.
 /// Tolerances are per backend because GPUs differ in rounding; Metal is the reference backend.
+extension Trait where Self == ConditionTrait {
+    /// The GPU meshlet, visibility and shadow-cull processors were backend features of the removed Swan renderer.
+    /// They are not ported to SAGA native yet, so tests that need one are reported as skipped there, never as passed.
+    static var requiresGPUProcessors: Self {
+        .disabled(if: GoldenFrame.activeBackend == .saga, "The GPU culling processors are not ported to SAGA native yet")
+    }
+}
+
 struct GoldenFrame {
     enum Backend: String, CaseIterable {
         case metal
-        case webgpu
-        /// SAGA's native Vulkan/WebGPU runtime (`ADAENGINE_SAGA_NATIVE=1` builds).
+        /// SAGA's native Vulkan runtime on Windows, Linux and Android.
         case saga
     }
 
@@ -28,15 +35,12 @@ struct GoldenFrame {
 
         /// Same-GPU reruns are expected to match; the slack absorbs driver rounding only.
         static let metal = Self(channelSteps: 2, differingFraction: 0.0005)
-        static let webgpu = Self(channelSteps: 3, differingFraction: 0.001)
+        static let saga = Self(channelSteps: 3, differingFraction: 0.001)
     }
 
     /// The backend the GPU suites render with, or `nil` when no backend was requested.
     static var activeBackend: Backend? {
         let environment = ProcessInfo.processInfo.environment
-        if environment["ADAENGINE_GOLDEN_WEBGPU"] == "1" {
-            return .webgpu
-        }
         if environment["ADAENGINE_GOLDEN_SAGA"] == "1" {
             return .saga
         }
@@ -46,7 +50,7 @@ struct GoldenFrame {
     static var isEnabled: Bool { activeBackend != nil }
 
     static func tolerance(for backend: Backend) -> Tolerance {
-        backend == .metal ? .metal : .webgpu
+        backend == .metal ? .metal : .saga
     }
 
     /// Tolerance for comparing two renders of the active backend with each other or with its references.

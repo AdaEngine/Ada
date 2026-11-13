@@ -6,8 +6,6 @@ cache="${XDG_CACHE_HOME:-$HOME/.cache}/adaengine/studio-linux"
 scratch="${ADA_STUDIO_SCRATCH_PATH:-$cache/build}"
 configuration="${ADA_STUDIO_CONFIGURATION:-release}"
 version="${ADA_STUDIO_VERSION:-development-$(date +%Y%m%d-%H%M%S)}"
-: "${ADAENGINE_SWAN_PACKAGE_PATH:?Prepare Linux Swan first; see Documentation/Linux.md}"
-: "${SWAN_LOCAL_DAWN:?Set SWAN_LOCAL_DAWN to the Linux Dawn artifact relative to Swan}"
 export ADAENGINE_GRAVITY_PACKAGE_PATH="${ADAENGINE_GRAVITY_PACKAGE_PATH:-$root/Sources/gravity-lang}"
 export ADAENGINE_PACKAGE_PATH="$root"
 export ADAENGINE_SKIP_SWIFTLINT=1
@@ -27,6 +25,5 @@ binary="$(swift build --package-path "$root/Editor" --scratch-path "$scratch" -c
 compiler="$ADAENGINE_GRAVITY_PACKAGE_PATH"
 distribution="$(python3 "$root/script/package_studio_linux.py" \
     --binary-directory "$binary" --compiler "$compiler" \
-    --swan "$ADAENGINE_SWAN_PACKAGE_PATH" --dawn "$SWAN_LOCAL_DAWN" \
     --output "$cache/distributions" --version "$version" | tail -n 1)"
 exec "$distribution/ada-studio" "$@"

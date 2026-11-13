@@ -79,10 +79,16 @@
             self.samplerSlots = Set(stages.flatMap { $0.samplerBindings.map { slot($0.binding) } })
             self.vertexInputLocations = vertexStage.vertexInputs.map(\.location)
             let layouts = Self.vertexLayouts(for: descriptor)
-            let colorTargets = descriptor.colorAttachments.compactMap { attachment -> RenderColorTarget? in
+            var resolvedColorTargets = descriptor.colorAttachments.compactMap { attachment -> RenderColorTarget? in
                 guard let format = attachment.format.sagaFormat else { return nil }
                 return RenderColorTarget(format: format, colorState: attachment.sagaColorState)
             }
+            if resolvedColorTargets.isEmpty, descriptor.depthStencilDescriptor != nil {
+                // SAGA Vulkan cannot draw without a color attachment: depth-only pipelines get a placeholder target that
+                // is never written (empty write mask). The matching pass supplies the texture.
+                resolvedColorTargets = [RenderColorTarget(format: .rgba8Unorm, colorState: RenderColorState(blend: nil, writeMask: []))]
+            }
+            let colorTargets = resolvedColorTargets
             let primitive = RenderPrimitiveState(
                 topology: descriptor.primitive.saga,
                 stripIndexFormat: nil,

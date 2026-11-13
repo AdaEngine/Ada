@@ -8,9 +8,6 @@
     #if canImport(Metal)
         import Metal
     #endif
-    #if canImport(WebGPU)
-        @unsafe @preconcurrency import WebGPU
-    #endif
 
     extension Render3DGPUTests {
         @Suite("Terrain texture arrays", .enabled(if: GoldenFrame.isEnabled))
@@ -18,7 +15,7 @@
         struct TerrainTextureArrays {
             @Test("Array allocation and sampled pixels honor 32 slices and a single-slice array view")
             func terrainTextureArrayCapacityAndPixels() async throws {
-                let requested: RenderBackendType = GoldenFrame.activeBackend == .webgpu ? .webgpu : .metal
+                let requested: RenderBackendType = GoldenFrame.activeBackend == .saga ? .saga : .metal
                 unsafe RenderEngine.configurations.preferredBackend = requested
                 try RenderEngine.setupRenderEngine()
                 let engine = try #require(unsafe RenderEngine.shared)
@@ -36,15 +33,7 @@
                     descriptor.arrayLength = count
                     let empty = Texture2D(descriptor: descriptor)
                     // Fail safely on the missing allocation before attempting out-of-range slice uploads.
-                    if requested == .webgpu {
-                        #if canImport(WebGPU)
-                            let native = try #require(empty.gpuTexture as? WGPUGPUTexture)
-                            try #require(Int(native.texture.depthOrArrayLayers) == count)
-                        #else
-                            Issue.record("WebGPU must be compiled for this explicitly selected backend")
-                            return
-                        #endif
-                    } else {
+                    if requested == .metal {
                         #if canImport(Metal)
                             let native = try #require(MetalInterop.texture(empty))
                             try #require(native.arrayLength == count)

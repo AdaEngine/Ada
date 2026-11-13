@@ -17,8 +17,8 @@ def positive(value):
 
 
 def component(value):
-    if value not in ("studio", "swift", "tint", "wasm", "playground"):
-        raise argparse.ArgumentTypeError("choose studio, swift, tint, wasm or playground")
+    if value not in ("studio", "swift", "wasm", "playground"):
+        raise argparse.ArgumentTypeError("choose studio, swift, wasm or playground")
     return value
 
 
@@ -36,7 +36,7 @@ def parser():
     doctor.add_argument("--json", action="store_true", help="Machine-readable report; exit 1 when required dependencies are missing")
     doctor.add_argument("--cloud-panels", type=Path)
     prepare = commands.add_parser("prepare", parents=[common], help="Install pinned host dependencies; default: studio, wasm and playground")
-    prepare.add_argument("components", nargs="*", type=component, metavar="COMPONENT", help="studio, swift, tint, wasm, playground")
+    prepare.add_argument("components", nargs="*", type=component, metavar="COMPONENT", help="studio, swift, wasm, playground")
     prepare.add_argument("--skip-system", action="store_true", help="Skip apt/brew/winget system prerequisites")
 
     def build_options(command, profile=False):

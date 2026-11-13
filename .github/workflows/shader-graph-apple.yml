@@ -37,7 +37,6 @@ jobs:
       ADAENGINE_PACKAGE_PATH: ${{ github.workspace }}/AdaEngine
       ADAENGINE_GRAVITY_PACKAGE_PATH: ${{ github.workspace }}/AdaEngine/Sources/gravity-lang
       ADA_MCP_LOCAL_PATH: ${{ github.workspace }}/.build-tools/apple-mcp
-      ADAENGINE_DISABLE_SWAN: '1'
       ADAENGINE_SKIP_SWIFTLINT: '1'
     steps:
       # AdaMCP's local dependency uses the checkout directory as its SwiftPM identity.

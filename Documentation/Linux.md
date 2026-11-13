@@ -1,12 +1,12 @@
 # Linux development
 
-The Linux backend uses X11 (including XWayland and WSLg) and the existing WebGPU
+The Linux backend uses X11 (including XWayland and WSLg) and the SAGA Vulkan
 renderer. `LinuxSmoke` exercises window/input support; Studio Standalone and
 AdaExamples games use the same backend.
 
 ## Ubuntu 24.04 / WSL 2
 
-Use Swift 6.3.2 for compatibility with the current Swan/Dawn dependency. The
+Use Swift 6.3.2 (the pinned Linux toolchain). The
 engine's package remains in Swift 6.2 language mode. Install the Linux toolchain
 using [Swiftly](https://www.swift.org/install/linux/), then:
 
@@ -35,45 +35,25 @@ ADAENGINE_HEADLESS=1 swift build --scratch-path "$ADAENGINE_LINUX_SCRATCH" --tar
 while diagnosing platform compilation when unrelated sources have existing lint
 errors. Run lint separately on changed sources before submitting changes.
 
-## Swan compatibility
+## SAGA Vulkan
 
-The current Swan checkout provides a Linux Dawn artifact but omits Linux from
-the native `WebGPU` target dependency condition. Stage an independent copy:
+Native rendering goes through SAGA's Vulkan runtime; Swan, Dawn and Tint are removed. Keep the SAGA repository
+beside AdaEngine (`../SAGA`) or point `ADAENGINE_SAGA_PACKAGE_PATH` at it. Native builds need a SAGA revision that
+provides Vulkan surface presentation (`makePresentableDevice`, `addSurface`, `removeSurface`); no published SAGA
+revision contains that API yet, so a published pin is pending. Headless builds (`ADAENGINE_HEADLESS=1`) need no SAGA.
+Linux window presentation through SAGA has not been verified on a Linux host for this change.
 
 ```sh
-mkdir -p "$HOME/adaengine-linux-tools"
-git clone https://github.com/adobe/swan.git "$HOME/adaengine-linux-tools/swan-source"
-git -C "$HOME/adaengine-linux-tools/swan-source" checkout --detach 1eb45a22c79439b50e9cde774454450e50147149
-python3 script/prepare_swan_linux.py "$HOME/adaengine-linux-tools/swan-source" "$HOME/adaengine-linux-tools/swan"
-export ADAENGINE_SWAN_PACKAGE_PATH="$HOME/adaengine-linux-tools/swan"
-export ADAENGINE_TINT_CACHE="$HOME/adaengine-linux-tools/tint"
-export TINT_EXECUTABLE="$(python3 script/ensure_tint.py)"
 # ADAEXAMPLES_PATH points to a clone of https://github.com/AdaEngine/AdaExamples
 swift run --package-path "$ADAEXAMPLES_PATH/Examples/Technical/LinuxSmoke" --scratch-path "$ADAENGINE_LINUX_SCRATCH" -j 6 LinuxSmoke
 ```
-
-The checkout used for this port is Swan commit
-`1eb45a22c79439b50e9cde774454450e50147149`, compatible with Swift 6.3.2 and
-SwiftSyntax 602 (the same compatibility requirement as `Tools/Tint/README.md`).
-An existing compatible checkout can also be passed to the staging helper.
-The helper changes
-the platform list in its destination and preserves the original dependency.
-It refuses unrecognized manifests and unrelated existing destinations.
-
-An already downloaded, checksum-verified Linux Dawn `.artifactbundle` can be
-copied into the staged Swan directory and selected with
-`SWAN_LOCAL_DAWN=DawnLinux.artifactbundle` (relative to that package). This avoids
-downloading it again through SwiftPM, including when Windows and WSL use different
-proxy settings.
 
 ## Validation
 
 ```sh
 ADAENGINE_LINUX_WINDOW_TESTS=1 swift test --scratch-path "$ADAENGINE_LINUX_SCRATCH" \
   --filter 'LinuxPlatformTests|LinuxRuntimeTests' -j 6
-python3 -m unittest discover -s script -p test_prepare_swan_linux.py
-python3 script/ensure_tint.py --check
-ADAENGINE_SWIFT_JOBS=4 bash script/validate_webgpu.sh
+ADAENGINE_SWIFT_JOBS=4 bash script/validate_gpu.sh
 ```
 
 The window test requires a working X11 display. Headless rendering can validate
@@ -86,9 +66,9 @@ The initial screen implementation reports the primary display at scale 1.
 Per-monitor scaling, native Wayland, custom cursor textures and native alert
 dialogs require further work. Alerts currently appear in the engine log.
 
-## Verified on 2026-10-17
+## Verified on 2026-10-17 (before the SAGA cutover)
 
-Ubuntu 24.04 under WSL 2 / WSLg, Swift 6.3.2 and Mesa llvmpipe Vulkan:
+This was verified with the former Swan/Dawn renderer and is kept as history. Ubuntu 24.04 under WSL 2 / WSLg, Swift 6.3.2 and Mesa llvmpipe Vulkan:
 
 - `AdaPlatform` and `LinuxSmoke` build successfully.
 - All 5 focused Linux runtime/platform tests pass, including real X11 resize,
@@ -121,7 +101,7 @@ sudo apt-get install -y zenity
 bash script/run_studio_linux.sh
 ```
 
-Keep the Swan, `SWAN_LOCAL_DAWN` and Tint overrides from the earlier setup.
+Keep the `ADAENGINE_SAGA_PACKAGE_PATH` override from the setup above.
 The Studio launcher selects the bundled compiler by default; the environment
 override is useful for running standalone sample builds with the same compiler.
 
@@ -130,8 +110,8 @@ declarations after `//` comments in Windows-authored projects and keeps diagnost
 line positions correct for LF, CRLF and CR sources.
 
 The launcher builds Release by default, then packages `AdaEditor`, `gravity-lsp`,
-`AdaPackageTool`, resources, Swift runtime libraries, Tint, the AdaScript compiler
-and a source `BuildSDK` containing Linux Swan/Dawn. The resulting directory,
+`AdaPackageTool`, resources, Swift runtime libraries, the AdaScript compiler
+and a source `BuildSDK` containing the SAGA checkout when one is present. The resulting directory,
 `.tar.gz` and checksum are under `~/.cache/adaengine/studio-linux/distributions`.
 Run the extracted directory's `./ada-studio`; building Swift games additionally
 requires the host Swift toolchain and development packages. Override

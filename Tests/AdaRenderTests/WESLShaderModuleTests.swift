@@ -1,14 +1,14 @@
-#if canImport(WebGPU) && !os(WASI) && !os(Android)
+#if canImport(AdaWGSLCompiler) && !os(WASI)
 @testable import AdaRender
 import Foundation
 import Testing
 
 @MainActor
-@Suite("WESL modules on native WebGPU")
+@Suite("WESL modules on native SAGA")
 struct WESLShaderModuleTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"))
     func nativeShaderModuleLinksAndReflectsBothBindingLayouts() throws {
-        unsafe RenderEngine.configurations.preferredBackend = .webgpu
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         try RenderEngine.setupRenderEngine()
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("ada wesl \(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

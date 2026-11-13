@@ -138,9 +138,9 @@ Game-authored UI follows its own art direction unless the task explicitly adopts
 - `python ada_tool.py doctor` reports missing tools and fixes without installing/downloading.
   Use `--profile studio|wasm|playground` to narrow checks and `--json` for automation;
   exit code 1 means a required dependency is missing.
-- `python ada_tool.py prepare` installs system prerequisites, pinned Swift, Tint, native
+- `python ada_tool.py prepare` installs system prerequisites, pinned Swift, native
   Studio dependencies, the WASM SDK and Node/pnpm frontend dependencies. Select components
-  with `prepare studio`, `prepare swift`, `prepare tint`, `prepare wasm` or `prepare playground`.
+  with `prepare studio`, `prepare swift`, `prepare wasm` or `prepare playground`.
   `--skip-system` skips apt/brew/winget prerequisites; it does not skip toolchain downloads.
   Windows WASM uses the existing Ubuntu 24.04 WSL worker; WSL must already be enabled.
 - `python ada_tool.py install studio` builds and installs Release Standalone;
@@ -163,8 +163,8 @@ Game-authored UI follows its own art direction unless the task explicitly adopts
   compiler logs are there too. Do not delete the user's shared `.build`.
 - Version policy lives in [Tools/ada-toolchain.json](Tools/ada-toolchain.json): Windows native
   Swift 6.3.1, macOS/Linux and WASM Swift 6.3.2; the engine language mode remains Swift 6.2.
-  Tint/Lore retain their existing pins. The CLI reads the pnpm pin from `Editor/WebUI/package.json`.
-  Windows Dawn requires MSVC 14.44+ (VS 2022 17.14+); `doctor` rejects older toolsets
+  Lore retains its existing pin. The CLI reads the pnpm pin from `Editor/WebUI/package.json`.
+  Windows requires MSVC 14.44+ (VS 2022 17.14+); `doctor` rejects older toolsets
   before a build, and `prepare studio` upgrades existing VS 2022 Build Tools when necessary.
 - Keep implementation in `script/ada_tools/`. Test with `python script/test_ada_tool.py`.
   Existing platform installers/packagers, bootstrap helpers, GPU validators and their tests
@@ -180,23 +180,21 @@ Game-authored UI follows its own art direction unless the task explicitly adopts
 - Do not delete or rewrite the user's shared `.build` directory. Immediately retry with an isolated scratch directory, for example: `swift test --scratch-path /tmp/adaengine-swift-build --filter SomeSuiteName` or `swift build --scratch-path /tmp/adaengine-swift-build`.
 - Reuse the same scratch path for subsequent commands in the task so the clean build remains incremental.
 
-### WebGPU shader validation
-- For shader, sprite-renderer or WebGPU changes, run `script/validate_webgpu.sh`
-  from the engine root with compatible Swan/Dawn and Swift 6.3.2. It bootstraps
-  pinned Tint and tests a fresh SPIR-V → WGSL conversion plus actual GPU pixels.
-- The script also runs the 3D GPU suites (`Render3DGPUTests`) on WebGPU against the
-  references in `Tests/AdaEngineTests/GoldenFrames/webgpu` and checks that they agree
-  with the Metal references. It runs its package sequentially because the engine owns
-  one process-wide renderer.
-- `python3 script/ensure_tint.py --check` verifies the installed tool hash and
-  reader/writer smoke. Do not treat cached WGSL as proof of current Tint behavior.
-- Tool setup and overrides are documented in [Tools/Tint/README.md](Tools/Tint/README.md).
+### GPU validation (SAGA)
+- Native desktop rendering goes through SAGA (Vulkan on Windows and Linux, Metal on Apple); browsers use SAGA's
+  WebGPU host. Swan, Dawn, Tint and the DLSS bridge are removed and are not coming back.
+- For shader, sprite-renderer or GPU changes, run `script/validate_gpu.sh` from the engine root with Swift 6.3.2.
+  It compiles fresh WESL shaders through SAGACompiler, runs the sprite smokes and the 3D GPU suites
+  (`Render3DGPUTests`) on SAGA native against `Tests/AdaEngineTests/GoldenFrames/saga`, and checks that they
+  agree with the Metal references. It runs its package sequentially because the engine owns one process-wide renderer.
+- Native SAGA builds currently resolve a sibling `../SAGA` checkout (or `ADAENGINE_SAGA_PACKAGE_PATH`), because the
+  Vulkan surface-presentation API is not in a published SAGA revision yet. Headless builds (`ADAENGINE_HEADLESS=1`) need no SAGA.
 
 ### Test
 - **Use Swift Testing** for AdaEngine package tests: `import Testing`, `@Suite`, `@Test`, and `#expect` / `#require`. Do not add new **XCTest**-based tests in `AdaEngine/Tests/`.
 - 3D rendering is checked with golden frames. The GPU suites are gated by
   `ADAENGINE_GOLDEN_METAL=1` (run `swift test --filter Render3DGPUTests`) or
-  `ADAENGINE_GOLDEN_WEBGPU=1` (through `script/validate_webgpu.sh`). References live in
+  `ADAENGINE_GOLDEN_SAGA=1` (through `script/validate_gpu.sh`). References live in
   `Tests/AdaEngineTests/GoldenFrames/<backend>`; re-record with `ADAENGINE_GOLDEN_RECORD=1`
   and review the diff images written to `ADAENGINE_GOLDEN_OUTPUT` on a mismatch. Keep every
   GPU suite nested under `Render3DGPUTests`, which serializes them.

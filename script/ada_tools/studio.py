@@ -68,13 +68,6 @@ def build(ctx, args):
     binary = Path(output.splitlines()[-1]) if output else scratch / mode
     if ctx.host == "windows" and args.target == "studio" and not ctx.dry:
         shutil.copy2(Path(ctx.env["LORE_WINDOWS_SDK_PATH"]) / "lore.dll", binary)
-        # Builds linked with the optional DLSS bridge load NVIDIA's NGX runtimes from the executable folder.
-        dlss = ctx.root / ".build-tools/dlss-interop"
-        if (dlss / "build.json").is_file():
-            for name in ("nvngx_dlss.dll", "nvngx_dlssd.dll", "NVIDIA-DLSS-LICENSE.txt"):
-                if not (dlss / name).is_file():
-                    raise ToolError(f"DLSS runtime is missing: {name}; rerun script/build_dlss.py")
-                shutil.copy2(dlss / name, binary)
     return binary
 
 
@@ -88,7 +81,6 @@ def distribution(ctx, args, binary, work):
                           fallback=work / ("AdaStudio-local-" + configuration(args) + "-windows-x86_64"))
     else:
         path = ctx.helper("package_studio_linux.py", "--binary-directory", binary, "--compiler", compiler,
-                          "--swan", ctx.env["ADAENGINE_SWAN_PACKAGE_PATH"], "--dawn", ctx.env["SWAN_LOCAL_DAWN"],
                           "--output", work, "--version", "local-" + configuration(args), fallback=work / "AdaStudio-local-linux")
     return Path(path)
 
@@ -218,7 +210,7 @@ def launch_environment(ctx):
     # Saved build overrides point into the checkout; an installed app should
     # discover its bundled SDK/tools. Keep overrides explicitly set by the caller.
     for name in ctx.managed:
-        if name.startswith(("ADAENGINE_", "ADAEDITOR_", "ADA_MCP_", "LORE_", "TINT_", "SWAN_")) and name not in os.environ:
+        if name.startswith(("ADAENGINE_", "ADAEDITOR_", "ADA_MCP_", "LORE_")) and name not in os.environ:
             environment.pop(name, None)
     return environment
 

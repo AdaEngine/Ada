@@ -41,23 +41,6 @@ struct Render3DMeshletSettingsTests {
         #expect(MemoryLayout<IndexedIndirectArguments>.offset(of: \.firstInstance) == 16)
     }
 
-    #if canImport(WebGPU) && !WASM && !os(Android)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"), arguments: [0, 1, 2, 3])
-    func mapShadersCompileFreshForEveryAttachmentLayout(variant: Int) async throws {
-        let root = ProcessInfo.processInfo.environment["ADAENGINE_SHADER_SOURCE_ROOT"].map { URL(fileURLWithPath: $0) }
-            ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let compiler = try ShaderCompiler(from: root.appendingPathComponent("Sources/AdaCorePipelines/Assets/Shaders/meshlet_map_3d.glsl"))
-        if variant & 1 != 0 { compiler.setMacro("MAP_RESPONSE", value: "1", for: .fragment) }
-        if variant & 2 != 0 { compiler.setMacro("MAP_SURFACE", value: "1", for: .fragment) }
-        for stage in [ShaderStage.vertex, .fragment] {
-            let binary = try compiler.compileSpirvBin(for: stage, ignoreCache: true)
-            let converted = try await WGSLShaderCompiler().compile(
-                spirvData: binary.data, entryPoint: "meshlet_map_validation", stage: stage, defines: []
-            )
-            #expect(converted.language == .wgsl && converted.source.contains("fn meshlet_map_validation("))
-        }
-    }
-    #endif
 }
 
 extension Render3DGPUTests {
@@ -111,7 +94,7 @@ extension Render3DGPUTests {
             return try #require(statistics.snapshots[String(scene.camera.id)])
         }
 
-        @Test
+        @Test(.requiresGPUProcessors)
         func allVisibleAndPartlyVisibleClustersMatchOriginalPixels() async throws {
             let scene = try await MeshletBaselineFixtures.empty(size: [480, 320], cameraPosition: [0, 0, -40])
             let mesh = try Self.panel(device: scene.device)
@@ -234,7 +217,7 @@ extension Render3DGPUTests {
             }
         }
 
-        @Test
+        @Test(.requiresGPUProcessors)
         func gpuCompactionMatchesCPUOrderAcrossWorkgroupsAndSegments() async throws {
             let scene = try await MeshletBaselineFixtures.empty(size: [32, 32])
             let processor = try #require(scene.device.createMeshletVisibilityProcessor())
@@ -291,7 +274,7 @@ extension Render3DGPUTests {
             }
         }
 
-        @Test
+        @Test(.requiresGPUProcessors)
         func affineGPUWorldBoundsMatchCPUAcrossRotatedFrustaAndClipPlanes() async throws {
             let scene = try await MeshletBaselineFixtures.empty(size: [32, 32])
             let processor = try #require(scene.device.createMeshletVisibilityProcessor())
@@ -374,7 +357,7 @@ extension Render3DGPUTests {
                 "A projective object transform must select complete legacy geometry, not use affine-only bounds.")
         }
 
-        @Test
+        @Test(.requiresGPUProcessors)
         func occupiedFrameRingFallsBackThenReusesCompletedSlots() async throws {
             let scene = try await MeshletBaselineFixtures.empty(size: [32, 32])
             let processor = try #require(scene.device.createMeshletVisibilityProcessor())
@@ -526,7 +509,7 @@ extension Render3DGPUTests.Meshlets {
         }
     }
 
-    @Test
+    @Test(.requiresGPUProcessors)
     func parallelPrefixHandlesGroupBoundariesAndMaximumProfileSize() async throws {
         let scene = try await MeshletBaselineFixtures.empty(size: [32, 32])
         let processor = try #require(scene.device.createMeshletVisibilityProcessor())

@@ -157,7 +157,7 @@
 
         init(buffer: SAGACommandBuffer, descriptor: RenderPassDescriptor) {
             self.buffer = buffer
-            self.colors = descriptor.colorAttachments.compactMap { attachment in
+            var colors = descriptor.colorAttachments.compactMap { attachment -> PassColor? in
                 guard let texture = attachment.texture.gpuTexture as? SAGAGPUTexture,
                       let format = texture.pixelFormat.sagaFormat else { return nil }
                 let loads = attachment.operation?.loadAction ?? .clear
@@ -175,6 +175,23 @@
                     owners: [texture] + [attachment.resolveTexture?.gpuTexture as? SAGAGPUTexture].compactMap { $0 }
                 )
             }
+            if colors.isEmpty, let depthTexture = descriptor.depthStencilAttachment?.texture.gpuTexture as? SAGAGPUTexture {
+                // SAGA Vulkan cannot draw without a color attachment, so a depth-only pass gets a placeholder of the same
+                // size. Its pipelines write nothing to it (see `SAGARenderPipeline`). Drop this when SAGA supports
+                // depth-only passes.
+                if let placeholder = try? SAGAGPUTexture(
+                    context: buffer.context,
+                    descriptor: AdaRender.TextureDescriptor(
+                        width: depthTexture.size.width, height: depthTexture.size.height, pixelFormat: .rgba8,
+                        textureUsage: [.renderTarget], textureType: .texture2D, mipmapLevel: 1
+                    )
+                ) {
+                    colors = [PassColor(
+                        slot: placeholder.slot, clear: nil, store: .store, resolve: nil, format: .rgba8Unorm, owners: [placeholder]
+                    )]
+                }
+            }
+            self.colors = colors
             if let attachment = descriptor.depthStencilAttachment,
                let texture = attachment.texture.gpuTexture as? SAGAGPUTexture,
                let depthFormat = texture.pixelFormat.sagaFormat {
@@ -433,7 +450,7 @@
             }
             let textureList = textures.map { slot, texture -> (ComputeBindingSlot, ResourceSlot<ResourceID>) in
                 retained.append(texture)
-                return (slot, texture.slot)
+                return (slot, texture.sampledSlot)
             }
             let samplerList = samplers.map { slot, sampler -> (ComputeBindingSlot, ResourceSlot<ResourceID>) in
                 retained.append(sampler)

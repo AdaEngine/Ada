@@ -66,7 +66,7 @@ def windows_environment(ctx):
             ctx.env[key.upper() if key.lower() == "path" else key] = value
     version = ctx.env.get("VCToolsVersion", "")
     if not compatible_msvc(version):
-        raise ToolError(f"MSVC {version or 'unknown'} is too old for the pinned Dawn runtime; requires "
+        raise ToolError(f"MSVC {version or 'unknown'} is older than the pinned minimum; requires "
                         f"{PIN['windows_msvc_minimum']}+ (Visual Studio 2022 17.14+). Run: python ada_tool.py prepare studio")
     # Persist the Visual Studio tools' locations, but not arbitrary process secrets.
     for directory in reversed(ctx.env.get("PATH", "").split(os.pathsep)):
@@ -232,37 +232,10 @@ def pnpm(ctx, *arguments, cwd=None):
     return ctx.run(["node", executable, *arguments], cwd=cwd or ctx.root / "Editor/WebUI")
 
 
-def prepare_linux_swan(ctx):
-    pin = PIN["linux_swan"]
-    source = ctx.cache / ("swan-source-" + pin["revision"])
-    stage = ctx.cache / ("swan-" + pin["revision"])
-    if not (source / ".git").is_dir():
-        ctx.run(["git", "init", source])
-        ctx.run(["git", "-C", source, "fetch", "--depth", "1", pin["repository"], pin["revision"]])
-        ctx.run(["git", "-C", source, "checkout", "--detach", "FETCH_HEAD"])
-    revision = ctx.run(["git", "-C", source, "rev-parse", "HEAD"], capture=True)
-    if revision and revision != pin["revision"]:
-        raise ToolError("Unexpected Swan revision; refusing to reset " + str(source))
-    ctx.helper("prepare_swan_linux.py", source, stage, fallback=stage)
-    artifact = stage / "DawnLinux.artifactbundle"
-    if not (artifact / "info.json").is_file():
-        archive = download(ctx, pin["dawn_url"], "dawn-linux.zip", pin["dawn_sha256"])
-        if not ctx.dry:
-            with tempfile.TemporaryDirectory(prefix="dawn-", dir=ctx.cache) as work:
-                work = Path(work)
-                extract_zip(archive, work)
-                manifests = list(work.rglob("*.artifactbundle/info.json"))
-                if len(manifests) != 1:
-                    raise ToolError("Expected one Linux Dawn artifact bundle")
-                manifests[0].parent.rename(artifact)
-    ctx.set("ADAENGINE_SWAN_PACKAGE_PATH", stage)
-    ctx.set("SWAN_LOCAL_DAWN", artifact.name)
-
-
 def native_dependencies(ctx):
     ctx.set("ADAENGINE_PACKAGE_PATH", ctx.root)
     ctx.set("ADAENGINE_GRAVITY_PACKAGE_PATH", ctx.env.get("ADAENGINE_GRAVITY_PACKAGE_PATH", ctx.root / "Sources/gravity-lang"))
-    ctx.env.update(ADAENGINE_HEADLESS="0", ADAENGINE_DISABLE_SWAN="0")
+    ctx.env.update(ADAENGINE_HEADLESS="0")
     if ctx.host in ("windows", "linux"):
         helper = "ensure_windows_lore.py" if ctx.host == "windows" else "ensure_linux_lore.py"
         variable = "LORE_WINDOWS_SDK_PATH" if ctx.host == "windows" else "LORE_LINUX_SDK_PATH"
@@ -279,8 +252,6 @@ def native_dependencies(ctx):
             ctx.helper("ensure_windows_export_tools.py")
         else:
             ctx.set("LD_LIBRARY_PATH", ctx.env[variable] + os.pathsep + ctx.env.get("LD_LIBRARY_PATH", ""))
-            if not ctx.env.get("ADAENGINE_SWAN_PACKAGE_PATH") or not ctx.env.get("SWAN_LOCAL_DAWN"):
-                prepare_linux_swan(ctx)
             # Build the bundled native AdaScript compiler for the standalone SDK.
             gravity = ctx.env["ADAENGINE_GRAVITY_PACKAGE_PATH"]
             ctx.run(["cmake", "-S", gravity, "-B", ctx.cache / "gravity", "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"])
@@ -313,8 +284,6 @@ def prepare(ctx, args):
         prepare_swift(ctx, args.skip_system)
     if "studio" in selected:
         native_dependencies(ctx)
-    if "tint" in selected:
-        ctx.set("TINT_EXECUTABLE", ctx.helper("ensure_tint.py", "--jobs", ctx.jobs))
     if "wasm" in selected:
         if ctx.host == "windows":
             if not ctx.which("wsl.exe") and not ctx.dry:
@@ -374,10 +343,6 @@ def doctor(ctx, args):
             add("Xcode", ok, output, "Install Xcode and select it with xcode-select")
             add("XcodeGen", ctx.which("xcodegen"), ctx.which("xcodegen") or "missing", "brew install xcodegen")
         else:
-            swan = Path(ctx.env.get("ADAENGINE_SWAN_PACKAGE_PATH", "/__missing_swan__"))
-            dawn = swan / ctx.env.get("SWAN_LOCAL_DAWN", "__missing_dawn__")
-            add("Linux Swan/Dawn", (swan / "Package.swift").is_file() and (dawn / "info.json").is_file(),
-                ctx.env.get("ADAENGINE_SWAN_PACKAGE_PATH", "not prepared"), "python ada_tool.py prepare studio")
             for tool in ("clang", "pkg-config", "zenity"):
                 add(tool, ctx.which(tool), ctx.which(tool) or "missing", "python ada_tool.py prepare studio")
             ok, output = ctx.probe(["pkg-config", "--modversion", "x11", "alsa"])

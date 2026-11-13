@@ -141,7 +141,7 @@ extension Render3DGPUTests {
             let lights = spawnFlyingLights(scene, count: try integer("FLYING_LIGHTS", fallback: 0, range: 0...4))
             defer { for light in lights { scene.app.main.removeEntity(light) } }
             setPose(scene, route: route, sample: 0, count: samples, lights: lights)
-            let window = GoldenFrame.activeBackend == .webgpu ? min(frames, 90) : max(1, unsafe RenderEngine.configurations.maxFramesInFlight)
+            let window = GoldenFrame.activeBackend == .saga ? min(frames, 90) : max(1, unsafe RenderEngine.configurations.maxFramesInFlight)
             for frame in 0..<warmup {
                 try await scene.app.update()
                 // Warm the per-frame face redraws too; the plain baseline keeps its static warmup pose.
@@ -216,7 +216,7 @@ extension Render3DGPUTests {
             let routeIDs = try Self.filtered(routes.routes.map(\.id), key: "ROUTE")
             var report = Report(backend: GoldenFrame.activeBackend?.rawValue ?? "unknown", width: width, height: height,
                 frames: frames, warmup: warmup, rounds: rounds,
-                submissionWindowFrames: GoldenFrame.activeBackend == .webgpu ? min(frames, 90) : max(1, unsafe RenderEngine.configurations.maxFramesInFlight),
+                submissionWindowFrames: GoldenFrame.activeBackend == .saga ? min(frames, 90) : max(1, unsafe RenderEngine.configurations.maxFramesInFlight),
                 sourceReceipt: receipt, routes: routes, measurements: [])
             for preset in presets {
                 for quality in qualities {

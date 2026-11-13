@@ -61,7 +61,7 @@
                 #expect(warnings.count == (mode == "missing" ? 2 : 0))
             }
 
-            @Test("Obsolete palette GPU allocations release after source reload and removal", .enabled(if: GoldenFrame.activeBackend == .webgpu))
+            @Test("Obsolete palette GPU allocations release after source reload and removal", .enabled(if: GoldenFrame.activeBackend == .saga))
             func terrainMaterialGPUTexturesRelease() async throws {
                 let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
                 let directory = root.appendingPathComponent("TerrainMaterialGPU-" + UUID().uuidString, isDirectory: true).standardizedFileURL

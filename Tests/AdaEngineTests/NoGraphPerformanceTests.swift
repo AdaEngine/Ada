@@ -17,7 +17,7 @@ extension Render3DGPUTests {
         @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_PERF"] == "1" && GoldenFrame.activeBackend != nil),
               arguments: [SpriteRenderingMode.automatic, .batched])
         func ordinarySprites(mode: SpriteRenderingMode) async throws {
-            let backend: RenderBackendType = GoldenFrame.activeBackend == .webgpu ? .webgpu : .metal
+            let backend: RenderBackendType = GoldenFrame.activeBackend == .saga ? .saga : .metal
             unsafe RenderEngine.configurations.preferredBackend = backend
             try RenderEngine.setupRenderEngine()
             try #require(unsafe RenderEngine.shared.type == backend)

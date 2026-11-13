@@ -155,7 +155,7 @@ extension Render3DGPUTests {
             // WebGPU uploads are queue.writeBuffer operations ordered with submitted draws, so ring reuse
             // does not overwrite CPU-mapped memory. Use larger throughput windows to amortize native event
             // pumping. Metal writes shared memory directly and retains the conservative in-flight bound.
-            let window = GoldenFrame.activeBackend == .webgpu ? min(frames, 90) : max(1, unsafe RenderEngine.configurations.maxFramesInFlight)
+            let window = GoldenFrame.activeBackend == .saga ? min(frames, 90) : max(1, unsafe RenderEngine.configurations.maxFramesInFlight)
             for index in 0..<warmup {
                 try await scene.app.update()
                 if (index + 1) % window == 0 { await drain(scene.device) }
@@ -246,7 +246,7 @@ extension Render3DGPUTests {
                             os: ProcessInfo.processInfo.operatingSystemVersionString, width: width, height: height,
                             warmupFrames: warmup, measuredFrames: frames, rounds: rounds,
                             maxFramesInFlight: unsafe RenderEngine.configurations.maxFramesInFlight,
-                            submissionWindowFrames: GoldenFrame.activeBackend == .webgpu ? min(frames, 90) : max(1, unsafe RenderEngine.configurations.maxFramesInFlight),
+                            submissionWindowFrames: GoldenFrame.activeBackend == .saga ? min(frames, 90) : max(1, unsafe RenderEngine.configurations.maxFramesInFlight),
                             measurements: measurements)
                         let encoder = JSONEncoder()
                         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

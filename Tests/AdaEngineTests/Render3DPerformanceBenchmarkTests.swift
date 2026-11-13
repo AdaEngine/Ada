@@ -49,7 +49,7 @@ extension Render3DGPUTests {
 
         /// A grid of spheres with eight materials, a ground, a sun with cascaded shadows and a ring of local lights.
         private static func makeScene(size: SizeInt, temporalScale: Float?, localLights: Bool, manyLights: Int = 0) async throws -> Render3DGPUTests.DebugViews.Scene {
-            let backend: RenderBackendType = GoldenFrame.activeBackend == .webgpu ? .webgpu : .metal
+            let backend: RenderBackendType = GoldenFrame.activeBackend == .saga ? .saga : .metal
             unsafe RenderEngine.configurations.preferredBackend = backend
             try RenderEngine.setupRenderEngine()
             try #require(unsafe RenderEngine.shared.type == backend)

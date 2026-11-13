@@ -7,11 +7,5 @@
     "sdk": "swift-6.3.2-RELEASE_wasm",
     "url": "https://download.swift.org/swift-6.3.2-release/wasm-sdk/swift-6.3.2-RELEASE/swift-6.3.2-RELEASE_wasm.artifactbundle.tar.gz",
     "sha256": "a61f0584c93283589f8b2f42db05c1f9a182b506c2957271402992655591dd7c"
-  },
-  "linux_swan": {
-    "repository": "https://github.com/AdaEngine/swan.git",
-    "revision": "790df787281e9cf1c2358a11bb42b2ec2df01029",
-    "dawn_url": "https://github.com/adobe/swan/releases/download/dawn-chromium-stable-148.0.7778.97/dawn-chromium-stable-148.0.7778.97-release_linux.artifactbundle.zip",
-    "dawn_sha256": "66647a674725d74afb81607631297143d5de58f5de425cc35f154ce4b4fa79ee"
   }
 }

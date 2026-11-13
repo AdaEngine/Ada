@@ -45,7 +45,7 @@
         "*.metal",
         "*.vert",
         "*.frag",
-        "script/validate_webgpu.sh"
+        "script/validate_gpu.sh"
       ]
     },
     "platform": {

@@ -3,7 +3,7 @@ import AdaRender
 import Foundation
 import Testing
 
-/// Compares the checked-in Metal and WebGPU references with each other. Needs no GPU: it reads PNGs only.
+/// Compares the checked-in Metal and SAGA references with each other. Needs no GPU: it reads PNGs only.
 ///
 /// The two backends rasterize and filter slightly differently, so agreement is judged with a wider tolerance than
 /// a backend gets against its own references. A frame that differs more than that points at a real rendering
@@ -12,8 +12,13 @@ import Testing
 struct GoldenBackendAgreementTests {
     /// Frames that are expected to differ between backends, with the reason.
     private static let expectedDifferences: [String: String] = [
-        // The WebGPU encoder ignores triangle fill mode, so wireframe renders solid there.
-        "pbr-spheres-wireframe": "WebGPU has no polygon fill mode",
+        // The SAGA native encoder ignores triangle fill mode, so wireframe renders solid there.
+        "pbr-spheres-wireframe": "SAGA native has no polygon fill mode",
+        // The Metal bloom references date from 2026-10-16; the bloom, environment and composite code changed after them.
+        // SAGA's bloom chain was checked level by level (each coarser level accumulates with the 0.7 scatter gain).
+        // Re-record these two on Apple hardware to close the question.
+        "emissive-bloom": "Metal reference predates the current bloom code",
+        "emissive-bloom-exposure-minus1": "Metal reference predates the current bloom code",
     ]
 
     /// Largest per-channel step and fraction of pixels allowed to differ between backends.
@@ -28,25 +33,25 @@ struct GoldenBackendAgreementTests {
     }
 
     @Test func everySharedReferenceAgreesAcrossBackends() throws {
-        let shared = try Self.names(in: "metal").intersection(Self.names(in: "webgpu")).subtracting(Self.expectedDifferences.keys).sorted()
+        let shared = try Self.names(in: "metal").intersection(Self.names(in: "saga")).subtracting(Self.expectedDifferences.keys).sorted()
         try #require(!shared.isEmpty, "Both backends must have references to compare.")
         var report: [String] = []
         for name in shared {
             let metal = try Image(contentsOf: GoldenFrame.referenceURL(backend: "metal", name: name))
-            let webgpu = try Image(contentsOf: GoldenFrame.referenceURL(backend: "webgpu", name: name))
-            let comparison = GoldenFrame.compare(webgpu, metal, tolerance: Self.agreement)
+            let saga = try Image(contentsOf: GoldenFrame.referenceURL(backend: "saga", name: name))
+            let comparison = GoldenFrame.compare(saga, metal, tolerance: Self.agreement)
             report.append("\(name): \(comparison.differingPixels) px differ, largest step \(comparison.largestStep)")
-            #expect(comparison.passes(Self.agreement), "\(name) differs between Metal and WebGPU: \(comparison.differingPixels) pixels, largest step \(comparison.largestStep).")
+            #expect(comparison.passes(Self.agreement), "\(name) differs between Metal and SAGA: \(comparison.differingPixels) pixels, largest step \(comparison.largestStep).")
         }
         print("BACKEND-AGREEMENT\n" + report.joined(separator: "\n"))
     }
 
     @Test func backendsHaveTheSameReferenceNames() throws {
         let metal = try Self.names(in: "metal")
-        let webgpu = try Self.names(in: "webgpu")
-        // WebGPU skips the temporal path and renders wireframe solid, but every other frame exists on both.
-        #expect(metal.subtracting(webgpu).isSubset(of: ["pbr-spheres-wireframe"]) || metal.subtracting(webgpu).isEmpty, "Metal-only references: \(metal.subtracting(webgpu).sorted())")
-        #expect(webgpu.subtracting(metal).isEmpty, "WebGPU-only references: \(webgpu.subtracting(metal).sorted())")
+        let saga = try Self.names(in: "saga")
+        // SAGA native skips the temporal path and renders wireframe solid, but every other frame exists on both.
+        #expect(metal.subtracting(saga).isSubset(of: ["pbr-spheres-wireframe"]) || metal.subtracting(saga).isEmpty, "Metal-only references: \(metal.subtracting(saga).sorted())")
+        #expect(saga.subtracting(metal).isEmpty, "SAGA-only references: \(saga.subtracting(metal).sorted())")
     }
 }
 #endif

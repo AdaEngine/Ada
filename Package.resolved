@@ -1,23 +1,6 @@
 {
-  "originHash" : "72f5945e6b7791063c3f024ee00cf8ac9c73053598433b2246e931725fa45f89",
+  "originHash" : "bb65c7efdf9e8efe0439c17266ce6c646e6e159ae8fee78ee757fd903fb0dc28",
   "pins" : [
-    {
-      "identity" : "javascriptkit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/swiftwasm/JavaScriptKit.git",
-      "state" : {
-        "revision" : "991755e698a7516eac571e6f6a65c04c907ce5ed",
-        "version" : "0.59.0"
-      }
-    },
-    {
-      "identity" : "saga",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/AdaEngine/SAGA.git",
-      "state" : {
-        "revision" : "5f04e009ce4a15ca4bfede6d7df7b14225d020cf"
-      }
-    },
     {
       "identity" : "swift-atomics",
       "kind" : "remoteSourceControl",

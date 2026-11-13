@@ -6,8 +6,8 @@ import Testing
 @MainActor
 struct WESLGradientPipelineTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"))
-    func gradientUsesLinkedWESLOnNativeWebGPU() throws {
-        unsafe RenderEngine.configurations.preferredBackend = .webgpu
+    func gradientUsesLinkedWESLOnNativeSAGA() throws {
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         try RenderEngine.setupRenderEngine()
         var pipelines = RenderPipelines(configurator: LinearGradientPipeline())
         let pipeline = pipelines.pipeline(device: unsafe RenderEngine.shared.renderDevice).descriptor

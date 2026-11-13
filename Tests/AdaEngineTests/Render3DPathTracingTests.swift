@@ -12,21 +12,6 @@ import Testing
 
 @Suite("Path tracing settings and BVH")
 struct Render3DPathTracingSettingsTests {
-    #if canImport(WebGPU) && !WASM && !os(Android)
-    @Test(.enabled(if:ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"))
-    func pathShadersCompileFreshWithoutAGPU() async throws {
-        let root = URL(fileURLWithPath:#filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        for name in ["path_tracing_3d.glsl","path_tracing_composite_3d.glsl"] {
-            let compiler = try ShaderCompiler(from:root.appendingPathComponent("Sources/AdaCorePipelines/Assets/Shaders/\(name)"))
-            for stage in [ShaderStage.vertex,.fragment] {
-                let binary = try compiler.compileSpirvBin(for:stage,ignoreCache:true)
-                let result = try await WGSLShaderCompiler().compile(spirvData:binary.data,entryPoint:"path_validation",stage:stage,defines:[])
-                #expect(result.source.contains("fn path_validation("))
-            }
-        }
-    }
-    #endif
-
     @Test func oldScenesStayOptedOutAndSettingsRoundTrip() throws {
         #expect(try JSONDecoder().decode(Environment3D.self,from:Data("{}".utf8)).pathTracing.isEnabled == false)
         var environment = Environment3D()

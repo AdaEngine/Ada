@@ -89,7 +89,7 @@ public final class ShaderModule: Asset, @unchecked Sendable {
 extension ShaderModule {
     /// Whether the active renderer can load bundled WESL shader modules.
     public static var supportsBundledWESL: Bool {
-        #if (WASM && WEBGPU_ENABLED) || ((SAGA_RENDER || (canImport(WebGPU) && !os(Android))) && canImport(AdaWGSLCompiler))
+        #if (WASM && WEBGPU_ENABLED) || (SAGA_RENDER && canImport(AdaWGSLCompiler))
             return unsafe RenderEngine.shared.type.consumesWGSL
         #else
             return false
@@ -101,7 +101,7 @@ extension ShaderModule {
     /// - Parameter fileUrl: The file url to create the shader module from.
     /// - Returns: The shader module.
     public static func create(from fileUrl: URL) throws -> ShaderModule {
-        #if canImport(AdaWGSLCompiler) && (SAGA_RENDER || (canImport(WebGPU) && !os(Android))) && !WASM
+        #if canImport(AdaWGSLCompiler) && SAGA_RENDER && !WASM
             if fileUrl.pathExtension.lowercased() == "wesl" {
                 return try createWESL(from: fileUrl)
             }
@@ -138,7 +138,7 @@ extension ShaderModule {
                     throw ShaderModuleError.notFound(baseURL.path)
                 }
                 return module
-            #elseif canImport(AdaWGSLCompiler) && (SAGA_RENDER || (canImport(WebGPU) && !os(Android)))
+            #elseif canImport(AdaWGSLCompiler) && SAGA_RENDER
                 let features = Dictionary(uniqueKeysWithValues: names.map { ($0, true) })
                 return try createWESL(from: url, features: features)
             #else

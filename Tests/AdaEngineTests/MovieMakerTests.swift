@@ -77,7 +77,7 @@ extension Render3DGPUTests {
             defer { try? FileManager.default.removeItem(at: root) }
             let previousBackend = unsafe RenderEngine.configurations.preferredBackend
             defer { unsafe RenderEngine.configurations.preferredBackend = previousBackend }
-            unsafe RenderEngine.configurations.preferredBackend = GoldenFrame.activeBackend == .webgpu ? .webgpu : .metal
+            unsafe RenderEngine.configurations.preferredBackend = GoldenFrame.activeBackend == .saga ? .saga : .metal
             let recorder = MovieMaker()
             let config = MovieRecordingConfiguration(
                 outputURL: root.appendingPathComponent("world.png"), framesPerSecond: 30,
@@ -143,7 +143,7 @@ extension Render3DGPUTests {
             defer { try? FileManager.default.removeItem(at: root) }
             let previousBackend = unsafe RenderEngine.configurations.preferredBackend
             defer { unsafe RenderEngine.configurations.preferredBackend = previousBackend }
-            unsafe RenderEngine.configurations.preferredBackend = GoldenFrame.activeBackend == .webgpu ? .webgpu : .metal
+            unsafe RenderEngine.configurations.preferredBackend = GoldenFrame.activeBackend == .saga ? .saga : .metal
             let maker = MovieMaker()
             let config = MovieRecordingConfiguration(outputURL: root.appendingPathComponent("cancel.png"), width: 8, height: 8, frameCount: 10)
             var task: Task<MovieRecording, any Error>?
@@ -172,7 +172,7 @@ extension Render3DGPUTests {
             defer { try? FileManager.default.removeItem(at: root) }
             let previousBackend = unsafe RenderEngine.configurations.preferredBackend
             defer { unsafe RenderEngine.configurations.preferredBackend = previousBackend }
-            unsafe RenderEngine.configurations.preferredBackend = GoldenFrame.activeBackend == .webgpu ? .webgpu : .metal
+            unsafe RenderEngine.configurations.preferredBackend = GoldenFrame.activeBackend == .saga ? .saga : .metal
             var world: World?
             let config = MovieRecordingConfiguration(outputURL: root.appendingPathComponent("physics.png"), framesPerSecond: 5, width: 8, height: 8, frameCount: 2)
             try await MovieMaker().record(configuration: config, make: { app in

@@ -48,15 +48,13 @@ def build_env():
     env = os.environ.copy()
     env["ADAENGINE_ANDROID"] = "1"
     env.pop("ADAENGINE_HEADLESS", None)
-    if env.get("ADAENGINE_SAGA_NATIVE") == "1":
-        checkout = Path(env.get("ADAENGINE_SAGA_PACKAGE_PATH") or ROOT.parent / "SAGA").expanduser().resolve()
+    # Android renders through SAGA Vulkan. SwiftPM resolves the pinned SAGA revision unless a local checkout is named.
+    override = env.get("ADAENGINE_SAGA_PACKAGE_PATH")
+    if override:
+        checkout = Path(override).expanduser().resolve()
         if not (checkout / "Package.swift").is_file():
-            raise AndroidError(f"SAGA checkout not found at {checkout}. Set ADAENGINE_SAGA_PACKAGE_PATH.")
+            raise AndroidError(f"SAGA checkout not found at {checkout}. Fix or unset ADAENGINE_SAGA_PACKAGE_PATH.")
         env["ADAENGINE_SAGA_PACKAGE_PATH"] = str(checkout)
-        env["ADAENGINE_DISABLE_SWAN"] = "1"
-    else:
-        env.pop("ADAENGINE_DISABLE_SWAN", None)
-        env["SWAN_RUNTIME_ONLY"] = "1"
     if not env.get("JAVA_HOME"):
         candidates = [Path("/Applications/Android Studio.app/Contents/jbr/Contents/Home")]
         jdk = next((path for path in candidates if (path/"bin/java").exists()), None)
@@ -107,26 +105,6 @@ def validate_options(args):
         url=urlsplit(callback)
         if not args.java_source or not url.scheme or not url.hostname or url.query or url.fragment:
             raise AndroidError("callback-url requires a Java host and a scheme://host/path URL")
-
-def validate_webgpu(args, env):
-    swan = env.get("ADAENGINE_SWAN_PACKAGE_PATH")
-    artifact = env.get("SWAN_LOCAL_DAWN")
-    if not swan or not artifact:
-        raise AndroidError("Android WebGPU requires ADAENGINE_SWAN_PACKAGE_PATH and SWAN_LOCAL_DAWN. See Tools/Android/README.md.")
-    swan = Path(swan).expanduser().resolve()
-    if not (swan/"Package.swift").is_file() or Path(artifact).is_absolute():
-        raise AndroidError("Use a Swan package path and a SWAN_LOCAL_DAWN path relative to that package.")
-    bundle = swan/artifact
-    try:
-        artifacts = json.loads((bundle/"info.json").read_text())["artifacts"]
-        variants = [variant for item in artifacts.values() for variant in item["variants"]]
-    except (OSError, ValueError, KeyError, TypeError) as error:
-        raise AndroidError(f"Invalid Dawn artifact bundle {bundle}: {error}") from error
-    for abi in (ABIS if args.abi == "all" else [args.abi]):
-        triple = f"{ABIS[abi][0]}-unknown-linux-android{args.min_sdk}"
-        if not any(triple in variant.get("supportedTriples", []) and (bundle/variant["path"]).is_file() for variant in variants):
-            raise AndroidError(f"Dawn bundle has no library for {triple}. Build that ABI with Swan's Dawn/build_android.py.")
-    return bundle
 
 def write_manifest(path, args):
     manifest=ET.Element("manifest", {"package": args.application_id})
@@ -243,8 +221,6 @@ def select_swift_sdks(args,bundle):
 def build(args):
     validate_options(args)
     env=build_env()
-    if env.get("ADAENGINE_SAGA_NATIVE") != "1":
-        validate_webgpu(args,env)
     sdk=sdk_path(args)
     tools=sdk/"build-tools"/args.build_tools
     swift_roots,bundle=swift_sdk_root(args)
@@ -372,10 +348,7 @@ def main():
         else:
             validate_options(args)
             env=build_env()
-            if env.get("ADAENGINE_SAGA_NATIVE") == "1":
-                print("SAGA Vulkan:",env["ADAENGINE_SAGA_PACKAGE_PATH"])
-            else:
-                print("Dawn WebGPU:",validate_webgpu(args,env))
+            print("SAGA Vulkan:",env.get("ADAENGINE_SAGA_PACKAGE_PATH","pinned revision resolved by SwiftPM"))
             print(run(swift_command(args)+["--version"],env=env,capture=True).strip())
             print("Swift SDK:",swift_sdk_root(args)[1])
             print("NDK:",ndk_host(ndk_path(args)))

@@ -171,40 +171,30 @@ class AndroidPackagingTests(unittest.TestCase):
 if __name__=="__main__":
     unittest.main()
 
-class AndroidWebGPUSetupTests(unittest.TestCase):
-    def test_saga_build_uses_the_checkout_without_requiring_dawn(self):
+class AndroidSAGASetupTests(unittest.TestCase):
+    def test_a_local_saga_checkout_overrides_the_pinned_revision(self):
         with tempfile.TemporaryDirectory() as temporary:
             checkout=Path(temporary)/"SAGA checkout"
             checkout.mkdir()
             (checkout/"Package.swift").write_text("// fixture")
             from unittest.mock import patch
-            with patch.dict("os.environ",{"ADAENGINE_SAGA_NATIVE":"1","ADAENGINE_SAGA_PACKAGE_PATH":str(checkout)},clear=True):
+            with patch.dict("os.environ",{"ADAENGINE_SAGA_PACKAGE_PATH":str(checkout)},clear=True):
                 env=android.build_env()
-            self.assertEqual(env.get("ADAENGINE_DISABLE_SWAN"),"1","SAGA builds must disable Swan")
             self.assertEqual(env["ADAENGINE_SAGA_PACKAGE_PATH"],str(checkout.resolve()))
+            self.assertNotIn("ADAENGINE_DISABLE_SWAN",env)
 
-    def test_requires_explicit_android_dawn_setup(self):
-        args=android.parser().parse_args(["build"])
-        with self.assertRaisesRegex(android.AndroidError,"ADAENGINE_SWAN_PACKAGE_PATH"):
-            android.validate_webgpu(args,{})
+    def test_without_an_override_the_pinned_revision_is_used(self):
+        from unittest.mock import patch
+        with patch.dict("os.environ",{},clear=True):
+            env=android.build_env()
+        self.assertNotIn("ADAENGINE_SAGA_PACKAGE_PATH",env)
 
-    def test_rejects_an_unbuilt_abi_before_swift_build(self):
-        import json
+    def test_rejects_a_saga_override_without_a_package(self):
         with tempfile.TemporaryDirectory() as temporary:
-            root=Path(temporary)
-            (root/"Package.swift").write_text("// fixture")
-            bundle=root/"android.artifactbundle"
-            bundle.mkdir()
-            (bundle/"lib.a").write_bytes(b"library")
-            (bundle/"info.json").write_text(json.dumps({"artifacts":{"dawn":{"variants":[
-                {"path":"lib.a","supportedTriples":["aarch64-unknown-linux-android29"]}
-            ]}}}))
-            env={"ADAENGINE_SWAN_PACKAGE_PATH":str(root),"SWAN_LOCAL_DAWN":"android.artifactbundle"}
-            arm64=android.parser().parse_args(["build"])
-            self.assertEqual(android.validate_webgpu(arm64,env),bundle.resolve())
-            x86=android.parser().parse_args(["build","--abi","x86_64"])
-            with self.assertRaisesRegex(android.AndroidError,"x86_64-unknown-linux-android29"):
-                android.validate_webgpu(x86,env)
+            from unittest.mock import patch
+            with patch.dict("os.environ",{"ADAENGINE_SAGA_PACKAGE_PATH":temporary},clear=True):
+                with self.assertRaisesRegex(android.AndroidError,"SAGA checkout not found"):
+                    android.build_env()
 
 class AndroidSDKSelectionTests(unittest.TestCase):
     def test_export_staging_does_not_change_sdk_import_paths(self):

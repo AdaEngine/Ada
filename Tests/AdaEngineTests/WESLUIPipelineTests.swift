@@ -8,7 +8,7 @@ import Testing
 struct WESLUIPipelineTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"))
     func uiPrimitivesUseLinkedWESLAndPreserveBindings() throws {
-        unsafe RenderEngine.configurations.preferredBackend = .webgpu
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         try RenderEngine.setupRenderEngine()
         let device = unsafe RenderEngine.shared.renderDevice
         var quads = RenderPipelines(configurator: QuadPipeline())

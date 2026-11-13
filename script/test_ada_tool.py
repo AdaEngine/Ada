@@ -99,11 +99,11 @@ class CLIParsingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             args = parser().parse_args(["doctor"])
             ctx = Context(args, root=directory)
-            ctx.set("TINT_EXECUTABLE", "saved-tint")
+            ctx.set("ADAENGINE_SAGA_PACKAGE_PATH", "saved-saga")
             ctx.save()
-            with patch.dict(os.environ, {"TINT_EXECUTABLE": "explicit-tint"}):
+            with patch.dict(os.environ, {"ADAENGINE_SAGA_PACKAGE_PATH": "explicit-saga"}):
                 restored = Context(args, root=directory)
-            self.assertEqual(restored.env["TINT_EXECUTABLE"], "explicit-tint")
+            self.assertEqual(restored.env["ADAENGINE_SAGA_PACKAGE_PATH"], "explicit-saga")
             saved = json.loads((ctx.cache / "environment.json").read_text())
             self.assertNotIn("PATH", saved["environment"])
             self.assertNotIn("environment", saved["environment"])
@@ -123,11 +123,11 @@ class CLIParsingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             ctx = Context(argparse.Namespace(), root=directory)
             ctx.set("ADAENGINE_PACKAGE_PATH", directory)
-            ctx.set("TINT_EXECUTABLE", "cached-tint")
-            with patch.dict(os.environ, {"TINT_EXECUTABLE": "explicit-tint"}):
-                ctx.env["TINT_EXECUTABLE"] = os.environ["TINT_EXECUTABLE"]
+            ctx.set("ADAENGINE_SAGA_PACKAGE_PATH", "cached-saga")
+            with patch.dict(os.environ, {"ADAENGINE_SAGA_PACKAGE_PATH": "explicit-saga"}):
+                ctx.env["ADAENGINE_SAGA_PACKAGE_PATH"] = os.environ["ADAENGINE_SAGA_PACKAGE_PATH"]
                 launch = studio.launch_environment(ctx)
-            self.assertEqual(launch["TINT_EXECUTABLE"], "explicit-tint")
+            self.assertEqual(launch["ADAENGINE_SAGA_PACKAGE_PATH"], "explicit-saga")
             if "ADAENGINE_PACKAGE_PATH" not in os.environ:
                 self.assertNotIn("ADAENGINE_PACKAGE_PATH", launch)
             self.assertEqual(ctx.env["ADAENGINE_PACKAGE_PATH"], directory)

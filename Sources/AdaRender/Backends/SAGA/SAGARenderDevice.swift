@@ -22,8 +22,19 @@
         public var supportsInstancedVertexInputs: Bool { true }
         public var supportsSpatialUpscaling: Bool { false }
         public var supportsTemporalUpscaling: Bool { false }
-        public var supportsHybridReflections: Bool { false }
-        public var supportsLightingSurfaceBuffer: Bool { false }
+        /// Hybrid reflections write five HDR targets (40 bytes per pixel) and the surface buffer a sixth. Vulkan has no
+        /// per-sample byte limit, so native Vulkan only needs the attachment count. Browsers keep WebGPU's 32-byte limit
+        /// and Metal is unverified, so both stay off.
+        private var supportsWideGeometryTargets: Bool {
+            #if SAGA_NATIVE
+                context.capabilities.maxColorAttachments >= 6
+            #else
+                false
+            #endif
+        }
+
+        public var supportsHybridReflections: Bool { supportsWideGeometryTargets }
+        public var supportsLightingSurfaceBuffer: Bool { supportsWideGeometryTargets }
         public var supportsMultiDrawIndirect: Bool { false }
 
         init(context: SAGAContext) {

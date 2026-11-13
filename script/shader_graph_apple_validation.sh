@@ -48,7 +48,7 @@ case "$check" in
   metal-native)
     export ADAENGINE_SAGA_METAL=0
     make -C Sources/gravity-lang -j 3 gravity
-    package="$(python3 script/webgpu_validation_package.py "$RUNNER_TEMP/metal-validation-package")"
+    package="$(python3 script/gpu_validation_package.py "$RUNNER_TEMP/metal-validation-package")"
     # Preserve the failing gate's status while still exercising native export.
     metal_status=0
     ADAENGINE_GOLDEN_METAL=1 ADAENGINE_SPRITE_METAL_SMOKE=1 \

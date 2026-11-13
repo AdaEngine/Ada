@@ -181,7 +181,7 @@ public final class ShaderCompiler {
                 return shader
             }
 
-            #if canImport(WebGPU) || (WASM && WEBGPU_ENABLED)
+            #if WEBGPU_ENABLED
                 if unsafe RenderEngine.shared.type.deviceLang == .wgsl {
                     guard let wgslSource = self.shaderSource.getWGSLSource(for: stage) else {
                         let sourcePath = self.shaderSource.getSourceFileURL(for: stage)?.path ?? "<unknown>"
@@ -203,21 +203,6 @@ public final class ShaderCompiler {
         #endif
 
         let binary = try self.compileSpirvBin(for: stage, ignoreCache: hasChanges)
-
-        #if canImport(WebGPU) && os(Android)
-            if unsafe RenderEngine.shared.type.deviceLang == .wgsl {
-                let shader = try Shader(spirv: binary, compiler: self)
-                let spirvCompiler = try SpirvCompiler(spriv: binary.data, stage: stage, deviceLang: .glsl)
-                shader.reflectionData = spirvCompiler.reflection()
-                try shader.compile()
-                do {
-                    try ShaderCache.saveReflection(shader.reflectionData, for: self.shaderSource, stage: stage)
-                } catch {
-                    self.logger.warning("Failed to save reflection: \(error)")
-                }
-                return shader
-            }
-        #endif
 
         #if SAGA_RENDER && !WASM
             // SAGA consumes SPIR-V directly and derives its bindings from the compiled stage.
@@ -372,14 +357,8 @@ public final class ShaderCompiler {
 
 extension ShaderCompiler {
     func makeDeviceShaderCompiler() -> ShaderDeviceCompilerEngine {
-        switch unsafe RenderEngine.shared.type.deviceLang {
-        #if canImport(WebGPU) && !WASM && !os(Android)
-            case .wgsl:
-                return WGSLShaderCompiler()
-        #endif
-        default:
-            return GLSLangShaderCompiler()
-        }
+        // Device shader compilation is the GLSL path (glslang to SPIR-V) used by SAGA native and Metal.
+        GLSLangShaderCompiler()
     }
 }
 

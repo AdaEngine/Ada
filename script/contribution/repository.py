@@ -60,9 +60,9 @@ def snapshot(root):
         else:
             digest.update(b"<missing>")
     environment = {key: os.environ.get(key) for key in (
-        "ADAENGINE_HEADLESS", "ADAENGINE_SKIP_WEBGPU_PLUGINS", "ADAENGINE_SKIP_SWIFTLINT",
-        "ADAENGINE_GOLDEN_METAL", "ADAENGINE_GOLDEN_WEBGPU", "ADA_CLOUD_PANELS_DIST",
-        "ADAENGINE_WEBGPU_TEST_FILTER", "ADAENGINE_WEBGPU_SCRATCH", "ADAENGINE_SWIFT_CONFIGURATION", "TINT_EXECUTABLE",
+        "ADAENGINE_HEADLESS", "ADAENGINE_SKIP_SWIFTLINT",
+        "ADAENGINE_GOLDEN_METAL", "ADAENGINE_GOLDEN_SAGA", "ADA_CLOUD_PANELS_DIST",
+        "ADAENGINE_GPU_TEST_FILTER", "ADAENGINE_GPU_SCRATCH", "ADAENGINE_SWIFT_CONFIGURATION",
     )}
     digest.update(json.dumps(environment, sort_keys=True).encode())
     return digest.hexdigest()

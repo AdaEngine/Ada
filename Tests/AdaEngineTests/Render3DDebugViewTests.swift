@@ -261,7 +261,7 @@ extension Render3DGPUTests {
             pathTracingPresentation: Bool = false
         ) async throws -> Scene {
             let backend = GoldenFrame.activeBackend ?? .metal
-            let requested: RenderBackendType = backend == .saga ? .saga : (backend == .webgpu ? .webgpu : .metal)
+            let requested: RenderBackendType = backend == .saga ? .saga : .metal
             unsafe RenderEngine.configurations.preferredBackend = requested
             try RenderEngine.setupRenderEngine()
             // A silent fallback to another backend would make the references meaningless.

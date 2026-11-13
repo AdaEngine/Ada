@@ -146,25 +146,6 @@ extension Render3DGPUTests {
         }
 
         @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
-        func motionBindGroupsStopGrowingAfterTheFrameRingWarmsUp() async throws {
-            #if canImport(WebGPU)
-            guard GoldenFrame.activeBackend == .webgpu else { return }
-            let scene = try await Render3DDebugViewGPUTests.makeScene()
-            try scene.configure { $0.motionBlurEnabled = true }
-            _ = try await scene.render(.none, frames: 8)
-            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
-            let mesh = try #require(scene.sphereEntities.first?.components[Mesh3DComponent.self]?.mesh)
-            let configuration = PBR3DConfiguration(vertex: mesh.models[0].parts[0].vertexDescriptor, blended: false)
-            let cache = world.getRefResource(RenderPipelines<Motion3DPipeline>.self)
-            let pipeline = try #require(cache.wrappedValue.pipeline(for: configuration, device: scene.device) as? WGPURenderPipeline)
-            let warm = pipeline.cachedBindGroupCount
-            _ = try await scene.render(.none, frames: 40)
-            #expect(warm > 0 && pipeline.cachedBindGroupCount == warm,
-                    "A camera uniform allocated every frame grows material bindings without bound.")
-            #endif
-        }
-
-        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
         func multipleCamerasKeepTheirOwnInstanceBuffers() async throws {
             let scene = try await Render3DDebugViewGPUTests.makeScene()
             try scene.configure { $0.motionBlurEnabled = true }

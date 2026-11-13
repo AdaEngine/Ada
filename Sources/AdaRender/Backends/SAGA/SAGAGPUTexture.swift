@@ -38,6 +38,10 @@
         public var label: String?
         let context: SAGAContext
         let slot: ResourceSlot<ResourceID>
+        /// What sampling binds. Array and cube textures need an explicit view: a one-layer array otherwise resolves to a
+        /// plain 2D view and a cube to an array view, which a `texture_2d_array` or `texture_cube` binding rejects.
+        let sampledSlot: ResourceSlot<ResourceID>
+        private let viewSlot: ResourceSlot<ResourceID>?
         let pixelFormat: PixelFormat
         let allowsBindingCache: Bool
         let allowsTransientBindingCache: Bool
@@ -86,6 +90,22 @@
             context.queue.enqueue { device in
                 slot.fulfill(try await device.createTexture(sagaDescriptor))
             }
+            let viewDimension: TextureViewDimension? = switch descriptor.textureType {
+            case .texture2DArray: .d2Array
+            case .textureCube: .cube
+            default: nil
+            }
+            if let viewDimension {
+                let view = ResourceSlot<ResourceID>()
+                self.viewSlot = view
+                self.sampledSlot = view
+                context.queue.enqueue { device in
+                    view.fulfill(try await device.createTextureView(texture: try slot.get(), .init(dimension: viewDimension)))
+                }
+            } else {
+                self.viewSlot = nil
+                self.sampledSlot = slot
+            }
 
             let initial = descriptor.image.map { [TextureSubresource(image: $0, mipLevel: 0)] } ?? []
             for subresource in initial + descriptor.subresources {
@@ -96,7 +116,11 @@
         deinit {
             guard ownsResource else { return }
             let slot = self.slot
+            let viewSlot = self.viewSlot
             context.queue.enqueue { device in
+                if let viewSlot, let view = try? viewSlot.get() {
+                    try await device.destroyTextureView(view)
+                }
                 if let id = try? slot.get() {
                     try await device.destroyTexture(id)
                 }

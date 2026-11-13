@@ -1,4 +1,4 @@
-#if canImport(WebGPU) && !os(WASI) && !os(Android)
+#if canImport(AdaWGSLCompiler) && !os(WASI)
 import AdaAssets
 @testable import AdaRender
 @testable import AdaUI
@@ -12,8 +12,13 @@ extension Render3DGPUTests {
         @Test
         func legacySourcesRemainAvailableAndModuleFailuresPropagate() throws {
             let legacy = CustomMaterial(UIShadowMaterial())
-            #expect(legacy.shaderSource.getSource(for: .vertex) != nil)
-            #expect(legacy.shaderSource.getSource(for: .fragment) != nil)
+            if ShaderModule.supportsBundledWESL {
+                // A renderer that consumes WESL links the material's module and never loads its GLSL fallback.
+                #expect(legacy.shaderSource.stages.isEmpty)
+            } else {
+                #expect(legacy.shaderSource.getSource(for: .vertex) != nil)
+                #expect(legacy.shaderSource.getSource(for: .fragment) != nil)
+            }
             let failed = CustomMaterial(FailingLinkedMaterial())
             #expect(throws: HookFailure.unavailable) {
                 try failed.makeShaderModule(defines: [])
@@ -22,7 +27,7 @@ extension Render3DGPUTests {
 
         @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"))
         func customMaterialRetainsLinkedModuleAndDistinctIdentity() async throws {
-            unsafe RenderEngine.configurations.preferredBackend = .webgpu
+            unsafe RenderEngine.configurations.preferredBackend = .saga
             try RenderEngine.setupRenderEngine()
             let material = CustomMaterial(LinkedShadowMaterial())
             let module = try material.makeShaderModule(defines: [])
@@ -49,7 +54,7 @@ extension Render3DGPUTests {
 
         @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"))
         func shadowModuleLoadsBothStagesAndPreservesBindings() throws {
-            unsafe RenderEngine.configurations.preferredBackend = .webgpu
+            unsafe RenderEngine.configurations.preferredBackend = .saga
             try RenderEngine.setupRenderEngine()
             let root = URL(fileURLWithPath: #filePath)
                 .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

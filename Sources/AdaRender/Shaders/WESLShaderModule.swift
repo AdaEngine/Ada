@@ -1,6 +1,6 @@
 import Foundation
 
-#if canImport(AdaWGSLCompiler) && (SAGA_RENDER || (canImport(WebGPU) && !os(Android))) && !WASM
+#if canImport(AdaWGSLCompiler) && SAGA_RENDER && !WASM
 import AdaWGSLCompiler
 import Foundation
 

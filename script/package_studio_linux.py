@@ -16,15 +16,13 @@ from ensure_linux_lore import ensure as ensure_lore
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def package(binary_directory, compiler, swan, dawn, output, version):
+def package(binary_directory, compiler, output, version):
     if not version or any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_" for c in version):
         raise ValueError("Version must be a filename component")
     metadata = json.loads(subprocess.check_output(["swift", "-print-target-info"], text=True))
     triple = metadata["target"]["triple"]
     if "linux" not in triple:
         raise RuntimeError("Run this packager with a Linux Swift toolchain")
-    if Path(dawn).is_absolute() or ".." in Path(dawn).parts:
-        raise ValueError("Dawn artifact must be relative to Swan")
     output.mkdir(parents=True, exist_ok=True)
     name = "AdaStudio-" + version + "-" + triple.split("-")[0] + "-linux"
     destination = output / name
@@ -57,8 +55,6 @@ def package(binary_directory, compiler, swan, dawn, output, version):
         sdk = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(sdk)
         sdk.stage(ROOT, compiler, directory / "BuildSDK")
-        sdk.copy_inputs(swan, directory / "BuildSDK/Swan", ["Package.swift", "LICENSE", "Sources"])
-        shutil.copytree(swan / dawn, directory / "BuildSDK/Swan/DawnLinux.artifactbundle")
         (directory / "ada-studio").write_text('''#!/usr/bin/env bash
 set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -66,8 +62,7 @@ export LD_LIBRARY_PATH="$root/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export ADA_STUDIO_SDK="$root/BuildSDK"
 export ADAENGINE_PACKAGE_PATH="$root/BuildSDK/AdaEngine"
 export ADAENGINE_GRAVITY_PACKAGE_PATH="$root/BuildSDK/AdaScript"
-export ADAENGINE_SWAN_PACKAGE_PATH="$root/BuildSDK/Swan"
-export SWAN_LOCAL_DAWN=DawnLinux.artifactbundle
+if [[ -f "$root/BuildSDK/SAGA/Package.swift" ]]; then export ADAENGINE_SAGA_PACKAGE_PATH="$root/BuildSDK/SAGA"; fi
 export ADAENGINE_SKIP_SWIFTLINT=1
 exec "$root/AdaEditor" "$@"
 ''', encoding="utf-8")
@@ -114,13 +109,11 @@ exec "$root/ada-studio" --ada-studio-cli "$@"
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    for option in ("binary-directory", "compiler", "swan", "output"):
+    for option in ("binary-directory", "compiler", "output"):
         parser.add_argument("--" + option, type=Path, required=True)
-    parser.add_argument("--dawn", default="DawnLinux.artifactbundle")
     parser.add_argument("--version", required=True)
     args = parser.parse_args()
-    print(package(args.binary_directory.resolve(), args.compiler.resolve(), args.swan.resolve(),
-                  args.dawn, args.output.resolve(), args.version))
+    print(package(args.binary_directory.resolve(), args.compiler.resolve(), args.output.resolve(), args.version))
 
 
 if __name__ == "__main__":

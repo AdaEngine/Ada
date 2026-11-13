@@ -29,17 +29,17 @@ struct SpriteMetalRenderingTests {
     }
 
     #endif
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_WGPU_SMOKE"] == "1"))
-    func rendersLayoutsAndPickingWithWebGPU() async throws {
-        try await renderCanvasMeshes(backend: .webgpu)
-        let chunks = try await renderReferenceScene(backend: .webgpu)
-        let sprites = try await renderReferenceScene(backend: .webgpu, tileMapMode: .sprites)
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_SAGA_SMOKE"] == "1"))
+    func rendersLayoutsAndPickingWithSAGA() async throws {
+        try await renderCanvasMeshes(backend: .saga)
+        let chunks = try await renderReferenceScene(backend: .saga)
+        let sprites = try await renderReferenceScene(backend: .saga, tileMapMode: .sprites)
         #expect(chunks.data == sprites.data, "Chunk geometry must preserve the reference renderer's visible pixels.")
-        let reference = try await renderReferenceScene(backend: .webgpu, spriteMode: .batched)
-        let referenceSprites = try await renderReferenceScene(backend: .webgpu, tileMapMode: .sprites, spriteMode: .batched)
-        #expect(chunks.data == reference.data, "WebGPU instancing must match the expanded reference path.")
+        let reference = try await renderReferenceScene(backend: .saga, spriteMode: .batched)
+        let referenceSprites = try await renderReferenceScene(backend: .saga, tileMapMode: .sprites, spriteMode: .batched)
+        #expect(chunks.data == reference.data, "SAGA instancing must match the expanded reference path.")
         #expect(sprites.data == referenceSprites.data)
-        // Three RGBA pixels require 12 bytes, whereas WebGPU copy rows require 256-byte alignment.
+        // Three RGBA pixels require 12 bytes, whereas GPU copy rows require 256-byte alignment.
         let device = unsafe RenderEngine.shared.renderDevice
         let target = RenderTexture(size: SizeInt(width: 3, height: 2), scaleFactor: 1, format: .bgra8)
         let command = device.createCommandQueue().makeCommandBuffer()
@@ -62,8 +62,8 @@ struct SpriteMetalRenderingTests {
     func rendersTileOcclusionWithMetal() async throws { try await renderTileOcclusionMask(backend: .metal) }
     #endif
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_WGPU_SMOKE"] == "1"))
-    func rendersTileOcclusionWithWebGPU() async throws { try await renderTileOcclusionMask(backend: .webgpu) }
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_SAGA_SMOKE"] == "1"))
+    func rendersTileOcclusionWithSAGA() async throws { try await renderTileOcclusionMask(backend: .saga) }
 
     private func renderCanvasMeshes(backend: RenderBackendType) async throws {
         unsafe RenderEngine.configurations.preferredBackend = backend
@@ -179,7 +179,7 @@ struct SpriteMetalRenderingTests {
         #expect(result.getPixel(x: 110, y: 96) == .black)
         #expect(result.getPixel(x: 16, y: 64) == .white)
         #if canImport(CoreGraphics) && canImport(ImageIO)
-        let captureVariable = backend == .webgpu ? "ADAENGINE_TILE_OCCLUSION_WGPU_CAPTURE" : "ADAENGINE_TILE_OCCLUSION_METAL_CAPTURE"
+        let captureVariable = backend == .saga ? "ADAENGINE_TILE_OCCLUSION_SAGA_CAPTURE" : "ADAENGINE_TILE_OCCLUSION_METAL_CAPTURE"
         if let path = ProcessInfo.processInfo.environment[captureVariable] { try result.writePNG(to: URL(fileURLWithPath: path)) }
         #endif
     }
@@ -368,7 +368,7 @@ struct SpriteMetalRenderingTests {
             #expect(result.getPixel(x: 32 + orientation.rawValue * 48, y: 192) != .black)
         }
         #if canImport(CoreGraphics) && canImport(ImageIO)
-        let captureVariable = backend == .webgpu ? "ADAENGINE_SPRITE_WGPU_CAPTURE" : "ADAENGINE_SPRITE_METAL_CAPTURE"
+        let captureVariable = backend == .saga ? "ADAENGINE_SPRITE_SAGA_CAPTURE" : "ADAENGINE_SPRITE_METAL_CAPTURE"
         if tileMapMode == .chunks, let path = ProcessInfo.processInfo.environment[captureVariable] {
             try result.writePNG(to: URL(fileURLWithPath: path))
         }
@@ -381,7 +381,7 @@ extension Render3DGPUTests {
     @MainActor @Suite("Sprite Shader Graph pixels") struct SpriteGraphs {
         @Test(.enabled(if: GoldenFrame.activeBackend != nil), arguments: [SpriteRenderingMode.batched, .automatic])
         func identityGraphPreservesAtlasLayoutAlphaAndPainterOrder(mode: SpriteRenderingMode) async throws {
-            let backend: RenderBackendType = GoldenFrame.activeBackend == .metal ? .metal : .webgpu
+            let backend: RenderBackendType = GoldenFrame.activeBackend == .metal ? .metal : .saga
             let harness = SpriteMetalRenderingTests()
             let stock = try await harness.renderReferenceScene(backend: backend, spriteMode: mode)
             let graph = try await harness.renderReferenceScene(backend: backend, spriteMode: mode, graphMode: true)

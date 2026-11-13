@@ -250,7 +250,7 @@ extension Render3DGPUTests {
             return scene
         }
 
-        @Test
+        @Test(.requiresGPUProcessors)
         func gpuCutMatchesCPUIndicesAndRejectsOnlyInvisibleSelectedClusters() async throws {
             let prepared = try MeshletLODFixture.make()
             let scene = try await MeshletBaselineFixtures.empty(size: [32, 32])
@@ -306,7 +306,7 @@ extension Render3DGPUTests {
             #expect(Array(combined[48..<60]) == parents, "Shared hierarchy draws must not alias near/far LOD uniforms or their bounded output segments.")
         }
 
-        @Test
+        @Test(.requiresGPUProcessors)
         func nearMixedAndFarRenderedCutsPreserveLegacySilhouetteAndReduceTriangles() async throws {
             let prepared = try MeshletLODFixture.make(), scene = try await Self.scene(prepared)
             let render = try #require(scene.app.getSubworldBuilder(by: .renderWorld))

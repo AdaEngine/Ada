@@ -10,7 +10,7 @@ extension Render3DGPUTests {
     @MainActor
     @Suite("Shader Graph GPU rendering")
     struct ShaderGraphs {
-        @Test(.enabled(if: GoldenFrame.activeBackend == .webgpu && ProcessInfo.processInfo.environment["ADAENGINE_SHADER_GRAPH_ARCHIVE"] != nil))
+        @Test(.enabled(if: GoldenFrame.activeBackend == .saga && ProcessInfo.processInfo.environment["ADAENGINE_SHADER_GRAPH_ARCHIVE"] != nil))
         func bakedTextureVariantsMatchLiveLayersAndMorphDefines() async throws {
             let path = try #require(ProcessInfo.processInfo.environment["ADAENGINE_SHADER_GRAPH_ARCHIVE"])
             let archive = try JSONDecoder().decode(ShaderGraphArchive.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
@@ -49,7 +49,7 @@ extension Render3DGPUTests {
             }
         }
 
-        @Test(.enabled(if: GoldenFrame.activeBackend == .webgpu && ProcessInfo.processInfo.environment["ADAENGINE_SHADER_GRAPH_ARCHIVE"] != nil))
+        @Test(.enabled(if: GoldenFrame.activeBackend == .saga && ProcessInfo.processInfo.environment["ADAENGINE_SHADER_GRAPH_ARCHIVE"] != nil))
         func hostBakedWGSLRendersThroughTheProductionSurfacePipeline() async throws {
             let path = try #require(ProcessInfo.processInfo.environment["ADAENGINE_SHADER_GRAPH_ARCHIVE"])
             let archive = try JSONDecoder().decode(ShaderGraphArchive.self, from: Data(contentsOf: URL(fileURLWithPath: path)))

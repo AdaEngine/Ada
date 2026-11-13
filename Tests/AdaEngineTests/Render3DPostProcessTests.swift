@@ -222,7 +222,7 @@ extension Render3DGPUTests {
         /// The composite shader tone maps the direct and FXAA paths and the temporal shader tone maps the upscaled
         /// path. Both include one shared transform, so every operator must give the same picture on both. The
         /// temporal path exists only on Metal.
-        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled && GoldenFrame.activeBackend != .webgpu), arguments: ToneMapper3D.allCases)
+        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled && GoldenFrame.activeBackend != .saga), arguments: ToneMapper3D.allCases)
         func operatorsAgreeBetweenCompositeAndTemporalShaders(mapper: ToneMapper3D) async throws {
             let direct = try await Render3DDebugViewGPUTests.makeScene(emissiveSphere: true)
             try direct.configure { $0.postProcess.toneMapper = mapper }
@@ -304,7 +304,7 @@ extension Render3DGPUTests {
 
             /// Temporal upscaling needs MetalFX, so WebGPU renders only the direct and FXAA paths.
             nonisolated static var supported: [Path] {
-                GoldenFrame.activeBackend == .webgpu ? [.direct, .fxaa] : allCases
+                GoldenFrame.activeBackend == .saga ? [.direct, .fxaa] : allCases
             }
         }
 

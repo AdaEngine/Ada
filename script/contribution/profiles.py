@@ -124,10 +124,10 @@ def build_checks(root, paths, config, paths_file, logs, quick=False, runtime=Non
             checks.append(Check("web-tests", "tests", ["node", "--test", *tests], cwd="Editor/WebUI", tests=True, timeout=timeout))
             checks.append(Check("web-localization", "style", ["node", "scripts/check-localization.mjs"], cwd="Editor/WebUI", timeout=timeout))
     if not quick and "gpu" in profiles:
-        checks.append(Check("webgpu", "dynamic", ["bash", "script/validate_webgpu.sh"], timeout=timeout,
-                            tests=True, env={"ADAENGINE_WEBGPU_TEST_FILTER": ""}, required_output=[
-                                r"Test rendersLayoutsAndPickingWithWebGPU\(\).*passed",
-                                r"Test rendersTileOcclusionWithWebGPU\(\).*passed",
+        checks.append(Check("gpu", "dynamic", ["bash", "script/validate_gpu.sh"], timeout=timeout,
+                            tests=True, env={"ADAENGINE_GPU_TEST_FILTER": ""}, required_output=[
+                                r"Test rendersLayoutsAndPickingWithSAGA\(\).*passed",
+                                r"Test rendersTileOcclusionWithSAGA\(\).*passed",
                                 r'Suite "3D GPU rendering" passed']))
     runtime_needed = any(not is_documentation_path(p) and fnmatch.fnmatchcase(p, pattern)
                          for p in paths for pattern in config["runtime_paths"])

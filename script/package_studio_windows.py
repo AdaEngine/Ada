@@ -60,7 +60,7 @@ def bundle_dependencies(directory, binaries, search):
 
 def clean_environment():
     environment = {key: value for key, value in os.environ.items()
-                   if not key.upper().startswith(("ADAENGINE_", "ADA_STUDIO_", "ADA_MCP_", "TINT_", "SWAN_"))}
+                   if not key.upper().startswith(("ADAENGINE_", "ADA_STUDIO_", "ADA_MCP_"))}
     for key in list(environment):
         if key.lower() == "path":
             del environment[key]
@@ -123,23 +123,6 @@ def package(binary_directory, compiler, output, version, smoke_test=True, *, sta
             for library in path.glob("*.dll"):
                 if not (directory / library.name).exists():
                     shutil.copy2(library, directory)
-        artifacts = binary_directory.parent.parent / "artifacts"
-        for name_dll in ["dxcompiler.dll", "dxil.dll", "d3dcompiler_47.dll"]:
-            candidates = [path for path in artifacts.rglob(name_dll) if "windows_x86_64" in str(path)]
-            source = binary_directory / name_dll
-            if not source.is_file() and candidates:
-                source = candidates[0]
-            if not source.is_file():
-                raise RuntimeError(f"Dawn runtime is missing: {name_dll}")
-            shutil.copy2(source, directory)
-        # A build linked with the optional DLSS bridge (script/build_dlss.py) needs NVIDIA's signed NGX runtimes
-        # beside the executable: Super Resolution and Ray Reconstruction, plus their license.
-        dlss = ROOT / ".build-tools/dlss-interop"
-        if (dlss / "build.json").is_file():
-            for name in ["nvngx_dlss.dll", "nvngx_dlssd.dll", "NVIDIA-DLSS-LICENSE.txt"]:
-                if not (dlss / name).is_file():
-                    raise RuntimeError(f"DLSS runtime is missing: {name}; rerun script/build_dlss.py")
-                shutil.copy2(dlss / name, directory)
         lore_sdk = Path(run("python", ROOT / "script/ensure_windows_lore.py"))
         search = [binary_directory, lore_sdk] + runtime + [Path(path) for path in os.environ.get("PATH", "").split(os.pathsep) if path]
         binaries = list(directory.glob("*.dll")) + [directory / "AdaEditor.exe", directory / "adastudio.exe", directory / "BuildSDK/AdaScript/gravity.exe"]

@@ -112,7 +112,7 @@ extension Render3DGPUTests {
             return a | b | c | d
         }
 
-        @Test
+        @Test(.requiresGPUProcessors)
         func movingCurvedSourceUsesItsActualCoarseSurfaceForTemporalGuides() async throws {
             let scene = try await MeshletBaselineFixtures.empty(size: [320, 240], cameraPosition: [0, 0, -6])
             var camera = try #require(scene.camera.components[Camera.self])

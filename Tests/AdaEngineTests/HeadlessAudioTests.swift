@@ -24,7 +24,7 @@ struct HeadlessAudioTests {
         try #require(renderer.type == .headless)
 
         // A later preference change must not make an already headless process audible.
-        unsafe RenderEngine.configurations.preferredBackend = .webgpu
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         let app = AppWorlds(main: World())
         let plugin = AudioPlugin(masterVolume: 0.7)
         plugin.setup(in: app)

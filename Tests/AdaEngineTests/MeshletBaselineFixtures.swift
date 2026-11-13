@@ -28,7 +28,7 @@ enum MeshletBaselineFixtures {
     }
 
     static func empty(size: SizeInt, cameraPosition: Vector3 = [0, 0, -10], shadows: Bool = false) async throws -> Scene {
-        let backend: RenderBackendType = GoldenFrame.activeBackend == .webgpu ? .webgpu : .metal
+        let backend: RenderBackendType = GoldenFrame.activeBackend == .saga ? .saga : .metal
         unsafe RenderEngine.configurations.preferredBackend = backend
         try RenderEngine.setupRenderEngine()
         let engine = try #require(unsafe RenderEngine.shared)

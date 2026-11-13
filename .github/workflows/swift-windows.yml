@@ -17,7 +17,6 @@ jobs:
     runs-on: windows-2022
     env:
       ADAENGINE_HEADLESS: "1"
-      ADAENGINE_SKIP_WEBGPU_PLUGINS: "1"
     steps:
         - name: Setup
           uses: compnerd/gha-setup-swift@v0.2.3

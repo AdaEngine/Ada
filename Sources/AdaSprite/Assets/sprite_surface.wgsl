@@ -4,11 +4,12 @@ struct SpriteVertex {
     @location(1) uv: vec2f,
 }
 
-@group(0) @binding(0) var spriteImage: texture_2d<f32>;
-@group(0) @binding(1) var spriteSampler: sampler;
+// The names match what Shader Graph sprite nodes emit (`textureSample(u_Texture, u_Sampler, ...)`).
+@group(0) @binding(0) var u_Texture: texture_2d<f32>;
+@group(0) @binding(1) var u_Sampler: sampler;
 
 fn shadeSprite(input: SpriteVertex) -> vec4f {
-    let color = textureSample(spriteImage, spriteSampler, input.uv) * input.color;
+    let color = textureSample(u_Texture, u_Sampler, input.uv) * input.color;
     if color.a == 0.0 {
         discard;
     }
