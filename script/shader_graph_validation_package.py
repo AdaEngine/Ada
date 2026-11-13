@@ -26,7 +26,9 @@ for relative in [
     "Tests/AdaShaderGraphBakerTests/WebExportSupportTests.swift",
 ]:
     source = root / relative
-    shutil.copy2(source, tests / source.name)
+    content = source.read_text(encoding="utf-8")
+    content = content.replace("@testable import AdaShaderGraphBaker", "@testable import ShaderGraphValidationBaker")
+    (tests / source.name).write_text(content, encoding="utf-8")
 shutil.copytree(root / "Tests/AdaScriptAOTFixture", destination / "Tests/AdaScriptAOTFixture", dirs_exist_ok=True)
 shutil.copytree(root / "Plugins/AdaShaderGraphBaker", destination / "Sources/AdaShaderGraphBaker", dirs_exist_ok=True)
 shutil.copy2(root / "Plugins/AdaWebExportPlugin/WebExportSupport.swift", destination / "Sources/AdaShaderGraphBaker/WebExportSupport.swift")
@@ -39,14 +41,15 @@ let package = Package(name: "ShaderGraphScriptingValidation", platforms: [.macOS
     .package(name: "AdaEngine", path: ''' + json.dumps(str(root)) + '''),
     .package(name: "gravity-lang", path: ''' + json.dumps(str(root / "Sources/gravity-lang")) + ''')
 ], targets: [
-    .executableTarget(name: "AdaShaderGraphBaker", dependencies: [
+    .executableTarget(name: "ShaderGraphValidationBaker", dependencies: [
         .product(name: "AdaWGSLCompiler", package: "AdaEngine"),
         .product(name: "AdaRender", package: "AdaEngine"), .product(name: "AdaCorePipelines", package: "AdaEngine"),
-        .product(name: "AdaScene", package: "AdaEngine"), .product(name: "AdaSprite", package: "AdaEngine")]),
+        .product(name: "AdaScene", package: "AdaEngine"), .product(name: "AdaSprite", package: "AdaEngine")],
+        path: "Sources/AdaShaderGraphBaker"),
     .target(name: "AdaScriptAOTFixture", dependencies: [.product(name: "CGravity", package: "gravity-lang")],
         path: "Tests/AdaScriptAOTFixture", exclude: ''' + json.dumps(excluded) + ''', publicHeadersPath: "include"),
     .testTarget(name: "ShaderGraphValidationTests", dependencies: [
-''' + dependencies + ''', "AdaShaderGraphBaker", "AdaScriptAOTFixture", .product(name: "GravityAOT", package: "gravity-lang")])
+''' + dependencies + ''', "ShaderGraphValidationBaker", "AdaScriptAOTFixture", .product(name: "GravityAOT", package: "gravity-lang")])
 ])
 ''')
 print(destination)

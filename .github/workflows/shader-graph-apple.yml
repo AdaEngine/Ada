@@ -49,12 +49,11 @@ jobs:
           persist-credentials: false
       - name: Check out the pinned mobile runtime
         if: matrix.check == 'ipad-simulator'
-        uses: actions/checkout@v4
-        with:
-          repository: TeamSloppy/Sloppy
-          ref: 0d8fd03d0269a480b6af3fb4f40333c319e2c398
-          path: Sloppy
-          persist-credentials: false
+        run: |
+          git init Sloppy
+          git -C Sloppy fetch --no-tags --no-recurse-submodules --depth=1 \
+            https://github.com/TeamSloppy/Sloppy.git 0d8fd03d0269a480b6af3fb4f40333c319e2c398
+          git -C Sloppy checkout --detach FETCH_HEAD
       - name: Build and run the production paths
         working-directory: AdaEngine
         run: bash script/shader_graph_apple_validation.sh '${{ matrix.check }}' "$RUNNER_TEMP/shader-graph-evidence"

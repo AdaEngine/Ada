@@ -1,7 +1,6 @@
 """Exercise app-bundle installation on macOS without touching /Applications."""
 from pathlib import Path
 import plistlib
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -20,7 +19,9 @@ class MacOSInstallationTests(unittest.TestCase):
         self.applications = self.root / "Applications"
         self.destination = self.applications / "Ada Studio.app"
         (self.source / "Contents/MacOS").mkdir(parents=True)
-        shutil.copy2("/bin/echo", self.source / "Contents/MacOS/Ada Studio")
+        executable = self.source / "Contents/MacOS/Ada Studio"
+        executable.write_text('#!/bin/sh\nprintf "%s\\n" "$@"\n')
+        executable.chmod(0o755)
         (self.source / "Contents/Info.plist").write_bytes(plistlib.dumps({
             "CFBundleIdentifier": "org.adaengine.editor", "CFBundleExecutable": "Ada Studio",
             "CFBundlePackageType": "APPL",

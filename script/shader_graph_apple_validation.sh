@@ -15,9 +15,9 @@ case "$check" in
     export ADAENGINE_HEADLESS=1 ADAENGINE_SKIP_WEBGPU_PLUGINS=1 ADAENGINE_WEB_EXPORT=1
     package="$(python3 script/shader_graph_validation_package.py "$RUNNER_TEMP/cpu-validation-package")"
     scratch="$RUNNER_TEMP/cpu-validation-build"
-    swift build --package-path "$package" --scratch-path "$scratch" --jobs 3 --product AdaShaderGraphBaker
+    swift build --package-path "$package" --scratch-path "$scratch" --jobs 3 --product ShaderGraphValidationBaker
     bin="$(swift build --package-path "$package" --scratch-path "$scratch" --show-bin-path)"
-    ADAENGINE_SHADER_GRAPH_BAKER="$bin/AdaShaderGraphBaker" \
+    ADAENGINE_SHADER_GRAPH_BAKER="$bin/ShaderGraphValidationBaker" \
       swift test --package-path "$package" --scratch-path "$scratch" --jobs 3 --no-parallel
     ;;
   saga-default)
