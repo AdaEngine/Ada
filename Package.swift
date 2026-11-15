@@ -308,13 +308,6 @@ if isWebExportEnabled {
     adaRenderDependencies.append(.product(name: "SAGAWebGPU", package: "SAGA", condition: .when(platforms: [.wasi])))
     adaRenderDependencies.append(.product(name: "SAGA", package: "SAGA", condition: .when(platforms: [.wasi])))
     adaRenderDependencies.append(.product(name: "SAGACompiler", package: "SAGA", condition: .when(platforms: [.wasi])))
-    // Opt in only when the selected local SAGA checkout exposes the device-limit host API.
-    if ProcessInfo.processInfo.environment["ADAENGINE_SAGA_WEB_DEVICE_LIMIT"] == "1" {
-        guard sagaCheckoutPath != nil else {
-            fatalError("ADAENGINE_SAGA_WEB_DEVICE_LIMIT requires a compatible SAGA checkout in BuildSDK or ADAENGINE_SAGA_PACKAGE_PATH")
-        }
-        swiftSettings.append(.define("SAGA_WEB_DEVICE_LIMIT", .when(platforms: [.wasi])))
-    }
     swiftSettings.append(.define("SAGA_WEBGPU", .when(platforms: [.wasi])))
     swiftSettings.append(.define("SAGA_RENDER", .when(platforms: [.wasi])))
 }
@@ -1347,7 +1340,6 @@ targets += [
         swiftSettings: (isSAGANativeEnabled ? [.define("SAGA_NATIVE")] : [])
             + (isSAGAMetalEnabled ? [.define("SAGA_METAL", .when(platforms: [.macOS]))] : [])
             + (isSAGAMetalNativePassEnabled ? [.define("SAGA_METAL_NATIVE_PASS", .when(platforms: [.macOS]))] : [])
-
     ),
     .testTarget(
         name: "AdaInputTests",
@@ -1488,7 +1480,7 @@ if let sagaPath = sagaCheckoutPath {
     package.dependencies.append(.package(name: "SAGA", path: sagaPath))
 } else {
     // SAGA Metal compositor submission and native Vulkan surface presentation.
-    let sagaRevision = "1f535c6165359d20c672a56ed843cc265728165b"
+    let sagaRevision = "74173a185bd9899656dca8cd6ba058334b0ed1fa"
     package.dependencies.append(.package(
         url: "https://github.com/AdaEngine/SAGA.git",
         revision: sagaRevision

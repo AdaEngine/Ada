@@ -166,7 +166,7 @@ fails on the unchanged tooling. The WASM doctor check for the pinned dependency 
 
 ## SAGA-only integration
 
-AdaEngine pins SAGA revision `1f535c6165359d20c672a56ed843cc265728165b`, published
+The first SAGA-only AdaEngine checkout pinned `1f535c6165359d20c672a56ed843cc265728165b`, published
 on `AdaEngine/SAGA` at `codex/metal-native-pass`. A fresh SwiftPM scratch resolved
 the lockfile through the canonical GitHub URL. The manifest selects SAGA Metal
 on Apple, SAGA Vulkan on Windows, Linux, and Android, and SAGA WebGPU for web
@@ -175,5 +175,65 @@ exports. Headless builds use the CPU shader compiler.
 The final Web Player passed its 2D color and 3D golden checks in Chromium.
 The packaged Android Vulkan smoke rendered the same sphere after Home and Back
 and read back a populated indirect draw. The iPhone Simulator smoke used the
-published pin and presented a lit sphere. Windows presentation, physical
-Android, Apple TV, and Vision Pro still require runtime evidence for this pin.
+published pin and presented a lit sphere.
+
+The integration checks below used `e308bcd2b58d91d91f266d6565fbb84b16e6467e`. The export
+passed the 2D and 3D Chromium checks with the WebGPU device's sampled-texture
+limit passed to SAGA. An iPhone Simulator build resolved the same pin and
+presented the 3D sphere. A SwiftPM build of the Apple TV Simulator smoke used this
+pin and presented a 1920×1080 frame with 98,356 green sphere pixels on tvOS 26.2.
+The simulator app bundle used an ad hoc signature and a UIKit scene manifest.
+The visionOS 26.2 Simulator ran a signed windowed smoke app on the same pin.
+Xcode 26.6's Swift 6.3.3 compiled `AdaEngineEmbeddable` and the smoke app.
+Its 3840×2160 capture showed the 3D sphere in the app window.
+A separate visionOS 26.2 Simulator app opened a full `ImmersiveSpace` using
+`CompositorLayer` and `AdaImmersiveRenderer`. The renderer logged its first eye
+pair on SAGA. Two 3840×2160 captures of the immersive scene each contained
+418,540 green sphere pixels. Hardware foveation still requires a physical
+Vision Pro.
+On Linux ARM64, 18 targeted WESL and Vulkan tests ran successfully on llvmpipe.
+An Xlib presentation test under Xvfb required a Vulkan adapter and a window,
+then verified that resizing the window rebuilt the swapchain.
+On the same SAGA pin, the Vulkan Wayland test presented to headless Weston.
+The Linux AdaEngine window smoke also rendered its red canvas and white text
+through Weston's Xwayland server. The X11 window readback was 1024×640.
+The headless profile loaded a built-in WESL canvas material through the CPU compiler.
+A standalone Studio BuildSDK moved into an application bundle with spaces in
+its path resolved the public SAGA pin. Its bundled compiler ran, and its built
+shader transpiler emitted both WGSL stages of the canvas material with
+`VERTEX_POSITIONS` enabled.
+On macOS, `script/validate_gpu.sh` completed with 400 tests reported across 84 suites.
+A separate window test confirmed the expected drawable pixels and captured the blue
+frame before and after resizing. Metal returned zero presentation timestamps in both
+cases. A standalone AppKit window using `CAMetalLayer` also returned zero for all
+ten presented callbacks, including after resizing. The timestamp check remains
+open on this host.
+
+The local SAGA candidate `22a6070` passed its serial Foundation suite on Swift
+6.2.4 and 6.3.2, with 2,054 tests reported on each toolchain. AdaEngine loaded
+that candidate through the local dependency override and passed the focused
+WESL, sprite, Shader Graph, stereo rendering, and GPU visibility checks on Metal.
+The SAGA WASM diagnostic presented two frames and released every resource in
+Chromium on an Apple GPU. SAGA PR #3 was merged as
+`74173a185bd9899656dca8cd6ba058334b0ed1fa`, the revision AdaEngine now pins.
+The merge commit has the same Git tree as `e308bcd`. The three fixes tested
+in `22a6070` remain local.
+
+Web Player assembly rejects legacy shader files anywhere in its template before
+copying it. The shared project loader rejects legacy shader resources for both
+standalone players and Studio previews. In Chromium, a nested legacy `.shader`
+was rejected on first load and reload. A clean reload still rendered a frame.
+Native Studio export also preserved WESL and WGSL and rejected legacy shader
+files without replacing a previous export. The signed Android smoke APK
+contained 42 WESL and 16 WGSL files and no GLSL shader files or materials.
+
+The macOS engine and Studio built successfully. In the full engine suite, two
+terrain tests passed when rerun serially and the navigation slope test still
+failed. The full Studio suite reported failures and stopped at an assertion in
+`AnimatedTexture.currentFrame` called from the shared frame event. The tile
+source and UI Designer tests passed when run separately. The crash report
+identifies the animation update path. The cause of the invalid frame index in
+the full suite remains unresolved.
+
+Windows Vulkan presentation, physical Android, Apple TV hardware, and Vision Pro
+still require runtime evidence.

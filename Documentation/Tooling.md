@@ -268,18 +268,11 @@ and complete Studio/GPU/WASM exports still need verification on their own hosts.
 
 Web exports render through the pinned SAGA package and ship its JavaScript WebGPU host as `saga-webgpu.mjs`.
 The exporter copies `web/webgpu.mjs` from the SwiftPM dependency that provides `SAGAWebHost`.
-It also copies `web/golden.mjs` when available for frame comparisons. For migration builds, point
-the override at the companion checkout:
+It also copies `web/golden.mjs` when available for frame comparisons.
+The JavaScript host reads the sampled-texture limit from the WebGPU device it creates.
+AdaRender passes that value to SAGA, which rejects missing or invalid limits at startup.
 
-```sh
-export ADAENGINE_SAGA_PACKAGE_PATH=/absolute/path/to/saga-companion
-# Only when that checkout includes WebHostParameters.maxSampledTexturesPerShaderStage:
-export ADAENGINE_SAGA_WEB_DEVICE_LIMIT=1
-```
-
-The device-limit flag opts into the newer host boundary; do not set it with the
-pinned SAGA revision. With the newer host, the limit must be present and valid
-or device initialization fails; the value does not yet enforce pipeline limits.
+Use `ADAENGINE_SAGA_PACKAGE_PATH` to develop against a checkout that provides the same host API.
 
 Add `?sagadebug` to the page URL to wait for every submission and print SAGA device errors and per-pipeline binding
 reports to the console. Web export uses JavaScriptKit's generic BridgeJS runtime and resolves SAGA without Swan or Dawn.
@@ -336,5 +329,8 @@ the first surface while a second window is attached.
 unset ADAENGINE_HEADLESS ADAENGINE_WEB_EXPORT
 ADAENGINE_GPU_TEST_FILTER=SAGAVulkanDeviceTests bash script/validate_gpu.sh
 ```
+
+The command requires both Win32 presentation tests to pass. Windows test output
+is saved as `windows-gpu-tests.log` in the GPU scratch directory.
 
 For Android APK exports and emulator setup, see [Native Android apps](../Tools/Android/README.md).

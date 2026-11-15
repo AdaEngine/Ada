@@ -213,36 +213,24 @@ class CLIParsingTests(unittest.TestCase):
             self.assertTrue(args.profile)
             self.assertFalse(args.debug)
 
-    def test_wsl_passes_saga_flag_with_and_without_checkout(self):
+    def test_wsl_forwards_the_saga_checkout_when_configured(self):
         for saga in (None, "/work/saga"):
             with self.subTest(saga=saga), tempfile.TemporaryDirectory() as directory:
                 args = parser().parse_args(["build", "wasm", "--dry-run"])
                 ctx = Context(args, root=Path(directory), host="windows")
                 ctx.env.pop("ADAENGINE_SAGA_PACKAGE_PATH", None)
-                ctx.env["ADAENGINE_SAGA_WEB_DEVICE_LIMIT"] = "1"
                 if saga:
                     ctx.env["ADAENGINE_SAGA_PACKAGE_PATH"] = saga
                 with patch.object(ctx, "run", return_value="/work/engine") as run:
                     environment.wsl(ctx, ["build", "wasm"])
                 launch = run.call_args.args[0]
-                self.assertIn("ADAENGINE_SAGA_WEB_DEVICE_LIMIT=1", launch)
-                self.assertIn("env", launch)
+                self.assertEqual("env" in launch, saga is not None)
                 if saga:
                     self.assertIn("ADAENGINE_SAGA_PACKAGE_PATH=/work/saga", launch)
-
-    def test_web_limit_flag_requires_local_saga_in_manifest(self):
-        env = os.environ.copy()
-        env.update(ADAENGINE_WEB_EXPORT="1", ADAENGINE_SAGA_WEB_DEVICE_LIMIT="1")
-        env.pop("ADAENGINE_SAGA_PACKAGE_PATH", None)
-        result = subprocess.run(["swift", "package", "dump-package"], cwd=ROOT, env=env,
-                                capture_output=True, text=True, timeout=30)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("ADAENGINE_SAGA_WEB_DEVICE_LIMIT requires", result.stderr)
 
     def test_web_manifest_excludes_legacy_shader_compilers_on_wasi(self):
         env = os.environ.copy()
         env["ADAENGINE_WEB_EXPORT"] = "1"
-        env.pop("ADAENGINE_SAGA_WEB_DEVICE_LIMIT", None)
         result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
                                 capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -261,7 +249,7 @@ class CLIParsingTests(unittest.TestCase):
 
     def test_standalone_wasi_manifest_selects_the_saga_wesl_linker(self):
         env = os.environ.copy()
-        for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_SAGA_WEB_DEVICE_LIMIT",
+        for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT",
                         "ADAENGINE_SAGA_METAL"):
             env.pop(setting, None)
         env["ADAENGINE_HEADLESS"] = "1"
@@ -284,7 +272,7 @@ class CLIParsingTests(unittest.TestCase):
     def test_watchos_does_not_select_metal_or_legacy_shaders(self):
         env = os.environ.copy()
         for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL",
-                        "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+                        "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_PACKAGE_PATH"):
             env.pop(setting, None)
         result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
                                 capture_output=True, text=True, timeout=30)
@@ -303,7 +291,7 @@ class CLIParsingTests(unittest.TestCase):
     def test_engine_shader_resources_have_no_legacy_bundle(self):
         env = os.environ.copy()
         for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL",
-                        "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+                        "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_PACKAGE_PATH"):
             env.pop(setting, None)
         command = ["swift", "package", "--disable-sandbox", "dump-package"]
         result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=30)
@@ -319,7 +307,7 @@ class CLIParsingTests(unittest.TestCase):
     def test_source_manifest_has_no_legacy_shader_targets_in_any_profile(self):
         env = os.environ.copy()
         for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS",
-                        "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+                        "ADAENGINE_SAGA_PACKAGE_PATH"):
             env.pop(setting, None)
         profiles = ({}, {"ADAENGINE_HEADLESS": "1"}, {"ADAENGINE_WEB_EXPORT": "1"}, {"ADAENGINE_ANDROID": "1"})
         command = ["swift", "package", "--disable-sandbox", "dump-package"]
@@ -339,7 +327,7 @@ class CLIParsingTests(unittest.TestCase):
     def test_relocated_source_sdk_manifest_has_no_legacy_shader_targets(self):
         env = os.environ.copy()
         for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL_NATIVE_PASS",
-                        "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+                        "ADAENGINE_SAGA_PACKAGE_PATH"):
             env.pop(setting, None)
         with tempfile.TemporaryDirectory(prefix="relocated ada sdk ") as temporary:
             source = Path(temporary) / "AdaEngine"
@@ -356,7 +344,7 @@ class CLIParsingTests(unittest.TestCase):
     def test_relocated_source_sdk_uses_bundled_saga_without_an_override(self):
         env = os.environ.copy()
         for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL_NATIVE_PASS",
-                        "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+                        "ADAENGINE_SAGA_PACKAGE_PATH"):
             env.pop(setting, None)
         with tempfile.TemporaryDirectory(prefix="relocated source sdk ") as temporary:
             root = Path(temporary).resolve()
@@ -384,7 +372,7 @@ class CLIParsingTests(unittest.TestCase):
     def test_native_vulkan_does_not_link_legacy_shader_compilers(self):
         env = os.environ.copy()
         for setting in ("ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL",
-                        "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_WEB_DEVICE_LIMIT"):
+                        "ADAENGINE_SAGA_METAL_NATIVE_PASS"):
             env.pop(setting, None)
         env["ADAENGINE_ANDROID"] = "1"
         result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,

@@ -52,19 +52,7 @@ public enum AdaWebPlayerBundle {
                 throw AdaWebPlayerProjectError.invalid("Player template contains a legacy shader at `\(relativePath)`. Re-export the player template.")
             }
         }
-        for path in project.files ?? [] {
-            let fileExtension = URL(fileURLWithPath: path).pathExtension.lowercased()
-            if AdaWebLegacyShader.extensions.contains(fileExtension) {
-                throw AdaWebLegacyShader.projectError(for: path)
-            }
-            if AdaWebLegacyShader.containers.contains(fileExtension),
-               AdaWebLegacyShader.containsLegacySource(
-                   at: try project.resourceURL(path, at: directory),
-                   declaredExtension: fileExtension
-               ) {
-                throw AdaWebLegacyShader.projectError(for: path)
-            }
-        }
+        try rejectLegacyTemplateFiles(in: templateRoot)
         guard
             !resources.contains(where: { $0.path == "game" || $0.path.hasPrefix("game/") || $0.path.hasPrefix("/game/") }),
             !fileManager.fileExists(atPath: template.appendingPathComponent("game").path)
@@ -129,6 +117,22 @@ public enum AdaWebPlayerBundle {
         }
         try encoder.encode(resources.sorted { $0.path < $1.path }).write(to: output.appendingPathComponent("ada-resource-manifest.json"))
         complete = true
+    }
+
+    private static func rejectLegacyTemplateFiles(in template: URL) throws {
+        // The whole template is copied, including files outside the eager WASI resource manifest.
+        guard let files = FileManager.default.enumerator(atPath: template.path) else {
+            throw AdaWebPlayerProjectError.invalid("Unable to read the Web Player template.")
+        }
+        for case let path as String in files {
+            let file = template.appendingPathComponent(path)
+            let fileExtension = file.pathExtension.lowercased()
+            guard AdaWebLegacyShader.extensions.contains(fileExtension) || AdaWebLegacyShader.containers.contains(fileExtension),
+                try file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != true,
+                AdaWebLegacyShader.containsLegacySource(at: file, declaredExtension: fileExtension)
+            else { continue }
+            throw AdaWebPlayerProjectError.invalid("Player template contains a legacy shader at `\(path)`. Re-export the player template.")
+        }
     }
 
     private struct PlayerDescriptor: Decodable {

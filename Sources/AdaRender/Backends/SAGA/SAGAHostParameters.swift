@@ -17,13 +17,7 @@
             func number(_ name: String) -> UInt32 {
                 UInt32(clamping: Int(host[name].number ?? 0))
             }
-            #if SAGA_WEB_DEVICE_LIMIT
-                // Missing or invalid values become zero, which SAGA rejects fail-closed.
-                if let value = host.maxSampledTexturesPerShaderStage.number,
-                   value.isFinite, value > 0, value <= Double(UInt32.max), value.rounded(.towardZero) == value {
-                    maxSampledTexturesPerShaderStage = UInt32(value)
-                }
-            #endif
+            maxSampledTexturesPerShaderStage = UInt32(exactly: host.maxSampledTexturesPerShaderStage.number ?? 0) ?? 0
             maxBufferSize = UInt64(host.maxBufferSize.number ?? 0)
             maxTextureDimension2D = number("maxTextureDimension2D")
             presentation = flag("supportsPresentation")

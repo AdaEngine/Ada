@@ -136,6 +136,14 @@ struct AdaWebPlayerTests {
         #expect(manifest.title == "SceneGame")
         #expect(try Data(contentsOf: game.appendingPathComponent("runtime-settings.json")) == Data(settings.utf8))
         #expect(try String(contentsOf: game.appendingPathComponent("Assets/Scenes/Main.ascn"), encoding: .utf8) == "format: ada.scene\n")
+
+        let legacyPath = "Assets/Scenes/legacy.shader"
+        try "#pragma stage : frag\n".write(to: project.appendingPathComponent(legacyPath), atomically: true, encoding: .utf8)
+        #expect(throws: AdaWebPlayerProjectError.invalid(
+            "Web Player cannot use GLSL shader `\(legacyPath)`. Port it to WESL and compile it to WGSL. See the WESLShaders guide."
+        )) {
+            try AdaWebPlayerProject.load(at: project)
+        }
     }
 
     @Test("Rejects a template whose resource manifest points at missing shader bytes")
@@ -175,26 +183,36 @@ struct AdaWebPlayerTests {
         }
         try JSONEncoder().encode(project).write(to: projectRoot.appendingPathComponent("project.json"))
         let output = root.appendingPathComponent("out")
-        #expect(throws: AdaWebPlayerProjectError.invalid(
+        let expected = AdaWebPlayerProjectError.invalid(
             "Web Player cannot use GLSL shader `\(path)`. Port it to WESL and compile it to WGSL. See the WESLShaders guide."
-        )) {
+        )
+        #expect(throws: expected) {
+            try AdaWebPlayerProject.load(at: projectRoot)
+        }
+        #expect(throws: expected) {
             try AdaWebPlayerBundle.assemble(template: template, project: projectRoot, output: output)
         }
         #expect(!FileManager.default.fileExists(atPath: output.path))
     }
 
-    @Test("Rejects a cached player template containing a legacy shader")
-    func legacyPlayerTemplate() throws {
+    @Test(
+        "Rejects a cached player template containing a legacy shader",
+        arguments: ["resources/Legacy.FRaG", "resources/nested/Legacy.mat"], [true, false]
+    )
+    func legacyPlayerTemplate(_ shader: String, listedInManifest: Bool) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }
         let project = root.appendingPathComponent("project")
         let template = root.appendingPathComponent("template")
         try makeProject(at: project)
         try makeTemplate(at: template)
-        let shader = "legacy.glsl"
-        try "#version 450 core\n".write(to: template.appendingPathComponent(shader), atomically: true, encoding: .utf8)
-        try JSONEncoder().encode([Entry(path: "/engine/legacy.glsl", url: shader)])
-            .write(to: template.appendingPathComponent("ada-resource-manifest.json"))
+        let file = template.appendingPathComponent(shader)
+        try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try "#version 450 core\n".write(to: file, atomically: true, encoding: .utf8)
+        if listedInManifest {
+            try JSONEncoder().encode([Entry(path: "/engine/\(shader)", url: shader)])
+                .write(to: template.appendingPathComponent("ada-resource-manifest.json"))
+        }
         let output = root.appendingPathComponent("out")
         #expect(throws: AdaWebPlayerProjectError.invalid(
             "Player template contains a legacy shader at `\(shader)`. Re-export the player template."

@@ -96,6 +96,19 @@ public struct AdaWebPlayerProject: Codable, Equatable, Sendable {
             project = try loadAdaProject(at: directory)
         }
         try project.validate()
+        for path in project.files ?? [] {
+            let fileExtension = URL(fileURLWithPath: path).pathExtension.lowercased()
+            if AdaWebLegacyShader.extensions.contains(fileExtension) {
+                throw AdaWebLegacyShader.projectError(for: path)
+            }
+            if AdaWebLegacyShader.containers.contains(fileExtension),
+               AdaWebLegacyShader.containsLegacySource(
+                   at: try project.resourceURL(path, at: directory),
+                   declaredExtension: fileExtension
+               ) {
+                throw AdaWebLegacyShader.projectError(for: path)
+            }
+        }
         return project
     }
 

@@ -38,15 +38,25 @@ ada_validation_filter="$ada_validation_filter|SAGAVisibilityProcessorTests"
 ada_validation_filter="$ada_validation_filter|MeshBufferTests|TextShaderRenderingTests"
 ada_validation_filter="$ada_validation_filter|Foveated3DRenderingTests"
 ada_validation_filter="$ada_validation_filter|PixelPerfectMetalTests"
-ada_validation_filter="${ADAENGINE_GPU_TEST_FILTER:-$ada_validation_filter}"
+ada_validation_override="${ADAENGINE_GPU_TEST_FILTER:-}"
+ada_validation_filter="${ada_validation_override:-$ada_validation_filter}"
 if [[ "${OS:-}" == "Windows_NT" ]]; then
   export ADAENGINE_SHADER_SOURCE_ROOT="$(cygpath -m "$ada_validation_root")"
   # Building the test product avoids compiling unrelated dependency command
   # plugins (JavaScriptKit's PackageToJS currently cannot compile on Windows).
   swift build "${ada_validation_build_args[@]}" --package-path "$ada_validation_package" "${ada_validation_product_args[@]}" \
     --disable-sandbox --scratch-path "$ada_validation_scratch"
+  ada_windows_test_log="$ada_validation_scratch/windows-gpu-tests.log"
   swift test -c "$ada_validation_configuration" --package-path "$ada_validation_package" --skip-build --scratch-path "$ada_validation_scratch" \
-    --no-parallel --filter "$ada_validation_filter"
+    --no-parallel --filter "$ada_validation_filter" 2>&1 | tee "$ada_windows_test_log"
+  if [[ -z "$ada_validation_override" || "$ada_validation_override" == "SAGAVulkanDeviceTests" ]]; then
+    for ada_window_test in offscreenResourcesWorkBeforePresentingToAWin32Window twoWindowsPresentAndTheFirstSurfaceCanBeRecreated; do
+      if ! grep -Fq "Test $ada_window_test() passed" "$ada_windows_test_log"; then
+        printf 'Windows GPU validation did not report a pass for %s. See %s\n' "$ada_window_test" "$ada_windows_test_log" >&2
+        exit 1
+      fi
+    done
+  fi
 else
   swift test "${ada_validation_build_args[@]}" --package-path "$ada_validation_package" --disable-sandbox --scratch-path "$ada_validation_scratch" \
     --no-parallel --filter "$ada_validation_filter"

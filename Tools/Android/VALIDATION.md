@@ -31,6 +31,20 @@ test deadline. Two runs with bounded presentation recovered the same frame at
 the six-second sample after both Home and Back. The next screenshot in each
 run confirmed the same sphere pixel count.
 
+## Published SAGA pin `e308bcd`
+
+- SwiftPM resolved `e308bcd2b58d91d91f266d6565fbb84b16e6467e` from GitHub while
+  building the ARM64 smoke APK with Swift 6.4.0 and NDK 28.2.13676358.
+- Signature and 16 KiB ZIP alignment checks passed. The APK contained 42 WESL
+  files and 16 WGSL files, with zero legacy shader files. Its link list included
+  `SAGAVulkan`.
+- On a Pixel 9a ARM64 emulator with SwiftShader, the scene presented 44,004
+  green sphere pixels at 480×720 on cold start and again after Home and Back.
+  The complete frame returned by the seven-second sample after each resume.
+  GPU readback confirmed one indirect draw with one visible instance.
+- The Waydroid Android 13 guest advertised Vulkan features but enumerated zero
+  Vulkan devices. Physical Android GPUs and x86_64 still need runtime validation.
+
 ## Historical WebGPU run — 2026-10-04
 
 - Swift 6.4.0 and matching official Android SDK; NDK r28c; Android SDK 36.

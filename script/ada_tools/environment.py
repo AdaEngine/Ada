@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 import re
 import sys
-import tempfile
 
 from .context import PIN, ToolError, download, extract_tar, extract_zip
 
@@ -270,8 +269,6 @@ def wsl(ctx, arguments):
         if not saga.startswith("/"):
             saga = ctx.run(["wsl.exe", "--exec", "wslpath", "-a", "-u", saga], capture=True) or saga
         variables.append(f"ADAENGINE_SAGA_PACKAGE_PATH={saga}")
-    if "ADAENGINE_SAGA_WEB_DEVICE_LIMIT" in ctx.env:
-        variables.append(f"ADAENGINE_SAGA_WEB_DEVICE_LIMIT={ctx.env['ADAENGINE_SAGA_WEB_DEVICE_LIMIT']}")
     environment = ["env", *variables] if variables else []
     return ctx.run(["wsl.exe", "--cd", root, "--exec", *environment, "python3", root + "/ada_tool.py", *arguments])
 
