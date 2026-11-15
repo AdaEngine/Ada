@@ -80,6 +80,7 @@
             guard window(for: windowId) == nil else { throw SetupError.windowAlreadyRegistered }
             let target: VulkanSurfaceTarget
             let lifetime: (any Sendable)?
+            let waitsForPresentation: Bool
             #if os(Windows)
                 guard let nativeSurface = surface as? WindowsSurface else { throw SetupError.unsupportedWindow }
                 target = unsafe .win32(
@@ -87,14 +88,17 @@
                     hwnd: UInt(bitPattern: nativeSurface.windowHwnd)
                 )
                 lifetime = nil
+                waitsForPresentation = false
             #elseif os(Linux)
                 guard let nativeSurface = surface as? LinuxXlibRenderSurface else { throw SetupError.unsupportedWindow }
                 target = unsafe .xlib(display: UInt(bitPattern: nativeSurface.xlibDisplay), window: UInt(nativeSurface.xlibWindow))
                 lifetime = nativeSurface.xlibWindowLifetime
+                waitsForPresentation = false
             #elseif os(Android)
                 guard let nativeSurface = surface as? AndroidNativeWindowRenderSurface else { throw SetupError.unsupportedWindow }
                 target = unsafe .android(window: UInt(bitPattern: nativeSurface.nativeWindow))
                 lifetime = nativeSurface.nativeWindowLifetime
+                waitsForPresentation = true
             #endif
             let window = SAGAWindow(
                 context: context,
@@ -102,7 +106,8 @@
                 size: size,
                 scaleFactor: surface.scaleFactor,
                 pixelFormat: surface.prefferedPixelFormat,
-                surfaceID: nil
+                surfaceID: nil,
+                waitsForPresentation: waitsForPresentation
             )
             let vulkan = self.vulkan
             let surfaceSlot = window.surface

@@ -19,27 +19,19 @@ git clone https://github.com/AdaEngine/AdaEngine.git
 cd AdaEngine
 ```
 
-2. WebGPU (first build). If you plan to use WebGPU, run the tint build plugin once (this executes `Plugins/WebGPUTintPlugin/WebGPUTintPlugin.swift`):
-
-```bash
-swift package plugin build-tint
-```
-
-This command downloads the Dawn/Tint sources from GitHub and builds the `tint` binary. SwiftPM will ask to allow network access for the plugin. Confirm the prompt to proceed.
-
-3. Open `Package.swift` in Xcode 26.3, or build from the command line:
+2. Open `Package.swift` in Xcode 26.3, or build from the command line. SwiftPM resolves the pinned SAGA package for rendering.
 
 ```bash
 swift build
 ```
 
-4. Run tests:
+3. Run tests:
 
 ```bash
 swift test --parallel
 ```
 
-5. (Optional) Run SwiftLint if you have it installed locally:
+4. (Optional) Run SwiftLint if you have it installed locally:
 
 ```bash
 swiftlint --config .swiftlint.yml
@@ -80,14 +72,6 @@ let package = Package(
 ```
 
 Replace `X.Y.Z` with the latest release tag.
-
-If your app enables WebGPU, run the tint build plugin once in the Ada package directory before the first build:
-
-```bash
-swift package plugin build-tint
-```
-
-SwiftPM will ask to allow network access for the plugin. Confirm the prompt to let it download the Dawn/Tint sources.
 
 ## Exporting a Web app
 

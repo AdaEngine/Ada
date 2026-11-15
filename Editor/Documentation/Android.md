@@ -1,7 +1,7 @@
 # Android export and run
 
 Android builds are available in **standalone Ada Studio on macOS and Windows**. Projects run
-as native Swift applications using Swan/Dawn WebGPU over Vulkan, with Android
+as native Swift applications using SAGA Vulkan, with Android
 NativeActivity and Swift Concurrency. Android API 29 or newer is required.
 
 ## Setup
@@ -10,11 +10,10 @@ On Windows, install the native Android SDK with platform-tools and emulator
 (Android Studio provides these), enable WSL with Ubuntu, then run
 `./script/setup_windows_build_tools.ps1 -AndroidOnly` from the engine root.
 The worker prepares Linux Swift 6.4, the matching Android Swift SDK, NDK r28c,
-JDK 17 and pinned Swan/Dawn for ARM64 and x86_64. Existing Android SDK licenses
+and JDK 17 for ARM64 and x86_64. Existing Android SDK licenses
 are copied from the Windows SDK. The Windows SDK setting selects native
 adb/emulator; compilation uses the managed Linux tools. APKs are written back
-to the project's export folder. Use a Vulkan-capable emulator GPU; the API 35
-SwiftShader image does not satisfy Dawn's core uniform-buffer limits.
+to the project's export folder. Use an emulator with Vulkan support.
 
 For an API 35 x86_64 image installed through Android Studio,
 `./script/create_windows_android_emulator.ps1` creates the optional
@@ -27,17 +26,15 @@ Open **Settings → Build & Export → Android** and configure:
 - JDK home (Android Studio's bundled JDK is detected automatically), and optionally a Gradle executable for external tooling.
 - Android build-tools version, if different from the default 36.0.0.
 - Swift 6.4 executable and the matching official Swift SDK for Android.
-- Swan package and its Android Dawn artifact path, relative to Swan.
+- Optional path to a local SAGA checkout. An empty field selects the published revision through SwiftPM.
 
 Use **Browse…** to choose paths, then **Save Build Settings**. Settings apply to this
 computer across all projects. The built-in APK exporter uses Android tools directly
 and does not require Gradle. The neighboring platform pages configure Web and native
 host tools and identify export paths that Studio does not yet provide.
 
-Standalone builds can bundle Swan and its artifact in the Studio build SDK using
-`stage-build-sdk.py --swan-root /path/to/swan`. Swift and the Android SDK/NDK stay
-external. See [engine Android setup](../../Tools/Android/README.md) for SDK setup
-and `Dawn/build_android.py` for building the required ARM64 or x86_64 variant.
+Swift and the Android SDK/NDK stay external to the Studio build SDK. See
+[engine Android setup](../../Tools/Android/README.md) for installing those tools.
 
 Create an AVD in Android Studio to use an emulator. For a physical device, enable
 USB debugging, connect it, and authorize the computer on the device.
@@ -58,7 +55,7 @@ output appear in Studio's existing Build Output/activity panels.
 
 **Build → Export to Android…** writes `Exports/Android/android/<product>-debug.apk`.
 The default export is ARM64. Run automatically selects ARM64 or x86_64 for the
-chosen destination; the Dawn artifact must include that ABI.
+chosen destination.
 
 AdaScript uses the existing AOT compiler, metadata validation, scene conversion
 and asset staging. Disabled AdaScript view entry points remain unavailable.
@@ -105,13 +102,13 @@ adastudio export --project /path/to/game --target android --emulator Pixel_9
 ```
 
 Swift projects can select `--product Game`. Tool overrides include `--swift`,
-`--swift-sdk`, `--swift-sdks`, `--android-sdk`, `--ndk`, `--swan`, and `--dawn`.
+`--swift-sdk`, `--swift-sdks`, `--android-sdk`, `--ndk` and `--saga`.
 `--abi arm64-v8a|x86_64|all` controls export-only builds. Release optimization still
 uses development signing. `--format json` returns the APK path and diagnostics.
 
 ## Validation boundary
 
-Swift and AdaScript exports were compiled, signature/alignment checked, installed
-and launched on an ARM64 Android emulator. Real Studio toolbar selection, export,
-run/stop and AVD boot are checked separately from CLI/service tests. Physical
-hardware and x86_64 execution require their own runtime checks.
+Earlier Swift and AdaScript export checks covered compilation, signing, alignment,
+installation and launch on an ARM64 emulator. Check Vulkan rendering and surface
+recreation on the intended device or emulator. Studio toolbar selection,
+export, run/stop and AVD boot have separate checks from CLI/service tests.

@@ -31,7 +31,7 @@ extension Render3DGPUTests {
     @Suite("Skybox display independent of IBL lighting")
     @MainActor
     struct SkyboxIBLDisplay {
-        @Test(.enabled(if: GoldenFrame.activeBackend == .metal))
+        @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
         func displayFlagChangesSkyAndPreservesPBRLighting() async throws {
             let scene = try await DebugViews.makeScene()
             for entity in scene.app.main.getEntities() where entity.id != scene.camera.id && entity.id != scene.sun.id {

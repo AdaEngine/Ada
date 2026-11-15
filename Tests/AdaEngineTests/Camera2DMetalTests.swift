@@ -131,10 +131,10 @@ struct Camera2DMetalTests {
 
     private func setupMetal() throws {
         if unsafe RenderEngine.shared == nil {
-            unsafe RenderEngine.configurations.preferredBackend = .metal
+            unsafe RenderEngine.configurations.preferredBackend = .saga
             try RenderEngine.setupRenderEngine()
         }
-        try #require(unsafe RenderEngine.shared.type == .metal, "Metal must be active; a headless fallback proves nothing.")
+        try #require(unsafe RenderEngine.shared.type == .saga, "SAGA Metal must be active; a headless fallback proves nothing.")
         Sprite.registerComponent()
         Transform.registerComponent()
         GlobalTransform.registerComponent()

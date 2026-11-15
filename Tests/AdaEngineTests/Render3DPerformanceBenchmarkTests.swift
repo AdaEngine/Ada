@@ -8,9 +8,6 @@ import AdaTransform
 import AdaUtils
 import Foundation
 import Math
-#if canImport(Metal)
-import Metal
-#endif
 import Testing
 
 @testable import AdaCorePipelines
@@ -49,14 +46,10 @@ extension Render3DGPUTests {
 
         /// A grid of spheres with eight materials, a ground, a sun with cascaded shadows and a ring of local lights.
         private static func makeScene(size: SizeInt, temporalScale: Float?, localLights: Bool, manyLights: Int = 0) async throws -> Render3DGPUTests.DebugViews.Scene {
-            let backend: RenderBackendType = GoldenFrame.activeBackend == .saga ? .saga : .metal
-            unsafe RenderEngine.configurations.preferredBackend = backend
+            unsafe RenderEngine.configurations.preferredBackend = .saga
             try RenderEngine.setupRenderEngine()
-            try #require(unsafe RenderEngine.shared.type == backend)
+            try #require(unsafe RenderEngine.shared.type == .saga)
             let device = unsafe RenderEngine.shared.renderDevice
-            #if canImport(Metal)
-            let queue = backend == .metal ? try #require(MetalInterop.commandQueue(for: device)) : nil
-            #endif
             let app = AppWorlds(main: World())
             app.insertResource(OffscreenRenderWorld())
                 .insertResource(PrimaryWindowId(windowId: RID()))
@@ -79,7 +72,7 @@ extension Render3DGPUTests {
             var camera = Camera(renderTarget: target)
             camera.backgroundColor = Color(red: 0.55, green: 0.7, blue: 0.9)
             if let temporalScale {
-                camera.temporalUpscaling = TemporalUpscalingSettings(renderScale: temporalScale)
+                camera.temporalUpscaling = TemporalUpscalingSettings(renderScale: temporalScale, method: .portable)
             }
             let cameraEntity = app.main.spawn(
                 "Camera",
@@ -135,11 +128,7 @@ extension Render3DGPUTests {
                     }
                 }
             }
-            #if canImport(Metal)
-            return Render3DGPUTests.DebugViews.Scene(app: app, device: device, target: target, queue: queue, camera: cameraEntity, sun: sunEntity)
-            #else
             return Render3DGPUTests.DebugViews.Scene(app: app, device: device, target: target, camera: cameraEntity, sun: sunEntity)
-            #endif
         }
 
         /// Created on first use, after the renderer exists.
@@ -207,7 +196,7 @@ extension Render3DGPUTests {
                     $0.postProcess.vignette.intensity = 0.4
                     $0.postProcess.colorGrading.lut = Self.lut
                 },
-                Configuration(name: "temporal 0.75", detail: "bare with MetalFX at 75% render scale", apply: bare, temporalScale: 0.75),
+                Configuration(name: "temporal 0.75", detail: "bare with portable temporal upscaling at 75% render scale", apply: bare, temporalScale: 0.75),
             ]
         }
 
@@ -248,6 +237,10 @@ extension Render3DGPUTests {
             let freeElapsed = freeStart.duration(to: .now)
             let freeSeconds = Double(freeElapsed.components.seconds) + Double(freeElapsed.components.attoseconds) / 1e18
             try #require(image.width == size.width, "The benchmark scene must render.")
+            if configuration.temporalScale != nil {
+                let statistics = try #require(renderWorld.getResource(Render3DTemporalStatistics.self))
+                try #require(statistics.snapshots.values.contains { $0.encodedFrames > 0 && $0.inputWidth < $0.outputWidth })
+            }
             return Result(
                 configuration: configuration,
                 samples: measured.samples,
@@ -265,7 +258,7 @@ extension Render3DGPUTests {
             func cell(_ value: Double?) -> String { value.map { String(format: "%.2f", $0) } ?? "-" }
             var lines = [
                 "Scene: \(grid * grid) PBR spheres (8 materials), ground, sun with 3 cascades, 6 point and 2 spot lights, \(size.width)x\(size.height), \(frames) measured frames, best of \(rounds) rounds.",
-                (GoldenFrame.activeBackend == .metal ? "Pass times are GPU milliseconds with passes serialized; `sum` adds the pass averages and `wall` is time per frame including those waits, and `free` is time per frame with nothing serialized (the sustained rate)." : "WebGPU has no per-pass GPU timestamps here. `wall` and `free` are CPU + GPU frame wall time; `free` includes a final readback. The GPU pass/sum columns are unavailable."),
+                "SAGA reports frame wall time for CPU and GPU work. The free-running measurement includes final readback. Per-pass GPU timestamps are unavailable.",
                 "",
                 "| configuration | " + columns.joined(separator: " | ") + " | sum | wall | free |",
                 "| --- | " + columns.map { _ in "---:" }.joined(separator: " | ") + " | ---: | ---: | ---: |",
@@ -304,8 +297,7 @@ extension Render3DGPUTests {
             // ADAENGINE_PERF_FILTER="bare,ssr" keeps only configurations whose name contains one of the words.
             let words = (ProcessInfo.processInfo.environment["ADAENGINE_PERF_FILTER"] ?? "").split(separator: ",").map(String.init)
             let configurations = Self.configurations().filter { configuration in
-                (words.isEmpty || words.contains { configuration.name.contains($0) })
-                    && (GoldenFrame.activeBackend == .metal || configuration.temporalScale == nil)
+                words.isEmpty || words.contains { configuration.name.contains($0) }
             }
             try #require(!configurations.isEmpty, "No requested benchmark configuration is supported by this backend.")
             var collected = [[Result]](repeating: [], count: configurations.count)
@@ -319,9 +311,6 @@ extension Render3DGPUTests {
             print("PERF REPORT\n" + report)
             if let path = ProcessInfo.processInfo.environment["ADAENGINE_PERF_OUTPUT"] {
                 try report.write(toFile: path, atomically: true, encoding: .utf8)
-            }
-            if GoldenFrame.activeBackend == .metal {
-                #expect(results.allSatisfy { !$0.samples.isEmpty }, "Every configuration must record GPU pass timings.")
             }
             #expect(results.allSatisfy { $0.frameMilliseconds > 0 && $0.freeRunningMilliseconds > 0 })
         }

@@ -27,6 +27,7 @@ struct EditorAdaScriptNativeExportTests {
         project.runtime.entry.scene = "Scene.ascn"
         try "class Helper { func value() { return 42; } }".write(to: root.appendingPathComponent("Sources/Helper.ada"), atomically: true, encoding: .utf8)
         try """
+        import { Helper } from "./Helper";
         func main() { return Helper().value(); }
         @system class ExportSystem {
             var started = false;
@@ -46,6 +47,10 @@ struct EditorAdaScriptNativeExportTests {
                 EditorAnimationKeyframe(time: 0, value: 0, curveToNext: .cubicInOut), EditorAnimationKeyframe(time: 1, value: 10)
             ])])]
         try model.encodedYAML().write(to: root.appendingPathComponent("Assets/Scene.ascn"), atomically: true, encoding: .utf8)
+        let modernShader = "@fragment fn main() -> @location(0) vec4f { return vec4f(1); }"
+        for name in ["material.wesl", "material.frag.wgsl"] {
+            try modernShader.write(to: root.appendingPathComponent("Assets/\(name)"), atomically: true, encoding: .utf8)
+        }
         var options = EditorAdaScriptNativeExportOptions(
             destination: ProcessInfo.processInfo.environment["ADA_AOT_EXPORT_WEB"] == "1" ? .web : .macOS,
             gravityRoot: gravity,
@@ -66,9 +71,14 @@ struct EditorAdaScriptNativeExportTests {
         let rebuildScript = try String(contentsOf: result.appendingPathComponent("script/build_and_run.sh"), encoding: .utf8)
         #expect(!rebuildScript.contains(engine.path))
         #expect(!rebuildScript.contains(gravity.path))
+        #expect(!rebuildScript.contains("ADAENGINE_DISABLE_SWAN"))
         let library = result.appendingPathComponent("Sources/GameplayNative/libada_game.a")
         let before = try Data(contentsOf: library)
         #expect(before.count > 100)
+        let exportedAssets = result.appendingPathComponent("Sources/AdaNativeGame/GameAssets")
+        for name in ["material.wesl", "material.frag.wgsl"] {
+            #expect(try String(contentsOf: exportedAssets.appendingPathComponent(name), encoding: .utf8) == modernShader)
+        }
         let scene = try JSONDecoder().decode(AdaScriptNativeSceneDocument.self, from: Data(contentsOf: result.appendingPathComponent("Sources/AdaNativeGame/GameAssets/Scene.ascn")))
         #expect(scene.entities.count == 1)
         let animation = try #require(scene.entities.first?.animationClips?.first)
@@ -122,6 +132,21 @@ struct EditorAdaScriptNativeExportTests {
             )
         )
         #expect(parse.succeeded, Comment(rawValue: parse.combinedOutput))
+        for (name, source) in [("legacy.FRaG", "#version 450"), ("legacy.mat", "source:\n  #pragma stage fragment")] {
+            let input = root.appendingPathComponent("Assets/\(name)")
+            try source.write(to: input, atomically: true, encoding: .utf8)
+            defer { try? FileManager.default.removeItem(at: input) }
+            do {
+                _ = try await exporter.export(project: project, at: root, to: output, options: options)
+                Issue.record("Legacy shader was accepted: \(name)")
+            } catch let error as EditorPreviewBuildFailure {
+                #expect(error.localizedDescription.contains(name))
+                #expect(error.localizedDescription.contains("WESL"))
+            }
+            #expect(try String(contentsOf: input, encoding: .utf8) == source)
+            #expect(try Data(contentsOf: library) == before)
+            #expect(!FileManager.default.fileExists(atPath: exportedAssets.appendingPathComponent(name).path))
+        }
         project.runtime.entry.view = "DisabledView"
         do {
             _ = try await exporter.export(project: project, at: root, to: output, options: options)

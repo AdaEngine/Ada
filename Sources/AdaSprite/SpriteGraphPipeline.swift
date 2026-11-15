@@ -1,4 +1,5 @@
-import AdaRender
+import AdaAssets
+@_spi(Internal) import AdaRender
 import AdaUtils
 import Foundation
 
@@ -9,11 +10,11 @@ public enum SpriteGraphPipeline {
         }
         let variant = instanced ? "sprite-instanced" : "sprite-expanded"
         let name = instanced ? "sprite_instanced" : "sprite"
-        #if WASM
-            // A WebAssembly build links no shaders: it uses the fragment AdaShaderGraphBaker linked from the WESL template.
+        #if SAGA_WEBGPU
+            // Web exports load the baked fragment for this template and graph.
             return try material.weslPipeline(base: base.descriptor, device: device, variant: variant, templateName: name) { "" }
         #else
-            // The native renderer links the WESL templates at runtime.
+            // Other WESL profiles link the templates at runtime.
             if ShaderModule.supportsBundledWESL {
                 return try material.weslPipeline(
                     base: base.descriptor, device: device, variant: variant,
@@ -23,9 +24,7 @@ public enum SpriteGraphPipeline {
                     try weslTemplate(instanced: instanced)
                 }
             }
-            return try material.pipeline(base: base.descriptor, device: device, variant: variant) {
-                try fragmentTemplate(instanced: instanced)
-            }
+                throw ShaderGraphDiagnostic(code: .invalidReference, nodeID: name)
         #endif
     }
 
@@ -45,13 +44,4 @@ public enum SpriteGraphPipeline {
         return source
     }
 
-    /// The production sprite fragment used by offline graph export.
-    public static func fragmentTemplate(instanced: Bool) throws -> String {
-        let path = instanced ? "Assets/sprite_instanced.glsl" : "Assets/sprite.glsl"
-        guard let url = Bundle.adaModule.resourceURL?.appendingPathComponent(path),
-            let fragment = try ShaderSource(from: url).getSource(for: .fragment) else {
-            throw ShaderGraphDiagnostic(code: .invalidReference, nodeID: path)
-        }
-        return fragment
-    }
 }

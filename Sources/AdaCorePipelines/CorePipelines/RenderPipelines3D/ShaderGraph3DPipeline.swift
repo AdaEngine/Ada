@@ -1,4 +1,5 @@
-import AdaRender
+import AdaAssets
+@_spi(Internal) import AdaRender
 import AdaUtils
 import Foundation
 
@@ -44,13 +45,13 @@ public enum ShaderGraph3DPipeline {
         }
         let name = URL(fileURLWithPath: template).deletingPathExtension().lastPathComponent
         let macros = features.enablingMacros.map { ShaderDefine.define($0) }
-        #if WASM
-            // A WebAssembly build links no shaders: it uses the fragment AdaShaderGraphBaker linked from the WESL template.
+        #if SAGA_WEBGPU
+            // Web exports load the baked fragment for this template and graph.
             return try material.weslPipeline(base: base.descriptor, device: device, variant: variant, defines: macros, templateName: name) {
                 ""
             }
         #else
-            // WESL templates take the graph as WGSL and link at runtime; GLSL templates keep the GLSL form.
+            // Native builds link the WESL template with the graph's WGSL at runtime.
             if template.hasSuffix(".wesl") {
                 return try material.weslPipeline(
                     base: base.descriptor, device: device, variant: variant, defines: macros,
@@ -60,9 +61,7 @@ public enum ShaderGraph3DPipeline {
                     try weslTemplate(path: template)
                 }
             }
-            return try material.pipeline(base: base.descriptor, device: device, variant: variant, defines: macros) {
-                try fragmentTemplate(path: template)
-            }
+            throw ShaderGraphDiagnostic(code: .invalidReference, nodeID: template)
         #endif
     }
 
@@ -71,9 +70,9 @@ public enum ShaderGraph3DPipeline {
         Bundle.adaModule.resourceURL?.appendingPathComponent("Shaders", isDirectory: true) ?? URL(fileURLWithPath: "/")
     }
 
-    /// A surface template in the language the active renderer links: WESL where it is supported, GLSL otherwise.
+    /// The bundled WESL template for a surface pipeline.
     public static func surfaceTemplatePath(_ name: String) -> String {
-        Flat3DPipeline.shaderPath.hasSuffix(".wesl") ? "Shaders/\(name).wesl" : "Shaders/\(name).glsl"
+        "Shaders/\(name).wesl"
     }
 
     /// The WESL source of a surface template; its `// ADA_GRAPH_SOURCE_MARKER` line receives the graph's WGSL.
@@ -86,12 +85,4 @@ public enum ShaderGraph3DPipeline {
         return source
     }
 
-    /// The production surface/silhouette fragment used by offline graph export.
-    public static func fragmentTemplate(path: String = "Shaders/flat3d.glsl") throws -> String {
-        guard let url = Bundle.adaModule.resourceURL?.appendingPathComponent(path),
-            let fragment = try ShaderSource(from: url).getSource(for: .fragment) else {
-            throw ShaderGraphDiagnostic(code: .invalidReference, nodeID: path)
-        }
-        return fragment
-    }
 }

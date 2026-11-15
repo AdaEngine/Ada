@@ -90,7 +90,7 @@ extension Render3DGPUTests {
 
             init(device: RenderDevice) throws {
                 self.device = device
-                let shader = try CorePipelineShaders.loadBundled(at: "Shaders/local_volumetric_fog_3d.glsl")
+                let shader = CorePipelineShaders.loadRequiredBuiltin("local_volumetric_fog_3d")
                 pipeline = device.createRenderPipeline(from: RenderPipelineDescriptor(
                     vertex: try #require(shader.asset.getShader(for: .vertex)),
                     fragment: shader.asset.getShader(for: .fragment), debugName: "Planar fog integral regression",

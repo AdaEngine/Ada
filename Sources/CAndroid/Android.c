@@ -109,7 +109,7 @@ static void on_window_created(ANativeActivity *a, ANativeWindow *window) {
     native_window=window; ANativeWindow_acquire(native_window);
     width=ANativeWindow_getWidth(window); height=ANativeWindow_getHeight(window);
     pthread_mutex_unlock(&window_lock);
-    ada_android_log("Android native window ready for WebGPU");
+    ada_android_log("Android native window ready");
     ada_android_surface_changed(width,height,scale);
     if (!started && native_window != NULL) { started=true; ada_android_start(); }
     ada_android_state(resumed ? 1 : 0);

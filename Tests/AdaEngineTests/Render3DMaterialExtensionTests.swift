@@ -133,7 +133,7 @@ struct Render3DMaterialExtensionConstantTests {
 }
 
 extension Render3DGPUTests {
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/MaterialExtensions`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DGPUTests/MaterialExtensions`.
     @Suite("3D material extensions on GPU")
     @MainActor
     struct MaterialExtensions {
@@ -228,6 +228,8 @@ extension Render3DGPUTests {
         @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
         func aHigherIORBrightensTheHighlightAndZeroSpecularRemovesIt() async throws {
             let (scene, material) = try await Self.makeScene { _ in }
+            // Leave room for both highlights in the 8-bit presented frame.
+            try scene.configure { $0.postProcess.exposureEV = -4 }
             let standard = Self.peakHighlight(try await scene.render(.none))
             material.ior = 3
             let strong = Self.peakHighlight(try await scene.render(.none))
@@ -235,6 +237,7 @@ extension Render3DGPUTests {
             material.specularFactor = 0
             let none = Self.peakHighlight(try await scene.render(.none))
             func total(_ color: Color) -> Float { color.red + color.green + color.blue }
+            try #require(total(strong) < 3, "The test exposure must keep the strongest highlight below white.")
             #expect(total(strong) > total(standard), "An IOR of 3 reflects more than 1.5 (\\(total(strong)) vs \\(total(standard))).")
             #expect(total(none) < total(standard), "No specular strength must dim the highlight (\\(total(none)) vs \\(total(standard))).")
         }

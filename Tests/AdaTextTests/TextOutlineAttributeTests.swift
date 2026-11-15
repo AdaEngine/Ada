@@ -1,7 +1,10 @@
-import AdaUtils
-import Foundation
-import Testing
+@testable import AdaRender
 @testable import AdaText
+import AdaUtils
+import AdaWGSLCompiler
+import Foundation
+import SAGAShaderIR
+import Testing
 
 struct TextOutlineAttributeTests {
 
@@ -38,17 +41,18 @@ struct TextOutlineAttributeTests {
 
     @Test
     func textShader_usesExplicitVaryingLocationsForMetalCompatibility() throws {
-        let shaderURL = Bundle.module.url(forResource: "text", withExtension: "glsl", subdirectory: "Assets")
-        let shader = try #require(shaderURL.map { try String(contentsOf: $0, encoding: .utf8) })
-
-        #expect(shader.contains("layout (location = 0) out vec4 v_ForegroundColor;"))
-        #expect(shader.contains("layout (location = 1) out vec4 v_OutlineColor;"))
-        #expect(shader.contains("layout (location = 2) out float v_OutlineWidth;"))
-        #expect(shader.contains("layout (location = 3) out vec2 v_TexCoordinate;"))
-        #expect(shader.contains("layout (location = 0) in vec4 v_ForegroundColor;"))
-        #expect(shader.contains("layout (location = 1) in vec4 v_OutlineColor;"))
-        #expect(shader.contains("layout (location = 2) in float v_OutlineWidth;"))
-        #expect(shader.contains("layout (location = 3) in vec2 v_TexCoordinate;"))
+        let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let artifact = try ShaderModule.linkWESL(from: repository.appendingPathComponent("Sources/AdaText/Assets/text.wesl"))
+        let stages = try WESLBackendCompiler.compile(artifact, to: .msl)
+        let vertex = try #require(stages.first { $0.stage == "vertex" })
+        let fragment = try #require(stages.first { $0.stage == "fragment" })
+        guard case let .render(vertexLayout) = vertex.reflection, case let .render(fragmentLayout) = fragment.reflection else {
+            Issue.record("Text vertex and fragment stages must reflect their varyings")
+            return
+        }
+        #expect(vertexLayout.varyings.map(\.location) == [0, 1, 2, 3])
+        #expect(vertexLayout.varyings.map(\.componentCount) == [4, 4, 1, 2])
+        #expect(vertexLayout.varyings == fragmentLayout.varyings)
     }
 
     @Test

@@ -62,7 +62,9 @@ export LD_LIBRARY_PATH="$root/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export ADA_STUDIO_SDK="$root/BuildSDK"
 export ADAENGINE_PACKAGE_PATH="$root/BuildSDK/AdaEngine"
 export ADAENGINE_GRAVITY_PACKAGE_PATH="$root/BuildSDK/AdaScript"
-if [[ -f "$root/BuildSDK/SAGA/Package.swift" ]]; then export ADAENGINE_SAGA_PACKAGE_PATH="$root/BuildSDK/SAGA"; fi
+if [[ -z "${ADAENGINE_SAGA_PACKAGE_PATH:-}" && -f "$root/BuildSDK/SAGA/Package.swift" ]]; then
+  export ADAENGINE_SAGA_PACKAGE_PATH="$root/BuildSDK/SAGA"
+fi
 export ADAENGINE_SKIP_SWIFTLINT=1
 exec "$root/AdaEditor" "$@"
 ''', encoding="utf-8")

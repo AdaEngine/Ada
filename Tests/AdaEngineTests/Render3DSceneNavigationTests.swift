@@ -35,11 +35,11 @@ extension Render3DGPUTests {
             return scene
         }
 
-        @Test(.enabled(if: GoldenFrame.activeBackend == .metal))
+        @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
         func replacingAndReloading3DCamerasKeepsCompletingNewFrames() async throws {
-            unsafe RenderEngine.configurations.preferredBackend = .metal
+            unsafe RenderEngine.configurations.preferredBackend = .saga
             try RenderEngine.setupRenderEngine()
-            try #require(unsafe RenderEngine.shared.type == .metal)
+            try #require(unsafe RenderEngine.shared.type == .saga)
             let device = unsafe RenderEngine.shared.renderDevice
             let runtime = OffscreenSceneRuntime(label: "navigation-\(UUID())", size: [96, 96], useSceneCameras: true) { app in
                 app.addPlugin(TransformPlugin()).addPlugin(RenderWorldPlugin()).addPlugin(CameraPlugin())

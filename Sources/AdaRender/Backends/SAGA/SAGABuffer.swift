@@ -23,12 +23,14 @@
     public class SAGABuffer: Buffer, @unchecked Sendable {
         let context: SAGAContext
         let slot: ResourceSlot<ResourceID>
+        let usage: BufferUsage
         public let length: Int
         public var label: String?
         @unsafe private let shadow: UnsafeMutableRawPointer
 
         init(context: SAGAContext, label: String?, length: Int, usage: BufferUsage) {
             self.context = context
+            self.usage = usage
             self.label = label
             self.length = length
             unsafe self.shadow = UnsafeMutableRawPointer.allocate(byteCount: max(length, 1), alignment: 16)

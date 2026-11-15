@@ -169,8 +169,14 @@ enum EditorCLI {
                 if invocation.options["target"] == "android" {
                     let sdk = try EditorBuildSDK.locate(override: invocation.options["sdk"])
                     var configuration = EditorAndroidConfiguration.load(engineRoot: sdk.engineRoot)
-                    for (option, key) in [("swift", "SWIFT_ANDROID_SWIFT"), ("swift-sdk", "SWIFT_ANDROID_SDK"), ("android-sdk", "ANDROID_HOME"),
-                                          ("ndk", "ANDROID_NDK_HOME"), ("swift-sdks", "SWIFT_ANDROID_SDKS_PATH"), ("swan", "ADAENGINE_SWAN_PACKAGE_PATH"), ("dawn", "SWAN_LOCAL_DAWN")] {
+                    for (option, key) in [
+                        ("swift", "SWIFT_ANDROID_SWIFT"),
+                        ("swift-sdk", "SWIFT_ANDROID_SDK"),
+                        ("android-sdk", "ANDROID_HOME"),
+                        ("ndk", "ANDROID_NDK_HOME"),
+                        ("swift-sdks", "SWIFT_ANDROID_SDKS_PATH"),
+                        ("saga", "ADAENGINE_SAGA_PACKAGE_PATH"),
+                    ] {
                         if let value = invocation.options[option] { configuration.environment[key] = value }
                     }
                     try configuration.validateBuildTools(engineRoot: sdk.engineRoot)

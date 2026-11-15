@@ -48,7 +48,7 @@ public final class ShaderModule: Asset, @unchecked Sendable {
         return Array(self.shaders.keys)
     }
 
-    /// Set a macro for a shader stage.
+    /// Sets a macro for a legacy shader stage. Select WESL features when creating the module.
     ///
     /// - Parameters:
     ///   - name: The name of the macro.
@@ -89,8 +89,11 @@ public final class ShaderModule: Asset, @unchecked Sendable {
 extension ShaderModule {
     /// Whether the active renderer can load bundled WESL shader modules.
     public static var supportsBundledWESL: Bool {
-        #if (WASM && WEBGPU_ENABLED) || (SAGA_RENDER && canImport(AdaWGSLCompiler))
-            return unsafe RenderEngine.shared.type.consumesWGSL
+        #if SAGA_WEBGPU || (canImport(AdaWGSLCompiler))
+            guard let backend = unsafe RenderEngine.shared?.type else {
+                return false
+            }
+            return backend.consumesWGSL || backend == .headless
         #else
             return false
         #endif
@@ -101,83 +104,47 @@ extension ShaderModule {
     /// - Parameter fileUrl: The file url to create the shader module from.
     /// - Returns: The shader module.
     public static func create(from fileUrl: URL) throws -> ShaderModule {
-        #if canImport(AdaWGSLCompiler) && SAGA_RENDER && !WASM
-            if fileUrl.pathExtension.lowercased() == "wesl" {
-                return try createWESL(from: fileUrl)
+        #if SAGA_WEBGPU
+            try requireWESLInput(fileUrl)
+            guard let module = try createWGSLModuleIfAvailable(at: fileUrl) else {
+                throw ShaderModuleError.notFound(fileUrl.path + ".{vert,frag}.wgsl")
             }
+            return module
+        #else
+            try requireWESLInput(fileUrl)
+            return try createWESL(from: fileUrl)
         #endif
-        #if WASM && WEBGPU_ENABLED
-            if fileUrl.pathExtension.lowercased() == "wesl" {
-                guard let module = try createWGSLModuleIfAvailable(at: fileUrl, reflectActiveBindings: true) else {
-                    throw ShaderModuleError.notFound(fileUrl.path + ".{vert,frag}.wgsl")
-                }
-                return module
-            }
-        #endif
-        return try ShaderCompiler(from: fileUrl).compileShaderModule()
     }
 
     /// Compile a bundled shader with every name in `defines` set to `1` in the vertex and fragment stages.
     ///
     /// The variant is compiled from the file's text rather than the file, so it bypasses the on-disk shader cache, whose
     /// entries are keyed by file and stage and would mix up variants of one file. Callers should keep the result.
-    /// WebAssembly loads shipped variants for terrain and wireframe, and uses the plain module for other optional features.
+    /// Web exports load shipped WGSL variants for WESL modules.
     public static func createBundled(at path: String, from bundle: Bundle, defines: [String]) throws -> ShaderModule {
         guard !defines.isEmpty else {
             return try loadBundled(at: path, from: bundle).asset
         }
-        if path.hasSuffix(".wesl") {
+        if (path as NSString).pathExtension.lowercased() == "wesl" {
             guard let resourceURL = bundle.resourceURL else {
                 throw ShaderModuleError.notFound(path)
             }
             let url = resourceURL.appendingPathComponent(path)
             let names = Set(defines).sorted()
-            #if WASM && WEBGPU_ENABLED
+            #if SAGA_WEBGPU
                 let baseURL = url.appendingPathExtension(names.joined(separator: "."))
-                guard let module = try createWGSLModuleIfAvailable(at: baseURL, reflectActiveBindings: true) else {
+                guard let module = try createWGSLModuleIfAvailable(at: baseURL) else {
                     throw ShaderModuleError.notFound(baseURL.path)
                 }
                 return module
-            #elseif canImport(AdaWGSLCompiler) && SAGA_RENDER
+            #elseif canImport(AdaWGSLCompiler)
                 let features = Dictionary(uniqueKeysWithValues: names.map { ($0, true) })
                 return try createWESL(from: url, features: features)
             #else
                 throw ShaderModuleError.notFound(path)
             #endif
         }
-        #if WASM
-            #if WEBGPU_ENABLED
-                if path == "Shaders/flat3d.glsl" {
-                    let variants = Set(defines).intersection(["ADA_TERRAIN", "ADA_WIREFRAME"]).sorted()
-                    if !variants.isEmpty, let resourceURL = bundle.resourceURL {
-                        let url = resourceURL.appendingPathComponent(path)
-                        let baseURL = url.deletingPathExtension().appendingPathExtension(variants.joined(separator: "."))
-                        guard let module = try createWGSLModuleIfAvailable(at: baseURL) else { throw ShaderModuleError.notFound(baseURL.path) }
-                        return module
-                    }
-                }
-            #endif
             return try loadBundled(at: path, from: bundle).asset
-        #else
-            guard let resourceURL = bundle.resourceURL else {
-                throw ShaderModuleError.notFound(path)
-            }
-            let url = resourceURL.appendingPathComponent(path)
-            guard let data = FileSystem.current.readFile(at: url) else {
-                throw ShaderModuleError.notFound(path)
-            }
-            let source = try ShaderSource(
-                source: String(bytes: data, encoding: .utf8) ?? "",
-                includeSearchPaths: [.local(url.deletingLastPathComponent())]
-            )
-            let compiler = ShaderCompiler(shaderSource: source)
-            for name in defines {
-                for stage in [ShaderStage.vertex, .fragment] {
-                    compiler.setMacro(name, value: "1", for: stage)
-                }
-            }
-            return try compiler.compileShaderModule()
-        #endif
     }
 
     /// Load a bundled shader module without the async asset pipeline.
@@ -190,15 +157,10 @@ extension ShaderModule {
         }
 
         let url = resourceURL.appendingPathComponent(path)
+        try requireWESLInput(url)
         guard FileSystem.current.itemExists(at: url) else {
             throw ShaderModuleError.notFound(path)
         }
-
-        #if WASM && WEBGPU_ENABLED
-            if path.hasSuffix(".glsl"), let wgslModule = try createWGSLModuleIfAvailable(at: url.deletingPathExtension()) {
-                return AssetHandle(wgslModule)
-            }
-        #endif
 
         return AssetHandle(try create(from: url))
     }
@@ -215,11 +177,17 @@ private enum ShaderModuleError: LocalizedError {
     }
 }
 
-#if WASM && WEBGPU_ENABLED
     extension ShaderModule {
-        private static func createWGSLModuleIfAvailable(
-            at baseURL: URL, reflectActiveBindings: Bool = false
-        ) throws -> ShaderModule? {
+        private static func requireWESLInput(_ url: URL) throws {
+            guard url.pathExtension.lowercased() == "wesl" else {
+                throw ShaderCompiler.CompileError.weslRequired(url.path)
+            }
+        }
+    }
+
+#if SAGA_WEBGPU
+    extension ShaderModule {
+        private static func createWGSLModuleIfAvailable(at baseURL: URL) throws -> ShaderModule? {
             let vertexURL = baseURL.appendingPathExtension("vert.wgsl")
             let fragmentURL = baseURL.appendingPathExtension("frag.wgsl")
 
@@ -237,10 +205,10 @@ private enum ShaderModuleError: LocalizedError {
             let vertexEntry = entryPoint(in: vertexSource, attribute: "vertex")
             let fragmentEntry = entryPoint(in: fragmentSource, attribute: "fragment")
             let vertexReflection = WGSLReflection.parse(
-                from: vertexSource, stage: .vertex, entryPoint: reflectActiveBindings ? vertexEntry : nil
+                from: vertexSource, stage: .vertex, entryPoint: vertexEntry
             )
             let fragmentReflection = WGSLReflection.parse(
-                from: fragmentSource, stage: .fragment, entryPoint: reflectActiveBindings ? fragmentEntry : nil
+                from: fragmentSource, stage: .fragment, entryPoint: fragmentEntry
             )
             let vertexShader = try makeWGSLShader(
                 source: vertexSource,

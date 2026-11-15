@@ -103,21 +103,26 @@ struct ShaderEffectModifierTests {
 }
 
 private struct TestUIShaderMaterial: UIShaderMaterial {
-    static func fragmentShader() throws -> AssetHandle<ShaderSource> {
-        let source = """
-        #version 450 core
-        #pragma stage : frag
+    static func shaderModule() throws -> ShaderModule? {
+        try ShaderModule.createWESL(source: """
+            import ada_engine::view::projectPosition;
 
-        #include <AdaEngine/UIShaderMaterial.frag>
+            struct VertexOutput {
+                @builtin(position) position: vec4f,
+                @location(0) color: vec4f,
+                @location(1) uv: vec2f,
+            }
 
-        [[main]]
-        void test_ui_shader_material_fragment()
-        {
-            COLOR = vec4(Input.UV, 0.0, 1.0);
-        }
-        """
-        return AssetHandle(try ShaderSource(source: source))
+            @vertex fn testVertex(@location(0) position: vec4f, @location(1) color: vec4f, @location(2) uv: vec2f) -> VertexOutput {
+                return VertexOutput(projectPosition(position), color, uv);
+            }
+
+            @fragment fn testFragment(input: VertexOutput) -> @location(0) vec4f {
+                return vec4f(input.uv, 0.0, 1.0);
+            }
+            """)
     }
+
 }
 
 private extension UIGraphicsContext.DrawCommand {

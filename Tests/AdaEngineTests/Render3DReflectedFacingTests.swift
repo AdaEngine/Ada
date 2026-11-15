@@ -115,28 +115,31 @@ extension Render3DGPUTests {
             #expect(unlit.getPixel(x: unlit.width / 2, y: unlit.height / 2).red < 0.3)
         }
 
-        /// Read private HDR targets through the engine queue; ordinary Image readback only supports 8-bit pixels.
+        #if SAGA_METAL_NATIVE_PASS
+        /// Ordinary Image readback covers 8-bit pixels. Keep the HDR bytes in a staging buffer.
         private static func readback(_ texture: Texture, scene: DebugViews.Scene, bytesPerPixel: Int) async throws -> (Data, Int) {
-            let native = try #require(MetalInterop.texture(texture))
-            let rowBytes = (native.width * bytesPerPixel + 255) & ~255
-            let buffer = try #require(native.device.makeBuffer(length: rowBytes * native.height, options: .storageModeShared))
-            let queue = try #require(scene.queue)
-            let command = try #require(queue.makeCommandBuffer())
-            let blit = try #require(command.makeBlitCommandEncoder())
-            blit.copy(
-                from: native, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
-                sourceSize: MTLSize(width: native.width, height: native.height, depth: 1),
-                to: buffer, destinationOffset: 0, destinationBytesPerRow: rowBytes, destinationBytesPerImage: rowBytes * native.height
-            )
-            blit.endEncoding()
-            await withCheckedContinuation { continuation in
-                command.addCompletedHandler { _ in continuation.resume() }
-                command.commit()
+            let size = texture.gpuTexture.size
+            let rowBytes = (size.width * bytesPerPixel + 255) & ~255
+            let byteCount = rowBytes * size.height
+            let staging = scene.device.createBuffer(label: "Reflected facing readback", length: byteCount, options: .storageShared)
+            try await MetalInterop.submitSAGAMetalPass(
+                on: scene.device, label: "Read reflected facing target",
+                textures: [.init(texture)], buffers: [.init(staging, access: .write)]
+            ) { commands, textures, buffers in
+                let native = try #require(textures.first)
+                let buffer = try #require(buffers.first)
+                let blit = try #require(commands.makeBlitCommandEncoder())
+                blit.copy(
+                    from: native, sourceSlice: 0, sourceLevel: 0, sourceOrigin: MTLOrigin(),
+                    sourceSize: MTLSize(width: size.width, height: size.height, depth: 1),
+                    to: buffer, destinationOffset: 0, destinationBytesPerRow: rowBytes, destinationBytesPerImage: byteCount
+                )
+                blit.endEncoding()
             }
-            return (unsafe Data(bytes: buffer.contents(), count: rowBytes * native.height), rowBytes)
+            return (try await staging.readData(), rowBytes)
         }
 
-        @Test(.enabled(if: GoldenFrame.activeBackend == .metal))
+        @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
         func reflectedSingleSidedCasterPreservesItsShadowDepth() async throws {
             let scene = try await DebugViews.makeScene()
             for entity in scene.sphereEntities { scene.app.main.removeEntity(entity) }
@@ -167,12 +170,11 @@ extension Render3DGPUTests {
             #expect(zip(positive, hidden).filter { abs($0 - $1) > 0.00001 }.count > 20, "The caster must actually contribute depth to the shadow map.")
         }
 
-        @Test(.enabled(if: GoldenFrame.activeBackend == .metal))
+        @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
         func reflectedSingleSidedMeshPreservesItsMotionVector() async throws {
             var motion: [Float] = []
             for reflected in [false, true] {
                 let scene = try await DebugViews.makeScene(temporalRenderScale: 0.67)
-                try #require(scene.device.supportsTemporalUpscaling)
                 for entity in scene.app.main.getEntities() where entity.id != scene.camera.id && entity.id != scene.sun.id {
                     scene.app.main.removeEntity(entity)
                 }
@@ -195,6 +197,7 @@ extension Render3DGPUTests {
             #expect(abs(motion[0]) > 0.005, "The moving quad must write a real motion vector.")
             #expect(abs(motion[1] - motion[0]) < 0.0001, "Reflection must preserve physical motion: \(motion).")
         }
+        #endif
     }
 }
 #endif

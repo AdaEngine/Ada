@@ -16,6 +16,9 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[2]
 ABIS = {"arm64-v8a": ("aarch64", "aarch64-linux-android"), "x86_64": ("x86_64", "x86_64-linux-android")}
 SYSTEM_LIBRARIES = {"libc.so", "libm.so", "libdl.so", "liblog.so", "libandroid.so", "libEGL.so", "libGLESv2.so", "libGLESv3.so", "libz.so", "libvulkan.so", "libaaudio.so", "libOpenSLES.so"}
+LEGACY_SHADER_EXTENSIONS = {".glsl", ".vert", ".frag", ".comp", ".geom", ".tesc", ".tese"}
+# Match standalone and embedded GLSL the same way as AdaWebExportPlugin.
+LEGACY_SHADER_DIRECTIVE = re.compile(r"^\s*#\s*(?:version\b|pragma\s+stage\b)", re.MULTILINE)
 ANDROID = "{http://schemas.android.com/apk/res/android}"
 ACTIVITY = "android.app.NativeActivity"
 ET.register_namespace("android", "http://schemas.android.com/apk/res/android")
@@ -190,16 +193,34 @@ def stage_resources(binaries, assets):
         raise AndroidError("No SwiftPM resource bundles were built")
     (destination/"manifest.txt").write_bytes(("\n".join(files)+"\n").encode("utf-8"))
 
+def is_legacy_shader(path):
+    extension = path.suffix.lower()
+    if extension in LEGACY_SHADER_EXTENSIONS:
+        return True
+    if extension not in {".mat", ".shader"}:
+        return False
+    try:
+        source = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    return LEGACY_SHADER_DIRECTIVE.search(source) is not None
+
+
 def append_payload(unsigned,staging,dex_files=()):
+    assets = sorted(path for path in (staging / "assets").rglob("*") if path.is_file())
+    legacy_shader = next((path for path in assets if is_legacy_shader(path)), None)
+    if legacy_shader is not None:
+        path = legacy_shader.relative_to(staging).as_posix()
+        raise AndroidError(f"Android export found legacy GLSL shader '{path}'. Port it to WESL or WGSL and rebuild the APK.")
+
     with zipfile.ZipFile(unsigned,"a",compression=zipfile.ZIP_STORED) as apk:
         for path in dex_files:
             apk.write(path,path.name)
         # Preserve the exact SwiftPM bundle manifest, including dotfiles and
         # UTF-8 names. aapt2 filters dotfiles and omits the ZIP UTF-8 flag;
         # appending with Python would then corrupt non-ASCII directory entries.
-        for path in sorted((staging/"assets").rglob("*")):
-            if path.is_file():
-                apk.write(path,path.relative_to(staging).as_posix(),compress_type=zipfile.ZIP_DEFLATED)
+        for path in assets:
+            apk.write(path,path.relative_to(staging).as_posix(),compress_type=zipfile.ZIP_DEFLATED)
         for path in sorted((staging/"lib").rglob("*.so")):
             apk.write(path,path.relative_to(staging).as_posix())
 
@@ -308,8 +329,8 @@ def launch(args):
 def parser():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command",choices=["doctor","build","run","devices"])
-    parser.add_argument("--package", help="Swift package to build; AndroidDemo lives in AdaExamples/Examples/Technical/AndroidDemo")
-    parser.add_argument("--product",default="AndroidDemo")
+    parser.add_argument("--package", help="Swift package containing the Android entry point")
+    parser.add_argument("--product",default="AndroidDemo",help="Name of the Swift dynamic library product")
     parser.add_argument("--application-id",default="org.adaengine.android.demo")
     parser.add_argument("--label",default="AdaEngine Android")
     parser.add_argument("--activity",default=ACTIVITY)
@@ -337,7 +358,7 @@ def main():
     cli=parser()
     args=cli.parse_args()
     if args.command in ("build", "run") and not args.apk and not args.package:
-        cli.error("--package is required to build; pass the AndroidDemo package in AdaExamples/Examples/Technical/AndroidDemo")
+        cli.error("--package is required to build; pass the Swift package containing the Android entry point")
     try:
         if args.command=="build":
             build(args)

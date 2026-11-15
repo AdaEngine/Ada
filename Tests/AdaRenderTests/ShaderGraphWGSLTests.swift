@@ -4,7 +4,7 @@
     import Foundation
     import Testing
 
-    /// The WGSL generator must accept every graph the GLSL generator accepts and keep the same binding contract.
+    /// Generated WGSL must preserve the Shader Graph binding contract.
     @Suite("Generated WGSL shader graph functions", .serialized)
     struct ShaderGraphWGSLTests {
         private static let operations: [ShaderGraph.Operation] = [
@@ -62,6 +62,32 @@
             _ = try link(program)
         }
 
+        @Test func cpuValidationLocatesAnInvalidGraphOutput() throws {
+            let program = try texturedGraph().compileWGSL()
+            try program.validateWGSL()
+            let output = try #require(program.sourceMap.first { $0.value.nodeID == "output" && $0.value.port == "baseColor" })
+            var lines = program.source.components(separatedBy: "\n")
+            lines[output.key - 1] = "ada_graph_result.color = missing_graph_value;"
+            let invalid = ShaderGraphProgram(
+                target: program.target,
+                renderSettings: program.renderSettings,
+                source: lines.joined(separator: "\n"),
+                parameters: program.parameters,
+                textures: program.textures,
+                sourceMap: program.sourceMap,
+                usesTime: program.usesTime,
+                format: .wgsl
+            )
+            do {
+                try invalid.validateWGSL()
+                Issue.record("SAGA accepted an unknown Shader Graph value")
+            } catch let error as ShaderGraphCompilationError {
+                #expect(error.nodeID == "output")
+                #expect(error.port == "baseColor")
+                #expect(error.message.contains("missing_graph_value"))
+            }
+        }
+
         private func texturedGraph() -> ShaderGraph {
             ShaderGraph(target: .pbrSurface, output: "output", nodes: [
                 .init(id: "uv", operation: .uv, type: .vector2),
@@ -74,14 +100,20 @@
             ])
         }
 
-        @Test func bindingsAndParameterSlotsMatchTheGLSLProgram() throws {
-            let graph = texturedGraph()
-            let glsl = try graph.compileGLSL()
-            let wgsl = try graph.compileWGSL()
-            #expect(wgsl.parameters == glsl.parameters)
-            #expect(wgsl.textures == glsl.textures)
-            #expect(wgsl.usesTime == glsl.usesTime)
-            #expect(Set(wgsl.sourceMap.values.map { "\($0.nodeID)/\($0.port ?? "")" }) == Set(glsl.sourceMap.values.map { "\($0.nodeID)/\($0.port ?? "")" }))
+        @Test func bindingsAndParameterSlotsMatchTheRuntimeContract() throws {
+            let wgsl = try texturedGraph().compileWGSL()
+            let parameter = try #require(wgsl.parameters.first)
+            #expect(wgsl.parameters.count == 1)
+            #expect(parameter.slot == 1)
+            #expect(parameter.type == .color)
+            #expect(parameter.defaultValue == [1, 1, 1, 1])
+            let texture = try #require(wgsl.textures.first)
+            #expect(wgsl.textures.count == 1)
+            #expect(texture.path == "stone.png")
+            #expect(texture.binding == ShaderGraphProgram.firstTextureBinding)
+            #expect(wgsl.usesTime)
+            let outputPorts = Set(wgsl.sourceMap.values.filter { $0.nodeID == "output" }.compactMap(\.port))
+            #expect(outputPorts == ["baseColor", "emission", "alpha"])
             #expect(!wgsl.source.contains("invalid shader identifier"))
 
             let module = try link(wgsl)
@@ -89,7 +121,7 @@
             let layouts = try WESLBackendCompiler.webGPUUniformBuffers(module, entryPoint: entry)
             let uniforms = try #require(layouts.first { Int($0.group) == ShaderGraphProgram.resourceSet && Int($0.binding) == ShaderGraphProgram.uniformBinding })
             // One aligned vec4 per parameter plus slot zero for time.
-            #expect(uniforms.minimumByteSize == UInt64((glsl.parameters.count + 1) * 16))
+            #expect(uniforms.minimumByteSize == UInt64((wgsl.parameters.count + 1) * 16))
             // The linker re-tokenizes with spaces, so compare without whitespace.
             let compact = module.wgsl.filter { !$0.isWhitespace }
             #expect(compact.contains("@binding(\(ShaderGraphProgram.firstTextureBinding))"))

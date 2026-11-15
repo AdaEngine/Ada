@@ -189,8 +189,10 @@ private struct AdaProjectMetadata: Decodable {
     let runtime: Runtime
 }
 
-public enum AdaWebPlayerProjectError: Error, Equatable, Sendable, CustomStringConvertible {
+public enum AdaWebPlayerProjectError: LocalizedError, Equatable, Sendable, CustomStringConvertible {
     case invalid(String)
+
+    public var errorDescription: String? { description }
 
     public var description: String {
         switch self {

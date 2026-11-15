@@ -88,5 +88,5 @@ to zero, preserving the image of old scenes.
 pause behavior. `Render3DGPUTests/Particles` checks actual GPU visibility in front
 of geometry, occlusion behind it, hiding the emitter, local-light response and
 blocking that light with an opaque shadow caster. `ParticleLighting3DTests` checks
-the bounded packed GPU layout and disabling stale/missing shadow state. Run the WebGPU checks
-through `script/validate_webgpu.sh`.
+the bounded packed GPU layout and disabling stale/missing shadow state. Run the SAGA GPU checks through
+`script/validate_gpu.sh`.

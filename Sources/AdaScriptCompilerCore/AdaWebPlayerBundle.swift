@@ -40,12 +40,29 @@ public enum AdaWebPlayerBundle {
         let templateRoot = template.resolvingSymlinksInPath().standardizedFileURL
         for resource in resources {
             let relativePath = resource.url.removingPercentEncoding ?? resource.url
-            let file = templateRoot.appendingPathComponent(relativePath).resolvingSymlinksInPath().standardizedFileURL
+            let resourceURL = templateRoot.appendingPathComponent(relativePath)
+            let file = resourceURL.resolvingSymlinksInPath().standardizedFileURL
             guard
                 file.path.hasPrefix(templateRoot.path + "/"),
                 (try? file.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
             else {
                 throw AdaWebPlayerProjectError.invalid("Missing or invalid player resource: \(resource.url).")
+            }
+            if AdaWebLegacyShader.containsLegacySource(at: file, declaredExtension: resourceURL.pathExtension) {
+                throw AdaWebPlayerProjectError.invalid("Player template contains a legacy shader at `\(relativePath)`. Re-export the player template.")
+            }
+        }
+        for path in project.files ?? [] {
+            let fileExtension = URL(fileURLWithPath: path).pathExtension.lowercased()
+            if AdaWebLegacyShader.extensions.contains(fileExtension) {
+                throw AdaWebLegacyShader.projectError(for: path)
+            }
+            if AdaWebLegacyShader.containers.contains(fileExtension),
+               AdaWebLegacyShader.containsLegacySource(
+                   at: try project.resourceURL(path, at: directory),
+                   declaredExtension: fileExtension
+               ) {
+                throw AdaWebLegacyShader.projectError(for: path)
             }
         }
         guard

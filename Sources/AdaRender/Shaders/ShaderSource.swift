@@ -8,7 +8,6 @@
 import AdaAssets
 import AdaUtils
 import Foundation
-import SPIRVCompiler
 
 public enum ShaderLanguage: String, Sendable, Codable {
     /// OpenGL/WebGL-style GLSL.
@@ -60,7 +59,6 @@ public final class ShaderSource: Asset, @unchecked Sendable {
     public private(set) var language: ShaderLanguage = .glsl
 
     private var sources: [ShaderStage: String] = [:]
-    private var entryPoints: [ShaderStage: String] = [:]
     private var sourceFileURLs: [ShaderStage: URL] = [:]
 
     /// Contains include search paths for shaders.
@@ -71,6 +69,10 @@ public final class ShaderSource: Asset, @unchecked Sendable {
 
     /// Create a shader source from a file. Automatic detect language and split to stages (for GLSL only).
     public init(from fileURL: URL) throws {
+        let language = ShaderUtils.shaderLang(from: fileURL.pathExtension)
+        if language == .glsl {
+            try ShaderCompiler.requireLegacySupport(for: fileURL.path)
+        }
         guard let data = FileSystem.current.readFile(at: fileURL) else {
             throw Error.failedToRead(fileURL.path)
         }
@@ -78,18 +80,11 @@ public final class ShaderSource: Asset, @unchecked Sendable {
         self.fileURL = fileURL
 
         let sourceCode = String(bytes: data, encoding: .utf8) ?? ""
-        self.language = ShaderUtils.shaderLang(from: fileURL.pathExtension)
+        self.language = language
         self.includeSearchPaths = [.local(fileURL.deletingLastPathComponent())]
 
-        switch language {
-        case .glsl:
-            self.sources = try ShaderUtils.processGLSLShader(source: sourceCode)
-            self.entryPoints = Self.getEntryPoints(from: self.sources)
-            self.sourceFileURLs = Dictionary(uniqueKeysWithValues: self.sources.keys.map { ($0, fileURL) })
-        default:
-            self.sources = [.max: sourceCode]
-            self.sourceFileURLs = [.max: fileURL]
-        }
+        self.sources = [.max: sourceCode]
+        self.sourceFileURLs = [.max: fileURL]
     }
 
     /// Create a shader source from raw string.
@@ -101,14 +96,13 @@ public final class ShaderSource: Asset, @unchecked Sendable {
         lang: ShaderLanguage = .glsl,
         includeSearchPaths: [ShaderSource.IncludeSearchPath] = []
     ) throws {
-        if lang == .glsl {
-            self.sources = try ShaderUtils.processGLSLShader(source: source)
-            self.entryPoints = Self.getEntryPoints(from: self.sources)
-        } else {
-            self.sources = [.max: source]
-        }
         self.includeSearchPaths = includeSearchPaths
         self.language = lang
+
+        if lang == .glsl {
+            try ShaderCompiler.requireLegacySupport(for: "inline shader")
+        }
+        self.sources = [.max: source]
     }
 
     /// Create an empty shader sources
@@ -117,7 +111,6 @@ public final class ShaderSource: Asset, @unchecked Sendable {
     /// Set new shader source code for specific stage.
     public func setSource(_ source: String, for stage: ShaderStage, fileURL: URL? = nil) {
         self.sources[stage] = source
-        self.entryPoints[stage] = (try? ShaderUtils.dropEntryPoint(from: source).0)
         self.sourceFileURLs[stage] = fileURL
     }
 
@@ -129,7 +122,7 @@ public final class ShaderSource: Asset, @unchecked Sendable {
 
     /// Get entry point for specific code.
     public func getEntryPoint(for stage: ShaderStage) -> String {
-        return self.entryPoints[stage] ?? "main"
+        return "main"
     }
 
     /// Return collection of stages available in this shader source.
@@ -141,30 +134,16 @@ public final class ShaderSource: Asset, @unchecked Sendable {
         return self.sourceFileURLs[stage] ?? self.fileURL
     }
 
-    func getWGSLSource(for stage: ShaderStage) -> String? {
-        guard let sourceFileURL = self.getSourceFileURL(for: stage) else {
-            return nil
-        }
-
-        let wgslURL =
-            sourceFileURL
-            .deletingPathExtension()
-            .appendingPathExtension(stage.wgslFileExtension)
-            .appendingPathExtension("wgsl")
-
-        guard let data = FileSystem.current.readFile(at: wgslURL) else {
-            return nil
-        }
-
-        return String(bytes: data, encoding: .utf8)
-    }
-
     // MARK: - Asset
 
     public var assetMetaInfo: AssetMetaInfo?
 
     public init(from assetDecoder: AssetDecoder) throws {
         let fileURL = assetDecoder.assetMeta.filePath
+        let language = ShaderUtils.shaderLang(from: fileURL.pathExtension)
+        if language == .glsl {
+            try ShaderCompiler.requireLegacySupport(for: fileURL.path)
+        }
         self.fileURL = fileURL
 
         guard let data = FileSystem.current.readFile(at: fileURL) else {
@@ -172,66 +151,20 @@ public final class ShaderSource: Asset, @unchecked Sendable {
         }
 
         let sourceCode = String(bytes: data, encoding: .utf8) ?? ""
-        self.language = ShaderUtils.shaderLang(from: fileURL.pathExtension)
+        self.language = language
         self.includeSearchPaths = [.local(fileURL.deletingLastPathComponent())]
 
-        switch language {
-        case .glsl:
-            let sources = try ShaderUtils.processGLSLShader(source: sourceCode)
-
-            if let stageName = assetDecoder.assetMeta.queryParams.first?.name,
-                let stage = ShaderUtils.shaderStage(from: stageName) {
-                guard let sourceForStage = sources[stage] else {
-                    throw Error.message("Cannot find a source for stage \(stageName)")
-                }
-
-                self.sources = [stage: sourceForStage]
-                self.sourceFileURLs = [stage: fileURL]
-            } else {
-                self.sources = sources
-                self.sourceFileURLs = Dictionary(uniqueKeysWithValues: sources.keys.map { ($0, fileURL) })
-            }
-        default:
-            self.sources = [.max: sourceCode]
-            self.sourceFileURLs = [.max: fileURL]
-        }
+        self.sources = [.max: sourceCode]
+        self.sourceFileURLs = [.max: fileURL]
     }
 
     public func encodeContents(with _: AssetEncoder) throws {
         fatalErrorMethodNotImplemented()
     }
 
-    private static func getEntryPoints(from sources: [ShaderStage: String]) -> [ShaderStage: String] {
-        var entryPoints = [ShaderStage: String]()
-
-        for (stage, source) in sources {
-            entryPoints[stage] = try? ShaderUtils.dropEntryPoint(from: source).0
-        }
-
-        return entryPoints
-    }
 
     public static func extensions() -> [String] {
         ["mat"]
-    }
-}
-
-extension ShaderStage {
-    var wgslFileExtension: String {
-        switch self {
-        case .vertex:
-            return "vert"
-        case .fragment:
-            return "frag"
-        case .compute:
-            return "comp"
-        case .tesselationControl:
-            return "tesc"
-        case .tesselationEvaluation:
-            return "tese"
-        case .max:
-            return "max"
-        }
     }
 }
 

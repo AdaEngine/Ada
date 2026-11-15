@@ -116,19 +116,17 @@
             appWorlds.addSystem(VisibilitySystem.self, on: .immersiveViews)
             appWorlds.addSystem(RefreshImmersiveViewsSystem.self, on: .postUpdate)
             try appWorlds.withExecutionContext { try setup(world) }
-            guard let device = unsafe RenderEngine.shared?.renderDevice,
-                let queue = MetalInterop.commandQueue(for: device)
-            else {
+            guard let device = unsafe RenderEngine.shared?.renderDevice else {
                 throw ImmersiveRendererError.metalResourceUnavailable
             }
-            guard queue.device.registryID == layer.device.registryID else { throw ImmersiveRendererError.incompatibleMetalDevice }
             let presentation = try ImmersivePresentation(
-                queue: queue, colorFormat: layer.configuration.colorFormat, depthFormat: layer.configuration.depthFormat,
+                device: device, metalDevice: layer.device,
+                colorFormat: layer.configuration.colorFormat, depthFormat: layer.configuration.depthFormat,
                 preservesPassthrough: preservesPassthrough
             )
             let hover = layer.configuration.trackingAreasFormat == .r16Uint
-                ? try ImmersiveHoverPass(device: queue.device, format: .r16Uint, depthFormat: layer.configuration.depthFormat) : nil
-            let overlay = try ImmersiveOverlayPass(device: queue.device, colorFormat: layer.configuration.colorFormat,
+                ? try ImmersiveHoverPass(device: layer.device, format: .r16Uint, depthFormat: layer.configuration.depthFormat) : nil
+            let overlay = try ImmersiveOverlayPass(device: layer.device, colorFormat: layer.configuration.colorFormat,
                 depthFormat: layer.configuration.depthFormat, tracking: hover != nil)
             layer.onSpatialEvent = { [weak self] events in
                 self?.receive(events)
@@ -219,8 +217,11 @@
                         // Dismissal can invalidate this frame while the async eye passes finish.
                         // The compositor has already retired it; do not submit/end that old frame.
                         guard layer.state != .invalidated else { break }
-                        try await presentation.present(drawable, eyes: renderedEyes, overlays: { commands in
-                            hover?.encode(commands: commands, drawable: drawable, world: self.world, eyes: self.eyes)
+                        let geometry = drawable.trackingAreasTextures.isEmpty ? nil : hover?.prepare(world: world)
+                        try await presentation.present(drawable, eyes: renderedEyes, buffers: geometry?.buffers ?? [], overlays: { commands, buffers in
+                            if let geometry {
+                                hover?.encode(commands: commands, drawable: drawable, geometry: geometry, eyes: self.eyes, nativeBuffers: buffers)
+                            }
                             for (index, eye) in self.eyes.enumerated() where index < drawable.views.count {
                                 let size = self.targets[index].size
                                 let drawings = self.appWorlds.withExecutionContext {
@@ -228,7 +229,7 @@
                                 }
                                 overlay.encode(commands: commands, drawable: drawable, eye: index, drawings: drawings)
                             }
-                        }) {
+                        }, isValid: { self.layer.state != .invalidated }) {
                             if !submissionEnded, self.layer.state != .invalidated {
                                 frame.endSubmission()
                                 submissionEnded = true
@@ -237,7 +238,8 @@
                     }
                     if !submissionEnded, layer.state != .invalidated { frame.endSubmission() }
                 } catch {
-                    if !submissionEnded, layer.state != .invalidated { frame.endSubmission() }
+                    if layer.state == .invalidated { break }
+                    if !submissionEnded { frame.endSubmission() }
                     throw error
                 }
             }

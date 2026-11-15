@@ -3,7 +3,7 @@ import AdaRender
 import Foundation
 import Testing
 
-/// Compares the checked-in Metal and SAGA references with each other. Needs no GPU: it reads PNGs only.
+/// Compares the checked-in legacy Metal, SAGA Metal and SAGA Vulkan references. Needs no GPU.
 ///
 /// The two backends rasterize and filter slightly differently, so agreement is judged with a wider tolerance than
 /// a backend gets against its own references. A frame that differs more than that points at a real rendering
@@ -33,15 +33,26 @@ struct GoldenBackendAgreementTests {
     }
 
     @Test func everySharedReferenceAgreesAcrossBackends() throws {
-        let shared = try Self.names(in: "metal").intersection(Self.names(in: "saga")).subtracting(Self.expectedDifferences.keys).sorted()
+        let shared = try Self.names(in: "metal").intersection(Self.names(in: "saga")).subtracting(Self.expectedDifferences.keys)
+        try Self.compareReferences(shared, "metal", "saga")
+    }
+
+    @Test func sagaMetalAndVulkanReferencesAgree() throws {
+        let vulkan = try Self.names(in: "saga")
+        let metal = try Self.names(in: "saga-metal")
+        #expect(vulkan == metal, "SAGA Metal and Vulkan need references for the same scenes.")
+        try Self.compareReferences(vulkan.intersection(metal), "saga", "saga-metal")
+    }
+
+    private static func compareReferences(_ shared: Set<String>, _ first: String, _ second: String) throws {
         try #require(!shared.isEmpty, "Both backends must have references to compare.")
         var report: [String] = []
-        for name in shared {
-            let metal = try Image(contentsOf: GoldenFrame.referenceURL(backend: "metal", name: name))
-            let saga = try Image(contentsOf: GoldenFrame.referenceURL(backend: "saga", name: name))
-            let comparison = GoldenFrame.compare(saga, metal, tolerance: Self.agreement)
+        for name in shared.sorted() {
+            let expected = try Image(contentsOf: GoldenFrame.referenceURL(backend: first, name: name))
+            let actual = try Image(contentsOf: GoldenFrame.referenceURL(backend: second, name: name))
+            let comparison = GoldenFrame.compare(actual, expected, tolerance: Self.agreement)
             report.append("\(name): \(comparison.differingPixels) px differ, largest step \(comparison.largestStep)")
-            #expect(comparison.passes(Self.agreement), "\(name) differs between Metal and SAGA: \(comparison.differingPixels) pixels, largest step \(comparison.largestStep).")
+            #expect(comparison.passes(Self.agreement), "\(name) differs between \(first) and \(second): \(comparison.differingPixels) pixels, largest step \(comparison.largestStep).")
         }
         print("BACKEND-AGREEMENT\n" + report.joined(separator: "\n"))
     }

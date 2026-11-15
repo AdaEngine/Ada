@@ -1,35 +1,41 @@
 import Foundation
 
-#if canImport(AdaWGSLCompiler) && SAGA_RENDER && !WASM
+#if canImport(AdaWGSLCompiler) && !SAGA_WEBGPU
 import AdaWGSLCompiler
-import Foundation
 
 extension ShaderModule {
-    /// Link a local WESL module and create its WebGPU shader stages.
+    /// Link a local WESL module and create its shader stages for the active renderer.
     public static func createWESL(
         from file: URL,
         packageRoot: URL? = nil,
         features: [String: Bool] = [:]
     ) throws -> ShaderModule {
-        guard unsafe RenderEngine.shared.type.consumesWGSL else {
-            throw WESLModuleError.requiresWebGPU
+        guard supportsBundledWESL else {
+            throw WESLModuleError.unsupportedRenderer
         }
+        let artifact = try linkWESL(from: file, packageRoot: packageRoot, features: features)
+        return try createModule(from: artifact)
+    }
+
+    /// Links a shader on the host for offline inspection or runtime module creation.
+    static func linkWESL(
+        from file: URL, packageRoot: URL? = nil, features: [String: Bool] = [:]
+    ) throws -> WESLHostCompiler.Artifact {
         let engineRoot = Bundle.adaModule.resourceURL?.appendingPathComponent("Shaders/WESL", isDirectory: true)
-        let artifact = try WESLHostCompiler.compile(
+        return try WESLHostCompiler.compile(
             sourceFile: file,
             packageRoot: packageRoot ?? file.deletingLastPathComponent(),
             features: features,
             dependencies: engineRoot.map { ["ada_engine": $0] } ?? [:]
         )
-        return try createModule(from: artifact)
     }
 
     /// Link generated WESL source (for example a Shader Graph spliced into a template) and create its shader stages.
     ///
     /// - Parameter packageRoot: Where `package::` imports resolve; defaults to a private temporary directory.
     public static func createWESL(source: String, packageRoot: URL? = nil, features: [String: Bool] = [:]) throws -> ShaderModule {
-        guard unsafe RenderEngine.shared.type.consumesWGSL else {
-            throw WESLModuleError.requiresWebGPU
+        guard supportsBundledWESL else {
+            throw WESLModuleError.unsupportedRenderer
         }
         let engineRoot = Bundle.adaModule.resourceURL?.appendingPathComponent("Shaders/WESL", isDirectory: true)
         let artifact = try WESLHostCompiler.compile(
@@ -41,7 +47,7 @@ extension ShaderModule {
         return try createModule(from: artifact)
     }
 
-    private static func createModule(from artifact: WESLHostCompiler.Artifact) throws -> ShaderModule {
+    static func createModule(from artifact: WESLHostCompiler.Artifact, device: (any RenderDevice)? = nil) throws -> ShaderModule {
         var shaders: [ShaderStage: Shader] = [:]
         var reflection = ShaderReflectionData()
         for entry in artifact.entryPoints {
@@ -50,7 +56,11 @@ extension ShaderModule {
             }
             let stageReflection = try weslStageReflection(artifact: artifact, entry: entry, stage: stage)
             let shader = Shader(source: artifact.wgsl, entryPoint: entry.name, stage: stage, reflectionData: stageReflection)
-            try shader.compile()
+            if let device {
+                shader.compiledShader = try device.compileShader(from: shader)
+            } else {
+                try shader.compile()
+            }
             shaders[stage] = shader
             reflection.merge(stageReflection)
         }
@@ -61,8 +71,8 @@ extension ShaderModule {
 
 
 extension ShaderGraphMaterial {
-    /// Replaces only the fragment stage of `base`, like ``pipeline(base:device:variant:defines:fragmentTemplate:)``, from a
-    /// WESL template whose `// ADA_GRAPH_SOURCE_MARKER` line receives the graph's WGSL.
+    /// Replaces the fragment stage of `base` using a WESL template.
+    /// The graph's WGSL replaces the template's `// ADA_GRAPH_SOURCE_MARKER` line.
     public func weslPipeline(
         base: RenderPipelineDescriptor,
         device: RenderDevice,
@@ -84,7 +94,7 @@ extension ShaderGraphMaterial {
             guard template.contains("// ADA_GRAPH_SOURCE_MARKER") else {
                 throw ShaderGraphDiagnostic(code: .invalidReference)
             }
-            let generated = try wgslProgram().inserting(in: template)
+            let generated = program.inserting(in: template)
             var sharedKey = key
             sharedKey.source = generated
             return try ShaderGraphPipelineStorage.shared.resolve(sharedKey, device: device, cacheFailure: false) {
@@ -105,7 +115,7 @@ extension ShaderGraphMaterial {
 #else
 extension ShaderGraphMaterial {
     #if WASM
-    /// A WebAssembly build links no shaders: it uses the fragment baked from the same template and graph.
+    /// Loads the fragment baked from the same template and graph for Web exports.
     public func weslPipeline(
         base: RenderPipelineDescriptor,
         device: RenderDevice,
@@ -123,7 +133,7 @@ extension ShaderGraphMaterial {
             defines: defines.sorted { $0.name < $1.name }
         )
         let pipeline = try pipelineStorage.resolve(key, device: device, cacheFailure: true) {
-            let identity = ShaderGraphArchive.Fragment.identity(template: templateName, graphSource: try wgslProgram().source)
+            let identity = ShaderGraphArchive.Fragment.identity(template: templateName, graphSource: program.source)
             guard let artifact = ShaderGraphRuntimeLibrary.fragment(source: identity, defines: defines) else {
                 throw ShaderGraphDiagnostic(code: .invalidReference, nodeID: "Missing baked Shader Graph variant: \(templateName) \(variant)")
             }

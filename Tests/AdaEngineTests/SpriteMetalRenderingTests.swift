@@ -15,20 +15,6 @@ import Testing
 @Suite("Sprite layout GPU rendering", .serialized)
 @MainActor
 struct SpriteMetalRenderingTests {
-    #if os(macOS)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_METAL_SMOKE"] == "1"))
-    func rendersLayoutsAndTileOrientations() async throws {
-        try await renderCanvasMeshes(backend: .metal)
-        let chunks = try await renderReferenceScene(backend: .metal)
-        let sprites = try await renderReferenceScene(backend: .metal, tileMapMode: .sprites)
-        #expect(chunks.data == sprites.data, "Chunk geometry must preserve the reference renderer's visible pixels.")
-        let reference = try await renderReferenceScene(backend: .metal, spriteMode: .batched)
-        let referenceSprites = try await renderReferenceScene(backend: .metal, tileMapMode: .sprites, spriteMode: .batched)
-        #expect(chunks.data == reference.data, "Instancing must preserve layout, alpha, tile and painter-order pixels.")
-        #expect(sprites.data == referenceSprites.data)
-    }
-
-    #endif
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_SAGA_SMOKE"] == "1"))
     func rendersLayoutsAndPickingWithSAGA() async throws {
         try await renderCanvasMeshes(backend: .saga)
@@ -57,10 +43,6 @@ struct SpriteMetalRenderingTests {
         #expect(sampledImage.getPixel(x: 0, y: 0) == .white)
     }
 
-    #if os(macOS)
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_METAL_SMOKE"] == "1"))
-    func rendersTileOcclusionWithMetal() async throws { try await renderTileOcclusionMask(backend: .metal) }
-    #endif
 
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_SAGA_SMOKE"] == "1"))
     func rendersTileOcclusionWithSAGA() async throws { try await renderTileOcclusionMask(backend: .saga) }
@@ -270,16 +252,17 @@ struct SpriteMetalRenderingTests {
             mapComponent
             Transform(position: [-224, -64, 0])
         }
+        var graphMaterials: [ShaderGraphMaterial] = []
         if graphMode {
             var graph = ShaderGraph(target: .sprite, output: "output", nodes: [
                 .init(id: "texture", operation: .spriteTexture, type: .color),
                 .init(id: "output", operation: .output, inputs: ["color": .init("texture")])
             ])
             graph.renderSettings.mode = .blend
-            let materials = try [ShaderGraphMaterial(source: .init(graph: graph)), ShaderGraphMaterial(source: .init(graph: graph))]
+            graphMaterials = try [ShaderGraphMaterial(source: .init(graph: graph)), ShaderGraphMaterial(source: .init(graph: graph))]
             for (index, entity) in mainWorld.getEntities().sorted(by: { $0.id < $1.id }).enumerated() {
                 if var sprite = entity.components[Sprite.self] {
-                    sprite.graphMaterial = materials[index % 2]
+                    sprite.graphMaterial = graphMaterials[index % 2]
                     entity.components[Sprite.self] = sprite
                 }
             }
@@ -319,6 +302,10 @@ struct SpriteMetalRenderingTests {
         await world.runScheduler(.batching)
         await world.runScheduler(.update)
 
+        for material in graphMaterials {
+            try #require(material.compilationError == nil, Comment(rawValue: material.compilationError ?? "Expected the sprite graph to compile"))
+            try #require(material.hasPreparedPipeline)
+        }
         let prepared = try #require(world.getResource(SpriteDrawData.self))
         #expect(prepared.usesInstancing == (spriteMode == .automatic))
         if prepared.usesInstancing {
@@ -381,7 +368,7 @@ extension Render3DGPUTests {
     @MainActor @Suite("Sprite Shader Graph pixels") struct SpriteGraphs {
         @Test(.enabled(if: GoldenFrame.activeBackend != nil), arguments: [SpriteRenderingMode.batched, .automatic])
         func identityGraphPreservesAtlasLayoutAlphaAndPainterOrder(mode: SpriteRenderingMode) async throws {
-            let backend: RenderBackendType = GoldenFrame.activeBackend == .metal ? .metal : .saga
+            let backend: RenderBackendType = .saga
             let harness = SpriteMetalRenderingTests()
             let stock = try await harness.renderReferenceScene(backend: backend, spriteMode: mode)
             let graph = try await harness.renderReferenceScene(backend: backend, spriteMode: mode, graphMode: true)

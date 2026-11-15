@@ -195,13 +195,19 @@ extension EditorSettingsWindowViewModel {
 
     func buildToolStatus(_ field: EditorBuildToolField, platform: EditorBuildPlatform) -> String {
         let value = buildExportConfiguration.normalizedValue(field, for: platform)
+        if field.id == "ADAENGINE_SAGA_PACKAGE_PATH", value.isEmpty {
+            return "Revision managed by SwiftPM"
+        }
         #if os(Windows)
         if platform == .web, field.kind != .identifier {
             return value.isEmpty ? "Automatic in WSL — checked when building."
                 : "WSL override — checked when building, not on Windows."
         }
-        if platform == .android, ["SWIFT_ANDROID_SWIFT", "SWIFT_ANDROID_SDKS_PATH", "ADAENGINE_SWAN_PACKAGE_PATH", "SWAN_LOCAL_DAWN"].contains(field.id) {
+        if platform == .android, ["SWIFT_ANDROID_SWIFT", "SWIFT_ANDROID_SDKS_PATH"].contains(field.id) {
             return "Provided by the WSL export tools on Windows."
+        }
+        if platform == .android, field.id == "ADAENGINE_SAGA_PACKAGE_PATH" {
+            return "WSL override — checked when building, not on Windows."
         }
         #endif
         if field.kind != .identifier, scannedBuildPlatforms.contains(platform), value.isEmpty {

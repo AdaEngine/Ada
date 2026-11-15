@@ -36,7 +36,7 @@ public protocol RenderSurface {
     }
 #endif
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+#if canImport(MetalKit)
     import MetalKit
     #if canImport(AppKit)
         import AppKit
@@ -56,7 +56,16 @@ public protocol RenderSurface {
         }
 
         public var prefferedPixelFormat: PixelFormat {
-            self.colorPixelFormat.toPixelFormat()
+            switch colorPixelFormat {
+            case .bgra8Unorm: .bgra8
+            case .bgra8Unorm_srgb: .bgra8_srgb
+            case .rgba8Unorm, .rgba8Uint: .rgba8
+            case .rgba16Float: .rgba_16f
+            case .rgba32Float: .rgba_32f
+            case .depth32Float: .depth_32f
+            case .depth32Float_stencil8: .depth_32f_stencil8
+            default: fatalError("Unsupported pixel format: \(colorPixelFormat)")
+            }
         }
     }
 

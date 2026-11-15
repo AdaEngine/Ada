@@ -12,7 +12,7 @@
 // Needs `playwright-core` (or SAGA_PLAYWRIGHT=<path>) and a Chromium with WebGPU (SAGA_CHROMIUM=<executable>).
 import assert from "node:assert/strict";
 import { createReadStream } from "node:fs";
-import { mkdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import { dirname, extname, join, normalize, resolve } from "node:path";
@@ -27,6 +27,15 @@ if (studioExport && mesh2D) throw new Error("Pass either --studio-export or --me
 const bundle = args.find(arg => !arg.startsWith("--"));
 if (!bundle) throw new Error("Pass the exported web player bundle directory");
 const actualPath = args.find(arg => arg.startsWith("--actual="))?.slice("--actual=".length);
+
+const legacyShader = /\.(?:glsl|vert|frag|comp|geom|tesc|tese)$/i;
+const resourceManifest = JSON.parse(await readFile(join(bundle, "ada-resource-manifest.json"), "utf8"));
+for (const { url } of resourceManifest) {
+    assert.ok(!legacyShader.test(decodeURIComponent(url)), `Legacy shader resource in web manifest: ${url}`);
+}
+for (const entry of await readdir(bundle, { recursive: true, withFileTypes: true })) {
+    assert.ok(entry.isDirectory() || !legacyShader.test(entry.name), `Legacy shader in web bundle: ${entry.name}`);
+}
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const goldenPath = join(root, "Tests/AdaEngineTests/GoldenFrames/saga-browser/smoke-160x96.png");

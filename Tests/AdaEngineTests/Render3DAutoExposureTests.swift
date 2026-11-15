@@ -53,7 +53,7 @@ struct Render3DAutoExposureSettingsTests {
 extension Render3DGPUTests {
     /// Renders automatic exposure through the real Metal pipeline.
     ///
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DAutoExposureGPUTests`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DAutoExposureGPUTests`.
     @Suite("3D auto exposure on GPU")
     @MainActor
     struct AutoExposure {

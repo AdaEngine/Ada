@@ -10,18 +10,9 @@ extension Render3DGPUTests {
     @MainActor
     struct WESLShadowPipelineTests {
         @Test
-        func legacySourcesRemainAvailableAndModuleFailuresPropagate() throws {
-            let legacy = CustomMaterial(UIShadowMaterial())
-            if ShaderModule.supportsBundledWESL {
-                // A renderer that consumes WESL links the material's module and never loads its GLSL fallback.
-                #expect(legacy.shaderSource.stages.isEmpty)
-            } else {
-                #expect(legacy.shaderSource.getSource(for: .vertex) != nil)
-                #expect(legacy.shaderSource.getSource(for: .fragment) != nil)
-            }
-            let failed = CustomMaterial(FailingLinkedMaterial())
+        func linkedModuleFailuresPropagate() throws {
             #expect(throws: HookFailure.unavailable) {
-                try failed.makeShaderModule(defines: [])
+                try CustomMaterial(FailingLinkedMaterial()).makeShaderModule(defines: [])
             }
         }
 
@@ -29,7 +20,7 @@ extension Render3DGPUTests {
         func customMaterialRetainsLinkedModuleAndDistinctIdentity() async throws {
             unsafe RenderEngine.configurations.preferredBackend = .saga
             try RenderEngine.setupRenderEngine()
-            let material = CustomMaterial(LinkedShadowMaterial())
+            let material = CustomMaterial(UIShadowMaterial())
             let module = try material.makeShaderModule(defines: [])
             #expect(module.getShader(for: .vertex)?.entryPoint == "ui_shadow_vertex")
             #expect(module === (try material.makeShaderModule(defines: [])))
@@ -44,7 +35,7 @@ extension Render3DGPUTests {
             let uploaded = bytes.withUnsafeBytes { unsafe $0.loadUnaligned(as: UIShadowParameters.self) }
             #expect(uploaded.geometry == Vector4(10, 20, 30, 4))
             #expect(uploaded.style == Vector4(1, 2, 3, 0.5))
-            let other = CustomMaterial(LinkedShadowMaterial())
+            let other = CustomMaterial(UIShadowMaterial())
             #expect(material != other)
             #expect(Set([material, other]).count == 2)
             #expect(throws: (any Error).self) {
@@ -56,10 +47,7 @@ extension Render3DGPUTests {
         func shadowModuleLoadsBothStagesAndPreservesBindings() throws {
             unsafe RenderEngine.configurations.preferredBackend = .saga
             try RenderEngine.setupRenderEngine()
-            let root = URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-            let file = root.appendingPathComponent("Sources/AdaUI/Assets/Shaders/ui_shadow.wesl")
-            let module = try ShaderModule.create(from: file)
+            let module = try #require(try UIShadowMaterial.shaderModule())
             #expect(Set(module.stages) == [.vertex, .fragment])
             let vertex = try #require(module.getShader(for: .vertex))
             let fragment = try #require(module.getShader(for: .fragment))
@@ -72,54 +60,16 @@ extension Render3DGPUTests {
             // These sizes must come from the validated shader, never from a host-stride override.
             #expect(vertexBindings.uniformsBuffers[2]?.size == 192)
             #expect(fragmentBindings.uniformsBuffers[0]?.size == 48)
+            #expect(module.reflectionData.shaderBuffers["UIShadowMaterial"]?.size == MemoryLayout<UIShadowParameters>.stride)
             #expect(fragmentBindings.sampledImages.isEmpty)
             #expect(fragmentBindings.samplers.isEmpty)
         }
     }
 }
 
-private struct LinkedShadowMaterial: UIShaderMaterial {
-    @Uniform(binding: 0, propertyName: "UIShadowMaterial") var parameters: UIShadowParameters
-
-    init() {
-        parameters = UIShadowParameters(color: .black, geometry: .zero, style: .zero)
-    }
-
-    static func shaderModule() throws -> ShaderModule? {
-        let root = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        let compiled = try ShaderModule.create(from: root.appendingPathComponent("Sources/AdaUI/Assets/Shaders/ui_shadow.wesl"))
-        // Explicit fixture ABI: production member/name mapping is not implemented yet.
-        // This verifies complete-module passthrough and upload, not production shadow material reflection.
-        var reflection = ShaderReflectionData()
-        let uniform = ShaderResource.ShaderBuffer(
-            name: "UIShadowMaterial",
-            size: MemoryLayout<UIShadowParameters>.stride,
-            shaderStage: .fragment,
-            binding: 0,
-            resourceAccess: .read,
-            members: [:]
-        )
-        reflection.shaderBuffers[uniform.name] = uniform
-        reflection.descriptorSets = [.init()]
-        reflection.descriptorSets[0].uniformsBuffers[0] = uniform
-        return ShaderModule(
-            shaders: [.vertex: try #require(compiled.getShader(for: .vertex)), .fragment: try #require(compiled.getShader(for: .fragment))],
-            reflectionData: reflection
-        )
-    }
-
-    static func fragmentShader() throws -> AssetHandle<ShaderSource> {
-        throw LinkedMaterialError.legacySourceMustNotBeRequested
-    }
-
-    private enum LinkedMaterialError: Error { case legacySourceMustNotBeRequested }
-}
-
 private enum HookFailure: Error { case unavailable }
 
 private struct FailingLinkedMaterial: UIShaderMaterial {
     static func shaderModule() throws -> ShaderModule? { throw HookFailure.unavailable }
-    static func fragmentShader() throws -> AssetHandle<ShaderSource> { throw HookFailure.unavailable }
 }
 #endif

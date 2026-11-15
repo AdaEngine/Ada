@@ -12,7 +12,7 @@ struct EditorMovieMakerGPUTests {
         #if os(Windows) || os(Linux)
         unsafe RenderEngine.configurations.preferredBackend = .webgpu
         #else
-        unsafe RenderEngine.configurations.preferredBackend = .metal
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         #endif
         let root = try movieEditorFixtureDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -70,7 +70,7 @@ struct EditorMovieMakerGPUTests {
         #if os(Windows) || os(Linux)
         unsafe RenderEngine.configurations.preferredBackend = .webgpu
         #else
-        unsafe RenderEngine.configurations.preferredBackend = .metal
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         #endif
         let root = try movieEditorFixtureDirectory()
         defer { try? FileManager.default.removeItem(at: root) }

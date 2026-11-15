@@ -1,4 +1,3 @@
-#if !os(WASI)
 import Foundation
 
 struct WESLLinker {
@@ -365,4 +364,3 @@ private func tokenize(_ source: String, file: URL) throws -> [String] {
     }
     return tokens
 }
-#endif

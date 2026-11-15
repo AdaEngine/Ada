@@ -12,6 +12,7 @@ struct AdaWebExportPlugin: CommandPlugin {
     private static var assetsDirectory: URL { URL(fileURLWithPath: #filePath).deletingLastPathComponent() }
     private static let renderBundle = "AdaEngine_AdaRender.resources"
     private static let flat3DBundle = "AdaEngine_AdaCorePipelines.resources"
+    private static let legacyShaderExtensions: Set<String> = ["glsl", "vert", "frag", "comp", "geom", "tesc", "tese"]
     private static let flat3DVariants = [["ADA_TERRAIN"], ["ADA_WIREFRAME"], ["ADA_TERRAIN", "ADA_WIREFRAME"]]
     /// Vertex layouts a 2D mesh can have, in the sorted order the runtime uses to name a shipped variant.
     private static let canvasMeshVariants = [
@@ -305,8 +306,22 @@ struct AdaWebExportPlugin: CommandPlugin {
         shaderTranspiler: URL
     ) throws {
         let fileManager = FileManager.default
+        let assetsSource = packageDirectory.appending(component: "Assets", directoryHint: .isDirectory)
+        let assetsDestination = options.outputDirectory.appending(component: "Assets", directoryHint: .isDirectory)
+        guard !assetsDestination.isDescendant(of: assetsSource), !assetsSource.isDescendant(of: assetsDestination) else {
+            throw ExportError.overlappingAssets
+        }
+        if let shader = try legacyShaders(in: assetsSource).first {
+            throw ExportError.unsupportedShader(shader.path)
+        }
         try fileManager.createDirectory(at: options.outputDirectory, withIntermediateDirectories: true)
 
+        let resourceBundles = try copyResourceBundles(
+            near: wasm,
+            to: options.outputDirectory,
+            packageName: package.displayName,
+            requiredTargetNames: requiredTargetNames(forProductNamed: options.product, in: package)
+        )
         let wasmOutput = options.outputDirectory.appending(component: "\(options.product).wasm", directoryHint: .notDirectory)
         try replaceItem(at: wasmOutput, with: wasm)
 
@@ -315,11 +330,6 @@ struct AdaWebExportPlugin: CommandPlugin {
             with: Self.assetsDirectory.appending(components: "Runtime", "engine-audio.js")
         )
         if options.product == "AdaWebPlayer" {
-            try "{\"runtimeAPI\":4,\"profile\":\"universal\"}".write(
-                to: options.outputDirectory.appending(component: "ada-web-player.json"),
-                atomically: true,
-                encoding: .utf8
-            )
             try replaceItem(
                 at: options.outputDirectory.appending(component: "player-audio.js"),
                 with: Self.assetsDirectory.appending(components: "Runtime", "player-audio.js")
@@ -330,12 +340,6 @@ struct AdaWebExportPlugin: CommandPlugin {
             )
         }
 
-        let resourceBundles = try copyResourceBundles(
-            near: wasm,
-            to: options.outputDirectory,
-            packageName: package.displayName,
-            requiredTargetNames: requiredTargetNames(forProductNamed: options.product, in: package)
-        )
         var resourceManifest = try resourceBundles
             .flatMap { bundle in
                 try manifestEntries(forResourceBundle: bundle)
@@ -378,12 +382,10 @@ struct AdaWebExportPlugin: CommandPlugin {
             to: options.outputDirectory.appending(component: "ada-resource-manifest.json", directoryHint: .notDirectory)
         )
 
-        let assetsSource = packageDirectory.appending(component: "Assets", directoryHint: .isDirectory)
-        let assetsDestination = options.outputDirectory.appending(component: "Assets", directoryHint: .isDirectory)
+        if fileManager.fileExists(atPath: assetsDestination.path(percentEncoded: false)) {
+            try fileManager.removeItem(at: assetsDestination)
+        }
         if fileManager.fileExists(atPath: assetsSource.path(percentEncoded: false)) {
-            if fileManager.fileExists(atPath: assetsDestination.path(percentEncoded: false)) {
-                try fileManager.removeItem(at: assetsDestination)
-            }
             try fileManager.copyItem(at: assetsSource, to: assetsDestination)
         }
         let runtime = try javascriptKitRuntime(checkouts: checkouts)
@@ -419,6 +421,13 @@ struct AdaWebExportPlugin: CommandPlugin {
             atomically: true,
             encoding: .utf8
         )
+        if options.product == "AdaWebPlayer" {
+            try "{\"runtimeAPI\":4,\"profile\":\"universal\",\"shaderPipeline\":\"wesl\"}".write(
+                to: options.outputDirectory.appending(component: "ada-web-player.json"),
+                atomically: true,
+                encoding: .utf8
+            )
+        }
     }
 
     private func copyLoaderAssets(to outputDirectory: URL) throws {
@@ -477,7 +486,17 @@ struct AdaWebExportPlugin: CommandPlugin {
             return resourceValues?.isDirectory == true
                 && requiredTargetNames.contains(resourceBundleTargetName(for: url, packageName: packageName))
         }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+        for source in resourceBundles {
+            if let shader = try legacyShaders(in: source).first {
+                throw ExportError.unsupportedShader(shader.path)
+            }
+        }
 
+        // The descriptor identifies a complete template. Replace it after export succeeds.
+        let descriptor = outputDirectory.appendingPathComponent("ada-web-player.json")
+        if fileManager.fileExists(atPath: descriptor.path) {
+            try fileManager.removeItem(at: descriptor)
+        }
         let resourcesDirectory = outputDirectory.appending(component: "resources", directoryHint: .isDirectory)
         if fileManager.fileExists(atPath: resourcesDirectory.path(percentEncoded: false)) {
             try fileManager.removeItem(at: resourcesDirectory)
@@ -504,7 +523,6 @@ struct AdaWebExportPlugin: CommandPlugin {
             .appendingPathComponent("shader-graph-host")
         var environment = ProcessInfo.processInfo.environment
         environment.removeValue(forKey: "BUILD_WASM")
-        environment["ADAENGINE_DISABLE_SWAN"] = "1"
         environment["ADAENGINE_WEB_EXPORT"] = "1"
         let arguments = ["swift", "build", "--package-path", engine.path, "--scratch-path", cache.path, "--disable-sandbox"]
         let build = Process()
@@ -537,26 +555,15 @@ struct AdaWebExportPlugin: CommandPlugin {
         shaderTranspiler: URL,
         requiresAllShaders: Bool
     ) throws -> [ResourceManifestEntry] {
-        let files: [URL] = try resourceBundles.flatMap { try regularFiles(in: $0.source) }
-        let shaders = files.filter { file in
-            switch file.pathExtension {
-            case "wesl": true
-            case "glsl": containsShaderStagePragma(file)
-            default: false
-            }
-        }
+        let shaders = try resourceBundles.flatMap { try regularFiles(in: $0.source) }
+            .filter { $0.pathExtension.lowercased() == "wesl" }
         let shaderURLs = shaders.sorted { $0.path(percentEncoded: false) < $1.path(percentEncoded: false) }
         guard !shaderURLs.isEmpty else {
             Diagnostics.remark("No shader resources need WGSL generation")
             return []
         }
 
-        let moduleIncludeArguments = shaderModuleIncludeArguments(
-            resourceBundles: resourceBundles,
-            packageDirectory: packageDirectory
-        )
-
-        let weslDependencies = shaderLibrary("WESL", resourceBundles: resourceBundles, packageDirectory: packageDirectory)
+        let weslDependencies = weslLibrary(resourceBundles: resourceBundles, packageDirectory: packageDirectory)
             .map { ["--wesl-dependency", "ada_engine=\($0.path(percentEncoded: false))"] } ?? []
 
         var entries: [ResourceManifestEntry] = []
@@ -564,32 +571,28 @@ struct AdaWebExportPlugin: CommandPlugin {
             guard let resourceBundle = resourceBundles.first(where: { shaderURL.isDescendant(of: $0.source) }) else {
                 continue
             }
+            let shaderPath = shaderURL.relativePath(from: resourceBundle.source)
             let shaderOutputDirectory = outputURL(forResourceURL: shaderURL, in: resourceBundle).deletingLastPathComponent()
             try FileManager.default.createDirectory(at: shaderOutputDirectory, withIntermediateDirectories: true)
 
-            var arguments = [
+            let arguments = [
                 "--input",
                 shaderURL.path(percentEncoded: false),
                 "--output-directory",
-                shaderOutputDirectory.path(percentEncoded: false)
-            ]
-            if shaderURL.pathExtension == "wesl" {
-                arguments.append("--web-stages")
-                arguments.append(contentsOf: weslDependencies)
-            } else {
-                arguments.append(contentsOf: moduleIncludeArguments)
-            }
+                shaderOutputDirectory.path(percentEncoded: false),
+                "--web-stages",
+            ] + weslDependencies
 
             let variants: [[String]]
             if resourceBundle.source.lastPathComponent == Self.flat3DBundle {
-                variants = switch shaderURL.relativePath(from: resourceBundle.source) {
-                case "Shaders/flat3d.glsl": Self.flat3DVariants
+                variants = switch shaderPath {
+                case "Shaders/flat3d.wesl": Self.flat3DVariants
                 case "Shaders/directional_shadow_3d.wesl", "Shaders/motion_3d.wesl": [["ADA_MORPH"]]
                 case "Shaders/meshlet_map_3d.wesl": [["MAP_RESPONSE"], ["MAP_SURFACE"], ["MAP_RESPONSE", "MAP_SURFACE"]]
                 default: []
                 }
             } else if resourceBundle.source.lastPathComponent == Self.renderBundle {
-                variants = switch shaderURL.relativePath(from: resourceBundle.source) {
+                variants = switch shaderPath {
                 case "Shaders/mesh2d/mesh2d.wesl",
                      "Shaders/Materials/color_canvas_material.wesl",
                      "Shaders/Materials/circle_canvas_material.wesl":
@@ -599,12 +602,11 @@ struct AdaWebExportPlugin: CommandPlugin {
             } else {
                 variants = []
             }
-            let variantFlag = shaderURL.pathExtension == "wesl" ? "--feature" : "--define"
-            for defines in [[]] + variants {
+            for features in [[]] + variants {
                 do {
                     let generatedOutput = try WebExportSupport.captureStandardOutput(
                         executable: shaderTranspiler.path(percentEncoded: false),
-                        arguments: arguments + defines.flatMap { [variantFlag, $0] },
+                        arguments: arguments + features.flatMap { ["--feature", $0] },
                         workingDirectory: packageDirectory
                     )
                     let generatedEntries = generatedOutput
@@ -626,7 +628,7 @@ struct AdaWebExportPlugin: CommandPlugin {
                         }
                     entries.append(contentsOf: generatedEntries)
                 } catch {
-                    if requiresAllShaders || !defines.isEmpty { throw error }
+                    if requiresAllShaders || !features.isEmpty { throw error }
                     Diagnostics.warning("Skipping WGSL generation for \(shaderURL.lastPathComponent): \(error)")
                 }
             }
@@ -636,13 +638,26 @@ struct AdaWebExportPlugin: CommandPlugin {
         return entries
     }
 
-    private func containsShaderStagePragma(_ url: URL) -> Bool {
-        guard let data = FileManager.default.contents(atPath: url.path(percentEncoded: false)),
-              let source = String(data: data, encoding: .utf8) else {
-            return false
+    private func legacyShaders(in directory: URL) throws -> [URL] {
+        guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            return []
         }
-
-        return source.contains("#pragma stage")
+        return try enumerator.compactMap { element in
+            guard let url = element as? URL,
+                  try url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != true else {
+                return nil
+            }
+            let fileExtension = url.pathExtension.lowercased()
+            if Self.legacyShaderExtensions.contains(fileExtension) {
+                return url
+            }
+            if fileExtension == "mat" || fileExtension == "shader",
+               let source = try? String(contentsOf: url, encoding: .utf8),
+               source.range(of: #"(?m)^\s*#\s*(?:version\b|pragma\s+stage\b)"#, options: .regularExpression) != nil {
+                return url
+            }
+            return nil
+        }
     }
 
     private func regularFiles(in directory: URL) throws -> [URL] {
@@ -664,18 +679,13 @@ struct AdaWebExportPlugin: CommandPlugin {
         return files
     }
 
-    private func shaderModuleIncludeArguments(resourceBundles: [ResourceBundleExport], packageDirectory: URL) -> [String] {
-        shaderLibrary("Public", resourceBundles: resourceBundles, packageDirectory: packageDirectory)
-            .map { ["--module-include", "AdaEngine=\($0.path(percentEncoded: false))"] } ?? []
-    }
-
-    private func shaderLibrary(_ folder: String, resourceBundles: [ResourceBundleExport], packageDirectory: URL) -> URL? {
+    private func weslLibrary(resourceBundles: [ResourceBundleExport], packageDirectory: URL) -> URL? {
         let bundled = resourceBundles.first { $0.source.lastPathComponent == Self.renderBundle }?
-            .source.appending(components: "Shaders", folder, directoryHint: .isDirectory)
+            .source.appending(components: "Shaders", "WESL", directoryHint: .isDirectory)
         let candidates = [
             bundled,
             packageDirectory.appending(
-                components: "Sources", "AdaRender", "Assets", "Shaders", folder,
+                components: "Sources", "AdaRender", "Assets", "Shaders", "WESL",
                 directoryHint: .isDirectory
             )
         ]
@@ -683,32 +693,14 @@ struct AdaWebExportPlugin: CommandPlugin {
     }
 
     private func manifestEntries(forResourceBundle bundle: ResourceBundleExport) throws -> [ResourceManifestEntry] {
-        let fileManager = FileManager.default
-        guard let enumerator = fileManager.enumerator(
-            at: bundle.source,
-            includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
-        ) else {
-            return []
-        }
-
-        var entries: [ResourceManifestEntry] = []
-        for item in enumerator {
-            guard let url = item as? URL else {
-                continue
-            }
-            let resourceValues = try url.resourceValues(forKeys: [.isRegularFileKey])
-            guard resourceValues.isRegularFile == true else {
-                continue
-            }
-            entries.append(
-                ResourceManifestEntry(
-                    path: url.path(percentEncoded: false),
-                    url: browserRelativeURL(forResourceURL: url, in: bundle)
-                )
+        try regularFiles(in: bundle.destination).map { url in
+            let relative = url.relativePath(from: bundle.destination)
+            let source = bundle.source.appendingPathComponent(relative)
+            return ResourceManifestEntry(
+                path: source.path(percentEncoded: false),
+                url: browserRelativeURL(forResourceURL: source, in: bundle)
             )
         }
-        return entries
     }
 
     private func writeResourceManifest(_ manifest: [ResourceManifestEntry], to output: URL) throws {
@@ -941,9 +933,9 @@ private extension URL {
         return path == directoryPath || path.hasPrefix(directoryPath + "/")
     }
 
-    func relativePath(from directory: URL) -> String {
-        let directoryPath = directory.normalizedPath
-        let path = normalizedPath
+    func relativePath(from directory: URL, resolvingSymlinks: Bool = true) -> String {
+        let directoryPath = resolvingSymlinks ? directory.normalizedPath : directory.standardizedFileURL.path
+        let path = resolvingSymlinks ? normalizedPath : standardizedFileURL.path
         guard path.hasPrefix(directoryPath + "/") else {
             return lastPathComponent
         }
@@ -973,6 +965,8 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
     case browserWASIRuntimeNotFound
     case sagaWebHostNotResolved
     case sagaWebHostAssetMissing(String)
+    case unsupportedShader(String)
+    case overlappingAssets
 
     var errorDescription: String? {
         description
@@ -993,6 +987,10 @@ private enum ExportError: LocalizedError, CustomStringConvertible {
             return "Web export requires a SAGA dependency that provides the SAGAWebHost product."
         case .sagaWebHostAssetMissing(let path):
             return "The resolved SAGAWebHost package is missing a browser asset at \(path). Use a SAGA revision that ships the matching browser host."
+        case .unsupportedShader(let path):
+            return "Web export cannot use GLSL shader `\(path)`. Port it to WESL and see the WESLShaders guide."
+        case .overlappingAssets:
+            return "Web export requires an output directory whose Assets folder is separate from the project's Assets."
         case .missingTarget:
             return "Missing required --product <ProductName> argument."
         case .missingValue(let argument):

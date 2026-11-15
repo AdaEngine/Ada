@@ -15,7 +15,7 @@ compositor's asymmetric per-eye projections. Native projections accept right-han
 view-space input, so the host explicitly mirrors input Z before adapting their depth;
 the compositor's NDC convention alone does not convert camera handedness. Ada's offscreen pipelines use forward
 Z; the final Metal pass converts depth back to reverse Z for system composition.
-The host uses the engine's Metal command queue to preserve GPU resource ordering.
+The host submits the compositor pass through SAGA's Metal queue to preserve GPU resource ordering.
 
 `SpatialGrabbable` marks root entities with local bounds. `SpatialInput` provides
 active grip poses and optional selection rays. `SpatialInteractionSystem` updates
@@ -40,12 +40,10 @@ adds bandwidth cost. A performance gain requires measurement on Vision Pro; simu
 launch alone cannot establish foveation quality, stereo alignment or gaze-driven savings.
 Capture-target drawables are not rendered yet.
 
-Custom geometry vertex shaders used with layered foveation must select the target
-layer explicitly. For the Metal backend, `ADA_METAL_RENDER_LAYER` is defined for
-vertex stages. The built-in shader reads a `uint` uniform at reserved binding 30
-(`GlobalBufferIndex.renderTargetLayer`) and writes `gl_Layer`; SPIRV-Cross maps that
-to Metal's `render_target_array_index`. Ordinary passes bind layer zero. Other
-backends do not define this macro.
+For a layered rate map, SAGA specializes the WESL vertex stage during Metal
+code generation and writes the selected eye layer to `render_target_array_index`.
+Single-layer rate maps use the ordinary vertex stage. Custom WESL geometry
+shaders use the same SAGA pipeline and shader interface.
 
 ## Reuse AdaUI panels in spatial windows
 

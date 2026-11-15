@@ -62,6 +62,16 @@ actor EditorAdaScriptNativeExporter {
         let stage = parent.appendingPathComponent(".ada-aot-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: stage) }
+        let player = stage.appendingPathComponent("Sources/AdaNativeGame", isDirectory: true)
+        try FileManager.default.createDirectory(at: player, withIntermediateDirectories: true)
+        let assets = player.appendingPathComponent("GameAssets", isDirectory: true)
+        let originalAssets = root.appendingPathComponent(project.paths.assets ?? "Assets", isDirectory: true)
+        if FileManager.default.fileExists(atPath: originalAssets.path) {
+            try FileManager.default.copyItem(at: originalAssets, to: assets)
+        } else {
+            try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
+        }
+        try Self.rejectLegacyShaders(in: assets)
         let catalog = try EditorScriptableObjectCatalogLoader.load(project: project, at: root)
         let sources = catalog.playRuntime.sources
         let interpreted = AdaScriptNativeSourceBuilder.requiresInterpretedRuntime(sources: sources)
@@ -133,15 +143,6 @@ actor EditorAdaScriptNativeExporter {
                 encoding: .utf8
             )
         }
-        let player = stage.appendingPathComponent("Sources/AdaNativeGame", isDirectory: true)
-        try FileManager.default.createDirectory(at: player, withIntermediateDirectories: true)
-        let assets = player.appendingPathComponent("GameAssets", isDirectory: true)
-        let originalAssets = root.appendingPathComponent(project.paths.assets ?? "Assets", isDirectory: true)
-        if FileManager.default.fileExists(atPath: originalAssets.path) {
-            try FileManager.default.copyItem(at: originalAssets, to: assets)
-        } else {
-            try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
-        }
         try await Self.convertScenes(at: assets, originalRoot: originalAssets, sources: sources)
         try Self.convertShaderGraphs(at: assets, originalRoot: originalAssets)
         try JSONEncoder().encode(project.inputActions).write(to: assets.appendingPathComponent("input-actions.json"))
@@ -169,8 +170,7 @@ actor EditorAdaScriptNativeExporter {
         """.write(to: codexDirectory.appendingPathComponent("environment.toml"), atomically: true, encoding: .utf8)
         let env = options.buildEnvironment.merging([
             "ADAENGINE_PACKAGE_PATH": options.engineRoot.path,
-            "ADAENGINE_GRAVITY_PACKAGE_PATH": options.gravityRoot.path,
-            "ADAENGINE_DISABLE_SWAN": "1"
+            "ADAENGINE_GRAVITY_PACKAGE_PATH": options.gravityRoot.path
         ]) { _, value in value }
         if !options.buildsPlayer {
             // Package-only mode is used for reusable library exports and compiler QA.
@@ -219,7 +219,6 @@ actor EditorAdaScriptNativeExporter {
             guard result.succeeded else { throw EditorPreviewBuildFailure(message: result.combinedOutput) }
             #else
             var webEnv = env
-            webEnv["ADAENGINE_DISABLE_SWAN"] = "0"
             webEnv["ADAENGINE_WEB_EXPORT"] = "1"
             webEnv["BUILD_WASM"] = "1"
             webEnv["PATH"] = URL(fileURLWithPath: options.swiftExecutable).deletingLastPathComponent().path + ":" + (ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin")
@@ -271,6 +270,27 @@ actor EditorAdaScriptNativeExporter {
         let result = await runner.run(EditorProcessCommand(executablePath: executable, arguments: arguments, workingDirectory: directory, environment: environment), output: log)
         try Task.checkCancellation()
         guard result.succeeded else { throw EditorPreviewBuildFailure(message: result.combinedOutput) }
+    }
+
+    private static func rejectLegacyShaders(in directory: URL) throws {
+        guard let files = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isDirectoryKey]) else { return }
+        let legacyExtensions: Set<String> = ["glsl", "vert", "frag", "comp", "geom", "tesc", "tese"]
+        let legacyDirective = #"(?m)^\s*#\s*(?:version\b|pragma\s+stage\b)"#
+        for case let file as URL in files {
+            guard try file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != true else { continue }
+            let fileExtension = file.pathExtension.lowercased()
+            var isLegacyShader = legacyExtensions.contains(fileExtension)
+            if fileExtension == "mat" || fileExtension == "shader",
+               let source = try? String(contentsOf: file, encoding: .utf8) {
+                isLegacyShader = source.range(of: legacyDirective, options: .regularExpression) != nil
+            }
+            if isLegacyShader {
+                let relativePath = file.pathComponents.dropFirst(directory.pathComponents.count).joined(separator: "/")
+                throw EditorPreviewBuildFailure(
+                    message: "Export found legacy GLSL shader '\(relativePath)'. Port it to WESL or WGSL. See the WESL shaders guide."
+                )
+            }
+        }
     }
 
     private static func convertShaderGraphs(at assets: URL, originalRoot: URL) throws {
@@ -652,7 +672,6 @@ actor EditorAdaScriptNativeExporter {
         ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
         cd "$ROOT_DIR"
         SWIFT="${SWIFT_EXECUTABLE:-swift}"
-        export ADAENGINE_DISABLE_SWAN=1
         BUILD_DIR="${ADA_NATIVE_SCRATCH_PATH:-$ROOT_DIR/build-native}"
         APP_BUNDLE="$ROOT_DIR/AdaNativeGame.app"
         APP_BINARY="$APP_BUNDLE/Contents/MacOS/AdaNativeGame"

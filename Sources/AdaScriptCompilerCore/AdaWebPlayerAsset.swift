@@ -62,6 +62,9 @@ extension AdaWebPlayerProject {
                 throw AdaWebPlayerProjectError.invalid("Invalid resource: \(asset.id).")
             }
             let ext = URL(fileURLWithPath: asset.path).pathExtension.lowercased()
+            if AdaWebLegacyShader.extensions.contains(ext) {
+                throw AdaWebLegacyShader.projectError(for: asset.path)
+            }
             let supported: [String]
             switch asset.kind {
             case .texture: supported = ["png"]
@@ -89,5 +92,25 @@ extension AdaWebPlayerProject {
         !path.isEmpty && path.count <= 220 && !path.contains("\\") && !path.contains(":")
             && !path.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains)
             && path.split(separator: "/", omittingEmptySubsequences: false).allSatisfy { !$0.isEmpty && !$0.hasPrefix(".") && !$0.hasSuffix(" ") }
+    }
+}
+
+enum AdaWebLegacyShader {
+    static let extensions: Set<String> = ["glsl", "vert", "frag", "comp", "geom", "tesc", "tese"]
+    static let containers: Set<String> = ["mat", "shader"]
+
+    static func containsLegacySource(at url: URL, declaredExtension: String) -> Bool {
+        let fileExtension = declaredExtension.lowercased()
+        if extensions.contains(fileExtension) {
+            return true
+        }
+        guard containers.contains(fileExtension), let source = try? String(contentsOf: url, encoding: .utf8) else {
+            return false
+        }
+        return source.range(of: #"(?m)^\s*#\s*(?:version\b|pragma\s+stage\b)"#, options: .regularExpression) != nil
+    }
+
+    static func projectError(for path: String) -> AdaWebPlayerProjectError {
+        .invalid("Web Player cannot use GLSL shader `\(path)`. Port it to WESL and compile it to WGSL. See the WESLShaders guide.")
     }
 }

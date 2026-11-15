@@ -5,7 +5,7 @@
 //  Created by v.prusakov on 8/13/21.
 //
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+#if canImport(MetalKit)
     import AdaUI
     import Math
     import MetalKit

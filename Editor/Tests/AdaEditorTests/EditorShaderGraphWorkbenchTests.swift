@@ -10,7 +10,7 @@ import Testing
         for kind in [EditorNewFileKind.spriteShaderGraph, .pbrShaderGraph, .dissolveShaderGraph, .uvScrollShaderGraph] {
             let content = kind.initialContent(fileName: "Effect.shadergraph")
             let graph = try JSONDecoder().decode(ShaderGraph.self, from: Data(content.utf8))
-            try graph.compileGLSL().validateGLSL()
+            try graph.compileWGSL().validateWGSL()
             #expect(EditorViewModel.fileKind(for: URL(fileURLWithPath: "/Effect.shadergraph"), isDirectory: false) == .genericAsset)
             #expect(EditorViewModel.assetPreviewKind(for: .genericAsset, fileExtension: "shadergraph") == .shaderGraph)
         }

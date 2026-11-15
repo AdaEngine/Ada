@@ -1,4 +1,6 @@
 @_spi(Internal) @testable import AdaRender
+import AdaWGSLCompiler
+import Foundation
 import Testing
 
 @testable import AdaEditor
@@ -7,9 +9,12 @@ import Testing
 struct MobileEditorVoiceTests {
     @Test("Companion Bubble shader compiles with the AdaUI ABI")
     func shaderCompilation() throws {
-        let source = try MobileVoiceOrbMaterial.fragmentShader()
-        let result = try ShaderCompiler(shaderSource: source.asset).compileSpirvBin(for: .fragment, ignoreCache: true)
-        #expect(!result.data.isEmpty)
+        let file = try #require(Bundle.editor.url(forResource: "mobile_voice_orb", withExtension: "wesl", subdirectory: "Assets/Shaders"))
+        let artifact = try ShaderModule.linkWESL(from: file)
+        #expect(artifact.entryPoints.contains { $0.stage == "vertex" })
+        let fragment = try #require(artifact.entryPoints.first { $0.stage == "fragment" })
+        let reflection = try ShaderModule.weslStageReflection(artifact: artifact, entry: fragment, stage: .fragment)
+        #expect(reflection.shaderBuffers["MobileVoiceOrbMaterial"]?.size == MemoryLayout<MobileVoiceOrbParameters>.stride)
     }
 
     @Test("Bubble responds to input and settles after recording")

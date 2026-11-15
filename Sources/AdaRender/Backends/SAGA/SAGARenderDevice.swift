@@ -6,6 +6,7 @@
 #if SAGA_RENDER && canImport(SAGACompiler)
     import AdaUtils
     import Foundation
+    import Logging
     import Math
     import SAGA
     import SAGACore
@@ -22,12 +23,12 @@
         public var supportsInstancedVertexInputs: Bool { true }
         public var supportsSpatialUpscaling: Bool { false }
         public var supportsTemporalUpscaling: Bool { false }
-        /// Hybrid reflections write five HDR targets (40 bytes per pixel) and the surface buffer a sixth. Vulkan has no
-        /// per-sample byte limit, so native Vulkan only needs the attachment count. Browsers keep WebGPU's 32-byte limit
-        /// and Metal is unverified, so both stay off.
+        /// The combined geometry pass writes five RGBA16Float targets and one RGBA8Unorm surface target.
+        /// SAGA's attachment budget charges eight bytes per sample for each of those formats.
         private var supportsWideGeometryTargets: Bool {
-            #if SAGA_NATIVE
+            #if SAGA_NATIVE || SAGA_METAL
                 context.capabilities.maxColorAttachments >= 6
+                    && context.capabilities.maxColorAttachmentBytesPerSample >= 48
             #else
                 false
             #endif
@@ -105,6 +106,17 @@
         public func createCommandQueue() -> any CommandQueue {
             SAGACommandQueue(context: context)
         }
+
+        #if SAGA_NATIVE || SAGA_METAL
+        public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? {
+            do {
+                return try SAGAVisibilityProcessor(context: context)
+            } catch {
+                context.logger.error("Cannot compile SAGA visibility shaders: \(error)")
+                return nil
+            }
+        }
+        #endif
 
         @MainActor
         public func createSwapchain(from window: WindowID) -> (any Swapchain)? {

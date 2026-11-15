@@ -20,6 +20,7 @@
         let context: SAGAContext
         let windowId: WindowID
         let pixelFormat: PixelFormat
+        private let waitsForPresentation: Bool
         /// The presentation surface of this window. Windows beyond the first receive theirs from the backend.
         let surface = ResourceSlot<UInt32>()
         private struct State {
@@ -27,15 +28,20 @@
             var scaleFactor: Float
             var backbuffer: SAGAGPUTexture?
             var lastPresentation: SubmissionTicket?
+            var isPresenting = false
             var isRetired = false
         }
 
         private let state: Mutex<State>
 
-        init(context: SAGAContext, windowId: WindowID, size: SizeInt, scaleFactor: Float, pixelFormat: PixelFormat, surfaceID: UInt32? = 0) {
+        init(
+            context: SAGAContext, windowId: WindowID, size: SizeInt, scaleFactor: Float,
+            pixelFormat: PixelFormat, surfaceID: UInt32? = 0, waitsForPresentation: Bool = false
+        ) {
             self.context = context
             self.windowId = windowId
             self.pixelFormat = pixelFormat
+            self.waitsForPresentation = waitsForPresentation
             if let surfaceID { surface.fulfill(surfaceID) }
             self.state = Mutex(State(size: size, scaleFactor: scaleFactor, backbuffer: nil))
         }
@@ -57,7 +63,7 @@
         /// Returns the texture for the current frame, creating it after a resize.
         func currentBackbuffer() -> SAGAGPUTexture? {
             state.withLock { state in
-                guard !state.isRetired else {
+                guard !state.isRetired, !state.isPresenting else {
                     return nil
                 }
                 if let backbuffer = state.backbuffer {
@@ -80,14 +86,23 @@
 
         func present(_ backbuffer: SAGAGPUTexture) {
             state.withLock { state in
-                guard !state.isRetired else {
+                guard !state.isRetired, !state.isPresenting else {
                     return
                 }
-                context.queue.enqueue { [self] device in
+                // Android can deliver Choreographer ticks faster than Vulkan can present.
+                // Keep retirement from having to drain a backlog of frames for the old window.
+                state.isPresenting = waitsForPresentation
+                context.queue.enqueue(onUnavailable: { [self] in finishPresentation() }) { [self] device in
+                    defer { finishPresentation() }
                     let ticket = try await device.present(try backbuffer.slot.get(), surface: try surface.get())
                     self.state.withLock { $0.lastPresentation = ticket }
+                    if waitsForPresentation { try await ticket.wait() }
                 }
             }
+        }
+
+        private func finishPresentation() {
+            if waitsForPresentation { state.withLock { $0.isPresenting = false } }
         }
 
         func retire(_ removeSurface: @escaping @Sendable (UInt32) async -> Void) {

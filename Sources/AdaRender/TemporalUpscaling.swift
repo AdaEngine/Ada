@@ -1,7 +1,7 @@
 import Math
 
 public enum TemporalReconstructionMethod: String, Codable, Sendable {
-    /// Native MetalFX or DLSS; preserves the original unsupported-device behavior.
+    /// Use the backend-provided temporal upscaler when available.
     case automatic
     /// Vendor-independent shader reconstruction (TAA at scale 1, temporal upscaling below 1).
     case portable

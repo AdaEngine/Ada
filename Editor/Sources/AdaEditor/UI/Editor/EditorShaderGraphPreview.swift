@@ -69,18 +69,19 @@ import Observation
     }
 
     @concurrent private static func validate(_ graph: ShaderGraph, validatedSource: String?) async throws -> String {
-        let program = try graph.compileGLSL()
-        if program.source != validatedSource { try program.validateGLSL() }
+        let program = try graph.compileWGSL()
+        if program.source != validatedSource, ShaderGraphProgram.supportsWGSLValidation {
+            try program.validateWGSL()
+        }
         return program.source
     }
 
     func checkDeviceError() {
-        guard let issue = material?.compilationError else {
+        guard let issue = material?.compilationDiagnostic else {
             if material?.hasPreparedPipeline == true { lastValidMaterial = material }
             return
         }
-        let diagnostic = material?.program.diagnostic(for: issue)
-        errorNode = diagnostic?.nodeID
+        errorNode = issue.nodeID
         error = L10n.text("The renderer could not prepare this graph material.")
         isStale = true
         if let lastValidMaterial, material !== lastValidMaterial {

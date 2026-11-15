@@ -265,11 +265,14 @@ def wsl(ctx, arguments):
     if not ctx.which("wsl.exe") and not ctx.dry:
         raise ToolError("Install WSL 2 with Ubuntu 24.04: wsl --install -d Ubuntu-24.04; then run prepare wasm")
     root = ctx.run(["wsl.exe", "--exec", "wslpath", "-a", "-u", ctx.root], capture=True) or "/mnt/<drive>/AdaEngine"
-    environment = []
+    variables = []
     if saga := ctx.env.get("ADAENGINE_SAGA_PACKAGE_PATH"):
         if not saga.startswith("/"):
             saga = ctx.run(["wsl.exe", "--exec", "wslpath", "-a", "-u", saga], capture=True) or saga
-        environment = ["env", f"ADAENGINE_SAGA_PACKAGE_PATH={saga}"]
+        variables.append(f"ADAENGINE_SAGA_PACKAGE_PATH={saga}")
+    if "ADAENGINE_SAGA_WEB_DEVICE_LIMIT" in ctx.env:
+        variables.append(f"ADAENGINE_SAGA_WEB_DEVICE_LIMIT={ctx.env['ADAENGINE_SAGA_WEB_DEVICE_LIMIT']}")
+    environment = ["env", *variables] if variables else []
     return ctx.run(["wsl.exe", "--cd", root, "--exec", *environment, "python3", root + "/ada_tool.py", *arguments])
 
 
@@ -329,8 +332,8 @@ def doctor(ctx, args):
         for tool in ("git", "cmake", "ninja"):
             add(tool, ctx.which(tool), ctx.which(tool) or "missing", "python ada_tool.py prepare studio")
         saga_override = ctx.env.get("ADAENGINE_SAGA_PACKAGE_PATH")
-        if saga_override or (studio and ctx.host != "macos"):
-            saga = Path(saga_override or ctx.root.parent / "SAGA")
+        if saga_override:
+            saga = Path(saga_override)
             add("SAGA", (saga / "Package.swift").is_file(), str(saga), "Set ADAENGINE_SAGA_PACKAGE_PATH to the local SAGA checkout")
         else:
             add("SAGA", True, "Revision managed by SwiftPM")

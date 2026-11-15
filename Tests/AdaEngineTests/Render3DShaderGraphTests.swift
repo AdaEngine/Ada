@@ -17,7 +17,7 @@ extension Render3DGPUTests {
             try ShaderGraphRuntimeLibrary.install(archive)
             let graph = try #require(archive.graphs.values.first { $0.target == .pbrSurface })
             let instance = try ShaderGraphMaterial(source: .init(graph: graph))
-            let source = instance.program.inserting(in: try ShaderGraph3DPipeline.fragmentTemplate())
+            let source = ShaderGraphArchive.Fragment.identity(template: "flat3d", graphSource: instance.program.source)
             let scene = try await DebugViews.makeScene()
             let material = try #require(scene.groundMaterial)
             material.graphMaterial = instance
@@ -39,7 +39,7 @@ extension Render3DGPUTests {
                     if morph { features.insert(.morph) }
                     let defines = features.enablingMacros.map { ShaderDefine.define($0) }
                     let fragment = try #require(ShaderGraphRuntimeLibrary.fragment(source: source, defines: defines))
-                    #expect(fragment.wgsl.contains("@fragment"))
+                    #expect(fragment.wgsl.range(of: #"@\s*fragment\b"#, options: .regularExpression) != nil)
                 }
                 let image = try await scene.render(.albedo)
                 let red = image.getPixel(x: image.width / 2, y: image.height - 30).red
@@ -50,15 +50,15 @@ extension Render3DGPUTests {
         }
 
         @Test(.enabled(if: GoldenFrame.activeBackend == .saga && ProcessInfo.processInfo.environment["ADAENGINE_SHADER_GRAPH_ARCHIVE"] != nil))
-        func hostBakedWGSLRendersThroughTheProductionSurfacePipeline() async throws {
+        func bakedBaseVariantMatchesTheLiveGraphIdentity() async throws {
             let path = try #require(ProcessInfo.processInfo.environment["ADAENGINE_SHADER_GRAPH_ARCHIVE"])
             let archive = try JSONDecoder().decode(ShaderGraphArchive.self, from: Data(contentsOf: URL(fileURLWithPath: path)))
             try ShaderGraphRuntimeLibrary.install(archive)
             let graph = try #require(archive.graphs.values.first { $0.target == .pbrSurface })
             let material = try ShaderGraphMaterial(source: .init(graph: graph))
-            let source = material.program.inserting(in: try ShaderGraph3DPipeline.fragmentTemplate())
+            let source = ShaderGraphArchive.Fragment.identity(template: "flat3d", graphSource: material.program.source)
             let fragment = try #require(ShaderGraphRuntimeLibrary.fragment(source: source, defines: []))
-            #expect(fragment.wgsl.contains("@fragment"))
+            #expect(fragment.wgsl.range(of: #"@\s*fragment\b"#, options: .regularExpression) != nil)
             let scene = try await DebugViews.makeScene()
             let ground = try #require(scene.groundMaterial)
             ground.baseColorFactor = [0.2, 0.6, 0.9, 1]
@@ -73,10 +73,9 @@ extension Render3DGPUTests {
             #expect(material.compilationError == nil)
         }
 
-        @Test(.enabled(if: GoldenFrame.activeBackend == .metal))
+        @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
         func alphaMaskRunsThroughActualTemporalMotionRendering() async throws {
             let scene = try await DebugViews.makeScene(temporalRenderScale: 0.67)
-            try #require(scene.device.supportsTemporalUpscaling)
             let entity = try #require(scene.sphereEntities.first)
             let material = try #require(entity.components[Mesh3DComponent.self]?.materials.first as? PBRMaterial)
             var graph = ShaderGraph(target: .pbrSurface, output: "output", nodes: [
@@ -89,7 +88,7 @@ extension Render3DGPUTests {
             let visible = try await scene.render(.none, frames: 6)
             let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
             let statistics = try #require(world.getResource(Render3DTemporalStatistics.self))
-            #expect(statistics.snapshots.values.contains { $0.encodedFrames + $0.fallbackFrames > 0 && $0.inputWidth < $0.outputWidth })
+            #expect(statistics.snapshots.values.contains { $0.encodedFrames > 0 && $0.inputWidth < $0.outputWidth })
             try instance.setValue([0], for: "alpha")
             let hidden = try await scene.render(.none, frames: 8)
             #expect(visible.data != hidden.data)

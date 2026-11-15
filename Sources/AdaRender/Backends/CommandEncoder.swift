@@ -110,7 +110,7 @@ public protocol CommandBuffer: AnyObject {
     func beginRenderPass(_ desc: RenderPassDescriptor) -> RenderCommandEncoder
 
     /// Renders into compressed geometry attachments and resolves them before screen-space effects.
-    /// Layered Metal shaders select ``GlobalBufferIndex/renderTargetLayer`` through their render-target-array output.
+    /// SAGA Metal specializes the vertex stage for the selected layer of a multi-layer rate map.
     func beginFoveatedRenderPass(_ desc: RenderPassDescriptor, rateMap: any RasterizationRateMap) throws -> FoveatedRenderPass
 
     /// Begins a blit pass and returns an encoder for recording memory transfer commands.
@@ -550,4 +550,8 @@ extension RenderCommandEncoder {
         drawCountBuffer _: any Buffer,
         drawCountOffset _: Int
     ) -> Bool { false }
+}
+
+/// A protocol that defines a draw command buffer.
+public protocol DrawCommandBuffer: Sendable {
 }

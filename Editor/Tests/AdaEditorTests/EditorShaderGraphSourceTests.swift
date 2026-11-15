@@ -38,7 +38,7 @@ struct EditorShaderGraphSourceTests {
         let frame = try root.uiNode(matching: .accessibilityIdentifier("AdaEditor.ShaderGraph.SourceEditor")).absoluteFrame
         #expect(frame == Rect(x: 180, y: 44, width: 1220, height: 656))
         let node = try #require(editorNode(in: root.viewTree.rootNode))
-        let source = try #require(model.graph).compileGLSL().source
+        let source = try #require(model.graph).compileWGSL().source
         #expect(node.text == source)
         #expect(node.showsLineNumbers && node.foldingStyle == .braces)
         #expect(node.resolvedFontPointSize() == 17)
@@ -62,7 +62,7 @@ struct EditorShaderGraphSourceTests {
         await settle()
         #expect(editorNode(in: root.viewTree.rootNode) === node)
         #expect(node.text != source)
-        #expect(node.text == (try model.graph?.compileGLSL().source))
+        #expect(node.text == (try model.graph?.compileWGSL().source))
         model.undo()
         await settle()
         #expect(node.text == source && !model.isDirty)
@@ -74,7 +74,14 @@ struct EditorShaderGraphSourceTests {
     }
 
     private func editorNode(in node: ViewNode) -> TextEditorViewNode? {
-        if let editor = node as? TextEditorViewNode { return editor }
-        return node.transientEnvironmentChildren.lazy.compactMap { editorNode(in: $0) }.first
+        if let editor = node as? TextEditorViewNode {
+            return editor
+        }
+        for child in node.transientEnvironmentChildren {
+            if let editor = editorNode(in: child) {
+                return editor
+            }
+        }
+        return nil
     }
 }

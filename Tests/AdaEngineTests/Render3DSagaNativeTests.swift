@@ -14,18 +14,29 @@
         @Suite("SAGA native")
         @MainActor
         struct SagaNative {
+            #if SAGA_NATIVE || SAGA_METAL_NATIVE_PASS
+            @Test(.enabled(if: GoldenFrame.activeBackend == .saga && sagaNativeTestDeviceAvailable()))
+            func gpuVisibilityCompactsAndDrawsTheProductionScene() async throws {
+                let scene = try await DebugViews.makeScene()
+                try scene.configure { $0.gpuOcclusionEnabled = false }
+                let ordinary = try await scene.render(.none)
+                try scene.configure { $0.gpuOcclusionEnabled = true }
+                let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+                var compacted = ordinary
+                for _ in 0..<4 {
+                    compacted = try await scene.render(.none)
+                    if world.getResource(GPUVisibility3DState.self)?.output(for: scene.camera.id) != nil { break }
+                }
+                let output = try #require(world.getResource(GPUVisibility3DState.self)?.output(for: scene.camera.id))
+                #expect(output.drawCount > 0)
+                let comparison = GoldenFrame.compare(compacted, ordinary, tolerance: GoldenFrame.activeTolerance)
+                #expect(comparison.passes(GoldenFrame.activeTolerance))
+            }
+            #endif
+
             private static var legacyReference: URL {
                 GoldenFrame.outputDirectory.appendingPathComponent("legacy-metal-spheres.png")
             }
-
-            #if os(macOS)
-                @Test(.enabled(if: compareSagaWithMetal && GoldenFrame.activeBackend == .metal))
-                func captureLegacyMetalReferenceForSAGA() async throws {
-                    let scene = try await DebugViews.makeScene()
-                    let image = try await scene.render(.none, frames: 4)
-                    try image.writePNG(to: Self.legacyReference)
-                }
-            #endif
 
             @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
             func theLitSphereRowRendersWithTheWESLShaders() async throws {
@@ -36,7 +47,7 @@
                     let reference = try Image(contentsOf: Self.legacyReference)
                     let comparison = GoldenFrame.compare(image, reference, tolerance: .metal)
                     #expect(comparison.passes(.metal),
-                            "SAGA differs from the fresh Metal frame: \(comparison.differingPixels) pixels, max step \(comparison.largestStep)")
+                            "SAGA differs from the recorded Metal frame: \(comparison.differingPixels) pixels, max step \(comparison.largestStep)")
                 }
 
                 let background = Color(red: 0.55, green: 0.7, blue: 0.9)

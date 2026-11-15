@@ -13,7 +13,7 @@ extension Render3DGPUTests {
     /// Screen-space reflections through the real pipeline. These frames guard performance work on the reflection
     /// pass: a faster trace must not visibly change what it draws.
     ///
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/Reflections`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DGPUTests/Reflections`.
     @Suite("3D reflections on GPU")
     @MainActor
     struct Reflections {

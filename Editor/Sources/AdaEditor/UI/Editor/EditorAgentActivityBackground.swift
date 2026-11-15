@@ -2,6 +2,7 @@
 import Android
 #endif
 @_spi(AdaEngine) import AdaEngine
+@_spi(Internal) import AdaRender
 import AdaUI
 import Foundation
 import Math
@@ -265,13 +266,6 @@ struct EditorAgentGlowMaterial: UIShaderMaterial {
         return try ShaderModule.create(from: url)
     }
 
-    static func fragmentShader() throws -> AssetHandle<ShaderSource> {
-        guard let url = Bundle.editor.url(forResource: "agent_activity", withExtension: "glsl", subdirectory: "Assets/Shaders") else {
-            throw EditorAgentGlowResourceError.missingShader
-        }
-        return AssetHandle(try ShaderSource(from: url))
-    }
-
     static func configurePipeline(
         keys _: Set<String>,
         vertex: Shader,
@@ -288,9 +282,4 @@ struct EditorAgentGlowMaterial: UIShaderMaterial {
         ]
         return descriptor
     }
-}
-
-private enum EditorAgentGlowResourceError: LocalizedError {
-    case missingShader
-    var errorDescription: String? { "Agent activity shader resource is missing." }
 }

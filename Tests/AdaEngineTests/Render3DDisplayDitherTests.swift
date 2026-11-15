@@ -98,33 +98,27 @@ extension Render3DGPUTests {
         private func render() async throws -> Image {
             let scene = try await DebugViews.makeScene()
             let device = scene.device
-            let source = try ShaderSource(source: """
-            #version 450 core
-            #pragma stage : vert
-            [[main]]
-            void display_dither_vertex() {
-                vec2 p[3] = vec2[](vec2(-1,-1), vec2(3,-1), vec2(-1,3));
-                gl_Position = vec4(p[gl_VertexIndex], 0, 1);
+            let probe = try WESLRenderProbe(source: """
+            import ada_engine::tonemapping::adaDitherDisplay;
+            import package::fullscreen::{FullscreenVertex, fullscreenVertex};
+
+            @vertex fn vertexMain(@builtin(vertex_index) index: u32) -> FullscreenVertex {
+                return fullscreenVertex(index);
             }
-            #version 450 core
-            #pragma stage : frag
-            layout(location=0) out vec4 o_Color;
-            #include <AdaEngine/Tonemapping.glsl>
-            [[main]]
-            void display_dither_fragment() {
-                float x = floor(gl_FragCoord.x);
-                vec3 color;
-                if (x < 128.0) { color = vec3(0.0); }
-                else if (x < 256.0) { color = vec3(1.0); }
-                else if (x < 512.0) { color = vec3(1.35,0.85,0.40) / 255.0; }
-                else { color = vec3(24.0,15.0,7.0) * ((x - 512.0 + 0.5) / 128.0) / 255.0; }
-                if (x < 256.0 || x >= 384.0) { color = adaDitherDisplay(color, gl_FragCoord.xy); }
-                o_Color = vec4(color,1.0);
+
+            @fragment fn fragmentMain(input: FullscreenVertex) -> @location(0) vec4f {
+                let x = floor(input.position.x);
+                var color: vec3f;
+                if x < 128.0 { color = vec3f(0.0); }
+                else if x < 256.0 { color = vec3f(1.0); }
+                else if x < 512.0 { color = vec3f(1.35, 0.85, 0.40) / 255.0; }
+                else { color = vec3f(24.0, 15.0, 7.0) * ((x - 512.0 + 0.5) / 128.0) / 255.0; }
+                if x < 256.0 || x >= 384.0 { color = adaDitherDisplay(color, input.position.xy); }
+                return vec4f(color, 1.0);
             }
             """)
-            let module = try ShaderCompiler(shaderSource: source).compileShaderModule()
             let pipeline = device.createRenderPipeline(from: RenderPipelineDescriptor(
-                vertex: try #require(module.getShader(for: .vertex)), fragment: module.getShader(for: .fragment),
+                vertex: probe.vertex, fragment: probe.fragment,
                 debugName: "Display quantization regression", backfaceCulling: false,
                 depthPixelFormat: .none, colorAttachments: [.init(format: .bgra8)]
             ))
@@ -137,7 +131,7 @@ extension Render3DGPUTests {
             pass.setRenderPipelineState(pipeline)
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             pass.endRenderPass()
-            command.commit()
+            await WESLRenderProbe.complete(command)
             return try #require(try await device.readImage(from: target))
         }
     }

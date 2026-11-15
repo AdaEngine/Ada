@@ -3,6 +3,7 @@
 import AdaAssets
 @testable import AdaCorePipelines
 import AdaECS
+import AdaEngine
 import AdaInput
 @_spi(Internal) @testable import AdaRender
 import AdaScene
@@ -13,24 +14,20 @@ import AdaUI
 import AdaUtils
 import Foundation
 import Math
-import Metal
 import Testing
 
 private let pixelPerfectSAGASmokeEnabled = ProcessInfo.processInfo.environment["ADAENGINE_PIXEL_PERFECT_SAGA_SMOKE"] == "1"
-private let pixelPerfectGPUSmokeEnabled =
-    pixelPerfectSAGASmokeEnabled || ProcessInfo.processInfo.environment["ADAENGINE_PIXEL_PERFECT_METAL_SMOKE"] == "1"
 
 /// Renders a pixel-perfect camera through the whole engine (camera extraction, render target preparation, the
-/// 2D render graph and the upscale node) on Metal and reads the output back.
-/// Run alone in a fresh process, like the other Metal suites:
-/// `ADAENGINE_PIXEL_PERFECT_METAL_SMOKE=1 swift test --filter PixelPerfectMetalTests`
+/// 2D render graph and the upscale node) on SAGA Metal and reads the output back.
+/// `ADAENGINE_PIXEL_PERFECT_SAGA_SMOKE=1 swift test --filter PixelPerfectMetalTests`
 @Suite("Pixel perfect GPU rendering", .serialized)
 @MainActor
 struct PixelPerfectMetalTests {
     private let scene = Color(red: 0.1, green: 0.2, blue: 0.6, alpha: 1)
     private let letterbox = Color(red: 0.9, green: 0.1, blue: 0.9, alpha: 1)
 
-    @Test(.enabled(if: pixelPerfectGPUSmokeEnabled))
+    @Test(.enabled(if: pixelPerfectSAGASmokeEnabled))
     func integerScaleCentresACrispPicture() async throws {
         // 8x6 art pixels into a 40x28 output: 4x scale, a 32x24 picture at (4, 2).
         let frame = try await render(output: SizeInt(width: 40, height: 28), resolution: SizeInt(width: 8, height: 6))
@@ -65,7 +62,7 @@ struct PixelPerfectMetalTests {
         #expect(strays == 0, "\(strays) picture pixels were blended")
     }
 
-    @Test(.enabled(if: pixelPerfectGPUSmokeEnabled))
+    @Test(.enabled(if: pixelPerfectSAGASmokeEnabled))
     func scaleFollowsTheOutputSize() async throws {
         // The same 8x6 picture in a 100x50 output: 8x scale, a 64x48 picture at (18, 1).
         let frame = try await render(output: SizeInt(width: 100, height: 50), resolution: SizeInt(width: 8, height: 6))
@@ -78,7 +75,7 @@ struct PixelPerfectMetalTests {
         expectColor(image.getPixel(x: 81, y: 48), .green, "bottom-right art pixel")
     }
 
-    @Test(.enabled(if: pixelPerfectGPUSmokeEnabled))
+    @Test(.enabled(if: pixelPerfectSAGASmokeEnabled))
     func fitModeFillsTheLimitingAxis() async throws {
         let frame = try await render(output: SizeInt(width: 40, height: 28), resolution: SizeInt(width: 8, height: 6), mode: .fit)
         let image = frame.image
@@ -88,7 +85,7 @@ struct PixelPerfectMetalTests {
         expectColor(image.getPixel(x: 20, y: 27), scene, "no border below", allowing: [.red, .green])
     }
 
-    @Test(.enabled(if: pixelPerfectGPUSmokeEnabled))
+    @Test(.enabled(if: pixelPerfectSAGASmokeEnabled))
     func aCameraWithoutThePresetStillFillsTheOutput() async throws {
         let frame = try await render(output: SizeInt(width: 40, height: 28), resolution: nil)
         let image = frame.image
@@ -99,7 +96,7 @@ struct PixelPerfectMetalTests {
         }
     }
 
-    @Test(.enabled(if: pixelPerfectGPUSmokeEnabled))
+    @Test(.enabled(if: pixelPerfectSAGASmokeEnabled))
     func uiIsDrawnAtOutputResolutionOnTopOfTheScaledScene() async throws {
         // 8x6 art pixels into 40x28: 4x scale, picture at (4, 2). Two UI blocks are placed in output pixels:
         // one inside the picture at an offset that is not a multiple of the scale, one in the border.
@@ -205,24 +202,16 @@ struct PixelPerfectMetalTests {
     }
 
     private func render(output: SizeInt, resolution: SizeInt?, mode: PixelPerfectSettings.ScaleMode = .integer, uiBlocks: [Rect] = []) async throws -> Frame {
-        let backend: RenderBackendType = pixelPerfectSAGASmokeEnabled ? .saga : .metal
-        unsafe RenderEngine.configurations.preferredBackend = backend
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         try RenderEngine.setupRenderEngine()
-        try #require(unsafe RenderEngine.shared.type == backend, "Requested GPU backend must be active.")
+        try #require(unsafe RenderEngine.shared.type == .saga, "The SAGA backend must be active.")
         let device = unsafe RenderEngine.shared.renderDevice
-        let queue: (any MTLCommandQueue)?
-        if pixelPerfectSAGASmokeEnabled {
-            queue = nil
-        } else {
-            let nativeQueue = try #require(MetalInterop.commandQueue(for: device))
-            queue = nativeQueue
-        }
 
         let app = AppWorlds(main: World())
         app.insertResource(OffscreenRenderWorld())
-            .insertResource(HandledEvents())
             .insertResource(PrimaryWindowId(windowId: RID()))
             .addPlugin(MainSchedulerPlugin())
+            .addPlugin(EventsPlugin())
             .addPlugin(TransformPlugin())
             .addPlugin(RenderWorldPlugin())
             .addPlugin(CameraPlugin())
@@ -258,13 +247,6 @@ struct PixelPerfectMetalTests {
 
         for _ in 0..<4 {
             try await app.update()
-        }
-        if let queue {
-            let fence = try #require(queue.makeCommandBuffer())
-            await withCheckedContinuation { continuation in
-                fence.addCompletedHandler { _ in continuation.resume() }
-                fence.commit()
-            }
         }
         return Frame(image: try #require(try await device.readImage(from: target)))
     }

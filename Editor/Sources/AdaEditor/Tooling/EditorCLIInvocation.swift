@@ -35,7 +35,7 @@ struct EditorCLIInvocation: Sendable {
         let common: Set<String> = ["format"]
         let project: Set<String> = ["project"]
         let toolchain: Set<String> = ["sdk", "swift"]
-        let build: Set<String> = ["target", "configuration", "output", "scratch-path", "swift-sdk", "product", "abi", "device", "emulator", "android-sdk", "ndk", "swift-sdks", "swan", "dawn"]
+        let build: Set<String> = ["target", "configuration", "output", "scratch-path", "swift-sdk", "product", "abi", "device", "emulator", "android-sdk", "ndk", "swift-sdks", "saga"]
         let allowed: Set<String>
         switch command {
         case .help, .version: allowed = common
@@ -75,13 +75,16 @@ struct EditorCLIInvocation: Sendable {
         if command == .build, parsed["target"] == "web" {
             throw EditorCLIError.argument("Use 'export --target web' for Web output.")
         }
-        let androidOptions: Set<String> = ["product", "abi", "device", "emulator", "android-sdk", "ndk", "swift-sdks", "swan", "dawn"]
+        let androidOptions: Set<String> = ["product", "abi", "device", "emulator", "android-sdk", "ndk", "swift-sdks", "saga"]
         if parsed["target"] != "android", !androidOptions.isDisjoint(with: parsed.keys) {
             throw EditorCLIError.argument("Android options require --target android.")
         }
         if parsed["device"] != nil, parsed["emulator"] != nil { throw EditorCLIError.argument("Choose --device or --emulator, not both.") }
         if let abi = parsed["abi"], !["arm64-v8a", "x86_64", "all"].contains(abi) { throw EditorCLIError.argument("Unsupported Android ABI.") }
         self.format = format
+        if let saga = parsed["saga"] {
+            parsed["saga"] = EditorAndroidConfiguration.absoluteSAGAPath(saga, relativeTo: directory)
+        }
         if command == .agentResources, parsed["output"] == nil {
             throw EditorCLIError.argument("agent-resources requires --output <file>.")
         }
@@ -112,7 +115,7 @@ struct EditorCLIInvocation: Sendable {
     Android:   --product <Swift product> --abi arm64-v8a|x86_64|all
                --device <adb serial> or --emulator <AVD name> to also install/run
                --android-sdk <path> --ndk <path> --swift-sdks <path>
-               --swan <package path> --dawn <artifact path relative to Swan>
+               --saga <local SAGA checkout>
     Toolchain: --sdk <BuildSDK directory> --swift <Swift executable>
 
     Installed: "/Applications/Ada Studio.app/Contents/MacOS/adastudio" <command>

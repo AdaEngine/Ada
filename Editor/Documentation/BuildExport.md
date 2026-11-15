@@ -64,6 +64,11 @@ under `Exports/<platform>/` so targets do not replace each other's output. Toolc
 requirements and supported export platforms are unchanged. The browser shell and
 dedicated phone screens do not yet expose the target editor.
 
+AdaScript export validates the project assets before building the player. If
+it finds GLSL shader sources, including GLSL embedded in a `.mat` or `.shader`
+file, it reports the asset path. Port the shader to WESL or WGSL and export
+again.
+
 ### Agent workflow
 
 Load the bundled `ada-build-run` skill for target configuration. Inspect the open
@@ -132,13 +137,13 @@ Windows Web and Android builds run through WSL Ubuntu. Run
 toolchains. Keep Web's Swift override empty to use the matching managed compiler;
 an explicit override must be a Linux executable path. Android discovery and
 deployment use the native Windows SDK, while the worker supplies Linux Swift,
-SDK/NDK, JDK and Dawn. Native host compiler settings continue to select Windows Swift.
+SDK/NDK and JDK. Native host compiler settings continue to select Windows Swift.
 
 | Page | Tools and current use |
 | --- | --- |
-| Android | SDK, NDK, JDK, optional Gradle, build-tools version, emulator data, Swift Android SDK/toolchain and Swan/Dawn. Existing APK export and device/emulator Run consume these settings. |
+| Android | SDK, NDK, JDK, optional Gradle, build-tools version, emulator data, matching Swift toolchain and Swift SDK for Android, and an optional local SAGA checkout. APK export and device or emulator runs consume these settings. |
 | iOS | Swift, Xcode Developer directory and iOS SDK. Profile storage and path checks are available; Studio does not yet export iOS games. |
-| Web | Swift WASM compiler, Swift SDK identifier and optional Tint. Web Run/Export consume these settings. |
+| Web | Swift WASM compiler and Swift SDK identifier. Web Run and Export resolve SAGA through SwiftPM. |
 | Windows | Swift, CMake, Ninja, Windows SDK and MSVC tools. Native host build commands consume the profile on Windows. Packaging Windows games from macOS is not available. |
 | Linux | Swift, CMake, Ninja and C compiler. Native host build commands consume the profile on Linux. Packaging Linux games from macOS is not available. |
 | macOS | Swift, Xcode Developer directory, SDK, CMake and Ninja. Native SwiftPM builds/runs/tests and macOS AdaScript export consume these settings. |

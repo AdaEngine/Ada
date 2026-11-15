@@ -8,9 +8,6 @@ import AdaTransform
 import AdaUtils
 import Foundation
 import Math
-#if canImport(Metal)
-import Metal
-#endif
 import Testing
 
 @testable import AdaCorePipelines
@@ -187,13 +184,26 @@ struct GoldenFrameComparisonTests {
         #expect(result.sizeMismatch)
         #expect(!result.passes(GoldenFrame.Tolerance(channelSteps: 255, differingFraction: 1)))
     }
+
+    #if os(macOS)
+    @Test(.disabled(if: GoldenFrame.isRecording))
+    func sagaMetalUsesItsOwnReference() throws {
+        let name = "pbr-spheres-ambientOcclusion"
+        let metalFrame = try Image(contentsOf: GoldenFrame.referenceURL(backend: "saga-metal", name: name))
+        let identical = GoldenFrame.Comparison(
+            differingPixels: 0, totalPixels: metalFrame.width * metalFrame.height, largestStep: 0, sizeMismatch: false
+        )
+        #expect(try GoldenFrame.check(metalFrame, name: name, backend: .saga) == .matched(identical),
+                "SAGA Metal used a different renderer's reference")
+    }
+    #endif
 }
 
 extension Render3DGPUTests {
     /// Renders a lit PBR scene through the real Metal pipeline for each debug view and checks the frames
     /// against golden references.
     ///
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DDebugViewGPUTests`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DDebugViewGPUTests`.
     /// Record references with `ADAENGINE_GOLDEN_RECORD=1`; set `ADAENGINE_GOLDEN_OUTPUT` to keep actual frames.
     /// Other integration suites initialize the process-wide engine as headless.
     @Suite("3D debug views on GPU")
@@ -209,10 +219,6 @@ extension Render3DGPUTests {
             let app: AppWorlds
             let device: RenderDevice
             let target: RenderTexture
-            /// Metal only: a fence on the engine's queue. WebGPU readback waits for submitted work itself.
-            #if canImport(Metal)
-            let queue: MTLCommandQueue?
-            #endif
             let camera: Entity
             let sun: Entity
             /// The ground's material, which tests edit between renders.
@@ -240,15 +246,6 @@ extension Render3DGPUTests {
                 for _ in 0..<frames {
                     try await app.update()
                 }
-                #if canImport(Metal)
-                if let queue {
-                    let fence = try #require(queue.makeCommandBuffer())
-                    await withCheckedContinuation { continuation in
-                        fence.addCompletedHandler { _ in continuation.resume() }
-                        fence.commit()
-                    }
-                }
-                #endif
                 return try #require(try await device.readImage(from: target))
             }
         }
@@ -260,16 +257,10 @@ extension Render3DGPUTests {
             temporalRenderScale: Float? = nil,
             pathTracingPresentation: Bool = false
         ) async throws -> Scene {
-            let backend = GoldenFrame.activeBackend ?? .metal
-            let requested: RenderBackendType = backend == .saga ? .saga : .metal
-            unsafe RenderEngine.configurations.preferredBackend = requested
+            unsafe RenderEngine.configurations.preferredBackend = .saga
             try RenderEngine.setupRenderEngine()
-            // A silent fallback to another backend would make the references meaningless.
-            try #require(unsafe RenderEngine.shared.type == requested, "The \(backend) backend must be active.")
+            try #require(unsafe RenderEngine.shared.type == .saga, "The SAGA backend must be active.")
             let device = unsafe RenderEngine.shared.renderDevice
-            #if canImport(Metal)
-            let queue = backend == .metal ? try #require(MetalInterop.commandQueue(for: device)) : nil
-            #endif
             let app = AppWorlds(main: World())
             app.insertResource(OffscreenRenderWorld())
                 .insertResource(PrimaryWindowId(windowId: RID()))
@@ -294,7 +285,7 @@ extension Render3DGPUTests {
             var camera = Camera(renderTarget: target)
             camera.backgroundColor = Color(red: 0.55, green: 0.7, blue: 0.9)
             if let temporalRenderScale {
-                camera.temporalUpscaling = TemporalUpscalingSettings(renderScale: temporalRenderScale)
+                camera.temporalUpscaling = TemporalUpscalingSettings(renderScale: temporalRenderScale, method: .portable)
             }
             // The camera looks along +Z at sphere centers, so the middle image row crosses all four spheres.
             let cameraEntity = app.main.spawn(
@@ -349,13 +340,8 @@ extension Render3DGPUTests {
                 Mesh3DComponent(mesh: Mesh.generateCube(size: [10, 0.1, 10], renderDevice: device), materials: [ground])
                 Transform(position: [0, -0.05, 0])
             }
-            #if canImport(Metal)
-            return Scene(app: app, device: device, target: target, queue: queue, camera: cameraEntity, sun: sunEntity,
-                         groundMaterial: ground, sphereEntities: sphereEntities)
-            #else
             return Scene(app: app, device: device, target: target, camera: cameraEntity, sun: sunEntity,
                          groundMaterial: ground, sphereEntities: sphereEntities)
-            #endif
         }
 
         private static func expectGolden(_ image: Image, named name: String) throws {

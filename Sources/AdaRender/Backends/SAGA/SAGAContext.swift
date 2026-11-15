@@ -30,6 +30,9 @@
     /// so every device operation goes through ``queue``, which preserves submission order.
     final class SAGAContext: Sendable {
         let capabilities: DeviceCapabilities
+        #if SAGA_NATIVE || SAGA_METAL
+        let visibilityPipelines = Mutex<SAGAVisibilityPipelines?>(nil)
+        #endif
         let supportsPresentation: Bool
         let queue: OrderedGPUWorkQueue<Device>
         /// Waits for each submission and logs device errors. Enabled by `globalThis.__adaSAGADebug = true`.
@@ -81,8 +84,9 @@
         private let clearPipelines = Mutex<[String: ResourceSlot<SAGATypes.RenderPipeline>]>([:])
 
         /// A pipeline that draws a degenerate triangle. A pass that records no draw uses it so its clears still run.
-        func clearPipeline(colors: [TextureFormat], depth: TextureFormat?) -> ResourceSlot<SAGATypes.RenderPipeline> {
+        func clearPipeline(colors: [TextureFormat], depth: TextureFormat?, rasterizationLayer: UInt32? = nil) -> ResourceSlot<SAGATypes.RenderPipeline> {
             let key = colors.map { String($0.rawValue) }.joined(separator: ",") + "|" + (depth.map { String($0.rawValue) } ?? "-")
+                + "|" + (rasterizationLayer.map(String.init) ?? "-")
             return clearPipelines.withLock { cache in
                 if let existing = cache[key] { return existing }
                 let slot = ResourceSlot<SAGATypes.RenderPipeline>()
@@ -101,7 +105,16 @@
                     @fragment fn fs() -> Out { var out: Out; \(assignments) return out; }
                     """
                     let compiler = IndependentShaderCompiler()
-                    let vertex = try compiler.compileRenderStage(.wgsl(source), entryPoint: "vs", to: output)
+                    let vertex: RenderStageArtifact
+                    #if SAGA_METAL_NATIVE_PASS
+                    if let rasterizationLayer {
+                        vertex = try compiler.compileMetalRasterizedVertexStage(.wgsl(source), entryPoint: "vs", layer: rasterizationLayer)
+                    } else {
+                        vertex = try compiler.compileRenderStage(.wgsl(source), entryPoint: "vs", to: output)
+                    }
+                    #else
+                    vertex = try compiler.compileRenderStage(.wgsl(source), entryPoint: "vs", to: output)
+                    #endif
                     let fragment = colors.isEmpty ? nil : try compiler.compileRenderStage(.wgsl(source), entryPoint: "fs", to: output)
                     slot.fulfill(
                         try await device.createRenderPipeline(

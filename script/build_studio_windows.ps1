@@ -15,7 +15,6 @@ if (-not $IsWindows -and $PSVersionTable.PSEdition -eq 'Core') {
 
 # Headless builds are useful for tests, but cannot display Studio.
 $env:ADAENGINE_HEADLESS = '0'
-$env:ADAENGINE_DISABLE_SWAN = '0'
 $env:ADAENGINE_PACKAGE_PATH = $studioRoot
 $studioLore = & python (Join-Path $studioRoot 'script/ensure_windows_lore.py')
 if ($LASTEXITCODE -ne 0) { throw 'Windows Lore SDK preparation failed.' }

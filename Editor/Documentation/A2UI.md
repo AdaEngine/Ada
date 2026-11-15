@@ -74,7 +74,7 @@ back to the agent automatically. The host owns gameplay effects of exported acti
 Run the test targets from the repository root:
 
 ```sh
-ADAENGINE_DISABLE_SWAN=1 swift test --package-path Editor --disable-sandbox \
+swift test --package-path Editor --disable-sandbox \
   --scratch-path /private/tmp/adaeditor-a2ui-build \
   --filter 'EditorAgentA2UITests|EditorAgentA2UITransportTests|EditorLoadingAnimationTests'
 ```

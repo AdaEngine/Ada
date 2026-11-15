@@ -112,7 +112,7 @@ final class EditorCloudToolHost {
                 throw EditorAgentServiceError.providerFailure("Save the open document before changing it with Ada AI.")
             }
         }
-        let extensions: Set<String> = ["ada", "ascn", "ui", "md", "txt", "json", "glsl", "swift"]
+        let extensions: Set<String> = ["ada", "ascn", "ui", "md", "txt", "json", "glsl", "swift", "wesl", "wgsl"]
         guard extensions.contains(url.pathExtension.lowercased()) else { throw EditorAIError.invalidResponse }
         if name == "editor.file.read" {
             guard try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0 <= 128_000 else { throw EditorAIError.invalidResponse }

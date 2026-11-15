@@ -5,6 +5,9 @@ import AdaScriptCompilerCore
 import AdaTilemap
 @_spi(Internal) import AdaUI
 import AdaUtils
+#if canImport(AdaWGSLCompiler)
+import AdaWGSLCompiler
+#endif
 import Foundation
 import Math
 import Testing
@@ -235,12 +238,29 @@ struct EditorFileTemplateMenuTests {
         #expect(!EditorNewFileGroup.adaScript.templates.contains(.uiScript))
     }
 
-    @Test("shader templates compile to SPIR-V")
+    @Test("shader templates create editable WESL and link through SAGA")
     func shaderTemplatesCompile() throws {
-        for (kind, stage) in [(EditorNewFileKind.vertexShader, ShaderStage.vertex), (.fragmentShader, .fragment), (.computeShader, .compute)] {
-            let source = try ShaderSource(source: kind.initialContent(fileName: "Template.glsl"))
-            let result = try ShaderCompiler(shaderSource: source).compileSpirvBin(for: stage, ignoreCache: true)
-            #expect(!result.data.isEmpty)
+        let root = try makeProjectDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let templates: [(EditorNewFileKind, String, String)] = [
+            (.vertexShader, "vertex", "vertex_main"),
+            (.fragmentShader, "fragment", "fragment_main"),
+            (.computeShader, "compute", "compute_main"),
+        ]
+        for (kind, stage, entryPoint) in templates {
+            try #require(kind.fileExtension == "wesl")
+            let file = root.appendingPathComponent("\(kind.rawValue).\(kind.fileExtension)")
+            #expect(EditorSourceLanguage.detect(fileName: file.lastPathComponent) == .wgsl)
+            try kind.initialContent(fileName: file.lastPathComponent).write(to: file, atomically: true, encoding: .utf8)
+            #if canImport(AdaWGSLCompiler)
+                let artifact = try WESLHostCompiler.compile(sourceFile: file, packageRoot: root)
+                #expect(artifact.entryPoints.map(\.stage) == [stage])
+                #expect(artifact.entryPoints.map(\.name) == [entryPoint])
+                for target in [WESLBackendCompiler.Target.msl, .spirv] {
+                    let output = try #require(try WESLBackendCompiler.compile(artifact, to: target).first)
+                    #expect(!output.data.isEmpty)
+                }
+            #endif
         }
     }
 

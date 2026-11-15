@@ -102,7 +102,7 @@ struct Render3DMorphTargetSelectionTests {
 }
 
 extension Render3DGPUTests {
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/MorphTargets`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DGPUTests/MorphTargets`.
     @Suite("3D morph targets on GPU")
     @MainActor
     struct MorphTargets {

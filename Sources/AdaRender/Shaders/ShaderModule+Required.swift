@@ -15,10 +15,9 @@ public extension ShaderModule {
         loadRequiredBundled(at: path, from: bundle, defines: [])
     }
 
-    /// Loads a migrated built-in shader using the format supported by the active renderer.
+    /// Loads a migrated built-in shader from its WESL source.
     static func loadRequiredBuiltin(at path: String, from bundle: Bundle) -> AssetHandle<ShaderModule> {
-        let fileExtension = supportsBundledWESL ? "wesl" : "glsl"
-        return loadRequiredBundled(at: "\(path).\(fileExtension)", from: bundle)
+        loadRequiredBuiltinVariant(at: "\(path).wesl", from: bundle)
     }
 
     /// Loads a required built-in variant while preserving its vertex and fragment output contract.
@@ -40,4 +39,20 @@ public extension ShaderModule {
         }
         return shader
     }
+}
+
+extension ShaderModule {
+
+    package static func createBuiltinVariant(at path: String, from bundle: Bundle, defines: [String]) throws -> ShaderModule {
+        try createBundled(at: path, from: bundle, defines: defines)
+    }
+
+    package static func loadRequiredBuiltinVariant(at path: String, from bundle: Bundle, defines: [String] = []) -> AssetHandle<ShaderModule> {
+        do {
+            return AssetHandle(try createBuiltinVariant(at: path, from: bundle, defines: defines))
+        } catch {
+            preconditionFailure("Required built-in shader '\(path)' with defines \(defines) could not be loaded: \(error)")
+        }
+    }
+
 }

@@ -1,7 +1,7 @@
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 
-/// Generated GLSL uses the same code surface and preferences as project source files.
+/// Generated WGSL uses the same code surface and preferences as project source files.
 struct EditorShaderGraphSourceView: View {
     let model: EditorShaderGraphModel
     var workbench: EditorWorkbenchViewModel?
@@ -35,16 +35,16 @@ struct EditorShaderGraphSourceView: View {
         let name = model.url?.deletingPathExtension().lastPathComponent ?? "ShaderGraph"
         var document = EditorTextDocument(
             id: "shadergraph-source:\(model.url?.path ?? name)",
-            title: "\(name).generated.glsl",
+            title: "\(name).generated.wgsl",
             relativePath: model.url?.lastPathComponent ?? "",
-            language: .glsl,
+            language: .wgsl,
             content: "",
             isReadOnly: true,
             statusMessage: L10n.text("Generated · read only")
         )
         do {
             guard let graph = model.graph else { throw EditorShaderGraphFileError.unavailable }
-            document.content = try graph.compileGLSL().source
+            document.content = try graph.compileWGSL().source
         } catch {
             document.errorMessage = model.diagnosticMessage ?? String(describing: error)
         }

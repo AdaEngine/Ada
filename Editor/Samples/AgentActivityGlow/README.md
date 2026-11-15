@@ -4,18 +4,27 @@
 
 Мягкая движущаяся волна по периметру окна: тонкая светлая кромка, цветное свечение внутрь окна и прозрачный центр. Оттенки получаются из одного `accent`, с небольшим сдвигом hue в обе стороны; для серого accent эффект остаётся нейтральным.
 
-`agent-activity.glsl` — переносимое тело GLSL-шейдера, без привязки к vertex stage, uniform layout и API материалов. Нативная версия подключена в `Sources/AdaEditor/UI/Editor/EditorAgentActivityBackground.swift`; её ресурс — `Sources/AdaEditor/Assets/Shaders/agent_activity.glsl`.
+Исходник примера находится в [`agent_activity.wesl`](../../Sources/AdaEditor/Assets/Shaders/agent_activity.wesl). Этот же модуль использует [слой Studio](../../Sources/AdaEditor/UI/Editor/EditorAgentActivityBackground.swift) на SAGA. Функция `agentActivityGlow` принимает параметры эффекта напрямую и возвращает цвет для fragment stage.
 
 Вызов во fragment stage:
 
-```glsl
-vec4 result = agentActivityGlow(
+```wgsl
+let result = agentActivityGlow(
     position, size, elapsedSeconds * speed, accentRGB,
     activity, intensity, width, radius, hueSpread
 );
 ```
 
-Начальные параметры исходного WebGL sample (настройки редактора указаны выше): `accentRGB = vec3(0.42, 0.36, 1.0)`, `activity = 1.0`, `intensity = 1.15`, `width = 42.0`, `radius = 14.0`, `speed = 1.0`.
+Начальные параметры примера (настройки редактора указаны выше): `accentRGB = vec3f(0.42, 0.36, 1.0)`, `activity = 1.0`, `intensity = 1.15`, `width = 42.0`, `radius = 14.0`, `speed = 1.0`.
+
+Чтобы собрать WGSL-стадии из корня AdaEngine, запустите:
+
+```sh
+ADAENGINE_WEB_EXPORT=1 swift run AdaShaderTranspilerTool \
+  --input Editor/Sources/AdaEditor/Assets/Shaders/agent_activity.wesl \
+  --wesl-dependency ada_engine=Sources/AdaRender/Assets/Shaders/WESL \
+  --output-directory /tmp/ada-agent-glow --web-stages
+```
 
 - `position`, `size`, `width`, `radius`: логические пиксели, начало координат сверху слева; `size` больше 2 px по обеим осям, `width >= 1`.
 - `elapsedSeconds`: монотонное время относительно запуска эффекта; `speed` в пределах 0–2 для sample.
@@ -27,7 +36,7 @@ vec4 result = agentActivityGlow(
 
 ## Состояния
 
-В демо состояния переключаются списком внизу окна. Это симуляция, не реальные события агента.
+Для проверки эффекта можно передавать следующие состояния вручную.
 
 | Состояние | Цвет | Движение волн | `hueSpread` |
 | --- | --- | --- | --- |
@@ -42,9 +51,9 @@ vec4 result = agentActivityGlow(
 
 Статус дублируется текстом и значком. Для подключения к агенту ошибка имеет приоритет над ожиданием пользователя; ожидание — над работой. `completed` выбирается только после подтверждённого успешного завершения без ожидающих approval/действий. Наличие внесённых правок само по себе не означает завершение.
 
-Вызов без `hueSpread` остаётся совместимым и использует 0.065. Для новых состояний используйте расширенную сигнатуру.
+Для состояния `working` передавайте `hueSpread = 0.065`.
 
-GLSL-тело используется в интерактивном WebGL sample. Нативная версия использует `UIShaderMaterial`, передаёт размер фонового слоя и обновляет uniforms без перестроения дерева редактора. Рабочий accent берётся из настройки либо из `theme.editorColors.blue`. Opacity применяется ко всему premultiplied RGBA, включая кромку. При выключении слой сохраняется до конца fade; после скрытия прекращаются его отрисовка и обновления фазы волн.
+В Studio эффект использует `UIShaderMaterial`, передаёт размер фонового слоя и обновляет uniforms без перестроения дерева редактора. Рабочий accent берётся из настройки либо из `theme.editorColors.blue`. Opacity применяется ко всему premultiplied RGBA, включая кромку. При выключении слой сохраняется до конца fade; после скрытия прекращаются его отрисовка и обновления фазы волн.
 
 В редакторе `EditorAgentActivityOverlay` рисует эффект поверх интерфейса по внешнему периметру всего окна, без отступов тулбара, футера и боковых полос. Он игнорирует safe area; центр прозрачен, клики проходят сквозь слой. Собственные фоны панелей сохранены, дополнительные защитные подложки удалены. `EditorSafeAreaBackground` остаётся обычным фоном. Состояние берётся из последней операции именно этого окна: `needsAttention` означает approval или другое явно зарегистрированное ожидание пользователя; отмена скрывает эффект, ошибка соединения отображается красным. Текст произвольных сообщений агента не используется для угадывания состояния.
 

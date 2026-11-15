@@ -31,7 +31,60 @@
             depthState = state
         }
 
-        func encode(commands: any MTLCommandBuffer, drawable: LayerRenderer.Drawable, world: World, eyes: [Entity]) {
+        struct Geometry {
+            struct Part {
+                let vertices: any VertexBuffer
+                let indices: any IndexBuffer
+                let addressing: SIMD2<UInt32>
+                let indexCount: Int
+                let indexType: MTLIndexType
+            }
+
+            struct Draw {
+                let owner: Entity.ID
+                let transform: Transform3D
+                let parts: [Part]
+            }
+
+            var draws: [Draw] = []
+            var buffers: [any Buffer] = []
+        }
+
+        func prepare(world: World) -> Geometry {
+            var geometry = Geometry()
+            var seenBuffers: Set<ObjectIdentifier> = []
+            for entity in world.getEntities() where entity.isActive {
+                guard let mesh = entity.components[Mesh3DComponent.self], entity.components[Visibility.self] != .hidden else { continue }
+                var owner: Entity? = entity
+                while let node = owner, node.components[SpatialGrabbable.self] == nil { owner = node.parent }
+                guard let owner, owner.id >= 0 else { continue }
+                var parts: [Geometry.Part] = []
+                for model in mesh.mesh.models {
+                    for part in model.parts where part.primitiveTopology == .triangleList {
+                        guard let position = part.vertexDescriptor.attributes.first(where: { $0.name == "positions" }),
+                              let layout = part.vertexDescriptor.layouts.first(where: { _ in true }) else { continue }
+                        parts.append(Geometry.Part(
+                            vertices: part.vertexBuffer,
+                            indices: part.indexBuffer,
+                            addressing: SIMD2(UInt32(layout.stride), UInt32(position.offset)),
+                            indexCount: part.indexCount,
+                            indexType: part.isUInt32 ? .uint32 : .uint16
+                        ))
+                        let buffers: [any Buffer] = [part.vertexBuffer, part.indexBuffer]
+                        for buffer in buffers where seenBuffers.insert(ObjectIdentifier(buffer)).inserted {
+                            geometry.buffers.append(buffer)
+                        }
+                    }
+                }
+                guard !parts.isEmpty else { continue }
+                let transform = entity.components[GlobalTransform.self]?.matrix ?? entity.components[Transform.self]?.matrix ?? .identity
+                geometry.draws.append(.init(owner: owner.id, transform: transform, parts: parts))
+            }
+            return geometry
+        }
+
+        func encode(commands: any MTLCommandBuffer, drawable: LayerRenderer.Drawable, geometry: Geometry,
+                    eyes: [Entity], nativeBuffers: [ObjectIdentifier: any MTLBuffer]) {
             guard !drawable.trackingAreasTextures.isEmpty else {
                 return
             }
@@ -52,44 +105,29 @@
                 encoder.setDepthStencilState(depthState)
                 encoder.setViewport(view.textureMap.viewport)
                 encoder.setCullMode(.none)
-                for entity in world.getEntities() where entity.isActive {
-                    guard let mesh = entity.components[Mesh3DComponent.self], entity.components[Visibility.self] != .hidden else { continue }
-                    var owner: Entity? = entity
-                    while let node = owner, node.components[SpatialGrabbable.self] == nil { owner = node.parent }
-                    guard let owner, owner.id >= 0 else { continue }
+                let viewProjection = camera.projection.makeClipView() * pose.matrix.inverse
+                for draw in geometry.draws {
                     let value: UInt16
-                    if let cached = values[owner.id] {
+                    if let cached = values[draw.owner] {
                         value = cached
                     } else {
-                        let area = drawable.addTrackingArea(identifier: .init(UInt64(owner.id) + 1))
+                        let area = drawable.addTrackingArea(identifier: .init(UInt64(draw.owner) + 1))
                         area.addHoverEffect(.automatic)
                         value = UInt16(area.renderValue.rawValue)
-                        values[owner.id] = value
+                        values[draw.owner] = value
                     }
-                    var matrix = entity.components[GlobalTransform.self]?.matrix ?? entity.components[Transform.self]?.matrix ?? .identity
-                    matrix = camera.projection.makeClipView() * pose.matrix.inverse * matrix
-                    var columns = Self.columns(matrix)
+                    var columns = Self.columns(viewProjection * draw.transform)
                     encoder.setVertexBytes(&columns, length: MemoryLayout<simd_float4x4>.stride, index: 1)
                     var trackingValue = value
                     encoder.setFragmentBytes(&trackingValue, length: MemoryLayout<UInt16>.stride, index: 0)
-                    for model in mesh.mesh.models {
-                        for part in model.parts where part.primitiveTopology == .triangleList {
-                            guard let vertices = MetalInterop.vertexBuffer(part.vertexBuffer),
-                                let indices = MetalInterop.indexBuffer(part.indexBuffer),
-                                let position = part.vertexDescriptor.attributes.first(where: { $0.name == "positions" }),
-                                let layout = part.vertexDescriptor.layouts.first(where: { _ in true })
-                            else { continue }
-                            var addressing = SIMD2<UInt32>(UInt32(layout.stride), UInt32(position.offset))
-                            encoder.setVertexBuffer(vertices.buffer, offset: vertices.offset, index: 0)
-                            encoder.setVertexBytes(&addressing, length: MemoryLayout<SIMD2<UInt32>>.stride, index: 2)
-                            encoder.drawIndexedPrimitives(
-                                type: .triangle,
-                                indexCount: part.indexCount,
-                                indexType: part.isUInt32 ? .uint32 : .uint16,
-                                indexBuffer: indices,
-                                indexBufferOffset: 0
-                            )
-                        }
+                    for part in draw.parts {
+                        guard let vertices = nativeBuffers[ObjectIdentifier(part.vertices)],
+                              let indices = nativeBuffers[ObjectIdentifier(part.indices)] else { continue }
+                        var addressing = part.addressing
+                        encoder.setVertexBuffer(vertices, offset: 0, index: 0)
+                        encoder.setVertexBytes(&addressing, length: MemoryLayout<SIMD2<UInt32>>.stride, index: 2)
+                        encoder.drawIndexedPrimitives(type: .triangle, indexCount: part.indexCount, indexType: part.indexType,
+                                                      indexBuffer: indices, indexBufferOffset: 0)
                     }
                 }
                 encoder.endEncoding()

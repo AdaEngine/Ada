@@ -12,7 +12,7 @@ extension ShaderGraph.ValueType {
 }
 
 extension ShaderGraph {
-    /// Generates WGSL for the same graph, parameter slots and bindings as ``compileGLSL()``, without touching a GPU.
+    /// Generates the fragment functions, parameter slots and resource bindings without accessing a GPU.
     ///
     /// The result defines `AdaGraphSurface` and `ada_graph_evaluate(uv: vec2f)`. A WESL template places it before
     /// its entry point; resources live in group ``ShaderGraphProgram/resourceSet`` at the documented bindings.

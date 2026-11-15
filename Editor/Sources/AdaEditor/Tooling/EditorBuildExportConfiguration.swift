@@ -67,7 +67,7 @@ enum EditorBuildPlatform: String, CaseIterable, Hashable, Sendable {
                 let kind: EditorBuildToolField.Kind
                 switch key {
                 case "SWIFT_ANDROID_SWIFT", "GRADLE_EXECUTABLE": kind = .executable
-                case "SWIFT_ANDROID_SDK", "ANDROID_BUILD_TOOLS_VERSION", "SWAN_LOCAL_DAWN": kind = .identifier
+                case "SWIFT_ANDROID_SDK", "ANDROID_BUILD_TOOLS_VERSION": kind = .identifier
                 default: kind = .directory
                 }
                 return EditorBuildToolField(key, label, kind)

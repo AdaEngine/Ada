@@ -213,6 +213,224 @@ class CLIParsingTests(unittest.TestCase):
             self.assertTrue(args.profile)
             self.assertFalse(args.debug)
 
+    def test_wsl_passes_saga_flag_with_and_without_checkout(self):
+        for saga in (None, "/work/saga"):
+            with self.subTest(saga=saga), tempfile.TemporaryDirectory() as directory:
+                args = parser().parse_args(["build", "wasm", "--dry-run"])
+                ctx = Context(args, root=Path(directory), host="windows")
+                ctx.env.pop("ADAENGINE_SAGA_PACKAGE_PATH", None)
+                ctx.env["ADAENGINE_SAGA_WEB_DEVICE_LIMIT"] = "1"
+                if saga:
+                    ctx.env["ADAENGINE_SAGA_PACKAGE_PATH"] = saga
+                with patch.object(ctx, "run", return_value="/work/engine") as run:
+                    environment.wsl(ctx, ["build", "wasm"])
+                launch = run.call_args.args[0]
+                self.assertIn("ADAENGINE_SAGA_WEB_DEVICE_LIMIT=1", launch)
+                self.assertIn("env", launch)
+                if saga:
+                    self.assertIn("ADAENGINE_SAGA_PACKAGE_PATH=/work/saga", launch)
+
+    def test_web_limit_flag_requires_local_saga_in_manifest(self):
+        env = os.environ.copy()
+        env.update(ADAENGINE_WEB_EXPORT="1", ADAENGINE_SAGA_WEB_DEVICE_LIMIT="1")
+        env.pop("ADAENGINE_SAGA_PACKAGE_PATH", None)
+        result = subprocess.run(["swift", "package", "dump-package"], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=30)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ADAENGINE_SAGA_WEB_DEVICE_LIMIT requires", result.stderr)
+
+    def test_web_manifest_excludes_legacy_shader_compilers_on_wasi(self):
+        env = os.environ.copy()
+        env["ADAENGINE_WEB_EXPORT"] = "1"
+        env.pop("ADAENGINE_SAGA_WEB_DEVICE_LIMIT", None)
+        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = json.loads(result.stdout)
+        render = next(target for target in manifest["targets"] if target["name"] == "AdaRender")
+        legacy = {"SPIRVCompiler", "SPIRV-Cross", "glslang"}
+        wasi_compilers = []
+        for dependency in render["dependencies"]:
+            for key in ("byName", "target"):
+                edge = dependency.get(key)
+                if edge and edge[0] in legacy:
+                    condition = edge[-1] or {}
+                    if not condition.get("platformNames") or "wasi" in condition["platformNames"]:
+                        wasi_compilers.append(edge[0])
+        self.assertEqual(wasi_compilers, [], "WebAssembly still links the legacy shader compiler")
+
+    def test_standalone_wasi_manifest_selects_the_saga_wesl_linker(self):
+        env = os.environ.copy()
+        for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_SAGA_WEB_DEVICE_LIMIT",
+                        "ADAENGINE_SAGA_METAL"):
+            env.pop(setting, None)
+        env["ADAENGINE_HEADLESS"] = "1"
+        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = json.loads(result.stdout)
+        render = next(target for target in manifest["targets"] if target["name"] == "AdaRender")
+        shader_compilers = {"AdaWGSLCompiler", "SPIRVCompiler", "SPIRV-Cross", "glslang"}
+        active_compilers = set()
+        for dependency in render["dependencies"]:
+            for key in ("byName", "target"):
+                edge = dependency.get(key)
+                if edge and edge[0] in shader_compilers:
+                    platforms = (edge[-1] or {}).get("platformNames")
+                    if not platforms or "wasi" in platforms:
+                        active_compilers.add(edge[0])
+        self.assertEqual(active_compilers, {"AdaWGSLCompiler"}, "Standalone WASI must link WESL through SAGA")
+
+    def test_watchos_does_not_select_metal_or_legacy_shaders(self):
+        env = os.environ.copy()
+        for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL",
+                        "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+            env.pop(setting, None)
+        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        target = next(item for item in json.loads(result.stdout)["targets"] if item["name"] == "AdaRender")
+        for setting in target["settings"]:
+            if setting["kind"].get("define", {}).get("_0") in {"METAL", "LEGACY_GLSL_COMPILER"}:
+                platforms = setting.get("condition", {}).get("platformNames") or ["all"]
+                self.assertNotIn("watchos", platforms, "watchOS must not select Metal or its legacy compiler")
+        for edge in target["dependencies"]:
+            dependency = edge.get("target") or edge.get("byName")
+            if dependency and dependency[0] in {"SPIRVCompiler", "SPIRV-Cross", "AdaLegacyShaders"}:
+                platforms = (dependency[-1] or {}).get("platformNames") or ["all"]
+                self.assertNotIn("watchos", platforms, "watchOS must not select Metal or its legacy compiler")
+
+    def test_engine_shader_resources_have_no_legacy_bundle(self):
+        env = os.environ.copy()
+        for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL",
+                        "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+            env.pop(setting, None)
+        command = ["swift", "package", "--disable-sandbox", "dump-package"]
+        result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        targets = {target["name"]: target for target in json.loads(result.stdout)["targets"]}
+        self.assertFalse({"AdaLegacyShaders", "SPIRVCompiler", "SPIRV-Cross", "glslang"}.intersection(targets))
+        self.assertFalse((ROOT / "LegacyShaders").exists())
+        for target in ("AdaCorePipelines", "AdaRender", "AdaUI", "AdaSpine", "AdaSprite", "AdaText", "AdaTilemap"):
+            assets = ROOT / "Sources" / target / "Assets"
+            glsl = [file for file in assets.rglob("*") if file.suffix in {".glsl", ".vert", ".frag"}]
+            self.assertEqual(glsl, [], f"{target} still ships legacy shaders in the common bundle")
+
+    def test_source_manifest_has_no_legacy_shader_targets_in_any_profile(self):
+        env = os.environ.copy()
+        for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS",
+                        "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+            env.pop(setting, None)
+        profiles = ({}, {"ADAENGINE_HEADLESS": "1"}, {"ADAENGINE_WEB_EXPORT": "1"}, {"ADAENGINE_ANDROID": "1"})
+        command = ["swift", "package", "--disable-sandbox", "dump-package"]
+        for profile in profiles:
+            with self.subTest(profile=profile):
+                result = subprocess.run(command, cwd=ROOT, env=env | profile, capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                manifest = json.loads(result.stdout)
+                targets = {target["name"]: target for target in manifest["targets"]}
+                self.assertFalse({"AdaLegacyShaders", "SPIRVCompiler", "SPIRV-Cross", "glslang"}.intersection(targets))
+                if not profile and sys.platform == "darwin":
+                    render = targets["AdaRender"]
+                    metal = next(edge["product"] for edge in render["dependencies"]
+                                 if edge.get("product", [None])[0] == "SAGAMetal")
+                    self.assertEqual(set(metal[-1]["platformNames"]), {"macos", "ios", "tvos", "visionos"})
+
+    def test_relocated_source_sdk_manifest_has_no_legacy_shader_targets(self):
+        env = os.environ.copy()
+        for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL_NATIVE_PASS",
+                        "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+            env.pop(setting, None)
+        with tempfile.TemporaryDirectory(prefix="relocated ada sdk ") as temporary:
+            source = Path(temporary) / "AdaEngine"
+            source.mkdir()
+            shutil.copy2(ROOT / "Package.swift", source)
+            result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=source, env=env,
+                                    capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        targets = {target["name"]: target for target in json.loads(result.stdout)["targets"]}
+        self.assertFalse({"AdaLegacyShaders", "glslang", "SPIRVCompiler", "SPIRV-Cross"}.intersection(targets))
+        products = {edge["product"][0] for edge in targets["AdaRender"]["dependencies"] if "product" in edge}
+        self.assertIn("SAGAMetal" if sys.platform == "darwin" else "SAGAVulkan", products)
+
+    def test_relocated_source_sdk_uses_bundled_saga_without_an_override(self):
+        env = os.environ.copy()
+        for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL_NATIVE_PASS",
+                        "ADAENGINE_SAGA_WEB_DEVICE_LIMIT", "ADAENGINE_SAGA_PACKAGE_PATH"):
+            env.pop(setting, None)
+        with tempfile.TemporaryDirectory(prefix="relocated source sdk ") as temporary:
+            root = Path(temporary).resolve()
+            sdk = root / "BuildSDK"
+            engine, saga = sdk / "AdaEngine", sdk / "SAGA"
+            engine.mkdir(parents=True)
+            saga.mkdir()
+            shutil.copy2(ROOT / "Package.swift", engine)
+            (saga / "Package.swift").touch()
+            (sdk / "sdk.json").write_text(json.dumps({"schemaVersion": 1, "engine": "AdaEngine", "saga": "SAGA"}))
+            moved = root / "Moved BuildSDK"
+            sdk.rename(moved)
+            command = ["swift", "package", "--disable-sandbox", "dump-package"]
+            for override, expected in ((None, moved / "SAGA"), (root / "Alternate SAGA", root / "Alternate SAGA")):
+                with self.subTest(override=override):
+                    profile = env | ({"ADAENGINE_SAGA_PACKAGE_PATH": str(override)} if override else {})
+                    result = subprocess.run(command, cwd=moved / "AdaEngine", env=profile,
+                                            capture_output=True, text=True, timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    dependencies = json.loads(result.stdout)["dependencies"]
+                    paths = [Path(package["path"]) for edge in dependencies for package in edge.get("fileSystem", [])
+                             if package.get("nameForTargetDependencyResolutionOnly") == "SAGA"]
+                    self.assertEqual(paths, [expected])
+
+    def test_native_vulkan_does_not_link_legacy_shader_compilers(self):
+        env = os.environ.copy()
+        for setting in ("ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL",
+                        "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_WEB_DEVICE_LIMIT"):
+            env.pop(setting, None)
+        env["ADAENGINE_ANDROID"] = "1"
+        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        render = next(target for target in json.loads(result.stdout)["targets"] if target["name"] == "AdaRender")
+        legacy = {"SPIRVCompiler", "SPIRV-Cross", "glslang"}
+        vulkan_platforms = {"linux", "windows", "android"}
+        linked = []
+        for edge in render["dependencies"]:
+            dependency = edge.get("target") or edge.get("byName")
+            if dependency and dependency[0] in legacy:
+                platforms = (dependency[-1] or {}).get("platformNames")
+                if not platforms or vulkan_platforms.intersection(platforms):
+                    linked.append(dependency[0])
+        self.assertEqual(linked, [], "Native Vulkan still links legacy shader compilers")
+
+    def test_vulkan_manifest_uses_published_saga_by_default(self):
+        env = os.environ.copy()
+        for setting in ("ADAENGINE_SAGA_PACKAGE_PATH", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL"):
+            env.pop(setting, None)
+        env["ADAENGINE_ANDROID"] = "1"
+        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        manifest = json.loads(result.stdout)
+        saga = [package for dependency in manifest["dependencies"] for package in dependency.get("sourceControl", [])
+                if package["identity"] == "saga"]
+        self.assertEqual(len(saga), 1, "Vulkan manifest still requires a sibling SAGA checkout")
+        self.assertRegex(saga[0]["requirement"]["revision"][0], r"^[0-9a-f]{40}$")
+        render = next(target for target in manifest["targets"] if target["name"] == "AdaRender")
+        self.assertIn("SAGAVulkan", json.dumps(render["dependencies"]))
+
+    def test_linux_doctor_accepts_the_pinned_saga_dependency(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = parser().parse_args(["doctor", "--profile", "studio", "--json"])
+            ctx = Context(args, root=Path(directory), host="linux")
+            ctx.arch = "x86_64"
+            ctx.env.pop("ADAENGINE_SAGA_PACKAGE_PATH", None)
+            output = io.StringIO()
+            with patch.object(environment, "swift_version", return_value=PIN["swift"]["linux"]), \
+                 patch.object(ctx, "probe", return_value=(True, "")), contextlib.redirect_stdout(output):
+                environment.doctor(ctx, args)
+            saga = next(check for check in json.loads(output.getvalue())["checks"] if check["name"] == "SAGA")
+            self.assertTrue(saga["ok"], "Linux doctor still requires a sibling SAGA checkout")
+
     def test_windows_wasm_plan_uses_worker_compiler_and_reuses_frontend(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

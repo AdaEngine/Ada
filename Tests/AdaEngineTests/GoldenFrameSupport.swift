@@ -6,12 +6,13 @@ import Testing
 
 /// Compares rendered frames against checked-in reference PNGs.
 ///
-/// References live in `GoldenFrames/<backend>/<name>.png` next to the tests. Select the backend with
-/// `ADAENGINE_GOLDEN_METAL=1` or `ADAENGINE_GOLDEN_SAGA=1` (SAGA native runs through `script/validate_saga_native.py`).
+/// References live in `GoldenFrames/<backend>/<name>.png` next to the tests.
+/// `ADAENGINE_GOLDEN_SAGA=1` selects `saga-metal` on macOS and `saga` on Vulkan.
+/// The `metal` directory contains archived comparison frames.
 /// Set `ADAENGINE_GOLDEN_RECORD=1` to (re)write references from the current output,
 /// `ADAENGINE_GOLDEN_REFERENCES=<dir>` to read or write references somewhere other than next to the tests, and
 /// `ADAENGINE_GOLDEN_OUTPUT=<dir>` to choose where actual and difference images go on a mismatch.
-/// Tolerances are per backend because GPUs differ in rounding; Metal is the reference backend.
+/// Tolerances account for rounding in repeated runs on the same backend.
 extension Trait where Self == ConditionTrait {
     /// The GPU meshlet, visibility and shadow-cull processors were backend features of the removed Swan renderer.
     /// They are not ported to SAGA native yet, so tests that need one are reported as skipped there, never as passed.
@@ -23,8 +24,14 @@ extension Trait where Self == ConditionTrait {
 struct GoldenFrame {
     enum Backend: String, CaseIterable {
         case metal
-        /// SAGA's native Vulkan runtime on Windows, Linux and Android.
         case saga
+
+        var referenceDirectory: String {
+            #if os(macOS)
+            if self == .saga { return "saga-metal" }
+            #endif
+            return rawValue
+        }
     }
 
     struct Tolerance: Sendable, Equatable {
@@ -40,11 +47,7 @@ struct GoldenFrame {
 
     /// The backend the GPU suites render with, or `nil` when no backend was requested.
     static var activeBackend: Backend? {
-        let environment = ProcessInfo.processInfo.environment
-        if environment["ADAENGINE_GOLDEN_SAGA"] == "1" {
-            return .saga
-        }
-        return environment["ADAENGINE_GOLDEN_METAL"] == "1" ? .metal : nil
+        ProcessInfo.processInfo.environment["ADAENGINE_GOLDEN_SAGA"] == "1" ? .saga : nil
     }
 
     static var isEnabled: Bool { activeBackend != nil }
@@ -54,7 +57,7 @@ struct GoldenFrame {
     }
 
     /// Tolerance for comparing two renders of the active backend with each other or with its references.
-    static var activeTolerance: Tolerance { tolerance(for: activeBackend ?? .metal) }
+    static var activeTolerance: Tolerance { tolerance(for: activeBackend ?? .saga) }
 
     struct Comparison: Equatable {
         var differingPixels: Int
@@ -133,9 +136,9 @@ struct GoldenFrame {
     }
 
     static func check(_ actual: Image, name: String, backend: Backend? = nil, tolerance: Tolerance? = nil) throws -> Outcome {
-        let backend = backend ?? activeBackend ?? .metal
+        let backend = backend ?? activeBackend ?? .saga
         let tolerance = tolerance ?? Self.tolerance(for: backend)
-        let reference = referenceURL(backend: backend.rawValue, name: name)
+        let reference = referenceURL(backend: backend.referenceDirectory, name: name)
         if isRecording {
             try FileManager.default.createDirectory(at: reference.deletingLastPathComponent(), withIntermediateDirectories: true)
             try actual.writePNG(to: reference)

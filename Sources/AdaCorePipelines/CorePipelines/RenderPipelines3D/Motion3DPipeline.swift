@@ -19,7 +19,7 @@ public struct Motion3DPipeline: RenderPipelineConfigurator {
         let plain = CorePipelineShaders.loadRequiredBuiltin("motion_3d")
         // Only the morph feature matters to the motion shader; the shading layers do not.
         let morph = configuration.features.intersection(.morph)
-        let path = ShaderModule.supportsBundledWESL ? "Shaders/motion_3d.wesl" : "Shaders/motion_3d.glsl"
+        let path = "Shaders/motion_3d.wesl"
         let shader = morph.isEmpty ? plain : variants.shader(at: path, for: morph, fallback: plain)
         var descriptor = base.configurate(with: configuration.vertex)
         descriptor.vertex = shader.asset.requiredShader(for: .vertex)

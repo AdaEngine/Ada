@@ -1,4 +1,3 @@
-#if !os(WASI)
 import Foundation
 import SAGACompiler
 import SAGAShaderIR
@@ -140,4 +139,3 @@ public enum WESLBackendCompiler {
         }
     }
 }
-#endif

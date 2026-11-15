@@ -16,11 +16,9 @@ python ada_tool.py install studio --debug --launch
 
 ## Local SAGA checkout
 
-Apple builds with SAGAMetal and browser exports resolve a pinned SAGA revision
-through SwiftPM. Set `ADAENGINE_SAGA_PACKAGE_PATH` to an absolute path to
-develop against a local checkout. In WSL use the Linux path. Native Vulkan
-development and native WebGPU compiler builds use the sibling SAGA checkout
-unless this override is set.
+Apple builds with SAGAMetal, native Vulkan builds and browser exports resolve pinned
+SAGA revisions through SwiftPM. Set `ADAENGINE_SAGA_PACKAGE_PATH` to an absolute path
+to develop against a local checkout. In WSL use the Linux path.
 
 ```powershell
 $env:ADAENGINE_SAGA_PACKAGE_PATH = 'D:/Development/SAGA'
@@ -38,6 +36,12 @@ Both configurations are Standalone distributions, including resources, runtime,
 and the source BuildSDK. Installation without `--source` builds the current
 checkout; it does not download the latest GitHub release. Debug selects the
 debug compiler configuration and has its own installation directory and shortcut.
+The source BuildSDK uses the same SAGA dependency as the engine. Its renderer
+selection travels with the staged AdaEngine package when Studio or the SDK moves
+to another directory.
+When SDK staging includes a local SAGA checkout, `sdk.json` records it and
+SwiftPM resolves it relative to the moved SDK. Set `ADAENGINE_SAGA_PACKAGE_PATH`
+to select a different checkout.
 
 | Host | Release installation | Debug installation |
 | --- | --- | --- |
@@ -85,7 +89,7 @@ python ada_tool.py prepare --skip-system
 ```
 
 `doctor` does not install or download anything. It checks the selected Swift
-version, native build tools, the local SAGA checkout, Lore, WASM
+version, native build tools, the selected SAGA override if present, Lore, WASM
 SDK/WSL, frontend tools and Cloud panel inputs according to the profile. JSON goes
 to stdout; diagnostic subprocess output goes to stderr. Exit codes: 0 ready,
 1 missing requirement or operation failure, 2 usage error, 130 interrupted.
@@ -269,7 +273,13 @@ the override at the companion checkout:
 
 ```sh
 export ADAENGINE_SAGA_PACKAGE_PATH=/absolute/path/to/saga-companion
+# Only when that checkout includes WebHostParameters.maxSampledTexturesPerShaderStage:
+export ADAENGINE_SAGA_WEB_DEVICE_LIMIT=1
 ```
+
+The device-limit flag opts into the newer host boundary; do not set it with the
+pinned SAGA revision. With the newer host, the limit must be present and valid
+or device initialization fails; the value does not yet enforce pipeline limits.
 
 Add `?sagadebug` to the page URL to wait for every submission and print SAGA device errors and per-pipeline binding
 reports to the console. Web export uses JavaScriptKit's generic BridgeJS runtime and resolves SAGA without Swan or Dawn.
@@ -280,8 +290,7 @@ reference). Pass `--actual=<path.png>` to save the captured frame. See [the smok
 
 ## SAGA Metal development
 
-AdaEngine selects SAGAMetal by default on macOS, iOS and tvOS. Set `ADAENGINE_SAGA_METAL=0`
-to use the legacy Metal backend during the transition. The following tests exercise SAGAMetal:
+AdaEngine selects SAGAMetal on macOS, iOS, tvOS, and visionOS. The following tests exercise SAGAMetal:
 
 ```sh
 ADAENGINE_SAGA_METAL_WINDOW_SMOKE=1 swift test --filter SAGAMetalWindowTests
@@ -291,6 +300,11 @@ ADAENGINE_PIXEL_PERFECT_SAGA_SMOKE=1 swift test --filter PixelPerfectMetalTests
 
 The window test requires a macOS desktop session with access to the Metal GPU. The renderer
 uses SAGA to compile linked WGSL to MSL and presents through the existing MetalKit views.
+
+The full `script/validate_gpu.sh` run on macOS compares frames against
+`Tests/AdaEngineTests/GoldenFrames/saga-metal`. Vulkan runs use the `saga` directory,
+and archived Metal references use `metal`. The backend agreement test compares the
+SAGA Metal and Vulkan captures using the existing limits.
 
 To build the engine for Apple TV and the Apple TV Simulator, use Xcode with both tvOS SDKs
 installed. For SAGAMetal, use the environment settings above with a SAGA checkout that also
@@ -303,27 +317,24 @@ swift build --target AdaEngine --scratch-path .build-tools/tvos-device \
   --triple arm64-apple-tvos18.0 --sdk "$(xcrun --sdk appletvos --show-sdk-path)"
 ```
 
-To compare the same 3D scene on both Metal implementations, capture the legacy result and then
-run SAGA in a fresh test process. Use a dedicated output directory:
-
-```sh
-export ADAENGINE_COMPARE_SAGA_METAL=1
-export ADAENGINE_GOLDEN_OUTPUT=/absolute/path/to/metal-comparison
-mkdir -p "$ADAENGINE_GOLDEN_OUTPUT"
-ADAENGINE_GOLDEN_METAL=1 swift test --filter captureLegacyMetalReferenceForSAGA
-ADAENGINE_GOLDEN_SAGA=1 swift test --filter theLitSphereRowRendersWithTheWESLShaders
-```
-
 ## Native SAGA Vulkan development
 
 Windows, Linux and Android render through SAGA Vulkan; there is no flag to select it and no other native
-renderer (Swan, Dawn and Tint are removed). The native build uses the system Vulkan driver. The SwiftPM
-build resolves SAGA from the sibling checkout or `ADAENGINE_SAGA_PACKAGE_PATH`. It needs a revision that
-supports attaching a Vulkan surface after device creation (`makePresentableDevice`, `addSurface`,
-`removeSurface`); no published SAGA revision has that API yet, so a reproducible pin is pending.
-Headless builds (`ADAENGINE_HEADLESS=1`) link no renderer and need no SAGA.
+renderer (Swan, Dawn and Tint are removed). The native build uses the system Vulkan driver. SwiftPM
+resolves the pinned SAGA revision, which provides `makePresentableDevice`, `addSurface` and `removeSurface`
+for attaching and retiring Vulkan surfaces after device creation.
+Native headless builds (`ADAENGINE_HEADLESS=1`) use the pinned SAGA CPU compiler to link and reflect WESL shaders. They run without a graphics device.
 Set `ADAENGINE_GOLDEN_SAGA=1` and `ADAENGINE_SAGA_WINDOWLESS=1` for the offscreen
 3D checks, then run `swift test --filter SagaNative`. Set `ADAENGINE_GOLDEN_OUTPUT`
 to an existing directory to collect the rendered PNGs.
+
+On Windows, run the Vulkan buffer, draw and Win32 surface tests from Git Bash
+with native Windows Swift in a desktop session with a Vulkan device. The suite covers presentation and replacement of
+the first surface while a second window is attached.
+
+```sh
+unset ADAENGINE_HEADLESS ADAENGINE_WEB_EXPORT
+ADAENGINE_GPU_TEST_FILTER=SAGAVulkanDeviceTests bash script/validate_gpu.sh
+```
 
 For Android APK exports and emulator setup, see [Native Android apps](../Tools/Android/README.md).

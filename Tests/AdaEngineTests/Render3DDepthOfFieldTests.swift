@@ -64,7 +64,7 @@ struct Render3DDepthOfFieldSettingsTests {
 extension Render3DGPUTests {
     /// Renders depth of field through the real pipeline.
     ///
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/DepthOfField`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DGPUTests/DepthOfField`.
     @Suite("3D depth of field on GPU")
     @MainActor
     struct DepthOfField {

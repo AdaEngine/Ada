@@ -1,15 +1,15 @@
-#if canImport(AdaWGSLCompiler) && !WASM && (SAGA_RENDER || !os(Android))
+#if canImport(AdaWGSLCompiler) && !SAGA_WEBGPU
 import AdaWGSLCompiler
 import Foundation
 
 enum WESLModuleError: LocalizedError {
-    case requiresWebGPU
+    case unsupportedRenderer
     case invalidEntryPoints
     case uniformLayoutUnavailable(group: Int, binding: Int)
 
     var errorDescription: String? {
         switch self {
-        case .requiresWebGPU: "WESL shader modules require a native renderer with WGSL support."
+        case .unsupportedRenderer: "WESL shader modules require SAGA or the native headless renderer."
         case .invalidEntryPoints: "A WESL shader module must have one entry point per active stage."
         case let .uniformLayoutUnavailable(group, binding):
             "Cannot adapt SAGA uniform layout at group \(group), binding \(binding); runtime reflection integration is incomplete."

@@ -7,40 +7,106 @@
     @available(visionOS 26.0, *)
     @MainActor
     final class ImmersivePresentation {
-        let queue: any MTLCommandQueue
+        private let device: any RenderDevice
+        private let metalDevice: any MTLDevice
         private let pipeline: any MTLRenderPipelineState
         private let depthState: any MTLDepthStencilState
         private let preservesPassthrough: Bool
 
-        init(queue: any MTLCommandQueue, colorFormat: MTLPixelFormat, depthFormat: MTLPixelFormat, preservesPassthrough: Bool) throws {
-            self.queue = queue
+        init(device: any RenderDevice, metalDevice: any MTLDevice, colorFormat: MTLPixelFormat,
+             depthFormat: MTLPixelFormat, preservesPassthrough: Bool) throws {
+            #if SAGA_METAL_NATIVE_PASS
+            guard MetalInterop.supportsSAGAMetalPass(on: device) else {
+                throw ImmersiveRendererError.metalResourceUnavailable
+            }
+            self.device = device
+            self.metalDevice = metalDevice
             self.preservesPassthrough = preservesPassthrough
-            let library = try queue.device.makeLibrary(source: ImmersiveCompositionShader.source, options: nil)
+            let library = try metalDevice.makeLibrary(source: ImmersiveCompositionShader.source, options: nil)
             let descriptor = MTLRenderPipelineDescriptor()
             descriptor.vertexFunction = library.makeFunction(name: "immersiveVertex")
             descriptor.fragmentFunction = library.makeFunction(name: "immersiveFragment")
             descriptor.colorAttachments[0].pixelFormat = colorFormat
             descriptor.depthAttachmentPixelFormat = depthFormat
             descriptor.inputPrimitiveTopology = .triangle
-            pipeline = try queue.device.makeRenderPipelineState(descriptor: descriptor)
+            pipeline = try metalDevice.makeRenderPipelineState(descriptor: descriptor)
             let depth = MTLDepthStencilDescriptor()
             depth.depthCompareFunction = .always
             depth.isDepthWriteEnabled = true
-            guard let depthState = queue.device.makeDepthStencilState(descriptor: depth) else {
+            guard let depthState = metalDevice.makeDepthStencilState(descriptor: depth) else {
                 throw ImmersiveRendererError.metalResourceUnavailable
             }
             self.depthState = depthState
+            #else
+            throw ImmersiveRendererError.metalResourceUnavailable
+            #endif
         }
 
-        func present(_ drawable: LayerRenderer.Drawable, eyes: [(RenderTexture, RenderTexture)], overlays: ((any MTLCommandBuffer) -> Void)? = nil, onSubmitted: () -> Void) async throws {
-            guard let commands = queue.makeCommandBuffer() else { throw ImmersiveRendererError.metalResourceUnavailable }
-            for (index, view) in drawable.views.enumerated() {
-                guard index < eyes.count,
-                    let color = MetalInterop.texture(eyes[index].0),
-                    let depth = MetalInterop.texture(eyes[index].1)
-                else {
-                    throw ImmersiveRendererError.missingEyeTarget
+        typealias OverlayRecorder = (any MTLCommandBuffer, [ObjectIdentifier: any MTLBuffer]) -> Void
+
+        #if SAGA_METAL_NATIVE_PASS
+        /// Holds compositor state on the main actor while render work is queued.
+        @MainActor
+        private final class Submission {
+            let drawable: LayerRenderer.Drawable
+            let buffers: [any Buffer]
+            let overlays: OverlayRecorder
+            let isValid: () -> Bool
+            let onSubmitted: () -> Void
+
+            init(drawable: LayerRenderer.Drawable, buffers: [any Buffer], overlays: @escaping OverlayRecorder,
+                 isValid: @escaping () -> Bool, onSubmitted: @escaping () -> Void) {
+                self.drawable = drawable
+                self.buffers = buffers
+                self.overlays = overlays
+                self.isValid = isValid
+                self.onSubmitted = onSubmitted
+            }
+        }
+        #endif
+
+        func present(
+            _ drawable: LayerRenderer.Drawable,
+            eyes: [(RenderTexture, RenderTexture)],
+            buffers: [any Buffer],
+            overlays: @escaping OverlayRecorder,
+            isValid: @escaping () -> Bool,
+            onSubmitted: @escaping () -> Void
+        ) async throws {
+            #if SAGA_METAL_NATIVE_PASS
+            let submission = Submission(drawable: drawable, buffers: buffers, overlays: overlays,
+                                        isValid: isValid, onSubmitted: onSubmitted)
+            try await MetalInterop.submitSAGAMetalPass(
+                on: device, label: "Immersive compositor",
+                textures: eyes.flatMap { [MetalInterop.NativePassUse<Texture>($0.0), .init($0.1)] },
+                buffers: buffers.map { .init($0) },
+                onCommitted: { submission.onSubmitted() }
+            ) { commands, textures, nativeBuffers in
+                guard submission.isValid() else { throw CancellationError() }
+                guard commands.device.registryID == self.metalDevice.registryID else {
+                    throw ImmersiveRendererError.incompatibleMetalDevice
                 }
+                let nativeEyes = stride(from: 0, to: textures.count, by: 2).map { (textures[$0], textures[$0 + 1]) }
+                try self.encode(submission.drawable, eyes: nativeEyes, commands: commands)
+                var resolvedBuffers: [ObjectIdentifier: any MTLBuffer] = [:]
+                for (buffer, native) in zip(submission.buffers, nativeBuffers) {
+                    resolvedBuffers[ObjectIdentifier(buffer)] = native
+                }
+                submission.overlays(commands, resolvedBuffers)
+                submission.drawable.encodePresent(commandBuffer: commands)
+            }
+            #else
+            throw ImmersiveRendererError.metalResourceUnavailable
+            #endif
+        }
+
+        private func encode(
+            _ drawable: LayerRenderer.Drawable, eyes: [(any MTLTexture, any MTLTexture)],
+            commands: any MTLCommandBuffer
+        ) throws {
+            for (index, view) in drawable.views.enumerated() {
+                guard index < eyes.count else { throw ImmersiveRendererError.missingEyeTarget }
+                let (color, depth) = eyes[index]
                 let map = view.textureMap
                 let textureIndex = map.textureIndex
                 let pass = MTLRenderPassDescriptor()
@@ -75,29 +141,15 @@
                 encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 3)
                 encoder.endEncoding()
             }
-            overlays?(commands)
-            drawable.encodePresent(commandBuffer: commands)
-            try await complete(commands, retaining: eyes, onSubmitted: onSubmitted)
         }
 
         /// A nonblocking fence before rendering the next eye with shared per-view uniform scratch.
         func finishEye() async throws {
-            guard let commands = queue.makeCommandBuffer() else { throw ImmersiveRendererError.metalResourceUnavailable }
-            try await complete(commands, retaining: [])
+            #if SAGA_METAL_NATIVE_PASS
+            try await MetalInterop.submitSAGAMetalPass(on: device, label: "Immersive eye fence") { _, _, _ in }
+            #else
+            throw ImmersiveRendererError.metalResourceUnavailable
+            #endif
         }
-
-        private func complete(_ commands: any MTLCommandBuffer, retaining eyes: [(RenderTexture, RenderTexture)], onSubmitted: () -> Void = {}) async throws {
-            let succeeded = await withCheckedContinuation { continuation in
-                commands.addCompletedHandler { buffer in
-                    // Explicitly retain sampled textures until the GPU is finished.
-                    _ = eyes
-                    continuation.resume(returning: buffer.status == .completed)
-                }
-                commands.commit()
-                onSubmitted()
-            }
-            guard succeeded else { throw ImmersiveRendererError.gpuSubmissionFailed }
-        }
-
     }
 #endif

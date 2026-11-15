@@ -49,6 +49,7 @@ struct ShaderGraphMaterialTests {
     @Test func instancesHaveIndependentValuesAndRoundTrip() throws {
         let first = try ShaderGraphMaterial(source: source())
         let second = try ShaderGraphMaterial(source: source())
+        #expect(first.program.format == .wgsl)
         try first.setValue([0, 1, 0, 1], for: "tint")
         #expect(first.value(for: "tint") == [0, 1, 0, 1])
         #expect(second.value(for: "tint") == [1, 1, 1, 1])

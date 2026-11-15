@@ -5,12 +5,7 @@
 //  Created by v.prusakov on 3/10/23.
 //
 
-import AdaUtils
 import Foundation
-import Logging
-import SPIRV_Cross
-import SPIRVCompiler
-import Tracing
 
 public struct DeviceCompiledShader: Codable {
     public struct EntryPoint: Codable {
@@ -24,27 +19,6 @@ public struct DeviceCompiledShader: Codable {
     public let source: String
 }
 
-/// Compile shader for device specific language.
-protocol ShaderDeviceCompilerEngine: Sendable {
-    func compile(
-        spirvData: Data,
-        entryPoint: String,
-        stage: ShaderStage,
-        defines: [ShaderDefine]
-    ) async throws -> DeviceCompiledShader
-}
-
-// TODO: Should we invert y-axis for vertex shader?
-// TODO: We should remove cached shaders if their included content will change.
-
-struct SpirvBinary {
-    let stage: ShaderStage
-    let data: Data
-    let language: ShaderLanguage
-    let entryPoint: String
-    let version: Int
-}
-
 public struct ShaderDefine: Hashable, Sendable {
     public let name: String
     public let value: String
@@ -54,65 +28,40 @@ public struct ShaderDefine: Hashable, Sendable {
     }
 }
 
-/// ShaderCompiler compile engine shader code to Shader objects (with SPIR-V binary).
+/// Compatibility API that diagnoses legacy shader inputs. Load WESL with ``ShaderModule``.
 public final class ShaderCompiler {
-    // glslang initialization/finalization is process-wide, including editor background compiles.
-    private static let compilationLock = NSLock()
     enum CompileError: LocalizedError {
-        case fileReadingFailed(String)
-        case glslError(String)
-        case failed(String)
+        case weslRequired(String)
 
         var errorDescription: String? {
             switch self {
-            case let .fileReadingFailed(path):
-                return "[ShaderCompiler] Failed to read file at path \(path)."
-            case let .glslError(msg):
-                return "[ShaderCompiler] GLSLang compile failed with error: \(msg)"
-            case let .failed(msg):
-                return "[ShaderCompiler] Failed: \(msg)."
+            case let .weslRequired(path):
+                #if SAGA_WEBGPU
+                return "Browser shader `\(path)` requires a prelinked WESL module. See the WESLShaders guide."
+                #elseif WASM
+                return "WASI shader `\(path)` requires a WESL module. See the WESLShaders guide."
+                #else
+                return "Shader `\(path)` requires a WESL module. See the WESLShaders guide."
+                #endif
             }
         }
     }
 
     /// Collection of include search paths available for your shader source.
-    public private(set) var includeSearchPaths: [ShaderSource.IncludeSearchPath] = [
-        .module(
-            name: "AdaEngine",
-            modulePath: Bundle.adaModule.resourceURL?.appendingPathComponent("Shaders/Public") ?? Bundle.adaModule.bundleURL
-        )
-    ]
+    public private(set) var includeSearchPaths: [ShaderSource.IncludeSearchPath] = []
 
     private var macros: [ShaderStage: [String: ShaderDefine]] = [:]
     private(set) var shaderSource: ShaderSource
-    private let logger = Logger(label: "org.adaengine.shader-compiler")
 
     /// Create a new shader compiler from file source.
     public init(from fileUrl: URL) throws {
-        self.shaderSource = try ShaderSource(from: fileUrl)
-        self.includeSearchPaths.append(contentsOf: self.shaderSource.includeSearchPaths)
+        throw CompileError.weslRequired(fileUrl.path)
     }
 
     /// Create a new shader compiler from shader source.
     public init(shaderSource: ShaderSource) {
         self.shaderSource = shaderSource
         self.includeSearchPaths.append(contentsOf: shaderSource.includeSearchPaths)
-    }
-
-    /// Validates complete GLSL without creating device objects or accessing the renderer.
-    /// Useful for background authoring diagnostics and offline shader export.
-    public static func validateFragmentGLSL(_ code: String, entryPoint: String = "main") throws -> Data {
-        try ShaderCompiler(shaderSource: ShaderSource()).compileCode(code, entryPoint: entryPoint, stage: .fragment).data
-    }
-
-    /// Fresh offline compilation using the production include paths and macros.
-    public func exportFragment() throws -> (data: Data, entryPoint: String, reflection: ShaderReflectionData) {
-        guard let code = shaderSource.getSource(for: .fragment) else { throw CompileError.failed("Missing fragment source") }
-        let processed = try ShaderIncluder.processIncludes(in: code, includeSearchPath: includeSearchPaths)
-        let (entryPoint, source) = try ShaderUtils.dropEntryPoint(from: processed)
-        let binary = try compileCode(source, entryPoint: entryPoint, stage: .fragment)
-        let reflection = try SpirvCompiler(spriv: binary.data, stage: .fragment, deviceLang: .glsl).reflection()
-        return (binary.data, binary.entryPoint, reflection)
     }
 
     public func addHeaderSearchPaths(_ paths: [ShaderSource.IncludeSearchPath]) {
@@ -130,253 +79,21 @@ public final class ShaderCompiler {
         self.shaderSource.setSource(stageSource, for: stage)
     }
 
-    /// Compile all shader sources to shader module.
+    static func requireLegacySupport(for path: String) throws {
+        throw CompileError.weslRequired(path)
+    }
+
+    /// Reports the migration diagnostic for an old shader module.
     public func compileShaderModule() throws -> ShaderModule {
-        var shaders: [ShaderStage: Shader] = [:]
-
-        var reflectionData = ShaderReflectionData()
-
-        for stage in self.shaderSource.stages {
-            let shader = try self.compileShader(for: stage)
-            shaders[stage] = shader
-            // Merge
-            reflectionData.merge(shader.reflectionData)
-        }
-
-        return ShaderModule(shaders: shaders, reflectionData: reflectionData)
+        throw weslRequired(for: .max)
     }
 
-    /// Compile shader by specific shader stage.
-    /// - Returns: Compiled Shader object.
-    /// - Throws: Error if something went wrong on compilation to SPIR-V.
+    /// Reports the migration diagnostic for an old shader stage.
     public func compileShader(for stage: ShaderStage) throws -> Shader {
-        let span = AdaTrace.startSpan(lazyName: "ShaderCompiler.compileShader.\(stage.rawValue)")
-        defer {
-            span.end()
-        }
-        let version = self.getShaderVersion(for: stage)
-        let hasChanges = ShaderCache.hasChanges(for: self.shaderSource, stage: stage, version: version, includeSearchPaths: self.includeSearchPaths)
-        do {
-            return try compileShader(for: stage, version: version, hasChanges: hasChanges)
-        } catch {
-            // The manifest already holds the new source hash: roll it back so the next launch recompiles.
-            if hasChanges { ShaderCache.invalidate(for: self.shaderSource, stage: stage) }
-            throw error
-        }
+        throw weslRequired(for: stage)
     }
 
-    private func compileShader(for stage: ShaderStage, version: Int, hasChanges: Bool) throws -> Shader {
-        if !hasChanges {
-            if let deviceCompiledShader = ShaderCache.getCachedDeviceCompiledShader(for: self.shaderSource, stage: stage),
-               deviceCompiledShader.language == (unsafe RenderEngine.shared.type.deviceLang) {
-                return try Shader.make(from: deviceCompiledShader, entryPoint: deviceCompiledShader.entryPoints.first?.name ?? "", stage: stage)
-            }
-        }
-
-        #if WASM
-            if unsafe RenderEngine.shared.type == .headless {
-                let binary = try self.compileSpirvBin(for: stage, ignoreCache: hasChanges)
-                let shader = try Shader(spirv: binary, compiler: self)
-                try shader.compile()
-                return shader
-            }
-
-            #if WEBGPU_ENABLED
-                if unsafe RenderEngine.shared.type.deviceLang == .wgsl {
-                    guard let wgslSource = self.shaderSource.getWGSLSource(for: stage) else {
-                        let sourcePath = self.shaderSource.getSourceFileURL(for: stage)?.path ?? "<unknown>"
-                        throw CompileError.failed("WGSL sidecar for `\(stage.rawValue)` shader not found next to \(sourcePath)")
-                    }
-
-                    let binary = try self.compileSpirvBin(for: stage, ignoreCache: hasChanges)
-                    let spirvCompiler = try SpirvCompiler(spriv: binary.data, stage: stage, deviceLang: .glsl)
-                    let shader = Shader(
-                        source: wgslSource,
-                        entryPoint: self.shaderSource.getEntryPoint(for: stage),
-                        stage: stage,
-                        reflectionData: spirvCompiler.reflection()
-                    )
-                    try shader.compile()
-                    return shader
-                }
-            #endif
-        #endif
-
-        let binary = try self.compileSpirvBin(for: stage, ignoreCache: hasChanges)
-
-        #if SAGA_RENDER && !WASM
-            // SAGA consumes SPIR-V directly and derives its bindings from the compiled stage.
-            if unsafe RenderEngine.shared.type == .saga {
-                let shader = try Shader(spirv: binary, compiler: self)
-                let spirvCompiler = try SpirvCompiler(spriv: binary.data, stage: stage, deviceLang: .glsl)
-                shader.reflectionData = spirvCompiler.reflection()
-                try shader.compile()
-                return shader
-            }
-        #endif
-
-        #if WASM
-            throw CompileError.failed("Synchronous device shader compilation is unavailable on WebAssembly")
-        #else
-            let deviceShaderCompiler = self.makeDeviceShaderCompiler()
-            let compiledShaderData = try UnsafeTask { [deviceShaderCompiler, macros] in
-                try await deviceShaderCompiler.compile(
-                    spirvData: binary.data,
-                    entryPoint: binary.entryPoint,
-                    stage: stage,
-                    defines: Array(macros[stage, default: [:]].values)
-                )
-            }
-            .get()
-            do {
-                try ShaderCache.saveDeviceCompiledShader(compiledShaderData, for: self.shaderSource, stage: stage)
-            } catch {
-                self.logger.warning("Failed to save device compiled shader to cache: \(error)")
-            }
-            let shader = try Shader.make(
-                from: compiledShaderData,
-                entryPoint: binary.entryPoint,
-                stage: stage
-            )
-            if let reflection = ShaderCache.getReflection(for: self.shaderSource, stage: stage) {
-                shader.reflectionData = reflection
-            } else {
-                try ShaderCache.saveReflection(shader.reflectionData, for: self.shaderSource, stage: stage)
-            }
-
-            return shader
-        #endif
-    }
-
-    // MARK: - Private
-
-    // Get SPIRV from cache or compile new if something change in file.
-    internal func compileSpirvBin(for stage: ShaderStage, ignoreCache: Bool = false) throws -> SpirvBinary {
-        let version = self.getShaderVersion(for: stage)
-
-        if !ignoreCache, !ShaderCache.hasChanges(for: self.shaderSource, stage: stage, version: version, includeSearchPaths: self.includeSearchPaths) {
-            let entryPoint = self.shaderSource.getEntryPoint(for: stage)
-            if let binary = ShaderCache.getCachedShader(
-                for: self.shaderSource,
-                stage: stage,
-                version: version,
-                entryPoint: entryPoint
-            ) {
-                return binary
-            }
-        }
-
-        guard let code = self.shaderSource.getSource(for: stage) else {
-            throw CompileError.failed("Sources for stage `\(stage.rawValue)` not found")
-        }
-
-        let processedCode = try ShaderIncluder.processIncludes(in: code, includeSearchPath: self.includeSearchPaths)
-        let (entryPoint, ppCode) = try ShaderUtils.dropEntryPoint(from: processedCode)
-        let spirv = try self.compileCode(ppCode, entryPoint: entryPoint, stage: stage)
-        do {
-            try ShaderCache.save(spirv, source: self.shaderSource, stage: stage, version: version)
-        } catch {
-            self.logger.warning("Failed to save spirv to cache: \(error)")
-        }
-
-        return spirv
-    }
-
-    internal func compileCode(_ code: String, entryPoint: String, stage: ShaderStage) throws -> SpirvBinary {
-        Self.compilationLock.lock()
-        defer { Self.compilationLock.unlock() }
-        let span = AdaTrace.startSpan(lazyName: "ShaderCompiler.compileCode.\(stage.rawValue)")
-        defer {
-            span.end()
-        }
-        guard glslang_initialize() != 0 else {
-            throw CompileError.glslError("Can't create glslang process.")
-        }
-
-        defer {
-            glslang_finalize()
-        }
-
-        var error: UnsafePointer<CChar>?
-        let defines = self.getDefines(for: stage)
-        let binary = unsafe defines.withCString { definesPtr in
-            let options = unsafe spirv_options(preamble: definesPtr)
-
-            return unsafe code.withCString { sourcePtr in
-                unsafe compile_shader_glsl(
-                    sourcePtr, /* source */
-                    stage.toShaderCompiler, /* stage */
-                    options, /* options */
-                    &error /* output error */
-                )
-            }
-        }
-
-        if let error = unsafe error {
-            let message = unsafe String(cString: error, encoding: .utf8) ?? "Failed to compile"
-            throw CompileError.glslError(message)
-        }
-
-        guard let bytes = unsafe binary.bytes else {
-            throw CompileError.glslError("Shader compiler returned no binary data.")
-        }
-        let data = unsafe Data(
-            bytesNoCopy: UnsafeMutableRawPointer(mutating: bytes),
-            count: Int(binary.length),
-            deallocator: .free
-        )
-
-        return SpirvBinary(
-            stage: stage,
-            data: data,
-            language: self.shaderSource.language,
-            entryPoint: entryPoint,
-            version: self.getShaderVersion(for: stage)
-        )
-    }
-
-    private func getShaderVersion(for stage: ShaderStage) -> Int {
-        return self.getDefines(for: stage).uniqueHashValue
-    }
-
-    private func getDefines(for stage: ShaderStage) -> String {
-        var defines = ""
-        #if METAL
-            if stage == .vertex, unsafe RenderEngine.shared.type == .metal {
-                defines += "#define ADA_METAL_RENDER_LAYER 1\n"
-            }
-        #endif
-
-        for macro in self.macros[stage, default: [:]].values {
-            defines.append("#define \(macro.name.uppercased()) \(macro.value)\n")
-        }
-
-        return defines
-    }
-}
-
-extension ShaderCompiler {
-    func makeDeviceShaderCompiler() -> ShaderDeviceCompilerEngine {
-        // Device shader compilation is the GLSL path (glslang to SPIR-V) used by SAGA native and Metal.
-        GLSLangShaderCompiler()
-    }
-}
-
-extension ShaderStage {
-    var toShaderCompiler: shaderc_stage {
-        switch self {
-        case .compute:
-            return SHADER_STAGE_COMPUTE
-        case .fragment:
-            return SHADER_STAGE_FRAGMENT
-        case .vertex:
-            return SHADER_STAGE_VERTEX
-        case .tesselationControl:
-            return SHADER_STAGE_TESSELATION_CONTROL
-        case .tesselationEvaluation:
-            return SHADER_STAGE_TESSELATION_EVALUATION
-        case .max:
-            return SHADER_STAGE_MAX
-        }
+    private func weslRequired(for stage: ShaderStage) -> CompileError {
+        .weslRequired(shaderSource.getSourceFileURL(for: stage)?.path ?? "inline shader")
     }
 }

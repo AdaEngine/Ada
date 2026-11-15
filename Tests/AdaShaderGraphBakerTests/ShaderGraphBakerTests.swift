@@ -32,7 +32,13 @@ struct ShaderGraphBakerTests {
     func realBakerHandlesInlineOverridesMissingResourcesAndUnicode() throws {
         let environment = ProcessInfo.processInfo.environment
         let executable = try #require(environment["ADAENGINE_SHADER_GRAPH_BAKER"])
-        let root = FileManager.default.temporaryDirectory.appendingPathComponent("Граф со пробелами " + UUID().uuidString)
+        #if os(macOS)
+            // Foundation can enumerate /tmp using /private/tmp file URLs.
+            let temporaryDirectory = URL(fileURLWithPath: "/private/tmp", isDirectory: true)
+        #else
+            let temporaryDirectory = FileManager.default.temporaryDirectory
+        #endif
+        let root = temporaryDirectory.appendingPathComponent("Граф со пробелами " + UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: root) }
         let scene = root.appendingPathComponent("Main.ascn")
@@ -67,7 +73,20 @@ struct ShaderGraphBakerTests {
         let invalidGraph = try run()
         #expect(invalidGraph.0 != 0 && invalidGraph.1.contains("invalid.shadergraph"))
         try FileManager.default.removeItem(at: invalid)
-        let graph = ShaderGraph(target: .sprite, output: "out", nodes: [.init(id: "out", operation: .output)])
+        let graph = ShaderGraph(target: .sprite, output: "out", nodes: [
+            .init(id: "texture", operation: .spriteTexture, type: .color),
+            .init(id: "out", operation: .output, inputs: ["color": .init("texture")]),
+        ])
+        let named = root.appendingPathComponent("Именованный граф.shadergraph")
+        let namedReference = "@res://" + named.lastPathComponent
+        try JSONEncoder().encode(graph).write(to: named)
+        try write(.init(path: namedReference))
+        try #require(try run().0 == 0)
+        let namedArchive = try JSONDecoder().decode(ShaderGraphArchive.self, from: Data(contentsOf: archive))
+        #expect(namedArchive.graphs[namedReference]?.target == .sprite)
+        #expect(namedArchive.fragments.count == 2)
+        try FileManager.default.removeItem(at: named)
+        try FileManager.default.removeItem(at: archive)
         try write(.init(graph: graph, textures: ["map": "../outside.png"]))
         let outsideTexture = try run()
         #expect(outsideTexture.0 != 0 && outsideTexture.1.contains("outside packaged resources"))

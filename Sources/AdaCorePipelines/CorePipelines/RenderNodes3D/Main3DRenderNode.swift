@@ -349,7 +349,9 @@ public struct Main3DRenderNode: RenderNode {
             if let surface = target.diffuseSurface3DTexture {
                 descriptor.colorAttachments.append(.init(texture: surface, operation: .init(loadAction: pathTracingOverlaysOnly ? .load : .clear, storeAction: .store), clearColor: .black))
             }
-            let foveatedPass = try camera.rasterizationRateMap.map {
+            // Late path-tracing overlays load the already resolved logical targets.
+            let geometryRateMap = pathTracingOverlaysOnly ? nil : camera.rasterizationRateMap
+            let foveatedPass = try geometryRateMap.map {
                 try commandBuffer.beginFoveatedRenderPass(descriptor, rateMap: $0)
             }
             let renderPass = foveatedPass?.encoder ?? commandBuffer.beginRenderPass(descriptor)

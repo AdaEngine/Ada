@@ -35,8 +35,8 @@ They also accept an existing Windows release directory or macOS `.app` bundle.
 ### Linux
 
 Studio Standalone can be built for X11/XWayland, including WSLg, with Swift 6.3.2
-and Vulkan. See [Linux setup and validation](../Documentation/Linux.md) for the
-pinned Swan/Dawn, Tint and bundled compiler setup, then run
+and SAGA Vulkan. See [Linux setup and validation](../Documentation/Linux.md) for the
+driver and bundled compiler setup, then run
 `bash script/run_studio_linux.sh` from the engine root. It builds and stages the
 editor, resources, Swift runtime and source BuildSDK before launching. File
 dialogs require Zenity; Linux is the local Run destination. This initial port
@@ -49,20 +49,19 @@ with up to four levels through `@export(group: "Camera/Auto Exposure")` in AdaSc
 or `@Export(group: "Camera/Auto Exposure")` in Swift components. Scene hierarchy
 includes name search, empty parent groups and a resizable, remembered width.
 
-Use Swift 6.3 or newer for the Swan/WebGPU dependency, Visual Studio C++ Build
-Tools, Python 3, CMake and Ninja. From the engine root, run:
+Use Swift 6.3.1 or newer, Visual Studio C++ Build Tools, Python 3, CMake, Ninja
+and a Vulkan-capable graphics driver. From the engine root, run:
 
 ```powershell
 ./script/run_studio_windows.ps1
 ```
 
-The launcher verifies/builds the pinned Tint shader compiler and prepares a
-pinned Gravity binding with native string allocation and UTF-8 lengths under
+The launcher prepares a pinned Gravity binding with native string allocation and UTF-8 lengths under
 `.build-tools/gravity-windows`; it never edits shared SwiftPM checkouts. It sets
 `ADAENGINE_GRAVITY_PACKAGE_PATH`, builds Release and opens a complete Standalone
 folder under `.build-tools/standalone-studio`. Windows Studio is always Standalone.
 The launcher uses the release packager to include and verify the build SDK,
-AdaScript compiler, Tint, resources and runtime DLLs. Launching the bare SwiftPM
+AdaScript compiler, resources and runtime DLLs. Launching the bare SwiftPM
 executable does not provide that export toolchain.
 Web/Android cross-build caches stay inside WSL at
 `~/.local/share/AdaStudio/BuildTools/builds`. Windows-mounted scratch paths are
@@ -80,7 +79,7 @@ SwiftPM cache when the shared cache belongs to another Swift toolchain.
 Local Run uses the Windows destination for SwiftPM and embedded AdaScript
 projects. Project/folder selection, multi-file asset import and RGB color dialogs
 use Windows controls; inspector alpha remains editable. HTTPS clients support
-bounded streaming downloads and cancellation. Rendering/readback uses Dawn D3D12.
+bounded streaming downloads and cancellation. Rendering and readback use SAGA Vulkan.
 The main window uses a themeable client-drawn title bar with application menus,
 Ctrl shortcuts and native minimize/maximize/close commands. Empty title-bar space
 drags the window; double-click and right-click retain Windows caption behavior.
@@ -92,7 +91,7 @@ require Apple platforms. AdaPlayer uses native WinSock and Windows DNS-SD;
 manual `host:port` connection is available when discovery is unavailable.
 `AdaEditor.exe --ada-player` opens the Windows player.
 
-Windows Studio follows the WebGPU FIFO display cadence using a high-resolution
+Windows Studio follows the Vulkan FIFO display cadence using a high-resolution
 frame clock. Release FPS and frame-interval measurements, hardware details and
 PresentMon reproduction commands are in [Windows performance](Documentation/WindowsPerformance.md).
 
@@ -118,18 +117,19 @@ It attaches `AdaStudio-<tag>-windows-x86_64.zip` and `.zip.sha256` to that relea
 Pull requests changing release tooling and manual workflow runs produce downloadable
 Actions artifacts only. Existing release assets are never overwritten on a rerun.
 
-Extract the whole archive and open `AdaEditor.exe`. Swift runtime DLLs, Dawn/DXC,
-resources, Tint and the AdaScript source build SDK are included. The archive is
+Extract the whole archive and open `AdaEditor.exe`. Swift runtime DLLs, resources
+and the AdaScript source build SDK are included. SAGA uses the system Vulkan
+loader. The archive is
 currently unsigned; native project builds still require Swift/Visual Studio C++
 tools, and Web/Android exports require WSL and their SDKs. To package locally:
 
 ```powershell
 $studioBin = (& ./script/build_studio_windows.ps1 -Configuration release | Select-Object -Last 1).Trim()
-python script/package_studio_windows.py --bin "$studioBin" --compiler-root "$env:ADAENGINE_GRAVITY_PACKAGE_PATH" --tint "$env:TINT_EXECUTABLE" --version local
+python script/package_studio_windows.py --bin "$studioBin" --compiler-root "$env:ADAENGINE_GRAVITY_PACKAGE_PATH" --version local
 ```
 
 WebAssembly and Android builds use a Linux worker under WSL (Ubuntu). Prepare
-the matching Swift SDKs, pinned Tint, Android SDK/NDK and Swan/Dawn with:
+the matching Swift SDKs and Android SDK/NDK with:
 
 ```powershell
 ./script/setup_windows_build_tools.ps1

@@ -32,7 +32,7 @@ public struct DirectionalShadow3DPipeline: RenderPipelineConfigurator {
     public func configurate(with shadowConfiguration: Shadow3DConfiguration) -> RenderPipelineDescriptor {
         let shader = shadowConfiguration.morph
             ? variants.shader(
-                at: ShaderModule.supportsBundledWESL ? "Shaders/directional_shadow_3d.wesl" : "Shaders/directional_shadow_3d.glsl",
+                at: "Shaders/directional_shadow_3d.wesl",
                 for: .morph,
                 fallback: self.shader
             )

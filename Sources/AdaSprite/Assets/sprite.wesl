@@ -1,5 +1,5 @@
 import ada_engine::view::projectPosition;
-import package::sprite_surface::{SpriteVertex, shadeSprite};
+import package::sprite_surface::{SpriteVertex, shadeSprite, u_Texture, u_Sampler};
 
 // Shader Graph materials (ADA_SHADER_GRAPH) receive the generated graph source at this marker line.
 // ADA_GRAPH_SOURCE_MARKER

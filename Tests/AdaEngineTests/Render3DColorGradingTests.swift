@@ -73,7 +73,7 @@ struct Render3DColorGradingSettingsTests {
 extension Render3DGPUTests {
     /// Renders vignette, saturation, contrast and LUT grading through the real Metal pipeline.
     ///
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DColorGradingGPUTests`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DColorGradingGPUTests`.
     @Suite("3D color grading on GPU")
     @MainActor
     struct ColorGrading {

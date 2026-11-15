@@ -3,7 +3,7 @@ import ada_engine::view::projectPosition;
 // WESL port of agent_activity.glsl. Coordinates, size, radius and width are in logical pixels.
 // The fragment returns PREMULTIPLIED RGBA; blend with ONE, ONE_MINUS_SRC_ALPHA.
 
-struct EditorAgentGlowMaterial {
+struct EditorAgentGlowUniforms {
     u_Color: vec4f,
     u_Geometry: vec4f,
     u_Style: vec4f,
@@ -15,7 +15,7 @@ struct AgentGlowVertex {
     @location(1) uv: vec2f,
 }
 
-@group(0) @binding(0) var<uniform> material: EditorAgentGlowMaterial;
+@group(0) @binding(0) var<uniform> EditorAgentGlowMaterial: EditorAgentGlowUniforms;
 
 @vertex
 fn editor_agent_activity_vertex(@location(0) position: vec4f, @location(1) color: vec4f, @location(2) uv: vec2f) -> AgentGlowVertex {
@@ -83,10 +83,10 @@ fn agentActivityGlow(
 
 @fragment
 fn editor_agent_activity_fragment(input: AgentGlowVertex) -> @location(0) vec4f {
-    let size = material.u_Geometry.xy;
+    let size = EditorAgentGlowMaterial.u_Geometry.xy;
     let position = input.uv * size;
     return agentActivityGlow(
-        position, size, material.u_Geometry.z, material.u_Color.rgb,
-        1.0, material.u_Style.x, material.u_Geometry.w, material.u_Style.z, material.u_Style.y
-    ) * material.u_Style.w;
+        position, size, EditorAgentGlowMaterial.u_Geometry.z, EditorAgentGlowMaterial.u_Color.rgb,
+        1.0, EditorAgentGlowMaterial.u_Style.x, EditorAgentGlowMaterial.u_Geometry.w, EditorAgentGlowMaterial.u_Style.z, EditorAgentGlowMaterial.u_Style.y
+    ) * EditorAgentGlowMaterial.u_Style.w;
 }

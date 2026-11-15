@@ -3,7 +3,6 @@
 import AdaEngine
 @_spi(Internal) import AdaRender
 import Foundation
-import Metal
 import Testing
 
 /// Renders imported MagicaVoxel models through the real Metal 3D pipeline and writes PNGs for inspection.
@@ -26,26 +25,20 @@ struct VoxelRenderingSmokeTests {
         let app: AppWorlds
         let device: RenderDevice
         let target: RenderTexture
-        let queue: MTLCommandQueue
 
         func render(frames: Int = 1) async throws -> Image {
             for _ in 0..<frames {
                 try await app.update()
             }
-            let fence = try #require(queue.makeCommandBuffer())
-            await withCheckedContinuation { continuation in
-                fence.addCompletedHandler { _ in continuation.resume() }
-                fence.commit()
-            }
-            return try #require(device.getImage(from: target))
+            return try #require(try await device.readImage(from: target))
         }
     }
 
     private static func makeScene() async throws -> Scene {
-        unsafe RenderEngine.configurations.preferredBackend = .metal
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         try RenderEngine.setupRenderEngine()
+        try #require(unsafe RenderEngine.shared.type == .saga)
         let device = unsafe RenderEngine.shared.renderDevice
-        let queue = try #require(MetalInterop.commandQueue(for: device))
         let app = AppWorlds(main: World())
         app.insertResource(OffscreenRenderWorld())
             .insertResource(PrimaryWindowId(windowId: RID()))
@@ -79,7 +72,7 @@ struct VoxelRenderingSmokeTests {
             DirectionalLightComponent(radiance: [1, 0.95, 0.85], intensity: 3, castShadows: true)
             Transform(rotation: Quat.euler([-0.9, 0.6, 0]))
         }
-        return Scene(app: app, device: device, target: target, queue: queue)
+        return Scene(app: app, device: device, target: target)
     }
 
     private static func nonBackgroundPixels(in image: Image) -> Int {

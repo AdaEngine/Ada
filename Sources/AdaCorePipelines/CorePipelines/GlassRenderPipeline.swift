@@ -10,7 +10,7 @@ import AdaUtils
 import Math
 
 /// Vertex data for rendering glass quads.
-/// Matches the attribute layout expected by glass.glsl.
+/// Matches the attribute layout expected by glass.wesl.
 public struct GlassVertexData: Sendable {
     /// Position in world space (vec4).
     public let position: Vector4

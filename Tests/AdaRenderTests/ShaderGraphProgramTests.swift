@@ -5,13 +5,29 @@ import Testing
 @Suite("Generated shader graph functions", .serialized)
 struct ShaderGraphProgramTests {
     @Test func validationRetainsNodeAndPortLocations() throws {
-        let program = try graph().compileGLSL()
-        try program.validateGLSL()
+        var program = try graph().compileWGSL()
+        try program.validateWGSL()
         let entry = try #require(program.sourceMap.first { $0.value.nodeID == "output" && $0.value.port == "color" })
-        let error = program.diagnostic(for: "ERROR: 101:\(entry.key): invalid assignment")
-        #expect(error.nodeID == "output")
-        #expect(error.port == "color")
-        #expect(program.diagnostic(for: "Device failure without a source location").nodeID == nil)
+        var source = program.source.components(separatedBy: "\n")
+        source[entry.key - 1] = "ada_graph_result.color = missing_graph_color;"
+        program = ShaderGraphProgram(
+            target: program.target,
+            renderSettings: program.renderSettings,
+            source: source.joined(separator: "\n"),
+            parameters: program.parameters,
+            textures: program.textures,
+            sourceMap: program.sourceMap,
+            usesTime: program.usesTime,
+            format: .wgsl
+        )
+        do {
+            try program.validateWGSL()
+            Issue.record("SAGA accepted an unknown Shader Graph value")
+        } catch let error as ShaderGraphCompilationError {
+            #expect(error.nodeID == "output")
+            #expect(error.port == "color")
+            #expect(error.message.contains("missing_graph_color"))
+        }
     }
 
     private func graph() -> ShaderGraph {
@@ -27,11 +43,11 @@ struct ShaderGraphProgramTests {
 
     @Test func resourcesAndDefaultsDoNotChangeCompiledCode() throws {
         var graph = graph()
-        let before = try graph.compileGLSL()
+        let before = try graph.compileWGSL()
         graph.nodes[1].reference = "other.png"
         graph.nodes[3].value = [0, 0, 0, 1]
         graph.nodes.reverse()
-        let after = try graph.compileGLSL()
+        let after = try graph.compileWGSL()
         #expect(before.source == after.source)
         #expect(before.parameters != after.parameters)
         #expect(before.textures != after.textures)
@@ -46,17 +62,22 @@ struct ShaderGraphProgramTests {
         var graph = graph()
         graph.target = target
         if target == .pbrSurface { graph.nodes[5].inputs = ["baseColor": .init("multiply"), "emission": .init("sample", port: "rgb")] }
-        let program = try graph.compileGLSL()
-        let source = try ShaderSource(source: """
-        #version 450 core
-        #pragma stage : frag
-        layout(location = 0) out vec4 result;
-        \(program.source)
-        void main() { AdaGraphSurface s = ada_graph_evaluate(vec2(0.5)); result = s.color + vec4(s.emission, 0.0); }
-        """)
-        let binary = try ShaderCompiler(shaderSource: source).compileSpirvBin(for: .fragment, ignoreCache: true)
-        #expect(!binary.data.isEmpty)
-        let reflection = try SpirvCompiler(spriv: binary.data, stage: .fragment, deviceLang: .glsl).reflection()
+        let program = try graph.compileWGSL()
+        let artifact = try ShaderGraphArchive.Fragment.bake(
+            template: "graph_test",
+            templateSource: """
+                // ADA_GRAPH_SOURCE_MARKER
+                @fragment fn main() -> @location(0) vec4f {
+                    let surface = ada_graph_evaluate(vec2f(0.5));
+                    return surface.color + vec4f(surface.emission, 0.0);
+                }
+                """,
+            program: program,
+            packageRoot: FileManager.default.temporaryDirectory,
+            macros: []
+        )
+        #expect(artifact.entryPoint == "main")
+        let reflection = artifact.reflection
         #expect(reflection.descriptorSets[ShaderGraphProgram.resourceSet].uniformsBuffers[ShaderGraphProgram.uniformBinding] != nil)
         #expect(reflection.descriptorSets[ShaderGraphProgram.resourceSet].sampledImages[ShaderGraphProgram.firstTextureBinding] != nil)
         #expect(reflection.descriptorSets[ShaderGraphProgram.samplerSet].samplers[ShaderGraphProgram.samplerBinding] != nil)

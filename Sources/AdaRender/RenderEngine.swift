@@ -27,8 +27,7 @@ public enum RenderUpscalingMode: Sendable, Equatable {
 
     /// Use the backend's spatial upscaler when it is available.
     ///
-    /// The scale is clamped to `0.5...1`. Metal uses MetalFX and WebGPU uses
-    /// FidelityFX Super Resolution 1 (EASU + RCAS). Unsupported backends render at native resolution.
+    /// The scale is clamped to `0.5...1`. The SAGA backend currently renders at native resolution.
     case spatial(renderScale: Float)
 }
 
@@ -49,8 +48,8 @@ public final class RenderEngine: RenderBackend, Sendable {
 
         /// The upscaling mode used for window render targets.
         ///
-        /// iOS defaults to MetalFX spatial upscaling from 75% linear resolution.
-        /// Other platforms keep native resolution unless explicitly configured.
+        /// iOS requests 75% spatial scaling. SAGA renders at native resolution for this request.
+        /// Other platforms default to `.disabled`.
         public var upscaling: RenderUpscalingMode = {
             #if os(iOS)
                 .spatial(renderScale: 0.75)
@@ -172,15 +171,13 @@ extension RenderEngine {
                 renderBackend = try SAGAMetalRenderBackend()
             #elseif SAGA_RENDER && SAGA_NATIVE && (os(Windows) || os(Linux) || os(Android)) && canImport(SAGAVulkan) && canImport(SAGACompiler)
                 renderBackend = try SAGANativeRenderBackend()
+            #elseif METAL
+                throw RenderEngineSetupError.sagaBackendUnavailable
             #else
                 fallthrough
             #endif
         case .metal:
-            #if METAL
-                renderBackend = MetalRenderBackend()
-            #else
-                fallthrough
-            #endif
+            throw RenderEngineSetupError.legacyMetalBackendUnavailable
         case .headless:
             renderBackend = HeadlessRenderBackend()
         }
@@ -194,13 +191,13 @@ extension RenderEngine {
         #elseif SAGA_RENDER && SAGA_NATIVE && canImport(SAGAVulkan)
             return .saga
         #elseif WASM
-            #if WEBGPU_ENABLED
+            #if SAGA_WEBGPU && WEBGPU_ENABLED
                 return .webgpu
             #else
                 return .headless
             #endif
-        #elseif METAL
-            return .metal
+        #elseif ADAENGINE_HEADLESS
+            return .headless
         #else
             return .headless
         #endif
@@ -209,11 +206,17 @@ extension RenderEngine {
 
 private enum RenderEngineSetupError: LocalizedError {
     case browserWebGPUBackendUnavailable
+    case sagaBackendUnavailable
+    case legacyMetalBackendUnavailable
 
     var errorDescription: String? {
         switch self {
         case .browserWebGPUBackendUnavailable:
             "The browser renderer needs the SAGA WebGPU host: open the page through the web export so `__adaSAGAHost` exists."
+        case .sagaBackendUnavailable:
+            "This build does not include a native SAGA renderer. Use a SAGA build or select the headless renderer."
+        case .legacyMetalBackendUnavailable:
+            "Select SAGA to render WESL shaders through Metal."
         }
     }
 }

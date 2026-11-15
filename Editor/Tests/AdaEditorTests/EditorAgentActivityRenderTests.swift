@@ -1,4 +1,4 @@
-#if canImport(Metal)
+#if os(macOS) && canImport(SAGAMetal)
     import AdaAssets
     import AdaCorePipelines
     @_spi(Internal) @testable import AdaRender
@@ -11,7 +11,7 @@
     @testable import AdaEditor
 
     @MainActor
-    @Suite("Editor agent activity Metal rendering", .serialized, .enabled(if: MTLCreateSystemDefaultDevice() != nil))
+    @Suite("Editor agent activity SAGA Metal rendering", .serialized, .enabled(if: MTLCreateSystemDefaultDevice() != nil))
     struct EditorAgentActivityRenderTests {
         @Test("The native shader renders semantic edge colors and a transparent center")
         func statusPixels() async throws {
@@ -41,8 +41,8 @@
 
     @MainActor
     private final class AgentGlowMetalProbe {
-        let device: MTLDevice
-        let pipeline: MetalRenderPipeline
+        let backend: SAGAMetalRenderBackend
+        let pipeline: any RenderPipeline
         let material: CustomMaterial<EditorAgentGlowMaterial>
 
         init() throws {
@@ -50,21 +50,16 @@
                 unsafe RenderEngine.configurations.preferredBackend = .headless
                 try RenderEngine.setupRenderEngine()
             }
-            let renderDevice = try #require(MTLCreateSystemDefaultDevice())
-            device = renderDevice
+            backend = try SAGAMetalRenderBackend()
             material = CustomMaterial(EditorAgentGlowMaterial())
-            let module = try ShaderCompiler(shaderSource: material.shaderSource).compileShaderModule()
+            let module = try material.makeShaderModule(defines: [])
             let storage = MaterialStorageData()
             storage.updateUniformBuffers(from: module)
             unsafe MaterialStorage.shared.setMaterialData(storage, for: material)
             material.update()
-            func compile(_ stage: ShaderStage, source: AssetHandle<ShaderSource>) throws -> Shader {
-                let spirv = try ShaderCompiler(shaderSource: source.asset).compileSpirvBin(for: stage, ignoreCache: true)
-                let result = try SpirvCompiler(spriv: spirv.data, stage: stage, deviceLang: .msl).compile()
-                let shader = Shader(source: result.source, entryPoint: try #require(result.entryPoints.first?.name), stage: stage, reflectionData: result.reflection)
-                shader.compiledShader = try MetalShader(shader: shader, device: renderDevice)
-                return shader
-            }
+            let file = try #require(Bundle.editor.url(forResource: "agent_activity", withExtension: "wesl", subdirectory: "Assets/Shaders"))
+            let linked = try ShaderModule.linkWESL(from: file)
+            let saga = try ShaderModule.createModule(from: linked, device: backend.renderDevice)
             var vertexDescriptor = VertexDescriptor()
             vertexDescriptor.attributes.append([
                 .attribute(.vector4, name: "a_Position"), .attribute(.vector4, name: "a_Color"), .attribute(.vector2, name: "a_TexCoordinate"),
@@ -72,27 +67,27 @@
             vertexDescriptor.layouts[0].stride = MemoryLayout<QuadVertexData>.stride
             let descriptor = try EditorAgentGlowMaterial.configurePipeline(
                 keys: [],
-                vertex: compile(.vertex, source: EditorAgentGlowMaterial.vertexShader()),
-                fragment: compile(.fragment, source: EditorAgentGlowMaterial.fragmentShader()),
+                vertex: try #require(saga.getShader(for: .vertex)),
+                fragment: try #require(saga.getShader(for: .fragment)),
                 vertexDescriptor: vertexDescriptor
             )
-            pipeline = try MetalRenderPipeline(descriptor: descriptor, device: device)
+            pipeline = backend.renderDevice.createRenderPipeline(from: descriptor)
         }
 
         func render(state: EditorAgentActivityState, time: Float) async throws -> [UInt8] {
-            let descriptor = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bgra8Unorm, width: 320, height: 200, mipmapped: false)
-            descriptor.storageMode = .shared
-            descriptor.usage = [.renderTarget]
-            let target = try #require(device.makeTexture(descriptor: descriptor))
-            let pass = MTLRenderPassDescriptor()
-            pass.colorAttachments[0].texture = target
-            pass.colorAttachments[0].loadAction = .clear
-            pass.colorAttachments[0].storeAction = .store
-            pass.colorAttachments[0].clearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 0)
-            let queue = try #require(device.makeCommandQueue())
-            let command = try #require(queue.makeCommandBuffer())
-            let encoder = try #require(command.makeRenderCommandEncoder(descriptor: pass))
-            encoder.setRenderPipelineState(pipeline.renderPipeline)
+            let device = backend.renderDevice
+            let target = Texture2D(
+                gpuTexture: device.createTexture(from: .init(
+                    width: 320, height: 200, pixelFormat: .bgra8,
+                    textureUsage: [.renderTarget, .read], textureType: .texture2D
+                )),
+                sampler: device.createSampler(from: .init()), size: [320, 200]
+            )
+            let command = device.createCommandQueue().makeCommandBuffer()
+            let encoder = command.beginRenderPass(.init(colorAttachments: [
+                .init(texture: target, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .clear)
+            ]))
+            encoder.setRenderPipelineState(pipeline)
             let positions: [Vector2] = [[-1, 1], [1, 1], [-1, -1], [-1, -1], [1, 1], [1, -1]]
             let vertices = positions.map { point in
                 QuadVertexData(
@@ -102,13 +97,11 @@
                     textureIndex: 0
                 )
             }
-            try vertices.withUnsafeBytes { bytes in
-                encoder.setVertexBytes(try #require(bytes.baseAddress), length: bytes.count, index: 0)
-            }
-            let transforms = [Transform3D.identity, .identity, .identity]
-            try transforms.withUnsafeBytes { bytes in
-                encoder.setVertexBytes(try #require(bytes.baseAddress), length: bytes.count, index: 2)
-            }
+            var vertexData = BufferData(label: "Editor glow probe vertices", elements: vertices)
+            vertexData.write(to: device)
+            encoder.setVertexBuffer(vertexData, offset: 0, slot: 0)
+            let view = GlobalViewUniform(projectionMatrix: .identity, viewProjectionMatrix: .identity)
+            encoder.setVertexBuffer(view, slot: GlobalBufferIndex.viewUniform)
             let color = state.color(accent: .blue)
             material.parameters = EditorAgentGlowParameters(
                 color: color,
@@ -119,21 +112,15 @@
             let uploaded = try #require(material.getValue(for: "EditorAgentGlowMaterial", type: EditorAgentGlowParameters.self))
             #expect(uploaded.color == color)
             #expect(uploaded.geometry.z == time)
-            withUnsafeBytes(of: uploaded) { bytes in
-                if let address = bytes.baseAddress {
-                    encoder.setFragmentBytes(address, length: bytes.count, index: 0)
-                }
-            }
-            encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
-            encoder.endEncoding()
-            await withCheckedContinuation { continuation in
-                command.addCompletedHandler { _ in continuation.resume() }
-                command.commit()
-            }
-            #expect(command.status == .completed)
-            var pixels = [UInt8](repeating: 0, count: 320 * 200 * 4)
-            target.getBytes(&pixels, bytesPerRow: 320 * 4, from: MTLRegionMake2D(0, 0, 320, 200), mipmapLevel: 0)
-            return pixels
+            var parameters = BufferData(label: "Editor glow probe parameters", elements: [uploaded])
+            parameters.write(to: device)
+            encoder.setFragmentBuffer(parameters, offset: 0, slot: 0)
+            encoder.draw(type: .triangle, vertexStart: 0, vertexCount: 6, instanceCount: 1)
+            encoder.endRenderPass()
+            command.commit()
+            let image = try #require(try await device.readImage(from: target))
+            #expect(backend.context.errorLog.all.isEmpty, "\(backend.context.errorLog.all)")
+            return Array(image.data)
         }
     }
 #endif

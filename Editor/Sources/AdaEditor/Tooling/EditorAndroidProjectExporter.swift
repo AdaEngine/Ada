@@ -52,7 +52,7 @@
           arguments: ["package", "describe", "--type", "json"],
           workingDirectory: root,
           environment: [
-            "ADAENGINE_ANDROID": "0", "ADAENGINE_HEADLESS": "1", "ADAENGINE_DISABLE_SWAN": "1",
+            "ADAENGINE_ANDROID": "0", "ADAENGINE_HEADLESS": "1",
             "ADAENGINE_GRAVITY_PACKAGE_PATH": sdk.compilerRoot.path,
           ]), output: log)
       try Task.checkCancellation()

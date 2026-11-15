@@ -7,6 +7,7 @@
 
 import AdaAssets
 import AdaUtils
+import Foundation
 import Synchronization
 
 // TODO: (Vlad) I think that `MaterialStorage` isn't great solution.
@@ -101,12 +102,7 @@ public class Material: Asset, Hashable, @unchecked Sendable {
             }
             return linkedShaderModule
         }
-        let compiler = ShaderCompiler(shaderSource: shaderSource)
-        for define in defines {
-            compiler.setMacro(define.name, value: define.value, for: .vertex)
-            compiler.setMacro(define.name, value: define.value, for: .fragment)
-        }
-        return try compiler.compileShaderModule()
+        throw ShaderCompiler.CompileError.weslRequired(shaderSource.getSourceFileURL(for: .max)?.path ?? "inline shader")
     }
 
     // MARK: Hashable

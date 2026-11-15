@@ -22,8 +22,7 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
     ("SWIFT_ANDROID_SWIFT", "Swift 6.4 executable"),
     ("SWIFT_ANDROID_SDKS_PATH", "Swift Android SDKs"),
     ("SWIFT_ANDROID_SDK", "Swift Android SDK identifier"),
-    ("ADAENGINE_SWAN_PACKAGE_PATH", "Swan package"),
-    ("SWAN_LOCAL_DAWN", "Dawn artifact (relative to Swan)"),
+    ("ADAENGINE_SAGA_PACKAGE_PATH", "SAGA checkout (optional)"),
   ]
   var environment: [String: String]
 
@@ -33,6 +32,7 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
       as? [String: String]
   ) -> Self {
     var values: [String: String] = [:]
+    let fieldNames = Set(fields.map(\.0))
     // Development-only defaults are data, never sourced or executed as shell code.
     if let engineRoot,
       let data = try? String(
@@ -41,22 +41,16 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
     {
       for line in data.split(separator: "\n") where line.hasPrefix("export ") {
         let pair = line.dropFirst(7).split(separator: "=", maxSplits: 1).map(String.init)
-        if pair.count == 2,
-          fields.contains(where: { $0.0 == pair[0] }) || pair[0] == "ANDROID_AVD_HOME"
-        {
+        if pair.count == 2, fieldNames.contains(pair[0]) {
           values[pair[0]] = pair[1].trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
         }
       }
     }
-    for (key, value) in environment
-    where fields.contains(where: { $0.0 == key }) || key == "ANDROID_AVD_HOME" {
-      if !value.isEmpty { values[key] = value }
+    for (key, value) in environment where fieldNames.contains(key) && !value.isEmpty {
+      values[key] = value
     }
-    for (key, value) in preferences ?? [:] where !value.isEmpty { values[key] = value }
-    if environment["ADAENGINE_SAGA_NATIVE"] == "1" {
-      values["ADAENGINE_SAGA_NATIVE"] = "1"
-      values["ADAENGINE_SAGA_PACKAGE_PATH"] = environment["ADAENGINE_SAGA_PACKAGE_PATH"]
-        ?? engineRoot?.deletingLastPathComponent().appendingPathComponent("SAGA").path
+    for (key, value) in preferences ?? [:] where fieldNames.contains(key) && !value.isEmpty {
+      values[key] = value
     }
     #if os(iOS) || os(tvOS) || os(visionOS)
       let home = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
@@ -84,15 +78,6 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
       ).path
     #endif
     values["SWIFT_ANDROID_SWIFT"] = values["SWIFT_ANDROID_SWIFT"] ?? defaultSwift
-    if let engineRoot {
-      let swan = engineRoot.deletingLastPathComponent().appendingPathComponent("Swan")
-      let development = engineRoot.deletingLastPathComponent().appendingPathComponent("swan")
-      values["ADAENGINE_SWAN_PACKAGE_PATH"] =
-        values["ADAENGINE_SWAN_PACKAGE_PATH"]
-        ?? (FileManager.default.fileExists(
-          atPath: swan.appendingPathComponent("Package.swift").path) ? swan.path : development.path)
-    }
-    values["SWAN_LOCAL_DAWN"] = values["SWAN_LOCAL_DAWN"] ?? "Dawn/dist/android.artifactbundle"
     if values["JAVA_HOME"] == nil {
       let jdk = "/Applications/Android Studio.app/Contents/jbr/Contents/Home"
       if FileManager.default.isExecutableFile(atPath: jdk + "/bin/java") { values["JAVA_HOME"] = jdk }
@@ -116,11 +101,26 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
           $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending
         }.last?.path
     }
+    if let saga = values["ADAENGINE_SAGA_PACKAGE_PATH"] {
+      values["ADAENGINE_SAGA_PACKAGE_PATH"] = absoluteSAGAPath(saga)
+    }
     values["ADAENGINE_ANDROID"] = "1"
-    values["SWAN_RUNTIME_ONLY"] = "1"
     values["ADAENGINE_HEADLESS"] = "0"
-    values["ADAENGINE_DISABLE_SWAN"] = "0"
     return Self(environment: values)
+  }
+
+  static func absoluteSAGAPath(
+    _ path: String,
+    relativeTo directory: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+  ) -> String {
+    let expanded = (path as NSString).expandingTildeInPath
+    #if os(Windows)
+      // Absolute Linux paths are interpreted by the WSL worker.
+      if expanded.hasPrefix("/") {
+        return expanded
+      }
+    #endif
+    return URL(fileURLWithPath: expanded, relativeTo: directory).standardizedFileURL.path
   }
 
   var adb: String {
@@ -147,7 +147,6 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
     #else
     let required = [
       "SWIFT_ANDROID_SWIFT", "SWIFT_ANDROID_SDKS_PATH", "ANDROID_HOME", "ANDROID_NDK_HOME",
-      environment["ADAENGINE_SAGA_NATIVE"] == "1" ? "ADAENGINE_SAGA_PACKAGE_PATH" : "ADAENGINE_SWAN_PACKAGE_PATH",
     ]
     #endif
     for key in required {
@@ -156,6 +155,13 @@ struct EditorAndroidConfiguration: Equatable, Sendable {
           message: "Configure \(key) in Settings → Build & Export → Android. The path is missing or unavailable.")
       }
     }
+    #if !os(Windows)
+      if let saga = environment["ADAENGINE_SAGA_PACKAGE_PATH"],
+        !FileManager.default.fileExists(atPath: URL(fileURLWithPath: saga).appendingPathComponent("Package.swift").path)
+      {
+        throw EditorPreviewBuildFailure(message: "The configured SAGA checkout is missing Package.swift: \(saga)")
+      }
+    #endif
     guard
       FileManager.default.fileExists(
         atPath: engineRoot.appendingPathComponent("Tools/Android/android.py").path)

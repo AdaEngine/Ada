@@ -185,20 +185,20 @@ Game-authored UI follows its own art direction unless the task explicitly adopts
   WebGPU host. Swan, Dawn, Tint and the DLSS bridge are removed and are not coming back.
 - For shader, sprite-renderer or GPU changes, run `script/validate_gpu.sh` from the engine root with Swift 6.3.2.
   It compiles fresh WESL shaders through SAGACompiler, runs the sprite smokes and the 3D GPU suites
-  (`Render3DGPUTests`) on SAGA native against `Tests/AdaEngineTests/GoldenFrames/saga`, and checks that they
-  agree with the Metal references. It runs its package sequentially because the engine owns one process-wide renderer.
-- Native SAGA builds currently resolve a sibling `../SAGA` checkout (or `ADAENGINE_SAGA_PACKAGE_PATH`), because the
-  Vulkan surface-presentation API is not in a published SAGA revision yet. Headless builds (`ADAENGINE_HEADLESS=1`) need no SAGA.
+  (`Render3DGPUTests`) on SAGA native against `Tests/AdaEngineTests/GoldenFrames/saga-metal` on macOS or
+  `Tests/AdaEngineTests/GoldenFrames/saga` on Vulkan. It also checks agreement across the reference sets.
+  It runs its package sequentially because the engine owns one process-wide renderer.
+- Native Vulkan builds resolve the pinned SAGA Vulkan revision through SwiftPM. Set `ADAENGINE_SAGA_PACKAGE_PATH` to develop against another checkout.
+  Native headless builds (`ADAENGINE_HEADLESS=1`) resolve the pinned SAGA CPU shader compiler through SwiftPM and run without a graphics device.
 
 ### Test
 - **Use Swift Testing** for AdaEngine package tests: `import Testing`, `@Suite`, `@Test`, and `#expect` / `#require`. Do not add new **XCTest**-based tests in `AdaEngine/Tests/`.
 - 3D rendering is checked with golden frames. The GPU suites are gated by
-  `ADAENGINE_GOLDEN_METAL=1` (run `swift test --filter Render3DGPUTests`) or
   `ADAENGINE_GOLDEN_SAGA=1` (through `script/validate_gpu.sh`). References live in
   `Tests/AdaEngineTests/GoldenFrames/<backend>`; re-record with `ADAENGINE_GOLDEN_RECORD=1`
   and review the diff images written to `ADAENGINE_GOLDEN_OUTPUT` on a mismatch. Keep every
   GPU suite nested under `Render3DGPUTests`, which serializes them.
-- Measure 3D performance with the benchmark, never by eye: `ADAENGINE_PERF=1 ADAENGINE_GOLDEN_METAL=1
+- Measure 3D performance with the benchmark, never by eye: `ADAENGINE_PERF=1 ADAENGINE_GOLDEN_SAGA=1
   swift test -c release -Xswiftc -enable-testing --filter Render3DGPUTests/Benchmarks` (options and
   interpretation in ADR-0027, "Performance pass 1"). Run it on a quiet machine; other GPU work inflates results.
 - Run all tests: `swift test --parallel`

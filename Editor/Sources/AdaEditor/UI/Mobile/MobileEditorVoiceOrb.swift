@@ -2,6 +2,7 @@
 import Android
 #endif
 @_spi(AdaEngine) import AdaEngine
+@_spi(Internal) import AdaRender
 import AdaUI
 import Foundation
 import Math
@@ -118,13 +119,6 @@ struct MobileVoiceOrbMaterial: UIShaderMaterial {
               let url = Bundle.editor.url(forResource: "mobile_voice_orb", withExtension: "wesl", subdirectory: "Assets/Shaders")
         else { return nil }
         return try ShaderModule.create(from: url)
-    }
-
-    static func fragmentShader() throws -> AssetHandle<ShaderSource> {
-        guard let url = Bundle.editor.url(forResource: "mobile_voice_orb", withExtension: "glsl", subdirectory: "Assets/Shaders") else {
-            throw CocoaError(.fileNoSuchFile)
-        }
-        return AssetHandle(try ShaderSource(from: url))
     }
 
     static func configurePipeline(keys _: Set<String>, vertex: Shader, fragment: Shader, vertexDescriptor: VertexDescriptor) throws -> RenderPipelineDescriptor {

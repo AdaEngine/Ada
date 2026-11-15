@@ -31,7 +31,7 @@ import Testing
                 .init(id: "output", operation: .output, inputs: ["color": .init("select")]),
             ]
         )
-        try graph.compileGLSL().validateGLSL()
+        try graph.compileWGSL().validateWGSL()
         return try ShaderGraphMaterial(source: .init(graph: graph))
     }
 

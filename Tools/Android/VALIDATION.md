@@ -1,4 +1,37 @@
-# Android WebGPU validation — 2026-10-04
+# Android rendering validation
+
+## SAGA Vulkan — 2026-11-15
+
+- Built a native SwiftPM smoke app with Swift 6.4.0, the matching Android Swift SDK,
+  NDK r28c, and the production SAGA Vulkan pin `e614dd1`.
+- The signed ARM64 APK passed 16 KiB ZIP alignment. It shipped the engine's WESL
+  resources and contained zero GLSL shader files. The native link list included
+  `SAGAVulkan` and no objects from the legacy `SPIRVCompiler`, `SPIRV-Cross`,
+  or `glslang` targets.
+- On a Pixel 9a ARM64 emulator with 16 KiB pages and SwiftShader, the AdaUI shader
+  drew a red background and white text. The center crop had the same red and
+  white pixel counts after returning from Home and reopening after Back. The
+  NativeActivity recreated its Vulkan surface in the same process.
+- A separate 3D build rendered a lit PBR sphere against the sky at 480 × 720.
+  The startup system confirmed the SAGA renderer, and the screenshot confirms
+  that linked WESL geometry shaders produced a visible Vulkan frame.
+- The scope of this run is ARM64 emulation with a software Vulkan driver. Physical
+  Android GPUs and x86_64 still need runtime validation.
+
+## Android surface recreation with bounded presentation
+
+The Android window waits for its outstanding presentation before acquiring another
+drawable. This keeps the work for a replaced Vulkan surface bounded while the
+Android frame loop continues processing application updates.
+
+On the ARM64 Pixel 9a emulator with SwiftShader, both control builds showed a
+complete 3D frame 32 seconds after Home. After Back, the previous build showed
+the frame at 130 seconds. The unpaced cutover build exceeded the 145-second
+test deadline. Two runs with bounded presentation recovered the same frame at
+the six-second sample after both Home and Back. The next screenshot in each
+run confirmed the same sphere pixel count.
+
+## Historical WebGPU run — 2026-10-04
 
 - Swift 6.4.0 and matching official Android SDK; NDK r28c; Android SDK 36.
 - Local Swan Android branch with Dawn pinned to

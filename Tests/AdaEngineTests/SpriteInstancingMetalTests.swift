@@ -15,9 +15,9 @@ import Testing
 struct SpriteInstancingMetalTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_SPRITE_INSTANCING_BENCHMARK"] == "1"))
     func benchmark() async throws {
-        unsafe RenderEngine.configurations.preferredBackend = .metal
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         try RenderEngine.setupRenderEngine()
-        try #require(unsafe RenderEngine.shared.type == .metal)
+        try #require(unsafe RenderEngine.shared.type == .saga)
         let device = unsafe RenderEngine.shared.renderDevice
         #expect(device.supportsInstancedVertexInputs)
         var pixels: Data?

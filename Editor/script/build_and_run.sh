@@ -18,7 +18,7 @@ if [[ "${ADA_EDITOR_STANDALONE_SWIFTPM:-0}" == "1" ]]; then
         editor_command="$(ps -p "$editor_pid" -o command= || true)"
         if [[ "$editor_command" == "$editor_binary" || "$editor_command" == "$editor_binary "* ]]; then kill "$editor_pid"; fi
     done
-    export ADAENGINE_ANDROID=0 ADAENGINE_DISABLE_SWAN=1 ADAENGINE_HEADLESS=1
+    export ADAENGINE_ANDROID=0 ADAENGINE_HEADLESS=1
     mkdir -p "$editor_scratch/package-roots"
     editor_canonical_engine="${ADAENGINE_PACKAGE_PATH:-$editor_scratch/package-roots/AdaEngine}"
     if [[ ! -e "$editor_canonical_engine" ]]; then ln -s "$editor_engine_root" "$editor_canonical_engine"; fi

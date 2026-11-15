@@ -917,7 +917,7 @@ enum EditorAgentPromptContext {
             [AdaEditor Project Capabilities]
             - Scene documents: *.ascn/*.scene/*.scn (YAML); prefer editor.scene.get/apply/undo for open scenes so revisions and editor history are preserved.
             - Swift and Ada Script code: \(sources) (Swift: *.swift, Ada Script: *.ada).
-            - Shaders: *.glsl/*.vert/*.frag/*.shader/*.metal under the project, commonly in \(assets).
+            - Shader modules: author *.wesl files and use *.wgsl for linked or standalone WGSL, commonly in \(assets).
             - Assets and project files: \(assets) and the project tree; project metadata is .ada/project.json.
             - AdaEditor MCP exposes scene, asset, build/test/play, output, Gravity LSP, runtime ECS, UI, render, trace, and profiler tools when project MCP is enabled.
             - Use editor.gravity.diagnostics/completion/hover/definition for .ada and .gravity; positions use zero-based UTF-16 LSP coordinates.

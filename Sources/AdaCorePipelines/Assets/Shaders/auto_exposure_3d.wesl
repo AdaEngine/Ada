@@ -53,8 +53,8 @@ fn adapt() -> vec4f {
         let blend = select(1.0 - exp(-exposure.parameters.y * speed), 1.0, speed >= 1000000.0);
         ev = mix(base, desired, blend);
     }
-    // Store the half-precision rounding residual so small adaptation steps accumulate.
-    let high = unpack2x16float(pack2x16float(vec2f(ev, 0.0))).x;
+    // Quantize explicitly so the rounding residual survives the half-float target.
+    let high = quantizeToF16(ev);
     return vec4f(high, ev - high, coverage, 1.0);
 }
 

@@ -8,8 +8,9 @@
 import Testing
 @_spi(Internal) @testable import AdaRender
 import AdaUtils
+import Foundation
 import Math
-#if canImport(Metal)
+#if SAGA_METAL_NATIVE_PASS
 import Metal
 #endif
 
@@ -186,128 +187,50 @@ struct MeshBufferTests {
         #expect(attributes[4].format == .vector4)
     }
 
-    @Test func `shader reflection keeps internal uniforms in descriptor layout only`() throws {
-        let source = try ShaderSource(source: """
-        #version 450 core
-        #pragma stage : vert
 
-        layout (binding = 2) uniform AE_GlobalView {
-            mat4 u_ViewProjection;
-        };
+    @Test func `WGSL reflection grows descriptor sets for nonzero set resources`() throws {
+        let source = """
+        @group(1) @binding(0) var customTexture: texture_2d<f32>;
+        @group(1) @binding(1) var customSampler: sampler;
 
-        layout (binding = 3) uniform AE_Mesh2dUniform {
-            mat4 u_MeshModel;
-        };
-
-        [[main]]
-        void test_vertex()
-        {
-            gl_Position = u_ViewProjection * u_MeshModel * vec4(0.0, 0.0, 0.0, 1.0);
+        @fragment fn testFragment() -> @location(0) vec4f {
+            return textureSample(customTexture, customSampler, vec2f(0.5));
         }
-        """)
-        let compiler = ShaderCompiler(shaderSource: source)
-        let spirv = try compiler.compileSpirvBin(for: .vertex, ignoreCache: true)
-        let reflection = try SpirvCompiler(
-            spriv: spirv.data,
-            stage: .vertex,
-            deviceLang: .glsl
-        ).reflection()
-
-        let descriptorSet = try #require(reflection.descriptorSets.first)
-        #expect(descriptorSet.uniformsBuffers.keys.contains(2))
-        #expect(descriptorSet.uniformsBuffers.keys.contains(3))
-        #expect(reflection.shaderBuffers["AE_GlobalView"] == nil)
-        #expect(reflection.shaderBuffers["AE_Mesh2dUniform"] == nil)
-    }
-
-    @Test func `shader reflection grows descriptor sets for nonzero set resources`() throws {
-        let source = try ShaderSource(source: """
-        #version 450 core
-        #pragma stage : frag
-
-        layout (location = 0) out vec4 color;
-        layout (set = 1, binding = 0) uniform texture2D customTexture;
-        layout (set = 1, binding = 1) uniform sampler customSampler;
-
-        [[main]]
-        void test_fragment()
-        {
-            color = texture(sampler2D(customTexture, customSampler), vec2(0.5));
-        }
-        """)
-        let compiler = ShaderCompiler(shaderSource: source)
-        let spirv = try compiler.compileSpirvBin(for: .fragment, ignoreCache: true)
-        let reflection = try SpirvCompiler(
-            spriv: spirv.data,
-            stage: .fragment,
-            deviceLang: .glsl
-        ).reflection()
+        """
+        let reflection = WGSLReflection.parse(from: source, stage: .fragment, entryPoint: "testFragment")
 
         #expect(reflection.descriptorSets.count == 2)
         #expect(reflection.descriptorSets[1].sampledImages.keys.contains(0))
         #expect(reflection.descriptorSets[1].samplers.keys.contains(1))
     }
 
-    #if canImport(Metal)
-    @Test func `mesh2d positions and colors pipeline compiles on Metal`() throws {
-        guard let device = MTLCreateSystemDefaultDevice() else {
-            return
-        }
+    #if SAGA_METAL_NATIVE_PASS
+    @Test(.enabled(if: MTLCreateSystemDefaultDevice() != nil))
+    func `mesh2d positions and colors pipeline compiles on SAGA Metal`() async throws {
+        let backend = try SAGAMetalRenderBackend()
 
         var mesh = MeshDescriptor(name: "colored mesh")
         mesh.positions = MeshBuffer<Vector3>([
             Vector3(x: 0, y: 0, z: 0),
             Vector3(x: 1, y: 0, z: 0),
         ])
-        mesh.colors = MeshBuffer<Color>([
-            .red,
-            .blue,
-        ])
+        mesh.colors = MeshBuffer<Color>([.red, .blue])
 
-        let shaderURL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
-            .appendingPathComponent("Sources/AdaRender/Assets/Shaders/mesh2d/mesh2d.glsl")
-        let shaderSource = try ShaderSource(from: shaderURL)
-        let compiler = ShaderCompiler(shaderSource: shaderSource)
-        for stage in [ShaderStage.vertex, .fragment] {
-            compiler.setMacro("VERTEX_POSITIONS", value: "1", for: stage)
-            compiler.setMacro("VERTEX_COLORS", value: "1", for: stage)
-        }
-
-        let vertexShader = try Self.makeMetalShader(stage: .vertex, compiler: compiler, device: device)
-        let fragmentShader = try Self.makeMetalShader(stage: .fragment, compiler: compiler, device: device)
-
-        let descriptor = RenderPipelineDescriptor(
-            vertex: vertexShader,
-            fragment: fragmentShader,
+        let root = ProcessInfo.processInfo.environment["ADAENGINE_SHADER_SOURCE_ROOT"].map { URL(fileURLWithPath: $0) }
+            ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let shaderURL = root.appendingPathComponent("Sources/AdaRender/Assets/Shaders/mesh2d/mesh2d.wesl")
+        let source = try ShaderModule.linkWESL(from: shaderURL, features: ["VERTEX_POSITIONS": true, "VERTEX_COLORS": true])
+        let module = try ShaderModule.createModule(from: source, device: backend.renderDevice)
+        let pipeline = backend.renderDevice.createRenderPipeline(from: .init(
+            vertex: try #require(module.getShader(for: .vertex)),
+            fragment: try #require(module.getShader(for: .fragment)),
             vertexDescriptor: mesh.getMeshVertexBufferDescriptor(),
-            colorAttachments: [
-                RenderPipelineColorAttachmentDescriptor(format: .bgra8),
-            ]
-        )
-
-        _ = try MetalRenderPipeline(descriptor: descriptor, device: device)
-    }
-
-    private static func makeMetalShader(
-        stage: ShaderStage,
-        compiler: ShaderCompiler,
-        device: MTLDevice
-    ) throws -> Shader {
-        let spirv = try compiler.compileSpirvBin(for: stage, ignoreCache: true)
-        let compiled = try SpirvCompiler(
-            spriv: spirv.data,
-            stage: stage,
-            deviceLang: .msl
-        ).compile()
-        let entryPoint = try #require(compiled.entryPoints.first?.name)
-        let shader = Shader(
-            source: compiled.source,
-            entryPoint: entryPoint,
-            stage: stage,
-            reflectionData: compiled.reflection
-        )
-        shader.compiledShader = try MetalShader(shader: shader, device: device)
-        return shader
+            colorAttachments: [.init(format: .bgra8)]
+        ))
+        await backend.context.queue.drain()
+        withExtendedLifetime(pipeline) {
+            #expect(backend.context.errorLog.all.isEmpty, "\(backend.context.errorLog.all)")
+        }
     }
     #endif
 

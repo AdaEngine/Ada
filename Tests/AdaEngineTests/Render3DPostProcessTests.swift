@@ -117,7 +117,7 @@ struct Render3DPostProcessSettingsTests {
 extension Render3DGPUTests {
     /// Renders an emissive sphere through the real Metal pipeline to check exposure and bloom.
     ///
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DPostProcessGPUTests`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DPostProcessGPUTests`.
     @Suite("3D post-process on GPU")
     @MainActor
     struct PostProcess {

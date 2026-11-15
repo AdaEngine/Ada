@@ -191,7 +191,7 @@ enum EditorSourceLanguage: String, Sendable {
             "tese",
             "vert":
             return .glsl
-        case "wgsl":
+        case "wesl", "wgsl":
             return .wgsl
         case "json":
             return .json

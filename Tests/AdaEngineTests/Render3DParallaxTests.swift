@@ -60,7 +60,7 @@ struct Render3DParallaxSettingsTests {
 extension Render3DGPUTests {
     /// Renders a relief ground through the real Metal pipeline.
     ///
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DParallaxGPUTests`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DParallaxGPUTests`.
     @Suite("3D parallax on GPU")
     @MainActor
     struct Parallax {

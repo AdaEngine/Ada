@@ -16,7 +16,7 @@ import Testing
             }
             graph.nodes.append(operationNode)
             graph.nodes.append(.init(id: "output", operation: .output, inputs: ["alpha": .init("effect", port: type == .float ? "value" : "x")]))
-            try graph.compileGLSL().validateGLSL()
+            try graph.compileWGSL().validateWGSL()
         }
     }
 
@@ -50,8 +50,8 @@ import Testing
                 .init(id: "output", operation: .output, inputs: ["baseColor": .init("color", port: "color")]),
             ]
         )
-        let program = try graph.compileGLSL()
-        try program.validateGLSL()
+        let program = try graph.compileWGSL()
+        try program.validateWGSL()
         #expect(!program.usesTime)
         let material = try ShaderGraphMaterial(source: .init(graph: graph))
         material.setTime(1)

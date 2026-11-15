@@ -279,7 +279,7 @@ public enum ToneMapper3D: String, Codable, Sendable, CaseIterable {
     /// No curve. Values above `1` clip to white, which is useful for checking raw energy.
     case none
 
-    /// Shader selector shared with `Tonemapping.glsl`. `aces` stays `0` so unset data keeps the old output.
+    /// Shader selector shared with `tonemapping.wgsl`. `aces` stays `0` so unset data keeps the old output.
     var shaderMode: Float {
         switch self {
         case .aces: 0

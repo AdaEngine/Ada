@@ -3,7 +3,7 @@ import ada_engine::view::projectPosition;
 // WESL port of mobile_voice_orb.glsl, itself ported from Sloppy Desktop Companion's DesktopOrb.metal.
 // Keep the volume, ribbons, palette, bloom and edge fade identical to the companion Bubble.
 
-struct MobileVoiceOrbMaterial {
+struct MobileVoiceOrbUniforms {
     u_Geometry: vec4f,
     u_Style: vec4f,
 }
@@ -14,7 +14,7 @@ struct OrbVertex {
     @location(1) uv: vec2f,
 }
 
-@group(0) @binding(0) var<uniform> material: MobileVoiceOrbMaterial;
+@group(0) @binding(0) var<uniform> MobileVoiceOrbMaterial: MobileVoiceOrbUniforms;
 
 @vertex
 fn mobile_voice_orb_vertex(@location(0) position: vec4f, @location(1) color: vec4f, @location(2) uv: vec2f) -> OrbVertex {
@@ -111,9 +111,9 @@ fn mobileVoiceOrb(coordinates: vec2f, resolution: vec2f, time: f32, level: f32) 
 
 @fragment
 fn mobile_voice_orb_fragment(input: OrbVertex) -> @location(0) vec4f {
-    let size = material.u_Geometry.xy;
+    let size = MobileVoiceOrbMaterial.u_Geometry.xy;
     return mobileVoiceOrb(
         vec2f(input.uv.x, 1.0 - input.uv.y) * size,
-        size, material.u_Geometry.z, material.u_Geometry.w
-    ) * material.u_Style.x;
+        size, MobileVoiceOrbMaterial.u_Geometry.z, MobileVoiceOrbMaterial.u_Geometry.w
+    ) * MobileVoiceOrbMaterial.u_Style.x;
 }

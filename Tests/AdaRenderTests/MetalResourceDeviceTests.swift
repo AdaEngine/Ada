@@ -1,16 +1,15 @@
-#if canImport(Metal)
-@testable import AdaRender
+#if os(macOS) && SAGA_METAL_NATIVE_PASS
+@_spi(Internal) @testable import AdaRender
 import Foundation
 import Math
 import Testing
 
-@Suite("Metal resource device")
-struct MetalResourceDeviceTests {
-    @Test("Concurrent resource loads reuse one context-free Metal device and queue")
-    func reusesDeviceForConcurrentUploads() async throws {
-        let backend = MetalRenderBackend()
-        let device = backend.createLocalRenderDevice()
-        #expect(device !== backend.renderDevice)
+@Suite("SAGA Metal resource devices")
+struct SAGAMetalResourceDeviceTests {
+    @Test("Concurrent local uploads are visible to the SAGA render device")
+    func concurrentUploadsAreVisibleToTheRenderer() async throws {
+        let backend = try SAGAMetalRenderBackend()
+        let renderer = try #require(backend.renderDevice as? SAGARenderDevice)
         let image = Image(width: 2, height: 1, data: Data([255, 0, 0, 255, 0, 255, 0, 255]))
         let uploads = await withTaskGroup(of: (RenderDevice, Texture2D).self) { group in
             for _ in 0..<32 {
@@ -39,8 +38,10 @@ struct MetalResourceDeviceTests {
         }
         #expect(uploads.count == 32)
         for (local, texture) in uploads {
-            #expect(local === device)
-            let readback = try #require(local.getImage(from: texture))
+            let uploadDevice = try #require(local as? SAGARenderDevice)
+            #expect(uploadDevice !== renderer)
+            #expect(uploadDevice.context === renderer.context)
+            let readback = try #require(try await renderer.readImage(from: texture))
             #expect(readback.data == image.data)
         }
     }

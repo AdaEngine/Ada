@@ -37,15 +37,15 @@ errors. Run lint separately on changed sources before submitting changes.
 
 ## SAGA Vulkan
 
-Native rendering goes through SAGA's Vulkan runtime; Swan, Dawn and Tint are removed. Keep the SAGA repository
-beside AdaEngine (`../SAGA`) or point `ADAENGINE_SAGA_PACKAGE_PATH` at it. Native builds need a SAGA revision that
-provides Vulkan surface presentation (`makePresentableDevice`, `addSurface`, `removeSurface`); no published SAGA
-revision contains that API yet, so a published pin is pending. Headless builds (`ADAENGINE_HEADLESS=1`) need no SAGA.
-Linux window presentation through SAGA has not been verified on a Linux host for this change.
+Native rendering uses SAGA Vulkan. SwiftPM resolves the pinned SAGA revision
+`e614dd1`, which supplies Vulkan surface presentation through
+`makePresentableDevice`, `addSurface`, and `removeSurface`. Set
+`ADAENGINE_SAGA_PACKAGE_PATH` to an absolute checkout path for local SAGA development.
+Headless builds (`ADAENGINE_HEADLESS=1`) use SAGA's CPU shader compiler through
+SwiftPM and run without a graphics device.
 
 ```sh
-# ADAEXAMPLES_PATH points to a clone of https://github.com/AdaEngine/AdaExamples
-swift run --package-path "$ADAEXAMPLES_PATH/Examples/Technical/LinuxSmoke" --scratch-path "$ADAENGINE_LINUX_SCRATCH" -j 6 LinuxSmoke
+swift run --package-path /path/to/game --scratch-path "$ADAENGINE_LINUX_SCRATCH" -j 6 GameProduct
 ```
 
 ## Validation
@@ -56,15 +56,30 @@ ADAENGINE_LINUX_WINDOW_TESTS=1 swift test --scratch-path "$ADAENGINE_LINUX_SCRAT
 ADAENGINE_SWIFT_JOBS=4 bash script/validate_gpu.sh
 ```
 
-The window test requires a working X11 display. Headless rendering can validate
-native window creation, resizing and teardown; it does not prove rendered pixels.
-For graphical verification run `LinuxSmoke`, edit its message, press its button,
-resize the native window and close it through the window manager. The executable
-prints its render backend and button actions.
+The window test requires a working X11 display. It exercises creation, resizing
+and teardown. To verify presentation, run a native SwiftPM app with SAGA Vulkan
+and inspect the rendered X11 window.
 
 The initial screen implementation reports the primary display at scale 1.
 Per-monitor scaling, native Wayland, custom cursor textures and native alert
 dialogs require further work. Alerts currently appear in the engine log.
+
+## Verified on 2026-11-15 with SAGA Vulkan
+
+The relocated SAGA source BuildSDK was built in an Ubuntu 24.04 ARM64 Colima
+guest using Swift 6.3.2, SAGA `e614dd1`, and Mesa 25.2.8 llvmpipe.
+
+- The GPU validation package passed WESL linking and binding reflection,
+  sprite layout, picking and tile occlusion, and the PBR sphere scene against
+  its Vulkan reference frames. The Shader Graph sprite and 3D material tests
+  also passed.
+- A SwiftPM AdaUI app built from the same SDK presented a 320 × 220 X11 window
+  under Xvfb. The captured frame showed a red background and white text.
+- The app link list included `SAGAVulkan` and excluded the legacy
+  `SPIRVCompiler`, `SPIRV-Cross`, and `glslang` targets.
+
+This run covers ARM64 software Vulkan with Xvfb. Physical GPUs, XWayland and
+WSLg still need separate validation.
 
 ## Verified on 2026-10-17 (before the SAGA cutover)
 
@@ -101,7 +116,7 @@ sudo apt-get install -y zenity
 bash script/run_studio_linux.sh
 ```
 
-Keep the `ADAENGINE_SAGA_PACKAGE_PATH` override from the setup above.
+Set `ADAENGINE_SAGA_PACKAGE_PATH` when developing against a local SAGA checkout.
 The Studio launcher selects the bundled compiler by default; the environment
 override is useful for running standalone sample builds with the same compiler.
 
@@ -111,7 +126,8 @@ line positions correct for LF, CRLF and CR sources.
 
 The launcher builds Release by default, then packages `AdaEditor`, `gravity-lsp`,
 `AdaPackageTool`, resources, Swift runtime libraries, the AdaScript compiler
-and a source `BuildSDK` containing the SAGA checkout when one is present. The resulting directory,
+and a source `BuildSDK` containing the local SAGA checkout if
+`ADAENGINE_SAGA_PACKAGE_PATH` was set. The resulting directory,
 `.tar.gz` and checksum are under `~/.cache/adaengine/studio-linux/distributions`.
 Run the extracted directory's `./ada-studio`; building Swift games additionally
 requires the host Swift toolchain and development packages. Override

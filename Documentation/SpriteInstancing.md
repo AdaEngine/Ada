@@ -66,10 +66,10 @@ cross-configuration GPU gains. Upload falls 47.8% and Release preparation improv
 Run the native checks separately from headless suites:
 
 ```sh
-ADAENGINE_DISABLE_SWAN=1 ADAENGINE_SPRITE_METAL_SMOKE=1 \
-swift test --filter SpriteMetalRenderingTests/rendersLayoutsAndTileOrientations
+ADAENGINE_SPRITE_SAGA_SMOKE=1 \
+swift test --filter SpriteMetalRenderingTests/rendersLayoutsAndPickingWithSAGA
 
-ADAENGINE_DISABLE_SWAN=1 ADAENGINE_SPRITE_INSTANCING_BENCHMARK=1 \
+ADAENGINE_SPRITE_INSTANCING_BENCHMARK=1 \
 ADAENGINE_SPRITE_INSTANCING_REPORT=/tmp/sprite-instancing-report.json \
 swift test --filter SpriteInstancingMetalTests
 ```
@@ -105,24 +105,8 @@ shared with native regression tests, including a fresh real Tint-generated UBO.
 Browser asynchronous texture readback uses the existing owned buffer mapping path
 and strips padded rows, enabling the same pixel checks as native backends.
 
-## Tint during development
+## Current validation
 
-```sh
-python3 script/ensure_tint.py       # Bootstrap the pinned host tool once, then verify/reuse
-python3 script/ensure_tint.py --check
-script/validate_webgpu.sh          # Real Tint conversion + production WebGPU pixel tests
-```
-
-Tint is pinned to Dawn revision `e75b7342117dbf775a80a6220f3876a3e4f180a3` with
-SPIR-V reader and WGSL writer enabled. The project tool cache records revision and
-SHA-256; each bootstrap runs a real conversion. Runtime and exporter discover this
-cache without requiring a manual TINT_EXECUTABLE on every invocation. An invalid
-explicit override fails. The `build-tint` command plugin uses the same bootstrap.
-See [Tools/Tint](../Tools/Tint/README.md) for prerequisites and cache overrides.
-
-The current proof uses Swift 6.3.2, compatible Swan checkout metadata
-`1eb45a22c79439b50e9cde774454450e50147149` and cached Dawn 147. Local Swan overrides
-must match the engine's SwiftSyntax constraint. Focused validation stages the current
-production test sources in an isolated package. Earlier full-root build attempts in
-this run failed in unrelated AdaScriptToolRuntime changes; focused results do not
-claim a full root package test pass.
+Run `script/validate_gpu.sh` with Swift 6.3.2 for native SAGA pixel checks.
+The browser export links WESL to WGSL with SAGACompiler and ships the SAGA WebGPU
+host. The validation table above records the pre-cutover results.

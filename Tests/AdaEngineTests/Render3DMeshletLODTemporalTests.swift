@@ -59,31 +59,23 @@ extension Render3DGPUTests {
         /// RGBA16F image readback is not supported on every backend. Sampling the actual motion
         /// target into UNORM keeps this check on GPU and preserves signed motion around red=.5.
         private static func motionImage(_ texture: RenderTexture, device: RenderDevice) async throws -> Image {
-            let source = try ShaderSource(source: """
-            #version 450 core
-            #pragma stage : vert
-            layout(location=0) out vec2 v_UV;
-            [[main]]
-            void guide_capture_vertex() {
-                vec2 uv=vec2(float(gl_VertexIndex >> 1u),float(gl_VertexIndex & 1u))*2.0;
-                gl_Position=vec4(uv*vec2(2.0,-2.0)+vec2(-1.0,1.0),0,1); v_UV=uv;
+            let probe = try WESLRenderProbe(source: """
+            import package::fullscreen::{FullscreenVertex, fullscreenVertex};
+
+            @vertex fn vertexMain(@builtin(vertex_index) index: u32) -> FullscreenVertex {
+                return fullscreenVertex(index);
             }
-            #version 450 core
-            #pragma stage : frag
-            layout(location=0) in vec2 v_UV;
-            layout(location=0) out vec4 o_Color;
-            layout(binding=0) uniform texture2D u_Motion;
-            layout(binding=1) uniform sampler u_Nearest;
-            [[main]]
-            void guide_capture_fragment() {
-                vec4 value=textureLod(sampler2D(u_Motion,u_Nearest),v_UV,0.0);
-                o_Color=vec4(clamp(vec2(0.5)+value.xy*4.0,vec2(0),vec2(1)),clamp((1.0-value.z)*16.0,0.0,1.0),value.w);
+
+            @group(0) @binding(0) var motion: texture_2d<f32>;
+            @group(0) @binding(1) var nearest: sampler;
+
+            @fragment fn fragmentMain(input: FullscreenVertex) -> @location(0) vec4f {
+                let value = textureSampleLevel(motion, nearest, input.uv, 0.0);
+                return vec4f(clamp(vec2f(0.5) + value.xy * 4.0, vec2f(0.0), vec2f(1.0)),
+                             clamp((1.0 - value.z) * 16.0, 0.0, 1.0), value.w);
             }
             """)
-            let module = try ShaderCompiler(shaderSource: source).compileShaderModule()
-            let vertex = try #require(module.getShader(for: .vertex))
-            let fragment = try #require(module.getShader(for: .fragment))
-            var descriptor = RenderPipelineDescriptor(vertex: vertex, fragment: fragment,
+            var descriptor = RenderPipelineDescriptor(vertex: probe.vertex, fragment: probe.fragment,
                 debugName: "Actual LOD temporal guide readback", backfaceCulling: false, depthPixelFormat: .none)
             descriptor.colorAttachments = [.init(format: .rgba8)]
             let pipeline = device.createRenderPipeline(from: descriptor)
@@ -94,10 +86,8 @@ extension Render3DGPUTests {
                 colorAttachments: [.init(texture: output, operation: .init(loadAction: .clear, storeAction: .store))]))
             pass.setViewport(Rect(x: 0, y: 0, width: Float(texture.size.width), height: Float(texture.size.height)))
             pass.setRenderPipelineState(pipeline)
-            pass.setResourceSet(.init(bindings: [
-                .init(binding: 0, shaderStages: .fragment, resource: .texture(texture)),
-                .init(binding: 1, shaderStages: .fragment, resource: .sampler(sampler)),
-            ]), index: 0)
+            pass.setFragmentTexture(texture, slot: try probe.textureSlot(0))
+            pass.setFragmentSamplerState(sampler, slot: try probe.samplerSlot(1))
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             pass.endRenderPass()
             await Self.complete(command)

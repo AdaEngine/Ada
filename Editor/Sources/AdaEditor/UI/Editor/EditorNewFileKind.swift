@@ -82,13 +82,13 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
         case .emptyScript: "Blank AdaScript source"
         case .scene: "Ada scene"
         case .uiScene: "Declarative AdaUI scene"
-        case .vertexShader: "GLSL vertex stage"
+        case .vertexShader: "WESL vertex stage"
         case .spriteShaderGraph: "Typed nodes for sprite color and alpha"
         case .pbrShaderGraph: "Typed nodes for a lit 3D surface"
         case .dissolveShaderGraph: "Animated noise and alpha clipping"
         case .uvScrollShaderGraph: "Animated sprite texture coordinates"
-        case .fragmentShader: "GLSL fragment stage"
-        case .computeShader: "GLSL compute kernel"
+        case .fragmentShader: "WESL fragment stage"
+        case .computeShader: "WESL compute kernel"
         case .atlas: "Packed PNG images with an atlas editor"
         case .particleEffect: "Emitters, lifetime curves and a live particle preview"
         case .spriteAnimation: "Frame clips from a sprite sheet, with Aseprite import and a live preview"
@@ -115,7 +115,7 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
         case .vertexShader,
             .fragmentShader,
             .computeShader:
-            "glsl"
+            "wesl"
         case .atlas: "atlas"
         case .particleEffect: "particles"
         case .spriteAnimation: "spriteanim"
@@ -229,47 +229,32 @@ enum EditorNewFileKind: String, CaseIterable, Hashable, Sendable {
             return "/* Add this table to a language folder, such as en.lproj. */\n\"hello\" = \"Hello\";\n"
         case .vertexShader:
             return """
-                #version 450 core
-                #pragma stage : vert
+                struct VertexOutput {
+                    @builtin(position) position: vec4f,
+                    @location(0) uv: vec2f,
+                }
 
-                layout(location = 0) in vec3 a_Position;
-                layout(location = 2) in vec2 a_UV;
-                layout(location = 0) out vec2 v_UV;
-
-                [[main]]
-                void vertex_main() {
-                    v_UV = a_UV;
-                    gl_Position = vec4(a_Position, 1.0);
+                @vertex
+                fn vertex_main(@location(0) position: vec3f, @location(2) uv: vec2f) -> VertexOutput {
+                    return VertexOutput(vec4f(position, 1.0), uv);
                 }
                 """
         case .fragmentShader:
             return """
-                #version 450 core
-                #pragma stage : frag
-
-                layout(location = 0) in vec2 v_UV;
-                layout(location = 0) out vec4 COLOR;
-
-                [[main]]
-                void fragment_main() {
-                    COLOR = vec4(v_UV, 0.5, 1.0);
+                @fragment
+                fn fragment_main(@location(0) uv: vec2f) -> @location(0) vec4f {
+                    return vec4f(uv, 0.5, 1.0);
                 }
                 """
         case .computeShader:
             return """
-                #version 450 core
-                #pragma stage : comp
+                @group(0) @binding(0) var<storage, read_write> values: array<f32>;
 
-                layout(local_size_x = 64) in;
-                layout(set = 0, binding = 0, std430) buffer Values {
-                    float values[];
-                } data;
-
-                [[main]]
-                void compute_main() {
-                    uint index = gl_GlobalInvocationID.x;
-                    if (index < data.values.length()) {
-                        data.values[index] = 0.0;
+                @compute @workgroup_size(64)
+                fn compute_main(@builtin(global_invocation_id) invocation: vec3u) {
+                    let index = invocation.x;
+                    if (index < arrayLength(&values)) {
+                        values[index] = 0.0;
                     }
                 }
                 """

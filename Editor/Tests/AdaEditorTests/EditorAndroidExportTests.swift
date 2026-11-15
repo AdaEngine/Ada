@@ -27,9 +27,10 @@
     @Test func androidCLIOptionsAndMetadataRoundTrip() throws {
       #if os(macOS)
       let invocation = try EditorCLIInvocation(arguments: [
-        "export", "--target", "android", "--device", "R58ABC", "--abi", "arm64-v8a",
+        "export", "--target", "android", "--device", "R58ABC", "--abi", "arm64-v8a", "--saga", "/src/SAGA",
       ])
       #expect(invocation.options["device"] == "R58ABC")
+      #expect(invocation.options["saga"] == "/src/SAGA")
       #expect(throws: EditorCLIError.self) {
         try EditorCLIInvocation(arguments: [
           "export", "--target", "android", "--device", "R58ABC", "--emulator", "Pixel",
@@ -47,6 +48,41 @@
       #expect(
         EditorAndroidConfiguration.applicationID(for: "Игра")
           != EditorAndroidConfiguration.applicationID(for: "Game"))
+    }
+
+    @Test func androidBuildToolsUsePinnedSAGAUnlessOverridden() throws {
+      let root = FileManager.default.temporaryDirectory.appendingPathComponent("Android Tools \(UUID())")
+      defer { try? FileManager.default.removeItem(at: root) }
+      let tool = root.appendingPathComponent("Tools/Android/android.py")
+      try FileManager.default.createDirectory(at: tool.deletingLastPathComponent(), withIntermediateDirectories: true)
+      try Data().write(to: tool)
+      var environment = [
+        "SWIFT_ANDROID_SWIFT": root.path,
+        "SWIFT_ANDROID_SDKS_PATH": root.path,
+        "ANDROID_HOME": root.path,
+        "ANDROID_NDK_HOME": root.path,
+        "ADAENGINE_SAGA_NATIVE": "1",
+      ]
+      let configuration = EditorAndroidConfiguration.load(engineRoot: root, environment: environment, preferences: [:])
+      #expect(configuration.environment["ADAENGINE_SAGA_PACKAGE_PATH"] == nil)
+      #expect(configuration.environment["ADAENGINE_SWAN_PACKAGE_PATH"] == nil)
+      try configuration.validateBuildTools(engineRoot: root)
+
+      try Data().write(to: root.appendingPathComponent("Package.swift"))
+      environment["ADAENGINE_SAGA_PACKAGE_PATH"] = root.path
+      let overridden = EditorAndroidConfiguration.load(engineRoot: root, environment: environment, preferences: [:])
+      #expect(overridden.environment["ADAENGINE_SAGA_PACKAGE_PATH"] == root.path)
+      try overridden.validateBuildTools(engineRoot: root)
+    }
+
+    @Test func relativeSAGACheckoutsAreAnchoredBeforeAndroidStaging() throws {
+      let directory = FileManager.default.temporaryDirectory
+      let path = "Local dependencies/SAGA"
+      let invocation = try EditorCLIInvocation(arguments: ["export", "--target", "android", "--saga", path], directory: directory)
+      #expect(invocation.options["saga"] == directory.appendingPathComponent(path).standardizedFileURL.path)
+      let configuration = EditorAndroidConfiguration.load(environment: ["ADAENGINE_SAGA_PACKAGE_PATH": path], preferences: [:])
+      let current = URL(fileURLWithPath: FileManager.default.currentDirectoryPath, isDirectory: true)
+      #expect(configuration.environment["ADAENGINE_SAGA_PACKAGE_PATH"] == current.appendingPathComponent(path).standardizedFileURL.path)
     }
 
     @Test(arguments: [false, true])

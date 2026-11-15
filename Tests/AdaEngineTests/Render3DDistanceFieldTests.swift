@@ -150,13 +150,14 @@ extension Render3DGPUTests {
             let stacked = Self.texture(counts: counts, value: value)
             let tiled = Self.texture(counts: counts, columns: 3, value: value)
             let query = """
-            float z = (floor(gl_FragCoord.x) + 0.5) * 6.0 / 64.0;
-            vec3 node = vec3(0.25, 1.5, z);
-            if (gl_FragCoord.y > 1.0 && gl_FragCoord.y < 2.0) { node = vec3(3.99, 2.99, z); }
-            if (gl_FragCoord.y > 2.0 && gl_FragCoord.y < 3.0) { node = mod(floor(gl_FragCoord.x), 2.0) < 0.5 ? vec3(0.0) : vec3(4.0,3.0,6.0); }
-            if (gl_FragCoord.y > 3.0) { node = vec3(z * 0.6, z * 0.4, z); }
-            float distance = adaDistanceFieldSample(u_SDFMinimumVoxel.xyz + node * u_SDFMinimumVoxel.w);
-            o_Color = vec4(vec3(0.5 + distance * 0.2),1.0);
+            let z = (floor(input.position.x) + 0.5) * 6.0 / 64.0;
+            let row = i32(input.position.y);
+            var node = vec3f(0.25, 1.5, z);
+            if row == 1 { node = vec3f(3.99, 2.99, z); }
+            if row == 2 { node = select(vec3f(4, 3, 6), vec3f(0.0), i32(input.position.x) % 2 == 0); }
+            if row == 3 { node = vec3f(z * 0.6, z * 0.4, z); }
+            let world = distanceField.u_SDFMinimumVoxel.xyz + node * distanceField.u_SDFMinimumVoxel.w;
+            return vec4f(vec3f(0.5 + adaDistanceFieldSample(world) * 0.2), 1.0);
             """
             let a = try await renderQuery(device: scene.device, texture: stacked, minimum: minimum, voxelSize: 0.5,
                 counts: counts, width: 64, height: 4, query: query)
@@ -186,14 +187,14 @@ extension Render3DGPUTests {
                 Self.boxDistance(minimum + node * 0.125, center: [0, 0, 2], half: [0.3, 0.3, 0.3])
             }
             let query = """
-            int test = int(gl_FragCoord.x);
-            vec3 origin = vec3(0.0,0.0,-1.0);
-            if (test == 1 || test == 5) { origin.x = 1.25; }
-            if (test == 2) { origin.z = -3.0; }
-            if (test == 3) { origin.x = 4.0; }
-            if (test == 4) { origin.z = 2.0; }
-            float visible = adaDistanceFieldVisibility(origin,vec3(0.0,1.0,0.0),vec3(0.0,0.0,1.0),6.0);
-            o_Color = vec4(vec3(visible),1.0);
+            let test = i32(input.position.x);
+            var origin = vec3f(0.0, 0.0, -1.0);
+            if test == 1 || test == 5 { origin.x = 1.25; }
+            if test == 2 { origin.z = -3.0; }
+            if test == 3 { origin.x = 4.0; }
+            if test == 4 { origin.z = 2.0; }
+            let visible = adaDistanceFieldVisibility(origin, vec3f(0, 1, 0), vec3f(0, 0, 1), 6.0);
+            return vec4f(vec3f(visible), 1.0);
             """
             let full = try await renderQuery(device: scene.device, texture: map, minimum: minimum, voxelSize: 0.125,
                 counts: counts, width: 6, height: 1, query: query)
@@ -217,8 +218,8 @@ extension Render3DGPUTests {
                 abs(shellMinimum.y + node.y * 0.1) - 0.075
             }
             let shellQuery = """
-            float visible = adaDistanceFieldVisibility(vec3(0.0),vec3(0.0,1.0,0.0),vec3(0.0,1.0,0.0),0.8);
-            o_Color = vec4(vec3(visible),1.0);
+            let visible = adaDistanceFieldVisibility(vec3f(0.0), vec3f(0, 1, 0), vec3f(0, 1, 0), 0.8);
+            return vec4f(vec3f(visible), 1.0);
             """
             let insufficientBias = try await renderQuery(device: scene.device, texture: shell, minimum: shellMinimum, voxelSize: 0.1,
                 counts: shellCounts, width: 1, height: 1, bias: 0.12, query: shellQuery)
@@ -272,33 +273,25 @@ extension Render3DGPUTests {
 
         private func renderQuery(device: RenderDevice, texture: Texture2D, minimum: Vector3, voxelSize: Float,
             counts: [Int], width: Int, height: Int, steps: Float = 48, bias: Float = 0.06, query: String) async throws -> Image {
-            let source = try ShaderSource(source: """
-            #version 450 core
-            #pragma stage : vert
-            [[main]]
-            void sdf_test_vertex() {
-                vec2 p[3] = vec2[](vec2(-1,-1),vec2(3,-1),vec2(-1,3));
-                gl_Position = vec4(p[gl_VertexIndex],0,1);
+            let probe = try WESLRenderProbe(source: """
+            import ada_engine::distance_field::{adaDistanceFieldSample, adaDistanceFieldVisibility, distanceField};
+            import package::fullscreen::{FullscreenVertex, fullscreenVertex};
+
+            @vertex fn vertexMain(@builtin(vertex_index) index: u32) -> FullscreenVertex {
+                return fullscreenVertex(index);
             }
-            #version 450 core
-            #pragma stage : frag
-            layout(location=0) out vec4 o_Color;
-            layout(binding=11) uniform sampler u_DirectionalShadowSampler;
-            #include <AdaEngine/DistanceField3D.glsl>
-            [[main]]
-            void sdf_test_fragment() {
+
+            @fragment fn fragmentMain(input: FullscreenVertex) -> @location(0) vec4f {
                 \(query)
             }
             """)
-            let module = try ShaderCompiler(shaderSource: source).compileShaderModule()
-            let pipeline = device.createRenderPipeline(from: .init(vertex: try #require(module.getShader(for: .vertex)),
-                fragment: module.getShader(for: .fragment), debugName: "Production SDF query regression",
+            let pipeline = device.createRenderPipeline(from: .init(vertex: probe.vertex,
+                fragment: probe.fragment, debugName: "Production SDF query regression",
                 backfaceCulling: false, depthPixelFormat: .none, colorAttachments: [.init(format: .bgra8)]))
             let uniform = device.createUniformBuffer(Vector4.self, count: 3, binding: 30)
             var constants: [Vector4] = [Vector4(minimum, voxelSize),
                 [Float(counts[0]), Float(counts[1]), Float(counts[2]), 6], [steps, bias, 0, 1]]
             uniform.setElements(&constants)
-            let sampler = device.createSampler(from: .init(minFilter: .nearest, magFilter: .nearest))
             let target = RenderTexture(size: [width, height], scaleFactor: 1, format: .bgra8)
             let command = device.createCommandQueue().makeCommandBuffer()
             let pass = command.beginRenderPass(.init(colorAttachments: [
@@ -306,12 +299,11 @@ extension Render3DGPUTests {
             ]))
             pass.setViewport(.init(x: 0, y: 0, width: Float(width), height: Float(height)))
             pass.setRenderPipelineState(pipeline)
-            pass.setFragmentBuffer(uniform, offset: 0, slot: 30)
-            pass.setFragmentTexture(texture, slot: 49)
-            pass.setFragmentSamplerState(sampler, slot: 11)
+            pass.setFragmentBuffer(uniform, offset: 0, slot: try probe.uniformSlot(30))
+            pass.setFragmentTexture(texture, slot: try probe.textureSlot(49))
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             pass.endRenderPass()
-            command.commit()
+            await WESLRenderProbe.complete(command)
             return try #require(try await device.readImage(from: target))
         }
     }

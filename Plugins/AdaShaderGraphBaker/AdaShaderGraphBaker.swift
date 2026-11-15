@@ -26,7 +26,7 @@ struct AdaShaderGraphBaker {
     private static func bake() throws {
         let args = CommandLine.arguments
         guard args.count == 2 else { throw BakeError.message("Usage: AdaShaderGraphBaker <GameAssets>") }
-        let root = URL(fileURLWithPath: args[1]).standardizedFileURL
+        let root = URL(fileURLWithPath: args[1]).resolvingSymlinksInPath().standardizedFileURL
         let files = (FileManager.default.enumerator(at: root, includingPropertiesForKeys: [.isRegularFileKey])?.allObjects as? [URL] ?? [])
             .filter { (try? $0.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true }.sorted { $0.path < $1.path }
         var graphs: [String: ShaderGraph] = [:]
@@ -36,8 +36,9 @@ struct AdaShaderGraphBaker {
         var textureMasks: Set<UInt32> = [0]
         for file in files {
             if file.pathExtension == "shadergraph" {
-                do { graphs[resource(file, root: root)] = try AssetsManager.loadFreshSync(ShaderGraphAsset.self, at: file.path).graph } catch {
-                    throw BakeError.message("\(resource(file, root: root)): \(error)")
+                let path = try resource(file, root: root)
+                do { graphs[path] = try AssetsManager.loadFreshSync(ShaderGraphAsset.self, at: file.path).graph } catch {
+                    throw BakeError.message("\(path): \(error)")
                 }
             }
             if ["ascn", "gltf", "glb"].contains(file.pathExtension), let object = try json(file) {
@@ -101,7 +102,7 @@ struct AdaShaderGraphBaker {
         }
         for path in paths {
             guard path.hasPrefix("@res://") else { throw BakeError.message("Texture is outside packaged resources: \(path)") }
-            let file = root.appendingPathComponent(String(path.dropFirst(7))).standardizedFileURL
+            let file = root.appendingPathComponent(String(path.dropFirst(7))).resolvingSymlinksInPath().standardizedFileURL
             guard file.path.hasPrefix(root.path + "/"), FileManager.default.fileExists(atPath: file.path) else {
                 throw BakeError.message("Missing packaged Shader Graph texture: \(path)")
             }
@@ -114,7 +115,14 @@ struct AdaShaderGraphBaker {
         print(output.path)
     }
 
-    private static func resource(_ file: URL, root: URL) -> String { "@res://" + file.path.dropFirst(root.path.count + 1) }
+    private static func resource(_ file: URL, root: URL) throws -> String {
+        let prefix = root.path.hasSuffix("/") ? root.path : root.path + "/"
+        let path = file.resolvingSymlinksInPath().standardizedFileURL.path
+        guard path.hasPrefix(prefix) else {
+            throw BakeError.message("Shader Graph is outside packaged resources: \(file.path)")
+        }
+        return "@res://" + path.dropFirst(prefix.count)
+    }
 
     private static func json(_ file: URL) throws -> Any? {
         var data = try Data(contentsOf: file)

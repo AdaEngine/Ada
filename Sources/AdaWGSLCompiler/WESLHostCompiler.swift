@@ -1,4 +1,3 @@
-#if !os(WASI)
 import Foundation
 import SAGACompiler
 import SAGAShaderIR
@@ -76,4 +75,3 @@ public enum WESLHostCompiler {
         return try compile(packageRoot: root, module: module, features: features, dependencies: dependencies)
     }
 }
-#endif

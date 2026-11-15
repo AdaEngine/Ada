@@ -13,6 +13,10 @@
     import SAGACore
     import SAGATypes
     import Synchronization
+    #if SAGA_METAL_NATIVE_PASS
+    import SAGAMetal
+    import SAGAShaderIR
+    #endif
 
     /// Builds one SAGA command when the device queue runs, after earlier resource work resolved its slots.
     typealias SAGACommandBuilder = @Sendable () throws -> BufferCommand
@@ -47,6 +51,15 @@
         func beginRenderPass(_ desc: RenderPassDescriptor) -> RenderCommandEncoder {
             SAGARenderCommandEncoder(buffer: self, descriptor: desc)
         }
+
+        #if SAGA_METAL_NATIVE_PASS
+        func beginFoveatedRenderPass(_ desc: RenderPassDescriptor, rateMap: any RasterizationRateMap) throws -> FoveatedRenderPass {
+            guard context.shaderOutput == .msl, let map = rateMap as? MetalRasterizationRateMap else {
+                throw FoveatedRenderingError.unsupportedBackend
+            }
+            return try map.beginSAGAPass(desc, commands: self)
+        }
+        #endif
 
         func beginBlitPass(_: BlitPassDescriptor) -> BlitCommandEncoder {
             SAGABlitCommandEncoder(buffer: self)
@@ -145,6 +158,9 @@
         private let colors: [PassColor]
         private let depth: PassDepth?
         private var drewInPass = false
+        #if SAGA_METAL_NATIVE_PASS
+        var rateMap: MetalRasterizationRateBinding?
+        #endif
 
         private var pipeline: SAGARenderPipeline?
         private var vertexBuffers: [Int: BufferBinding] = [:]
@@ -216,6 +232,16 @@
 
         func setRenderPipelineState(_ pipeline: RenderPipeline) {
             self.pipeline = pipeline as? SAGARenderPipeline
+            #if SAGA_METAL_NATIVE_PASS
+            if let layer = rateMap?.vertexLayer, let base = self.pipeline {
+                do {
+                    self.pipeline = try base.rasterizedVariant(layer: layer)
+                } catch {
+                    self.pipeline = nil
+                    buffer.append { throw error }
+                }
+            }
+            #endif
         }
 
         // MARK: Resources
@@ -307,6 +333,42 @@
 
         // MARK: Draws
 
+        func drawIndexedIndirect(arguments: any Buffer, offset: Int) -> Bool {
+            guard let arguments = arguments as? SAGABuffer,
+                  arguments.context === buffer.context, arguments.usage.contains(.indirect),
+                  offset >= 0, offset % 4 == 0, offset <= arguments.length,
+                  arguments.length - offset >= MemoryLayout<IndexedIndirectArguments>.stride,
+                  let index, index.buffer.context === buffer.context,
+                  index.offset >= 0, index.offset <= index.buffer.length,
+                  index.offset % Int(index.format.byteSize) == 0,
+                  index.buffer.length - index.offset >= Int(index.format.byteSize),
+                  let state = captureState() else { return false }
+            emit { target in
+                .renderIndirect(
+                    pipeline: try state.pipeline.slot.get(),
+                    target: target.color0,
+                    colorLoad: target.colorLoad,
+                    indirectBuffer: try arguments.slot.get(),
+                    indirectOffset: UInt64(offset),
+                    indexBuffer: IndexBufferBinding(
+                        buffer: try index.buffer.slot.get(), format: index.format,
+                        offset: UInt64(index.offset), size: UInt64(index.buffer.length - index.offset)
+                    ),
+                    vertexBuffers: try state.vertexBindings(),
+                    uniforms: try state.uniformBindings(),
+                    textures: try state.textureBindings(),
+                    samplers: try state.samplerBindings(),
+                    depth: target.depth,
+                    resolve: target.resolve,
+                    additionalColors: target.additionalColors,
+                    raster: state.raster,
+                    storageBuffers: try state.storageBindings(),
+                    colorStore: target.colorStore
+                )
+            }
+            return true
+        }
+
         func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int) {
             drawIndexed(indexCount: indexCount, indexBufferOffset: indexBufferOffset, instanceCount: instanceCount, firstInstance: 0)
         }
@@ -371,7 +433,14 @@
         func endRenderPass() {
             guard !drewInPass, !colors.isEmpty || depth != nil else { return }
             // No draw recorded: draw a degenerate triangle so the pass still applies its clears.
-            let clear = buffer.context.clearPipeline(colors: colors.map(\.format), depth: depth?.format)
+            #if SAGA_METAL_NATIVE_PASS
+            let layer = rateMap?.vertexLayer
+            let raster: RenderRasterState = rateMap == nil ? .init() : drawRaster
+            #else
+            let layer: UInt32? = nil
+            let raster = RenderRasterState()
+            #endif
+            let clear = buffer.context.clearPipeline(colors: colors.map(\.format), depth: depth?.format, rasterizationLayer: layer)
             emit { target in
                 .render(
                     pipeline: try clear.get(),
@@ -381,9 +450,18 @@
                     depth: target.depth,
                     resolve: target.resolve,
                     additionalColors: target.additionalColors,
+                    raster: raster,
                     colorStore: target.colorStore
                 )
             }
+        }
+
+        private var drawRaster: RenderRasterState {
+            #if SAGA_METAL_NATIVE_PASS
+            RenderRasterState(viewport: viewport, scissor: scissor, rateMap: rateMap)
+            #else
+            RenderRasterState(viewport: viewport, scissor: scissor)
+            #endif
         }
 
         // MARK: Capture
@@ -479,7 +557,7 @@
                 uniforms: uniformList,
                 textures: textureList,
                 samplers: samplerList,
-                raster: RenderRasterState(viewport: viewport, scissor: scissor),
+                raster: drawRaster,
                 retained: retained
             )
         }

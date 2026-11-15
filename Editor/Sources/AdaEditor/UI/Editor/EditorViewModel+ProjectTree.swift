@@ -13,7 +13,7 @@ private struct EditorProjectTreeEntry {
 private let editorProjectSkippedNames: Set<String> = [".ada", ".builds", ".DS_Store", ".git", ".lore", ".swiftpm", "DerivedData"]
 private let editorProjectTextExtensions: Set<String> = [
     "ada", "c", "cc", "comp", "cpp", "cxx", "frag", "geom", "glsl", "gravity", "h", "hpp", "hxx", "json", "md", "markdown",
-    "ui", "ascn", "tileset", "metal", "plist", "scn", "scene", "shader", "strings", "swift", "tesc", "tese", "toml", "txt", "vert", "wgsl", "xml", "yaml", "yml",
+    "ui", "ascn", "tileset", "metal", "plist", "scn", "scene", "shader", "strings", "swift", "tesc", "tese", "toml", "txt", "vert", "wesl", "wgsl", "xml", "yaml", "yml",
 ]
 
 extension EditorViewModel {

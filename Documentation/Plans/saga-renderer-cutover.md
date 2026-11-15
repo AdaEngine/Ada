@@ -2,9 +2,8 @@
 
 This implements the [approved cutover design](../Designs/saga-renderer-cutover.md). Keep the existing runtime selection until each replacement is demonstrated. The budgets below are estimates for one reviewable change; split larger implementations by behavior. Review the combined result independently after all tasks, as requested.
 
-Current delivery scope: finish SAGA Metal and browser WebGPU. Windows, Linux, and Android Vulkan
-remain follow-up work. Do not change their default renderer or remove their build dependencies
-as part of this delivery.
+The first delivery covered SAGA Metal and browser WebGPU. The final integration
+below also selects SAGA Vulkan on Windows, Linux, and Android.
 
 | Change | Depends on | Integration and evidence | Approximate budget |
 | --- | --- | --- | --- |
@@ -164,3 +163,17 @@ mean error 0.46 and 1.41% bad pixels.
 The candidate is published on `AdaEngine/SAGA` at `codex/adaengine-metal-web`. The local tooling test suite reported
 one existing macOS installation fixture error when copying system file flags; the same test
 fails on the unchanged tooling. The WASM doctor check for the pinned dependency passed.
+
+## SAGA-only integration
+
+AdaEngine pins SAGA revision `1f535c6165359d20c672a56ed843cc265728165b`, published
+on `AdaEngine/SAGA` at `codex/metal-native-pass`. A fresh SwiftPM scratch resolved
+the lockfile through the canonical GitHub URL. The manifest selects SAGA Metal
+on Apple, SAGA Vulkan on Windows, Linux, and Android, and SAGA WebGPU for web
+exports. Headless builds use the CPU shader compiler.
+
+The final Web Player passed its 2D color and 3D golden checks in Chromium.
+The packaged Android Vulkan smoke rendered the same sphere after Home and Back
+and read back a populated indirect draw. The iPhone Simulator smoke used the
+published pin and presented a lit sphere. Windows presentation, physical
+Android, Apple TV, and Vision Pro still require runtime evidence for this pin.

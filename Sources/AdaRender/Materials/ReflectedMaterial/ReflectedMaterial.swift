@@ -32,8 +32,8 @@ import AdaAssets
 /// When you declared material struct, you can pass it to the ``CustomMaterial`` object where main magic happens.
 ///
 public protocol ReflectedMaterial: ShaderBindable {
-    /// Optional complete module for materials whose stages are linked together (for example WESL).
-    /// Return nil to use the legacy stage-source path. Macro variants are not supported by this hook.
+    /// Complete linked module for a material that uses a single shader variant.
+    /// Materials that provide their own linked variants can use the default implementation.
     static func shaderModule() throws -> ShaderModule?
 
     /// Whether the material links a complete module per feature variant. Variants are chosen from
@@ -42,14 +42,6 @@ public protocol ReflectedMaterial: ShaderBindable {
 
     /// Builds the complete module for one set of feature defines when ``usesVariantShaderModules`` is true.
     static func variantShaderModule(defines: [ShaderDefine]) throws -> ShaderModule
-
-    /// Configure and pass shader source for custom material.
-    /// - Returns: A shader sources for vertex shader.
-    static func vertexShader() throws -> AssetHandle<ShaderSource>
-
-    /// Configure and pass shader source for custom material.
-    /// - Returns: A shader sources for fragment shader.
-    static func fragmentShader() throws -> AssetHandle<ShaderSource>
 
     /// Configure shader defines for specific vertex descriptor and keys.
     /// You can use this method to configure definitions specificly for you shader code.

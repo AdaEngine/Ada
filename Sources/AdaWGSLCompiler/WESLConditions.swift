@@ -1,4 +1,3 @@
-#if !os(WASI)
 import Foundation
 
 struct WESLConditions {
@@ -194,4 +193,3 @@ struct WESLConditions {
         private struct InvalidExpression: Error {}
     }
 }
-#endif

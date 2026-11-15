@@ -1,5 +1,5 @@
 import AdaAssets
-import AdaRender
+@_spi(Internal) import AdaRender
 import AdaUtils
 import Foundation
 import Math
@@ -88,32 +88,10 @@ struct UIShadowMaterial: UIShaderMaterial {
         )
     }
 
-    /// The WESL module links both stages; the GLSL stage sources below remain only for backends without WESL support.
+    /// The bundled WESL module links both shader stages.
     static func shaderModule() throws -> ShaderModule? {
         guard ShaderModule.supportsBundledWESL else { return nil }
         return try ShaderModule.createBundled(at: "Shaders/ui_shadow.wesl", from: .adaModule, defines: [])
-    }
-
-    static func fragmentShader() throws -> AssetHandle<ShaderSource> {
-        let relativePath = "Shaders/ui_shadow.glsl"
-        #if WASM
-            guard let resourceURL = Bundle.adaModule.resourceURL else {
-                throw UIShadowResourceError.missingShader
-            }
-            return AssetHandle(try ShaderSource(from: resourceURL.appendingPathComponent(relativePath)))
-        #else
-            let bundleName = "AdaEngine_AdaUI.bundle"
-            for root in [Bundle.main.resourceURL, Bundle.main.bundleURL].compactMap({ $0 }) {
-                let shaderURL = root.appendingPathComponent(bundleName).appendingPathComponent(relativePath)
-                if FileManager.default.fileExists(atPath: shaderURL.path) {
-                    return AssetHandle(try ShaderSource(from: shaderURL))
-                }
-            }
-            guard let resourceURL = Bundle.adaModule.resourceURL else {
-                throw UIShadowResourceError.missingShader
-            }
-            return AssetHandle(try ShaderSource(from: resourceURL.appendingPathComponent(relativePath)))
-        #endif
     }
 
     static func configurePipeline(
@@ -135,13 +113,5 @@ struct UIShadowMaterial: UIShaderMaterial {
             )
         ]
         return descriptor
-    }
-}
-
-private enum UIShadowResourceError: LocalizedError {
-    case missingShader
-
-    var errorDescription: String? {
-        "UI shadow shader resource is missing."
     }
 }

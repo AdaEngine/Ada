@@ -23,8 +23,28 @@ sources = destination / "Tests/RenderingValidationTests"
 sources.mkdir(parents=True, exist_ok=True)
 if not args.include_sponza_demo:
     (sources / "SponzaCameraTests.swift").unlink(missing_ok=True)
+pixel_perfect = os.environ.get("ADAENGINE_PIXEL_PERFECT_SAGA_SMOKE") == "1"
+pixel_perfect_source = "Tests/AdaEngineTests/PixelPerfectMetalTests.swift"
+if pixel_perfect:
+    shutil.copy2(root / pixel_perfect_source, sources / Path(pixel_perfect_source).name)
+else:
+    (sources / Path(pixel_perfect_source).name).unlink(missing_ok=True)
+for legacy_test in ("ShaderIncluderTests.swift", "ShaderCacheKeyTests.swift", "MetalVisibilityProcessorTests.swift"):
+    (sources / legacy_test).unlink(missing_ok=True)
 for relative in [
     "Tests/AdaRenderTests/WESLShaderModuleTests.swift",
+    "Tests/AdaRenderTests/MeshBufferTests.swift",
+    "Tests/AdaTextTests/TextShaderRenderingTests.swift",
+    "Tests/AdaRenderTests/SAGAVulkanDeviceTests.swift",
+    "Tests/AdaRenderTests/SAGAIndexedIndirectTests.swift",
+    "Tests/AdaRenderTests/SAGAVisibilityProcessorTests.swift",
+    "Tests/AdaRenderTests/SAGAMetalNativeSubmissionTests.swift",
+    "Tests/AdaRenderTests/MetalResourceDeviceTests.swift",
+    "Tests/AdaRenderTests/MetalFoveationTests.swift",
+    "Tests/AdaRenderTests/TextureImportSettingsTests.swift",
+    "Tests/AdaEngineTests/Foveated3DRenderingTests.swift",
+    "Tests/AdaEngineTests/Render3DSkyboxDisplayTests.swift",
+    "Tests/AdaEngineTests/WESLShadowPipelineTests.swift",
     "Tests/AdaEngineTests/WESLGradientPipelineTests.swift",
     "Tests/AdaEngineTests/WESLUIPipelineTests.swift",
     "Tests/AdaRenderTests/WGSLReflectionTests.swift",
@@ -61,10 +81,9 @@ for relative in [
     "Tests/AdaECSTests/OptionalResourceTests.swift",
     "Tests/AdaECSTests/ComponentChangeJournalTests.swift",
     "Tests/AdaTransformTests/AdaTransformTests.swift",
-    "Tests/AdaRenderTests/ShaderIncluderTests.swift",
-    "Tests/AdaRenderTests/ShaderCacheKeyTests.swift",
     # 3D post-processing and debug views render through the selected GPU backend and compare against references.
     "Tests/AdaEngineTests/GoldenFrameSupport.swift",
+    "Tests/AdaEngineTests/WESLRenderProbe.swift",
     "Tests/AdaEngineTests/PluginLoadingTests.swift",
     "Tests/AdaEngineTests/Render3DDebugViewTests.swift",
     "Tests/AdaEngineTests/Render3DShadowFilteringTests.swift",
@@ -119,8 +138,10 @@ for name in ["Courtyard", "Bench", "Lantern", "Pedestal"]:
     fixture_destination.mkdir(parents=True, exist_ok=True)
     shutil.copy2(garden_fixtures / (name + ".glb"), fixture_destination / (name + ".glb"))
 # AdaAssets has no package product; AdaScene re-exports it.
-modules = ["AdaAnimation", "AdaApp", "AdaCorePipelines", "AdaECS", "AdaRender", "AdaScene", "AdaSprite", "AdaTilemap", "AdaTransform", "AdaUtils", "Math"]
+modules = ["AdaAnimation", "AdaApp", "AdaCorePipelines", "AdaECS", "AdaRender", "AdaScene", "AdaSprite", "AdaText", "AdaTilemap", "AdaTransform", "AdaUtils", "Math"]
 dependencies = ',\n'.join('.product(name: ' + json.dumps(module) + ', package: "AdaEngine")' for module in modules)
+if pixel_perfect:
+    dependencies += ',\n.product(name: "AdaEngine", package: "AdaEngine", condition: .when(platforms: [.macOS]))'
 extra_targets = ""
 if args.include_sponza_demo:
     demo = destination / "Examples/Sponza"
@@ -138,10 +159,17 @@ if args.include_sponza_demo:
         .product(name: "AdaTransform", package: "AdaEngine"), .product(name: "Math", package: "AdaEngine")], path: "Examples/SponzaCamera"),
     .executableTarget(name: "SponzaDemo", dependencies: ["SponzaCamera", .product(name: "AdaEngine", package: "AdaEngine"),
         .product(name: "Math", package: "AdaEngine")], path: "Examples/Sponza", resources: [.copy("Assets")])'''
+test_settings = []
+enabled_values = {"1", "true", "yes", "on"}
+if not any(os.environ.get(setting, "").lower() in enabled_values for setting in ("ADAENGINE_HEADLESS", "ADAENGINE_WEB_EXPORT")):
+    test_settings.append('.define("SAGA_NATIVE", .when(platforms: [.windows, .linux]))')
+    if os.environ.get("ADAENGINE_ANDROID") != "1":
+        test_settings.append('.define("SAGA_METAL_NATIVE_PASS", .when(platforms: [.macOS]))')
+swift_settings = ", swiftSettings: [" + ", ".join(test_settings) + "]" if test_settings else ""
 (destination / "Package.swift").write_text('''// swift-tools-version: 6.2
 import PackageDescription
 let package = Package(name: "RenderingValidation", platforms: [.macOS(.v15)], dependencies: [
     .package(name: "AdaEngine", path: ''' + json.dumps(str(root)) + ''')
 ], targets: [.testTarget(name: "RenderingValidationTests", dependencies: [
-''' + dependencies + '\n])' + extra_targets + '])\n')
+''' + dependencies + '\n]' + swift_settings + ')' + extra_targets + '])\n')
 print(destination)

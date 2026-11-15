@@ -35,7 +35,7 @@ struct Render3DShadowFaceCacheSettingsTests {
 }
 
 extension Render3DGPUTests {
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/ShadowFaceCache`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DGPUTests/ShadowFaceCache`.
     @Suite("3D local shadow face cache on GPU")
     @MainActor
     struct ShadowFaceCache {

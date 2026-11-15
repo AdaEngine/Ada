@@ -164,6 +164,7 @@
                 "ada-resource-manifest.json", "ada-web-manifest.json", "package.json", "player-lobby.js",
             ]
             return descriptor.runtimeAPI >= StudioRuntimeCapabilities.webPlayerAPI && descriptor.profile == "universal"
+                && descriptor.shaderPipeline == "wesl"
                 && requiredFiles.allSatisfy { FileManager.default.fileExists(atPath: url.appendingPathComponent($0).path) }
         }
 
@@ -209,6 +210,7 @@
     private struct AdaScriptWebPlayerDescriptor: Decodable {
         let runtimeAPI: Int
         let profile: String
+        let shaderPipeline: String
     }
 
     private enum AdaScriptWebRunError: LocalizedError {

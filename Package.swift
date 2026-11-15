@@ -14,6 +14,27 @@ let isHeadlessCIEnabled = ProcessInfo.processInfo.environment["ADAENGINE_HEADLES
     .map { enabledEnvironmentValues.contains($0.lowercased()) } == true
 
 let isAndroidBuildEnabled = ProcessInfo.processInfo.environment["ADAENGINE_ANDROID"] == "1"
+let enginePackageDirectory = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+let sagaCheckoutPath: String? = {
+    if let overridePath = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"], !overridePath.isEmpty {
+        return overridePath
+    }
+
+    struct SDKManifest: Decodable {
+        let schemaVersion: Int
+        let engine: String
+        let saga: String?
+    }
+
+    let sdkDirectory = enginePackageDirectory.deletingLastPathComponent()
+    guard let data = try? Data(contentsOf: sdkDirectory.appendingPathComponent("sdk.json")),
+          let manifest = try? JSONDecoder().decode(SDKManifest.self, from: data),
+          manifest.schemaVersion == 1, manifest.engine == enginePackageDirectory.lastPathComponent,
+          manifest.saga == "SAGA" else {
+        return nil
+    }
+    return sdkDirectory.appendingPathComponent("SAGA").path
+}()
 
 #if os(macOS) || os(Linux)
 let isECSBenchmarkEnabled = ProcessInfo.processInfo.environment["ADAENGINE_BENCHMARKS"] == "1"
@@ -26,20 +47,20 @@ let isWebExportEnabled: Bool = {
     return webExportValue.map(enabledEnvironmentValues.contains) == true
 }()
 
-// Windows, Linux and Android render through SAGA Vulkan. Apple hosts use SAGA Metal (or the legacy Metal backend
-// during the transition) and only cross-build Android natively; browser exports use the SAGA WebGPU host.
+// Windows, Linux and Android render through SAGA Vulkan. Apple platforms render through SAGA Metal.
+// Browser exports use the SAGA WebGPU host.
 #if os(macOS)
 let isSAGANativeEnabled = isAndroidBuildEnabled && !isWebExportEnabled && !isHeadlessCIEnabled
 #else
 let isSAGANativeEnabled = !isWebExportEnabled && !isHeadlessCIEnabled
 #endif
 #if os(macOS)
-let sagaMetalOverride = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_METAL"]
-let isSAGAMetalEnabled = !isWebExportEnabled && !isAndroidBuildEnabled && !isSAGANativeEnabled
-    && (sagaMetalOverride.map { $0 == "1" } ?? !isHeadlessCIEnabled)
+let isSAGAMetalEnabled = !isWebExportEnabled && !isAndroidBuildEnabled && !isSAGANativeEnabled && !isHeadlessCIEnabled
 #else
 let isSAGAMetalEnabled = false
 #endif
+
+let isSAGAMetalNativePassEnabled = isSAGAMetalEnabled
 
 // Local compiler development can override the checked-in, patched AdaScript runtime.
 let gravityDevelopmentPath = ProcessInfo.processInfo.environment["ADAENGINE_GRAVITY_PACKAGE_PATH"]
@@ -70,9 +91,9 @@ extension String {
     static let wgpuTrait = "WGPU_ENABLED"
 }
 
-let usesSAGACompiler = isWebExportEnabled
-
 let applePlatforms: [Platform] = [.iOS, .macOS, .tvOS, .watchOS, .visionOS]
+let metalPlatforms: [Platform] = [.iOS, .macOS, .tvOS, .visionOS]
+let sagaMetalPlatforms = isSAGAMetalEnabled ? metalPlatforms : []
 
 var products: [Product] = [
     // Public runtime modules used by independently packaged examples.
@@ -199,7 +220,7 @@ var swiftSettings: [SwiftSetting] = [
     .define("ANDROID", .when(platforms: [.android])),
     .define("LINUX", .when(platforms: [.linux])),
     .define("DARWIN", .when(platforms: applePlatforms)),
-    .define("METAL", .when(platforms: applePlatforms)),
+    .define("METAL", .when(platforms: metalPlatforms)),
     .define("WEBGPU_ENABLED", .when(traits: [.wgpuTrait])),
     .define("WASM", .when(platforms: [.wasi])),
     .define("BROWSER", .when(platforms: [.wasi])),
@@ -209,6 +230,10 @@ var swiftSettings: [SwiftSetting] = [
     .strictMemorySafety(),
     .unsafeFlags(["-Xfrontend", "-validate-tbd-against-ir=none"]),
 ]
+
+if isHeadlessCIEnabled {
+    swiftSettings.append(.define("ADAENGINE_HEADLESS"))
+}
 
 let wasmExecutableLinkerSettings: [LinkerSetting] = [
     .unsafeFlags([
@@ -254,6 +279,9 @@ var adaEngineDependencies: [Target.Dependency] = [
     "AdaSpatial"
 ]
 
+let nativeShaderPlatforms: [Platform] = applePlatforms + [.linux, .windows, .android]
+let weslCompilerPlatforms = isWebExportEnabled ? nativeShaderPlatforms : nativeShaderPlatforms + [.wasi]
+
 var adaRenderDependencies: [Target.Dependency] = [
     .target(name: "CAndroid", condition: .when(platforms: [.android])),
     "AdaApp",
@@ -261,15 +289,12 @@ var adaRenderDependencies: [Target.Dependency] = [
     "AdaAssets",
     "AdaTransform",
     "Math",
-    .product(
-        name: "Yams",
-        package: "Yams",
-        condition: .when(platforms: applePlatforms + [.linux, .windows, .android])
-    ),
-    "SPIRV-Cross",
-    "SPIRVCompiler",
     "libpng",
     "CImageDecoder",
+    .target(
+        name: "AdaWGSLCompiler",
+        condition: .when(platforms: weslCompilerPlatforms)
+    ),
     .product(
         name: "JavaScriptKit",
         package: "JavaScriptKit",
@@ -277,20 +302,19 @@ var adaRenderDependencies: [Target.Dependency] = [
     ),
 ]
 
-if usesSAGACompiler {
-    adaRenderDependencies.append(
-        .target(
-            name: "AdaWGSLCompiler",
-            condition: .when(platforms: [.macOS, .linux, .windows])
-        )
-    )
-}
 if isWebExportEnabled {
     // Browser rendering runs through SAGA (see Documentation/Designs/saga-migration.md).
     adaRenderDependencies.append(.product(name: "SAGAWebHost", package: "SAGA", condition: .when(platforms: [.wasi])))
     adaRenderDependencies.append(.product(name: "SAGAWebGPU", package: "SAGA", condition: .when(platforms: [.wasi])))
     adaRenderDependencies.append(.product(name: "SAGA", package: "SAGA", condition: .when(platforms: [.wasi])))
     adaRenderDependencies.append(.product(name: "SAGACompiler", package: "SAGA", condition: .when(platforms: [.wasi])))
+    // Opt in only when the selected local SAGA checkout exposes the device-limit host API.
+    if ProcessInfo.processInfo.environment["ADAENGINE_SAGA_WEB_DEVICE_LIMIT"] == "1" {
+        guard sagaCheckoutPath != nil else {
+            fatalError("ADAENGINE_SAGA_WEB_DEVICE_LIMIT requires a compatible SAGA checkout in BuildSDK or ADAENGINE_SAGA_PACKAGE_PATH")
+        }
+        swiftSettings.append(.define("SAGA_WEB_DEVICE_LIMIT", .when(platforms: [.wasi])))
+    }
     swiftSettings.append(.define("SAGA_WEBGPU", .when(platforms: [.wasi])))
     swiftSettings.append(.define("SAGA_RENDER", .when(platforms: [.wasi])))
 }
@@ -301,16 +325,16 @@ if isSAGANativeEnabled {
     }
     swiftSettings.append(.define("SAGA_RENDER", .when(platforms: [.windows, .linux, .android])))
     swiftSettings.append(.define("SAGA_NATIVE", .when(platforms: [.windows, .linux, .android])))
-    adaRenderDependencies.append(.target(name: "AdaWGSLCompiler", condition: .when(platforms: [.windows, .linux, .android])))
 }
 if isSAGAMetalEnabled {
-    let sagaMetalPlatforms: [Platform] = [.macOS, .iOS, .tvOS]
     for product in ["SAGA", "SAGACompiler", "SAGAMetal"] {
         adaRenderDependencies.append(.product(name: product, package: "SAGA", condition: .when(platforms: sagaMetalPlatforms)))
     }
-    adaRenderDependencies.append(.target(name: "AdaWGSLCompiler", condition: .when(platforms: sagaMetalPlatforms)))
     swiftSettings.append(.define("SAGA_RENDER", .when(platforms: sagaMetalPlatforms)))
     swiftSettings.append(.define("SAGA_METAL", .when(platforms: sagaMetalPlatforms)))
+    if isSAGAMetalNativePassEnabled {
+        swiftSettings.append(.define("SAGA_METAL_NATIVE_PASS", .when(platforms: sagaMetalPlatforms)))
+    }
 }
 
 let adaEngineTarget: Target = .adaTarget(
@@ -331,7 +355,8 @@ let adaEngineEmbeddable: Target = .adaTarget(
     dependencies: [
         "AdaEngine",
         "AdaEngineMacros"
-    ]
+    ],
+    swiftSettings: isSAGAMetalNativePassEnabled ? [.define("SAGA_METAL_NATIVE_PASS")] : []
 )
 
 let adaEngineMacros: Target = .macro(
@@ -789,12 +814,10 @@ targets.append(
     )
 )
 
-if usesSAGACompiler || isSAGANativeEnabled || isSAGAMetalEnabled {
-    targets.append(.target(
-        name: "AdaWGSLCompiler",
-        dependencies: [.product(name: "SAGACompiler", package: "SAGA")]
-    ))
-}
+targets.append(.target(
+    name: "AdaWGSLCompiler",
+    dependencies: [.product(name: "SAGACompiler", package: "SAGA")]
+))
 
 if isWebExportEnabled {
     products.append(.library(name: "AdaWGSLCompiler", targets: ["AdaWGSLCompiler"]))
@@ -808,9 +831,7 @@ if isWebExportEnabled {
     targets.append(
         .executableTarget(
             name: "AdaShaderTranspilerTool",
-            dependencies: [
-                "SPIRVCompiler", "AdaWGSLCompiler"
-            ],
+            dependencies: ["AdaWGSLCompiler"],
             path: "Plugins/AdaShaderTranspilerTool"
         )
     )
@@ -972,131 +993,6 @@ targets += [
         cSettings: [
             .define("_POSIX_C_SOURCE", to: "200809L", .when(platforms: [.linux])),
             .unsafeFlags(["-w", "-std=c17"])
-        ]
-    ),
-
-    // GLSLang & SPIRV
-
-    .adaTarget(
-        name: "SPIRVCompiler",
-        dependencies: [
-            "glslang"
-        ],
-        publicHeadersPath: ".",
-        cxxSettings: [
-            .unsafeFlags(["-fno-exceptions"], .when(platforms: [.wasi])),
-            .unsafeFlags(["-w"])
-        ],
-        linkerSettings: [
-            .linkedLibrary("m", .when(platforms: [.linux]))
-        ]
-    ),
-    .target(
-        name: "glslang",
-        sources: {
-            var glslangSources: [String] = [
-                "glslang/MachineIndependent/attribute.cpp",
-                "glslang/MachineIndependent/Constant.cpp",
-                "glslang/MachineIndependent/glslang_tab.cpp",
-                "glslang/MachineIndependent/InfoSink.cpp",
-                "glslang/MachineIndependent/Initialize.cpp",
-                "glslang/MachineIndependent/Intermediate.cpp",
-                "glslang/MachineIndependent/intermOut.cpp",
-                "glslang/MachineIndependent/IntermTraverse.cpp",
-                "glslang/MachineIndependent/iomapper.cpp",
-                "glslang/MachineIndependent/limits.cpp",
-                "glslang/MachineIndependent/linkValidate.cpp",
-                "glslang/MachineIndependent/parseConst.cpp",
-                "glslang/MachineIndependent/ParseContextBase.cpp",
-                "glslang/MachineIndependent/ParseHelper.cpp",
-                "glslang/MachineIndependent/PoolAlloc.cpp",
-                "glslang/MachineIndependent/preprocessor/PpAtom.cpp",
-                "glslang/MachineIndependent/preprocessor/PpContext.cpp",
-                "glslang/MachineIndependent/preprocessor/Pp.cpp",
-                "glslang/MachineIndependent/preprocessor/PpScanner.cpp",
-                "glslang/MachineIndependent/preprocessor/PpTokens.cpp",
-                "glslang/MachineIndependent/propagateNoContraction.cpp",
-                "glslang/MachineIndependent/reflection.cpp",
-                "glslang/MachineIndependent/RemoveTree.cpp",
-                "glslang/MachineIndependent/Scan.cpp",
-                "glslang/MachineIndependent/ShaderLang.cpp",
-                "glslang/MachineIndependent/SpirvIntrinsics.cpp",
-                "glslang/MachineIndependent/SymbolTable.cpp",
-                "glslang/MachineIndependent/Versions.cpp",
-                "glslang/GenericCodeGen/CodeGen.cpp",
-                "glslang/GenericCodeGen/Link.cpp",
-                "OGLCompilersDLL/InitializeDll.cpp",
-                "SPIRV/disassemble.cpp",
-                "SPIRV/doc.cpp",
-                "SPIRV/GlslangToSpv.cpp",
-                "SPIRV/InReadableOrder.cpp",
-                "SPIRV/Logger.cpp",
-                "SPIRV/SpvBuilder.cpp",
-                "SPIRV/SpvPostProcess.cpp",
-                "SPIRV/SPVRemapper.cpp",
-                "SPIRV/SpvTools.cpp"
-            ]
-
-            #if os(Windows)
-            glslangSources.append("glslang/OSDependent/Windows/ossource.cpp")
-            #endif
-
-            #if os(Linux) || os(android) || os(macOS) || os(iOS) || os(tvOS) || os(visionOS) || os(watchOS) || os(WASI)
-            glslangSources.append("glslang/OSDependent/Unix/ossource.cpp")
-            #endif
-
-            return glslangSources
-        }(),
-        publicHeadersPath: ".",
-        cxxSettings: [
-            .define("ENABLE_OPT", to: "0"),
-            .define("_WASI_EMULATED_PROCESS_CLOCKS", .when(platforms: [.wasi])),
-            .unsafeFlags(["-fno-exceptions"], .when(platforms: [.wasi])),
-            .unsafeFlags(["-w"])
-        ],
-        linkerSettings: [
-            .linkedLibrary("wasi-emulated-process-clocks", .when(platforms: [.wasi]))
-        ]
-    ),
-    .target(
-        name: "SPIRV-Cross",
-        exclude: [
-            "CMakeLists.txt",
-            "CODE_OF_CONDUCT.adoc",
-            "LICENSE",
-            "LICENSES",
-            "Makefile",
-            "README.md",
-            "appveyor.yml",
-            "build_glslang_spirv_tools.sh",
-            "checkout_glslang_spirv_tools.sh",
-            "format_all.sh",
-            "gn",
-            "pkg-config"
-        ],
-        sources: [
-            "spirv_cfg.cpp",
-            "spirv_cpp.cpp",
-            "spirv_cross.cpp",
-            "spirv_cross_c.cpp",
-            "spirv_cross_parsed_ir.cpp",
-            "spirv_cross_util.cpp",
-            "spirv_glsl.cpp",
-            "spirv_hlsl.cpp",
-            "spirv_msl.cpp",
-            "spirv_parser.cpp",
-            "spirv_reflect.cpp"
-        ],
-        publicHeadersPath: "include",
-        cxxSettings: [
-            .define("SPIRV_CROSS_C_API_CPP", to: "1"),
-            .define("SPIRV_CROSS_C_API_GLSL", to: "1"),
-            .define("SPIRV_CROSS_C_API_HLSL", to: "1"),
-            .define("SPIRV_CROSS_C_API_MSL", to: "1"),
-            .define("SPIRV_CROSS_C_API_REFLECT", to: "1"),
-            .define("SPIRV_CROSS_EXCEPTIONS_TO_ASSERTIONS", .when(platforms: [.wasi])),
-            .unsafeFlags(["-fno-exceptions"], .when(platforms: [.wasi])),
-            .unsafeFlags(["-w"])
         ]
     ),
 
@@ -1401,8 +1297,9 @@ targets += [
     .testTarget(
         name: "AdaTextTests",
         dependencies: [
-            "AdaText"
-        ]
+            "AdaText", "AdaRender", "AdaWGSLCompiler"
+        ],
+        swiftSettings: isSAGAMetalNativePassEnabled ? [.define("SAGA_METAL_NATIVE_PASS", .when(platforms: sagaMetalPlatforms))] : []
     ),
     .testTarget(
         name: "AdaTransformTests",
@@ -1440,6 +1337,7 @@ targets += [
         dependencies: [
             "AdaAssets",
             "AdaRender",
+            "AdaWGSLCompiler",
             "Math",
             "AdaUtilsTesting"
         ],
@@ -1448,6 +1346,8 @@ targets += [
         ],
         swiftSettings: (isSAGANativeEnabled ? [.define("SAGA_NATIVE")] : [])
             + (isSAGAMetalEnabled ? [.define("SAGA_METAL", .when(platforms: [.macOS]))] : [])
+            + (isSAGAMetalNativePassEnabled ? [.define("SAGA_METAL_NATIVE_PASS", .when(platforms: [.macOS]))] : [])
+
     ),
     .testTarget(
         name: "AdaInputTests",
@@ -1584,21 +1484,15 @@ if !isWebExportEnabled && !isAndroidBuildEnabled {
     )
 }
 
-if usesSAGACompiler || isSAGANativeEnabled || isSAGAMetalEnabled {
-    if let sagaPath = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_PACKAGE_PATH"], !sagaPath.isEmpty {
-        package.dependencies.append(.package(name: "SAGA", path: sagaPath))
-    } else if isWebExportEnabled || isSAGAMetalEnabled {
-        package.dependencies.append(.package(
-            url: "https://github.com/AdaEngine/SAGA.git",
-            revision: "5f04e009ce4a15ca4bfede6d7df7b14225d020cf"
-        ))
-    } else {
-        // Native Vulkan needs SAGA's surface presentation API (`makePresentableDevice`, `addSurface`, `removeSurface`),
-        // which no published SAGA revision contains yet. Until one does, native builds use the sibling checkout.
-        let sagaPath = URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("SAGA").path
-        package.dependencies.append(.package(name: "SAGA", path: sagaPath))
-    }
+if let sagaPath = sagaCheckoutPath {
+    package.dependencies.append(.package(name: "SAGA", path: sagaPath))
+} else {
+    // SAGA Metal compositor submission and native Vulkan surface presentation.
+    let sagaRevision = "1f535c6165359d20c672a56ed843cc265728165b"
+    package.dependencies.append(.package(
+        url: "https://github.com/AdaEngine/SAGA.git",
+        revision: sagaRevision
+    ))
 }
 
 private extension Target {

@@ -1,11 +1,8 @@
 # Native Android apps
 
-The Android demo is maintained in [AdaExamples](https://github.com/AdaEngine/AdaExamples). Set `ADAEXAMPLES_PATH` to that checkout when using the commands below.
-
 AdaEngine can build a native Swift shared library, package it in a debug-signed
 APK, install it, and launch it on an authorized device or emulator. The host uses
-Android NativeActivity, native WebGPU (Swan + Dawn/Vulkan), Choreographer, and Swift Concurrency.
-No Kotlin translation or browser runtime is involved.
+Android NativeActivity, SAGA Vulkan, Choreographer, and Swift Concurrency.
 
 ## Prerequisites
 
@@ -15,7 +12,6 @@ No Kotlin translation or browser runtime is involved.
 - Android NDK r28c (27 or later is accepted by the Swift SDK setup script).
 - JDK 17 or later for `keytool` and `apksigner`.
 - Android API **29+** with Vulkan support; arm64-v8a or x86_64.
-- An Android Dawn artifact built from the exact revision used by the local Swan bindings.
 
 The root package keeps its Swift 6.2 minimum. Android uses the open-source 6.4.0
 toolchain explicitly; other platforms do not need to change their default Swift.
@@ -40,51 +36,33 @@ Set `SWIFT_ANDROID_SWIFT` to the **absolute path** of the 6.4.0 `swift` binary,
 or pass `--swift /path/to/swift`. This avoids changing the global Swift default.
 For another toolchain release, pass its matching `--swift-sdk` explicitly.
 
-## Swan and Dawn
-
-Use the local Swan checkout containing Android support, with its matching Swift 6.4 toolchain.
-Build Dawn using Python 3.10+, CMake and Ninja:
-
-```sh
-cd /path/to/swan
-ANDROID_NDK_HOME=/path/to/ndk python3 Dawn/build_android.py --arch arm64 --jobs 6
-# Add --arch x86_64 to build both ABIs in one bundle.
-export ADAENGINE_SWAN_PACKAGE_PATH=/path/to/swan
-export SWAN_LOCAL_DAWN=Dawn/dist/android.artifactbundle
-export SWAN_RUNTIME_ONLY=1
-```
-
-`SWAN_LOCAL_DAWN` is relative to the Swan package root. The runtime profile uses
-checked-in native bindings without resolving the generators' SwiftSyntax dependencies.
-The script pins Dawn to the bindings' revision, enables Vulkan, and disables Dawn's
-OpenGL/GLES backends. It strips debug data only from packaged copies.
-
 ## Build and run
 
-To try the native SAGA Vulkan path, set `ADAENGINE_SAGA_NATIVE=1` and place
-the SAGA checkout beside AdaEngine or set `ADAENGINE_SAGA_PACKAGE_PATH` to its
-absolute path. In this configuration the command-line APK builder uses SAGA and
-the system Vulkan loader. The Swift and Android SDK requirements still apply.
+The command-line APK builder uses SAGA and the system Vulkan loader. SwiftPM
+resolves the pinned Vulkan revision. Set `ADAENGINE_SAGA_PACKAGE_PATH` to an
+absolute path to build against a local SAGA checkout. The Swift and Android SDK
+requirements still apply.
 
-From the AdaEngine repository root:
+Set `ANDROID_PROJECT` to the Swift package directory and `ANDROID_PRODUCT` to the name of its
+dynamic library product. From the AdaEngine repository root, run these commands:
 
 ```sh
 python3 Tools/Android/android.py doctor
 python3 Tools/Android/android.py devices
-python3 Tools/Android/android.py build --package "$ADAEXAMPLES_PATH/Examples/Technical/AndroidDemo"
-python3 Tools/Android/android.py run --package "$ADAEXAMPLES_PATH/Examples/Technical/AndroidDemo" --serial emulator-5554
+python3 Tools/Android/android.py build --package "$ANDROID_PROJECT" --product "$ANDROID_PRODUCT"
+python3 Tools/Android/android.py run --package "$ANDROID_PROJECT" --product "$ANDROID_PRODUCT" --serial emulator-5554
 # Convenience wrapper; optionally reads task-local .build-android/local-env.sh
-Tools/Android/run_demo.sh --package "$ADAEXAMPLES_PATH/Examples/Technical/AndroidDemo" --serial emulator-5554
+Tools/Android/run_demo.sh --package "$ANDROID_PROJECT" --product "$ANDROID_PRODUCT" --serial emulator-5554
 ```
 
 `run` builds, installs, and starts the app. To reuse an APK:
 
 ```sh
-python3 Tools/Android/android.py run --package "$ADAEXAMPLES_PATH/Examples/Technical/AndroidDemo" \
-  --apk .build-android/apk/AndroidDemo-debug.apk --serial emulator-5554
+python3 Tools/Android/android.py run --package "$ANDROID_PROJECT" --product "$ANDROID_PRODUCT" \
+  --apk /path/to/build-debug.apk --serial emulator-5554
 ```
 
-Build a matching Dawn variant before selecting another ABI. Select `--abi x86_64` for an x86 emulator, or `--abi all` to package both 64-bit
+Select `--abi x86_64` for an x86 emulator, or `--abi all` to package both 64-bit
 ABIs. `--configuration release` optimizes Swift code, but still produces a
 **debug-signed** APK for development. Store distribution signing/AAB generation
 is outside this tool. Build output and the local development key live under
@@ -96,16 +74,10 @@ APK signature and 16 KiB native-library zip alignment. APK copies have debug
 sections stripped; the original Swift build/SDK files retain their DWARF. The NDK and matching
 Swift SDK supply the required C++/Swift runtimes.
 
-The 3D animation sample now lives in AdaExamples and also has an Android entry point:
-
-```sh
-Tools/Android/run_demo.sh --package ../AdaExamples/Samples/SkeletalGarden --product SkeletalGarden \
-  --application-id org.adaengine.android.garden --label "Skeletal Garden" \
-  --serial emulator-5554
-```
-
-On Android it automatically walks/runs the character. Desktop controls stay available
-on desktop builds.
+APK export reports the path of legacy GLSL shader sources found in SwiftPM
+resource bundles, including sources embedded in `.mat` and `.shader` files.
+Port these shaders to WESL or WGSL before rebuilding.
+See the [WESL shaders guide](../../Sources/AdaEngine/AdaEngine.docc/Articles/Developers/WESLShaders.md).
 
 ## Your own app
 
@@ -133,7 +105,7 @@ python3 /path/to/AdaEngine/Tools/Android/android.py run \
 
 For the app target's own SwiftPM resources, pass
 `AndroidResourceBundle.bundle(named: "PackageName_TargetName")` as `assetBundle`
-to `WindowGroup` or `DefaultAppWindow` on Android. See [AndroidDemo](https://github.com/AdaEngine/AdaExamples/tree/main/Examples/Technical/AndroidDemo).
+to `WindowGroup` or `DefaultAppWindow` on Android.
 The packaging tool extracts bundles from the APK into app-private storage
 before engine bootstrap; engine shaders/fonts use the same path. Writable data
 and caches also stay inside the app's private files directory.
@@ -148,12 +120,10 @@ and caches also stay inside the app's private files directory.
   integration again. `DispatchQueue.main` is not an Android UI dispatch API.
 - Stable Android pointer IDs become stable engine touch IDs; pause cancels
   active touches. Android Back finishes the activity.
-- The existing WebGPU backend supplies rendering, textures, buffers and shaders.
-  Android uses an acquired `ANativeWindow` and a Vulkan adapter. Surface loss detaches
-  the GPU swapchain; recreation obtains a fresh native window lease.
-- Native shaders are compiled to SPIR-V on-device and imported by Dawn; no Tint CLI
-  runs inside the APK. Dawn's native SPIR-V derivative option preserves existing GLSL
-  sampling behavior. Intermediate BGRA targets are composited into Android's RGBA output.
+- SAGA uses the system Vulkan loader and an acquired `ANativeWindow` for presentation.
+  Surface loss detaches the GPU swapchain. Recreation obtains a fresh native window lease.
+- SAGA compiles WESL/WGSL shaders to SPIR-V. Intermediate BGRA targets are composited
+  into Android's RGBA output.
 - Android URL opening, native alert dialogs, soft keyboard/text composition,
   hardware keyboard/gamepad input, native filesystem watching, and multiple native windows need additional
   host implementations. The current touch/AdaUI demo does not exercise those APIs.

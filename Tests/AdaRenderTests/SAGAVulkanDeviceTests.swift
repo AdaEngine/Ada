@@ -232,9 +232,9 @@
                 try drawable.present()
 
                 await backend.context.queue.drain()
-                #expect(backend.context.errorLog.all.isEmpty, "SAGA device errors: \(backend.context.errorLog.all)")
                 try backend.destroyWindow(windowID)
                 await backend.context.queue.drain()
+                #expect(backend.context.errorLog.all.isEmpty, "SAGA device errors: \(backend.context.errorLog.all)")
             }
 
         @Test(.enabled(if: SAGAVulkanDeviceTests.available))
@@ -306,9 +306,9 @@
                 try drawable.present()
             }
             await backend.context.queue.drain()
-            #expect(backend.context.errorLog.all.isEmpty, "SAGA device errors: \(backend.context.errorLog.all)")
             for id in ids { try backend.destroyWindow(id) }
             await backend.context.queue.drain()
+            #expect(backend.context.errorLog.all.isEmpty, "SAGA device errors: \(backend.context.errorLog.all)")
         }
         #endif
     }

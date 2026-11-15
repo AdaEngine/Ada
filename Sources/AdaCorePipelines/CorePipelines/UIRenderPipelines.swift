@@ -14,7 +14,7 @@ import Math
 
 public enum CorePipelineShaders {
     public static func loadBundled(at path: String) throws -> AssetHandle<ShaderModule> {
-        try ShaderModule.loadBundled(at: path, from: .adaModule)
+        AssetHandle(try ShaderModule.createBuiltinVariant(at: path, from: .adaModule, defines: []))
     }
 
     /// Loads a migrated built-in shader using the active backend's supported format.
@@ -23,7 +23,7 @@ public enum CorePipelineShaders {
     }
 
     public static func loadRequiredBundled(at path: String) -> AssetHandle<ShaderModule> {
-        ShaderModule.loadRequiredBundled(at: path, from: .adaModule)
+        ShaderModule.loadRequiredBuiltinVariant(at: path, from: .adaModule)
     }
 }
 
@@ -171,7 +171,7 @@ public struct LinePipeline: RenderPipelineConfigurator {
 }
 
 /// Vertex data for rendering quads (rectangles with optional textures).
-/// Matches the layout expected by quad.glsl shader.
+/// Matches the layout expected by quad.wesl shader.
 public struct QuadVertexData: Sendable {
     /// Position in world space (vec4).
     public let position: Vector4
@@ -196,7 +196,7 @@ public struct QuadVertexData: Sendable {
 }
 
 /// Vertex data for rendering circles/ellipses.
-/// Matches the layout expected by circle.glsl shader.
+/// Matches the layout expected by circle.wesl shader.
 public struct CircleVertexData: Sendable {
     /// Position in world space (vec3).
     public let worldPosition: Vector3
@@ -225,7 +225,7 @@ public struct CircleVertexData: Sendable {
 }
 
 /// Vertex data for rendering lines.
-/// Matches the layout expected by line.glsl shader.
+/// Matches the layout expected by line.wesl shader.
 public struct LineVertexData: Sendable {
     /// Position in world space (vec3).
     public let position: Vector3

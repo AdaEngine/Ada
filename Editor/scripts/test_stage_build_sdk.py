@@ -46,7 +46,9 @@ class StageSDKTests(unittest.TestCase):
             engine = root / "engine"
             compiler = root / "compiler"
             saga = root / "SAGA"
-            for base, files in [(engine, ["Package.swift", "LICENSE", "Sources/Runtime.swift", "Sources/.build/private", ".git/config", "script/ensure_tint.py", "Demos/Example/binary.glb"]),
+            for base, files in [(engine, ["Package.swift", "LICENSE", "Sources/Runtime.swift", "Sources/.build/private", ".git/config", "script/ensure_tint.py", "Demos/Example/binary.glb",
+                                          "LegacyShaders/Shaders/old.glsl", "Sources/glslang/Compiler.cpp",
+                                          "Sources/SPIRVCompiler/Compiler.cpp", "Sources/SPIRV-Cross/Compiler.cpp"]),
                                 (saga, ["Package.swift", "Sources/SAGACompiler/Compiler.swift", "Sources/.build/private", ".git/config",
                                         "web/webgpu.mjs", "web/golden.mjs", "web/node_modules/private"]),
                                 (compiler, ["Package.swift", "LICENSE", "src/shared/header.h", "tools/aot_build.py", "binding/Runtime.swift"])]:
@@ -58,10 +60,19 @@ class StageSDKTests(unittest.TestCase):
             host.write_text("#!/bin/sh\nexit 0\n")
             host.chmod(0o755)
             destination = root / "Moved Studio.app/Contents/Resources/BuildSDK"
-            with patch.object(sdk.subprocess, "run"):
+            with patch.object(sdk.subprocess, "run"), patch.dict(os.environ, {"ADAENGINE_SAGA_PACKAGE_PATH": ""}):
                 sdk.stage(engine, compiler, destination)
-            self.assertEqual(json.loads((destination / "sdk.json").read_text())["schemaVersion"], 1)
+            self.assertFalse((destination / "SAGA").exists(), "SDK must not bundle a sibling SAGA checkout by default")
+            self.assertNotIn("saga", json.loads((destination / "sdk.json").read_text()))
+            with patch.object(sdk.subprocess, "run"), patch.dict(os.environ, {"ADAENGINE_SAGA_PACKAGE_PATH": str(saga)}):
+                sdk.stage(engine, compiler, destination)
+            manifest = json.loads((destination / "sdk.json").read_text())
+            self.assertEqual(manifest["schemaVersion"], 1)
+            self.assertEqual(manifest["saga"], "SAGA")
             self.assertTrue((destination / "AdaEngine/Sources/Runtime.swift").is_file())
+            self.assertFalse((destination / "AdaEngine/LegacyShaders").exists())
+            for target in ("glslang", "SPIRVCompiler", "SPIRV-Cross"):
+                self.assertFalse((destination / "AdaEngine/Sources" / target).exists())
             self.assertTrue((destination / "AdaEngine/script/ensure_tint.py").is_file())
             self.assertTrue((destination / "AdaScript" / host.name).is_file())
             self.assertTrue((destination / "AdaScript/LICENSE").is_file())
@@ -126,14 +137,14 @@ class StageSDKTests(unittest.TestCase):
             self.assertTrue((staged_engine / shim / "wasi.js").is_file())
             self.assertFalse((staged_engine / "Demos/Project/dist").exists())
 
-    def test_android_sdk_keeps_dawn_static_library_after_relocation(self):
+    def test_android_sdk_keeps_runner_and_saga_sources_after_relocation(self):
         with tempfile.TemporaryDirectory() as temporary:
             root=Path(temporary)
             engine=root/"engine"
             compiler=root/"compiler"
-            swan=root/"swan"
+            saga=root/"saga"
             for base, names in [(engine,["Package.swift","Tools/Android/android.py"]),(compiler,["Package.swift","tools/aot_build.py"]),
-                                (swan,["Package.swift","Sources/WebGPU/WebGPU.swift","Dawn/dist/android.artifactbundle/info.json","Dawn/dist/android.artifactbundle/arm64/libwebgpu_dawn.a"])]:
+                                (saga,["Package.swift","Sources/SAGAVulkan/VulkanBackend.swift"])]:
                 for name in names:
                     path=base/name
                     path.parent.mkdir(parents=True,exist_ok=True)
@@ -142,13 +153,13 @@ class StageSDKTests(unittest.TestCase):
             host.write_text("#!/bin/sh\nexit 0\n")
             host.chmod(0o755)
             destination=root/"Studio.app/Contents/Resources/BuildSDK"
-            with patch.object(sdk.subprocess, "run"):
-                sdk.stage(engine,compiler,destination,swan)
+            with patch.object(sdk.subprocess, "run"), patch.dict(os.environ, {"ADAENGINE_SAGA_PACKAGE_PATH": str(saga)}):
+                sdk.stage(engine,compiler,destination)
             moved=root/"Relocated/BuildSDK"
             moved.parent.mkdir()
             destination.rename(moved)
-            self.assertTrue(json.loads((moved/"sdk.json").read_text())["android"])
-            self.assertEqual((moved/"Swan/Dawn/dist/android.artifactbundle/arm64/libwebgpu_dawn.a").read_text(),"fixture")
+            self.assertTrue((moved/"SAGA/Sources/SAGAVulkan/VulkanBackend.swift").is_file())
+            self.assertFalse((moved/"Swan").exists())
             self.assertTrue((moved/"AdaEngine/Tools/Android/android.py").is_file())
 
 

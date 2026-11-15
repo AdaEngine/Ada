@@ -10,6 +10,7 @@
     import SAGACore
     import SAGAShaderIR
     import SAGATypes
+    import Synchronization
 
     enum SAGAShaderError: Error {
         case spirvUnsupported
@@ -50,7 +51,20 @@
         let textureSlots: Set<ComputeBindingSlot>
         let samplerSlots: Set<ComputeBindingSlot>
 
-        init(context: SAGAContext, descriptor: RenderPipelineDescriptor) throws {
+        #if SAGA_METAL_NATIVE_PASS
+        private let rasterizedVariants = Mutex<[UInt32: SAGARenderPipeline]>([:])
+
+        func rasterizedVariant(layer: UInt32) throws -> SAGARenderPipeline {
+            try rasterizedVariants.withLock { variants in
+                if let cached = variants[layer] { return cached }
+                let pipeline = try SAGARenderPipeline(context: context, descriptor: descriptor, rasterizationLayer: layer)
+                variants[layer] = pipeline
+                return pipeline
+            }
+        }
+        #endif
+
+        init(context: SAGAContext, descriptor: RenderPipelineDescriptor, rasterizationLayer: UInt32? = nil) throws {
             guard let vertex = descriptor.vertex.compiledShader as? SAGAShader else {
                 throw SAGAShaderError.notASAGAShader
             }
@@ -67,7 +81,18 @@
             let active = descriptor.vertexDescriptor.activeBufferIndices
             self.vertexBufferSlots = Dictionary(uniqueKeysWithValues: active.enumerated().map { ($0.element, UInt32($0.offset)) })
 
-            let vertexStage = vertex.artifact
+            let vertexStage: RenderStageArtifact
+            #if SAGA_METAL_NATIVE_PASS
+            if let rasterizationLayer {
+                guard case let .code(source) = descriptor.vertex.source else { throw SAGAShaderError.spirvUnsupported }
+                vertexStage = try IndependentShaderCompiler().compileMetalRasterizedVertexStage(
+                    .wgsl(source), entryPoint: descriptor.vertex.entryPoint, layer: rasterizationLayer)
+            } else {
+                vertexStage = vertex.artifact
+            }
+            #else
+            vertexStage = vertex.artifact
+            #endif
             let fragmentStage = fragment?.artifact
             let stages = [vertexStage] + (fragmentStage.map { [$0] } ?? [])
             func slot(_ binding: IRResourceBinding) -> ComputeBindingSlot {

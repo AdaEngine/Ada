@@ -45,7 +45,7 @@ SDK or compiler checkout, set `ADAENGINE_PACKAGE_PATH` and
 The `.a` in the package is a host-platform archive; Web builds compile its C
 source for the WASI target rather than linking the host archive.
 
-Web uses Swift 6.3.2 and `swift-6.3.2-RELEASE_wasm` by default. The generated package pins JavaScriptKit 0.53 for the engine's current Swan binding. Override with
+Web uses Swift 6.3.2 and `swift-6.3.2-RELEASE_wasm` by default. The generated package pins JavaScriptKit 0.59.0 for the browser runtime. Override with
 `ADA_WEB_SWIFT_EXECUTABLE` and `ADA_WEB_SWIFT_SDK`. Exporting does not publish a
 website, sign an app, create an XCFramework or deploy to an iOS device.
 
@@ -124,7 +124,7 @@ borrowed capability expiry and scriptable lifecycle. Gravity executes the same
 async C host proof under sanitizers and in freestanding WASM with no VM imports.
 
 ```sh
-ADAENGINE_DISABLE_SWAN=1 swift test --filter AdaScriptNative
+swift test --filter AdaScriptNative
 ```
 
 Editor export tests run a real multi-source AOT compiler, link and execute its

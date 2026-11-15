@@ -89,9 +89,12 @@ it preserves unsaved edits, prepared scene data and external-write conflict chec
 Raw and source-control review tabs remain distinct. Hierarchy panels request
 label-only rows: do not scan numeric mesh/collider payloads for unused resource links
 while mounting, searching or updating the scene hierarchy.
-Text editing, syntax highlighting for Swift/AdaScript/YAML/GLSL, completion,
+Text editing, syntax highlighting for Swift, AdaScript, YAML and shader sources, completion,
 snippet placeholders, hover, definition navigation and diagnostics. Swift uses
 SourceKit-LSP; AdaScript uses the embedded language core / language server.
+Vertex, fragment and compute templates create `.wesl` modules. The code editor
+opens `.wesl` and `.wgsl` with WGSL highlighting. Existing GLSL files remain
+editable as text while projects are ported.
 AdaScript workspace diagnostics also run the shared `AdaScriptLinter`: operator,
 comma/colon and control-keyword spacing, separate statement lines, and blank
 lines between type/function declarations. They publish warning diagnostics with

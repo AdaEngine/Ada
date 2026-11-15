@@ -1,8 +1,14 @@
 #if os(macOS)
-@_spi(Internal) import AdaApp
-import AdaEngine
-@_spi(Internal) import AdaRender
+@_spi(Internal) @testable import AdaApp
+import AdaAssets
+import AdaCorePipelines
+import AdaECS
+@_spi(Internal) @testable import AdaRender
+import AdaScene
+import AdaTransform
+import AdaUtils
 import Foundation
+import Math
 import Metal
 import Testing
 
@@ -10,19 +16,19 @@ import Testing
 @Suite("Foveated 3D Metal scene", .serialized)
 @MainActor
 struct Foveated3DRenderingTests {
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_FOVEATION_METAL_SMOKE"] == "1"))
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ADAENGINE_FOVEATION_SAGA_SMOKE"] == "1"))
     func rendersBuiltInGeometryAndScreenSpaceEffectsForBothEyes() async throws {
-        unsafe RenderEngine.configurations.preferredBackend = .metal
+        unsafe RenderEngine.configurations.preferredBackend = .saga
         try RenderEngine.setupRenderEngine()
+        try #require(unsafe RenderEngine.shared.type == .saga)
         let device = unsafe RenderEngine.shared.renderDevice
-        let queue = try #require(MetalInterop.commandQueue(for: device))
+        let metal = try #require(MTLCreateSystemDefaultDevice())
         let app = AppWorlds(main: World())
         app.insertResource(OffscreenRenderWorld())
             .insertResource(PrimaryWindowId(windowId: RID()))
             .addPlugin(MainSchedulerPlugin())
             .addPlugin(TransformPlugin())
             .addPlugin(RenderWorldPlugin())
-            .addPlugin(EventsPlugin())
             .addPlugin(CameraPlugin())
             .addPlugin(AssetsPlugin(filePath: #filePath))
             .addPlugin(VisibilityPlugin())
@@ -46,13 +52,7 @@ struct Foveated3DRenderingTests {
         }
         func render() async throws -> Image {
             try await app.update()
-            let fence = try #require(queue.makeCommandBuffer())
-            await withCheckedContinuation { continuation in
-                fence.addCompletedHandler { _ in continuation.resume() }
-                fence.commit()
-            }
-            #expect(fence.status == .completed)
-            return try #require(device.getImage(from: target))
+            return try #require(try await device.readImage(from: target))
         }
         let baseline = try await render()
         #expect(baseline.getPixel(x: 64, y: 48) != .black)
@@ -67,7 +67,7 @@ struct Foveated3DRenderingTests {
             }
             descriptor.setLayer(layer, at: index)
         }
-        let nativeMap = try #require(queue.device.makeRasterizationRateMap(descriptor: descriptor))
+        let nativeMap = try #require(metal.makeRasterizationRateMap(descriptor: descriptor))
         for layer in 0..<2 {
             var camera = try #require(eye.components[Camera.self])
             camera.rasterizationRateMap = try MetalInterop.rasterizationRateMap(nativeMap, layer: layer, reusing: camera.rasterizationRateMap)
@@ -82,7 +82,6 @@ struct Foveated3DRenderingTests {
                     }
                 }
             }
-            if layer == 1 { try image.writePNG(to: URL(fileURLWithPath: "/tmp/adaengine-foveation-scene.png")) }
         }
         // Removing a frame map must restore ordinary rendering without stale compressed targets.
         var camera = try #require(eye.components[Camera.self])

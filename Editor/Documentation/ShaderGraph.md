@@ -30,7 +30,7 @@ Layout and organization do not change compiled shader code.
 Undo/Redo records one transaction per gesture. Save and Save All use the normal
 workbench document path; split panes and restored tabs share the document model.
 An unsupported schema, conflicting external edit or read-only file is preserved
-and reported instead of overwritten. Source mode opens generated GLSL in the shared
+and reported instead of overwritten. Source mode opens generated WGSL in the shared
 code editor, using the workbench's font and syntax palette, line numbers, folding,
 selection/copy and horizontal/vertical scrolling. It refreshes after graph edits
 and Undo; generated code is read-only and does not become a separate saved asset.
@@ -106,7 +106,9 @@ IDs, named ports and typed values; lowering validates every authored node and
 produces deterministic dependency order for reachable code. Cycles, missing IDs,
 unknown operations, invalid literals and incompatible ports retain their location.
 
-`compileGLSL()` produces code, parameter/texture bindings and a source map. Graph
+`compileWGSL()` produces code, parameter and texture bindings, and a source map. On
+builds that include SAGA's shader compiler, Preview validates this code on the CPU.
+Diagnostics carry the affected node and port when available, and Preview highlights the node. Graph
 resources use descriptor group 1 with numeric slots aligned to vec4. Material
 instances share immutable code/pipelines while keeping values, clocks, textures
 and immutable GPU snapshots independent. The stock render path remains available
@@ -114,8 +116,8 @@ when no graph is assigned.
 
 Web export packages host-compiled WGSL and reflection in `shaders.shadergraphlib`.
 The archive contains exact production fragment variants and graph documents;
-resource preloading installs it before scene decoding. The browser never compiles
-GLSL synchronously. Missing graphs, textures or baked variants fail explicitly.
+resource preloading installs it before scene decoding. The browser loads those
+baked WGSL fragments. Missing graphs, textures or baked variants fail explicitly.
 
 **Export acceptance is still incomplete.** WASM packaging succeeds, but the
 browser Player has an unresolved startup hang; native app packaging and the final

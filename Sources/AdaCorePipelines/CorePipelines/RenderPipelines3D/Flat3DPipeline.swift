@@ -161,18 +161,17 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
     private let shader: AssetHandle<ShaderModule>
     private let variants = PBR3DShaderVariants()
 
-    /// The WESL source where the renderer links it at runtime; the GLSL source otherwise.
-    /// The web export does not prelink flat3d variants yet, so WebAssembly keeps the GLSL path.
+    /// The WESL source for SAGA and browser WebGPU, with a fallback for other configurations.
     public static var shaderPath: String {
-        #if WASM
-            return "Shaders/flat3d.glsl"
+        #if SAGA_WEBGPU
+            return "Shaders/flat3d.wesl"
         #else
-            return ShaderModule.supportsBundledWESL ? "Shaders/flat3d.wesl" : "Shaders/flat3d.glsl"
+            return "Shaders/flat3d.wesl"
         #endif
     }
 
     public init() {
-        self.shader = ShaderModule.loadRequiredBundled(at: Self.shaderPath, from: .adaModule)
+        self.shader = ShaderModule.loadRequiredBuiltinVariant(at: Self.shaderPath, from: .adaModule)
     }
 
     public func configurate(with configuration: VertexDescriptor) -> RenderPipelineDescriptor {
@@ -181,7 +180,13 @@ public struct Flat3DPipeline: RenderPipelineConfigurator {
 
     /// A pipeline whose fragment shader only contains the shading layers in `features`.
     public func configurate(with configuration: VertexDescriptor, features: PBRMaterial.ShaderFeatures) -> RenderPipelineDescriptor {
-        let shader = features.isEmpty ? shader : variants.shader(for: features, fallback: shader)
+        #if SAGA_WEBGPU
+            // The web exporter prelinks the terrain and wireframe variants.
+            let shaderFeatures = features.intersection([.terrain, .wireframe])
+        #else
+            let shaderFeatures = features
+        #endif
+        let shader = shaderFeatures.isEmpty ? shader : variants.shader(for: shaderFeatures, fallback: shader)
         var configuration = configuration
         if !configuration.attributes.containsAttribute(by: MeshDescriptor.textureCoordinates.id.name) {
             configuration.attributes[2] = .attribute(.vector2, name: "defaultTextureCoordinate", bufferIndex: 4, offset: 0)
@@ -256,7 +261,7 @@ final class PBR3DShaderVariants: @unchecked Sendable {
         }
         let variant: AssetHandle<ShaderModule>
         do {
-            variant = AssetHandle(try ShaderModule.createBundled(at: path, from: .adaModule, defines: features.enablingMacros))
+            variant = AssetHandle(try ShaderModule.createBuiltinVariant(at: path, from: .adaModule, defines: features.enablingMacros))
         } catch {
             assertionFailure("Shader variant \(features.rawValue) of \(path) failed to compile: \(error)")
             // A plain shader has no fifth fragment output and cannot safely write a hybrid render pass.
@@ -271,7 +276,7 @@ final class PBR3DShaderVariants: @unchecked Sendable {
                 if let compatible = variants[requiredKey] {
                     variant = compatible
                 } else {
-                    variant = ShaderModule.loadRequiredBundled(at: path, from: .adaModule, defines: required.enablingMacros)
+                    variant = ShaderModule.loadRequiredBuiltinVariant(at: path, from: .adaModule, defines: required.enablingMacros)
                     variants[requiredKey] = variant
                 }
             }

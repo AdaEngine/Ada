@@ -10,7 +10,7 @@ extension Render3DGPUTests {
     @Suite("Continuous directional shadow filtering", .enabled(if: GoldenFrame.isEnabled))
     @MainActor
     struct ShadowFiltering {
-        // Execute the production GLSL helper on an eight-texel step. A nearest 3x3 PCF
+        // Execute the production WESL helper on an eight-texel step. A nearest 3x3 PCF
         // jumps by 1/3; comparison-before-filter reconstruction must give a continuous ramp.
         @Test func subTexelMotionProducesContinuousVisibility() async throws {
             let image = try await render(tile: false)
@@ -47,44 +47,37 @@ extension Render3DGPUTests {
         private func render(tile: Bool, pcss: Bool = false) async throws -> Image {
             let scene = try await DebugViews.makeScene()
             let device = scene.device
-            let source = try ShaderSource(source: """
-            #version 450 core
-            #pragma stage : vert
-            layout(location=0) out vec2 v_UV;
-            [[main]]
-            void shadow_test_vertex() {
-                vec2 p[3] = vec2[](vec2(-1,-1), vec2(3,-1), vec2(-1,3));
-                gl_Position = vec4(p[gl_VertexIndex], 0, 1);
-                v_UV = p[gl_VertexIndex] * 0.5 + 0.5;
+            let probe = try WESLRenderProbe(source: """
+            import ada_engine::shadow_pcf::{adaDirectionalShadowPCF, adaDirectionalShadowPCSS};
+            import package::fullscreen::{FullscreenVertex, fullscreenVertex};
+
+            @vertex fn vertexMain(@builtin(vertex_index) index: u32) -> FullscreenVertex {
+                return fullscreenVertex(index);
             }
-            #version 450 core
-            #pragma stage : frag
-            layout(location=0) in vec2 v_UV;
-            layout(location=0) out vec4 o_Color;
-            layout(binding=10) uniform texture2D u_DirectionalShadowTexture;
-            layout(binding=11) uniform sampler u_DirectionalShadowSampler;
-            #include <AdaEngine/ShadowPCF.glsl>
-            [[main]]
-            void shadow_test_fragment() {
-                vec2 texel = vec2(\(pcss ? "0.015625" : "0.125"), 1.0);
+
+            @group(0) @binding(10) var shadowAtlas: texture_2d<f32>;
+
+            @fragment fn fragmentMain(input: FullscreenVertex) -> @location(0) vec4f {
+                let texel = vec2f(\(pcss ? "0.015625" : "0.125"), 1.0);
+                let x = input.uv.x;
                 \(pcss ? """
-                vec4 settings=vec4(1.0,0.5,24.0,16.0);
-                float close=adaDirectionalShadowPCSS(vec2(v_UV.x,0.5),texel,vec2(0.0078125,0.5),vec2(0.9921875,0.5),0.21,mat4(1.0),settings,1.0);
-                float far=adaDirectionalShadowPCSS(vec2(v_UV.x,0.5),texel,vec2(0.0078125,0.5),vec2(0.9921875,0.5),0.8,mat4(1.0),settings,1.0);
-                o_Color=vec4(close,far,0.0,1.0);
-                """ : tile ? """
-                float shadow = adaDirectionalShadowPCF(vec2(v_UV.x * 0.5, 0.5), texel, vec2(0.0625, 0.5), vec2(0.4375, 0.5), 0.5);
-                float light = adaDirectionalShadowPCF(vec2(0.5 + v_UV.x * 0.5, 0.5), texel, vec2(0.5625, 0.5), vec2(0.9375, 0.5), 0.5);
-                o_Color = vec4(shadow, light, 0.0, 1.0);
-                """ : """
-                float visibility = adaDirectionalShadowPCF(vec2(v_UV.x, 0.5), texel, vec2(0.0625, 0.5), vec2(0.9375, 0.5), 0.5);
-                o_Color = vec4(vec3(visibility), 1.0);
-                """)
+                    let settings = vec4f(1.0, 0.5, 24.0, 16.0);
+                    let projection = mat4x4f(vec4f(1, 0, 0, 0), vec4f(0, 1, 0, 0), vec4f(0, 0, 1, 0), vec4f(0, 0, 0, 1));
+                    let close = adaDirectionalShadowPCSS(shadowAtlas, vec2f(x, 0.5), texel, vec2f(0.0078125, 0.5), vec2f(0.9921875, 0.5), 0.21, projection, settings, 1.0);
+                    let far = adaDirectionalShadowPCSS(shadowAtlas, vec2f(x, 0.5), texel, vec2f(0.0078125, 0.5), vec2f(0.9921875, 0.5), 0.8, projection, settings, 1.0);
+                    return vec4f(close, far, 0.0, 1.0);
+                    """ : tile ? """
+                    let shadow = adaDirectionalShadowPCF(shadowAtlas, vec2f(x * 0.5, 0.5), texel, vec2f(0.0625, 0.5), vec2f(0.4375, 0.5), 0.5);
+                    let light = adaDirectionalShadowPCF(shadowAtlas, vec2f(0.5 + x * 0.5, 0.5), texel, vec2f(0.5625, 0.5), vec2f(0.9375, 0.5), 0.5);
+                    return vec4f(shadow, light, 0.0, 1.0);
+                    """ : """
+                    let visibility = adaDirectionalShadowPCF(shadowAtlas, vec2f(x, 0.5), texel, vec2f(0.0625, 0.5), vec2f(0.9375, 0.5), 0.5);
+                    return vec4f(vec3f(visibility), 1.0);
+                    """)
             }
             """)
-            let module = try ShaderCompiler(shaderSource: source).compileShaderModule()
             let pipeline = device.createRenderPipeline(from: RenderPipelineDescriptor(
-                vertex: try #require(module.getShader(for: .vertex)), fragment: module.getShader(for: .fragment),
+                vertex: probe.vertex, fragment: probe.fragment,
                 debugName: "Shadow PCF regression", backfaceCulling: false,
                 depthPixelFormat: .none, colorAttachments: [.init(format: .bgra8)]
             ))
@@ -92,7 +85,6 @@ extension Render3DGPUTests {
             var depths = Image(width: size, height: 1, color: pcss ? Color(red:0.2,green:0.2,blue:0.2) : .black)
             for x in size/2..<size { depths.setPixel(in: [Float(x), 0], color: .white) }
             let texture = Texture2D(image: depths)
-            let sampler = device.createSampler(from: .init(minFilter: .nearest, magFilter: .nearest))
             let target = RenderTexture(size: [128, 4], scaleFactor: 1, format: .bgra8)
             let command = device.createCommandQueue().makeCommandBuffer()
             let pass = command.beginRenderPass(.init(colorAttachments: [
@@ -100,11 +92,10 @@ extension Render3DGPUTests {
             ]))
             pass.setViewport(Rect(x: 0, y: 0, width: 128, height: 4))
             pass.setRenderPipelineState(pipeline)
-            pass.setFragmentTexture(texture, slot: 10)
-            pass.setFragmentSamplerState(sampler, slot: 11)
+            pass.setFragmentTexture(texture, slot: try probe.textureSlot(10))
             pass.draw(type: .triangle, vertexStart: 0, vertexCount: 3, instanceCount: 1)
             pass.endRenderPass()
-            command.commit()
+            await WESLRenderProbe.complete(command)
             return try #require(try await device.readImage(from: target))
         }
     }

@@ -17,6 +17,7 @@ class AndroidPackagingTests(unittest.TestCase):
             result = subprocess.run([sys.executable, str(Path(android.__file__)), command], capture_output=True, text=True)
             self.assertEqual(result.returncode, 2)
             self.assertIn("--package is required", result.stderr)
+            self.assertIn("Swift package containing the Android entry point", result.stderr)
 
     def test_apk_preserves_every_manifest_asset_and_utf8_filename(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -27,6 +28,10 @@ class AndroidPackagingTests(unittest.TestCase):
             bundle.mkdir(parents=True)
             (bundle/".gitkeep").touch()
             (bundle/"Текстура 🌈.png").write_bytes(bytes(range(256)))
+            (bundle/"material.wesl").write_text("@fragment fn main() {}",encoding="utf-8")
+            (bundle/"material.frag.wgsl").write_text("@fragment fn main() {}",encoding="utf-8")
+            (bundle/"material.mat").write_text('shader: material.wesl\n',encoding="utf-8")
+            (bundle/"opaque.shader").write_bytes(b"\xff")
             android.stage_resources(binary,staging/"assets")
             library=staging/"lib/arm64-v8a/libGame.so"
             library.parent.mkdir(parents=True)
@@ -43,6 +48,31 @@ class AndroidPackagingTests(unittest.TestCase):
                 self.assertTrue(asset.flag_bits & 0x800)
                 self.assertEqual(archive.read(asset),bytes(range(256)))
                 self.assertEqual(archive.getinfo("lib/arm64-v8a/libGame.so").compress_type,zipfile.ZIP_STORED)
+
+    def test_apk_rejects_legacy_shader_assets_before_writing(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            staging=root/"staging"
+            assets=staging/"assets/bundles/Game.resources/Assets"
+            assets.mkdir(parents=True)
+            apk=root/"unsigned.apk"
+            with zipfile.ZipFile(apk,"w") as archive:
+                archive.writestr("AndroidManifest.xml",b"manifest")
+            original=apk.read_bytes()
+            standalone = [(name, "") for name in ("old.glsl","old.VERT","old.frag","old.comp","old.geom","old.tesc","old.tese")]
+            containers = [("old.MAT", "parameters:\n    #version 450\n"), ("old.shader", "# pragma stage fragment\n")]
+            for name, source in standalone + containers:
+                with self.subTest(name=name):
+                    shader=assets/name
+                    shader.write_text(source,encoding="utf-8")
+                    try:
+                        with self.assertRaises(android.AndroidError) as failure:
+                            android.append_payload(apk,staging)
+                        self.assertIn(f"Game.resources/Assets/{name}",str(failure.exception))
+                        self.assertIn("WESL",str(failure.exception))
+                        self.assertEqual(apk.read_bytes(),original)
+                    finally:
+                        shader.unlink()
 
     def test_java_host_dex_and_utf8_resources_share_the_apk(self):
         with tempfile.TemporaryDirectory() as temporary:

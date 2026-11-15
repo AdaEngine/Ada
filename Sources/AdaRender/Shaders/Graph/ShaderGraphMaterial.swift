@@ -39,9 +39,8 @@ public struct ShaderGraphMaterialSource: Codable, Hashable, Sendable {
 /// are replaced rather than overwritten, preserving values used by in-flight commands.
 public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
     public let program: ShaderGraphProgram
-    /// The authored graph, retained so the WGSL form can be generated for WESL templates.
+    /// The authored graph is also used by the legacy renderer's template path.
     let graph: ShaderGraph
-    private var cachedWGSLProgram: ShaderGraphProgram?
     let pipelineStorage = ShaderGraphPipelineStorage()
     private let lock = NSLock()
     private var source: ShaderGraphMaterialSource
@@ -51,7 +50,7 @@ public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
     private var revision: UInt64 = 0
     private var time: Float = 0
     private var automaticTime = true
-    private var issue: String?
+    private var issue: ShaderGraphCompilationError?
     private var preparedPipeline = false
     private struct Prepared {
         let device: RenderDevice
@@ -67,6 +66,11 @@ public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
     }
 
     public var compilationError: String? {
+        compilationDiagnostic?.message
+    }
+
+    /// The latest pipeline error, including its graph node and port when available.
+    public var compilationDiagnostic: ShaderGraphCompilationError? {
         lock.lock()
         defer { lock.unlock() }
         return issue
@@ -92,12 +96,17 @@ public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
     }
 
     public func reportCompilationError(_ error: any Error) {
-        let message = String(describing: error)
+        let graphError = error as? ShaderGraphDiagnostic
+        let diagnostic = (error as? ShaderGraphCompilationError) ?? ShaderGraphCompilationError(
+            message: String(describing: error),
+            nodeID: graphError?.nodeID,
+            port: graphError?.port
+        )
         lock.lock()
-        let changed = issue != message
-        issue = message
+        let changed = issue?.message != diagnostic.message
+        issue = diagnostic
         lock.unlock()
-        if changed { Logger(label: "org.adaengine.shader-graph").error("\(message)") }
+        if changed { Logger(label: "org.adaengine.shader-graph").error("\(diagnostic.message)") }
     }
 
     /// `resourceRootPath` supplies a physical root for document-backed previews
@@ -117,7 +126,7 @@ public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
         } else {
             throw ShaderGraphDiagnostic(code: .invalidReference)
         }
-        program = try graph.compileGLSL()
+        program = try graph.compileWGSL()
         self.graph = graph
         self.source = source
         for (id, value) in source.values { try validate(value, for: id) }
@@ -156,22 +165,6 @@ public final class ShaderGraphMaterial: Codable, @unchecked Sendable {
 
     public func encode(to encoder: any Encoder) throws {
         try descriptor.encode(to: encoder)
-    }
-
-    /// The same graph as WGSL for WESL templates. Parameter slots and bindings equal ``program``'s, so a material binds
-    /// identically whichever form a pipeline compiles.
-    func wgslProgram() throws -> ShaderGraphProgram {
-        lock.lock()
-        if let cachedWGSLProgram {
-            lock.unlock()
-            return cachedWGSLProgram
-        }
-        lock.unlock()
-        let compiled = try graph.compileWGSL()
-        lock.lock()
-        cachedWGSLProgram = compiled
-        lock.unlock()
-        return compiled
     }
 
     public func value(for id: String) -> [Float]? {

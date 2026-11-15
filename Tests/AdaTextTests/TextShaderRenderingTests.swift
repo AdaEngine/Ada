@@ -1,4 +1,4 @@
-#if canImport(Metal)
+#if os(macOS) && SAGA_METAL_NATIVE_PASS
 @_spi(Internal) @testable import AdaRender
 @testable import AdaText
 import AdaUtils
@@ -14,7 +14,8 @@ import Testing
 struct TextShaderRenderingTests {
     init() throws {
         if unsafe RenderEngine.shared == nil {
-            unsafe RenderEngine.configurations.preferredBackend = .headless
+            let validatesSAGA = ProcessInfo.processInfo.environment["ADAENGINE_VALIDATE_WGSL"] == "1"
+            unsafe RenderEngine.configurations.preferredBackend = validatesSAGA ? .saga : .headless
             try RenderEngine.setupRenderEngine()
         }
     }
@@ -124,10 +125,9 @@ struct TextShaderRenderingTests {
         let fontAtlas = try #require(atlas)
         let pixels = try await renderer.render(
             vertices: vertices,
-            atlas: fontAtlas.image.data,
-            atlasSize: fontAtlas.size,
+            fontAtlas: fontAtlas,
             outputSize: outputSize,
-            background: MTLClearColor(red: 24 / 255, green: 25 / 255, blue: 29 / 255, alpha: 1)
+            background: Color(red: 24 / 255, green: 25 / 255, blue: 29 / 255, alpha: 1)
         )
         #expect(pixels.filter { $0 > 80 && $0 < 200 }.count > 1000)
         if let outputPath = ProcessInfo.processInfo.environment["ADA_TEXT_RENDER_OUTPUT"] {
@@ -138,32 +138,26 @@ struct TextShaderRenderingTests {
 
 @MainActor
 private final class TextShaderProbe {
-    let device: MTLDevice
-    let pipeline: MetalRenderPipeline
+    let device: SAGARenderDevice
+    let pipeline: any RenderPipeline
 
     init() throws {
-        device = try #require(MTLCreateSystemDefaultDevice())
-        let repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        if let active = unsafe RenderEngine.shared?.renderDevice as? SAGARenderDevice {
+            device = active
+        } else {
+            let backend = try SAGAMetalRenderBackend()
+            device = try #require(backend.renderDevice as? SAGARenderDevice)
+        }
+        let repository = ProcessInfo.processInfo.environment["ADAENGINE_SHADER_SOURCE_ROOT"].map { URL(fileURLWithPath: $0) }
+            ?? URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let shaderURL = ProcessInfo.processInfo.environment["ADA_TEXT_SHADER_SOURCE"].map { URL(fileURLWithPath: $0) }
-            ?? repository.appendingPathComponent("Sources/AdaText/Assets/text.glsl")
-        let compiler = try ShaderCompiler(from: shaderURL)
+            ?? repository.appendingPathComponent("Sources/AdaText/Assets/text.wesl")
+        let source = try ShaderModule.linkWESL(from: shaderURL)
+        let module = try ShaderModule.createModule(from: source, device: device)
         var descriptor = TextPipeline().configurate(with: RenderPipelineEmptyConfiguration())
-        descriptor.vertex = try Self.compile(.vertex, compiler: compiler, device: device)
-        descriptor.fragment = try Self.compile(.fragment, compiler: compiler, device: device)
-        pipeline = try MetalRenderPipeline(descriptor: descriptor, device: device)
-    }
-
-    private static func compile(_ stage: ShaderStage, compiler: ShaderCompiler, device: MTLDevice) throws -> Shader {
-        let spirv = try compiler.compileSpirvBin(for: stage, ignoreCache: true)
-        let compiled = try SpirvCompiler(spriv: spirv.data, stage: stage, deviceLang: .msl).compile()
-        let shader = Shader(
-            source: compiled.source,
-            entryPoint: try #require(compiled.entryPoints.first?.name),
-            stage: stage,
-            reflectionData: compiled.reflection
-        )
-        shader.compiledShader = try MetalShader(shader: shader, device: device)
-        return shader
+        descriptor.vertex = try #require(module.getShader(for: .vertex))
+        descriptor.fragment = try #require(module.getShader(for: .fragment))
+        pipeline = device.createRenderPipeline(from: descriptor)
     }
 
     func quad(
@@ -193,75 +187,79 @@ private final class TextShaderProbe {
 
     func render(
         vertices: [GlyphVertexData],
-        atlas: Data,
-        atlasSize: SizeInt,
+        fontAtlas: Texture2D,
         outputSize: SizeInt,
-        background: MTLClearColor = MTLClearColor(red: 0, green: 0, blue: 0, alpha: 1)
+        background: Color
     ) async throws -> [UInt8] {
-        let texture = try makeAtlas(atlas, size: atlasSize)
-        let targetDescriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .bgra8Unorm, width: outputSize.width, height: outputSize.height, mipmapped: false
+        if let texture = fontAtlas.gpuTexture as? SAGAGPUTexture, texture.context === device.context {
+            return try await render(vertices: vertices, texture: fontAtlas, outputSize: outputSize, background: background)
+        }
+        return try await render(
+            vertices: vertices, atlas: fontAtlas.image.data, atlasSize: fontAtlas.size,
+            atlasFormat: fontAtlas.subresourcePixelFormat, outputSize: outputSize, background: background
         )
-        targetDescriptor.storageMode = .shared
-        targetDescriptor.usage = [.renderTarget, .shaderRead]
-        let target = try #require(device.makeTexture(descriptor: targetDescriptor))
-        let pass = MTLRenderPassDescriptor()
-        pass.colorAttachments[0].texture = target
-        pass.colorAttachments[0].loadAction = .clear
-        pass.colorAttachments[0].storeAction = .store
-        pass.colorAttachments[0].clearColor = background
-        let queue = try #require(device.makeCommandQueue())
-        let command = try #require(queue.makeCommandBuffer())
-        let encoder = try #require(command.makeRenderCommandEncoder(descriptor: pass))
-        encoder.setRenderPipelineState(pipeline.renderPipeline)
-        let vertexBuffer = try vertices.withUnsafeBytes { bytes in
-            let address = try #require(bytes.baseAddress)
-            return try #require(device.makeBuffer(bytes: address, length: bytes.count))
-        }
-        encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
-        let transforms = [Transform3D.identity, .identity, .identity]
-        transforms.withUnsafeBytes { bytes in
-            if let address = bytes.baseAddress {
-                encoder.setVertexBytes(address, length: bytes.count, index: 2)
-            }
-        }
-        let samplerDescriptor = MTLSamplerDescriptor()
-        samplerDescriptor.minFilter = .linear
-        samplerDescriptor.magFilter = .linear
-        encoder.setFragmentTexture(texture, index: 0)
-        encoder.setFragmentSamplerState(device.makeSamplerState(descriptor: samplerDescriptor), index: 1)
-        encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: vertices.count)
-        encoder.endEncoding()
-        await withCheckedContinuation { continuation in
-            command.addCompletedHandler { _ in continuation.resume() }
-            command.commit()
-        }
-        #expect(command.status == .completed)
-        var pixels = [UInt8](repeating: 0, count: outputSize.width * outputSize.height * 4)
-        target.getBytes(
-            &pixels,
-            bytesPerRow: outputSize.width * 4,
-            from: MTLRegionMake2D(0, 0, outputSize.width, outputSize.height),
-            mipmapLevel: 0
-        )
-        return pixels
     }
 
-    private func makeAtlas(_ data: Data, size: SizeInt) throws -> MTLTexture {
-        let descriptor = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .rgba32Float, width: size.width, height: size.height, mipmapped: false
+    func render(
+        vertices: [GlyphVertexData],
+        atlas: Data,
+        atlasSize: SizeInt,
+        atlasFormat: PixelFormat = .rgba_32f,
+        outputSize: SizeInt,
+        background: Color = .black
+    ) async throws -> [UInt8] {
+        try #require(atlasFormat == .rgba_16f || atlasFormat == .rgba_32f)
+        let rowBytes = atlasSize.width * (atlasFormat == .rgba_16f ? 8 : 16)
+        try #require(atlas.count == rowBytes * atlasSize.height)
+        let texture = Texture2D(
+            gpuTexture: device.createTexture(from: .init(
+                width: atlasSize.width, height: atlasSize.height, pixelFormat: atlasFormat,
+                textureUsage: [.read], textureType: .texture2D
+            )),
+            sampler: device.createSampler(from: .init(minFilter: .linear, magFilter: .linear)),
+            size: atlasSize
         )
-        descriptor.storageMode = .shared
-        let texture = try #require(device.makeTexture(descriptor: descriptor))
-        try data.withUnsafeBytes { bytes in
-            texture.replace(
-                region: MTLRegionMake2D(0, 0, size.width, size.height),
-                mipmapLevel: 0,
-                withBytes: try #require(bytes.baseAddress),
-                bytesPerRow: size.width * 16
+        try unsafe atlas.withUnsafeBytes { bytes in
+            let address = try #require(unsafe bytes.baseAddress)
+            unsafe texture.gpuTexture.replaceRegion(
+                RectInt(x: 0, y: 0, width: atlasSize.width, height: atlasSize.height),
+                mipmapLevel: 0, withBytes: address, bytesPerRow: rowBytes
             )
         }
-        return texture
+        return try await render(vertices: vertices, texture: texture, outputSize: outputSize, background: background)
+    }
+
+    private func render(
+        vertices: [GlyphVertexData], texture: Texture2D, outputSize: SizeInt, background: Color
+    ) async throws -> [UInt8] {
+        let errorsBefore = device.context.errorLog.all.count
+        let target = Texture2D(
+            gpuTexture: device.createTexture(from: .init(
+                width: outputSize.width, height: outputSize.height, pixelFormat: .bgra8,
+                textureUsage: [.renderTarget, .read], textureType: .texture2D
+            )),
+            sampler: device.createSampler(from: .init()), size: outputSize
+        )
+        var vertexData = BufferData(label: "Text shader probe vertices", elements: vertices)
+        vertexData.write(to: device)
+        let command = device.createCommandQueue().makeCommandBuffer()
+        let encoder = command.beginRenderPass(.init(colorAttachments: [
+            .init(texture: target, operation: .init(loadAction: .clear, storeAction: .store), clearColor: background)
+        ]))
+        encoder.setRenderPipelineState(pipeline)
+        encoder.setVertexBuffer(vertexData, offset: 0, slot: 0)
+        let view = GlobalViewUniform(projectionMatrix: .identity, viewProjectionMatrix: .identity)
+        encoder.setVertexBuffer(view, slot: GlobalBufferIndex.viewUniform)
+        encoder.setResourceSet(.init(bindings: [
+            .init(binding: 0, shaderStages: .fragment, resource: .texture(texture)),
+            .init(binding: 1, shaderStages: .fragment, resource: .sampler(texture.sampler)),
+        ]), index: 0)
+        encoder.draw(type: .triangle, vertexStart: 0, vertexCount: vertices.count, instanceCount: 1)
+        encoder.endRenderPass()
+        command.commit()
+        let image = try #require(try await device.readImage(from: target))
+        #expect(device.context.errorLog.all.count == errorsBefore, "\(device.context.errorLog.all)")
+        return Array(image.data)
     }
 
     func writePNG(_ pixels: [UInt8], size: SizeInt, to url: URL) throws {

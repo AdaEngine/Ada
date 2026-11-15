@@ -174,9 +174,9 @@ fine-grained performance. Profile larger surfaces before expanding the catalog.
 ## Validation
 
 ```sh
-ADAENGINE_DISABLE_SWAN=1 swift test --disable-sandbox \
+swift test --disable-sandbox \
   --scratch-path /private/tmp/adaengine-a2ui-build --filter 'A2UITests|A2UIProtocolTests|A2UIFormControlsTests'
-ADAENGINE_DISABLE_SWAN=1 swift test --disable-sandbox \
+swift test --disable-sandbox \
   --scratch-path /private/tmp/adaengine-a2ui-build --filter AdaUITests
 ./script/build_and_run.sh --verify
 ```

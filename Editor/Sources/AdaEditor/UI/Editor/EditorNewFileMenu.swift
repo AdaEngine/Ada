@@ -94,7 +94,7 @@ struct EditorNewFileMenu: View {
                                 .font(.system(size: 12))
                                 .foregroundColor(theme.editorColors.text)
                                 .lineLimit(1)
-                            Text(kind.detail)
+                            Text(L10n.tr(kind.detail))
                                 .font(.system(size: 10))
                                 .foregroundColor(theme.editorColors.muted)
                                 .lineLimit(1)

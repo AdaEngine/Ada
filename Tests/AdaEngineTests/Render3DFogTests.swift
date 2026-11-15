@@ -74,7 +74,7 @@ struct Render3DFogSettingsTests {
 extension Render3DGPUTests {
     /// Renders fog through the real composite pass.
     ///
-    /// Run alone: `ADAENGINE_GOLDEN_METAL=1 swift test --filter Render3DGPUTests/Fog`.
+    /// Run alone: `ADAENGINE_GOLDEN_SAGA=1 swift test --filter Render3DGPUTests/Fog`.
     @Suite("3D fog on GPU")
     @MainActor
     struct Fog {

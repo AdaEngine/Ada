@@ -9,26 +9,6 @@ import AdaAssets
 import AdaUtils
 import Foundation
 
-private func loadBundledCanvasShaderSource(
-    at path: String,
-    from bundle: Bundle
-) throws -> AssetHandle<ShaderSource> {
-    #if WASM
-        guard let resourceURL = bundle.resourceURL else {
-            throw ShaderSource.Error.failedToRead(path)
-        }
-
-        let resourcePath = path.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? path
-        return AssetHandle(try ShaderSource(from: resourceURL.appendingPathComponent(resourcePath)))
-    #else
-        return try AssetsManager.loadSync(
-            ShaderSource.self,
-            at: path,
-            from: bundle
-        )
-    #endif
-}
-
 /// This material can be render Meshes in 2D world.
 public protocol CanvasMaterial: ReflectedMaterial {}
 
@@ -42,20 +22,6 @@ extension CanvasMaterial {
 
     public static func variantShaderModule(defines: [ShaderDefine]) throws -> ShaderModule {
         try canvasVariantModule(at: "Shaders/mesh2d/mesh2d.wesl", defines: defines)
-    }
-
-    public static func vertexShader() throws -> AssetHandle<ShaderSource> {
-        return try loadBundledCanvasShaderSource(
-            at: "Shaders/mesh2d/mesh2d.glsl#vert",
-            from: Bundle.adaModule
-        )
-    }
-
-    public static func fragmentShader() throws -> AssetHandle<ShaderSource> {
-        return try loadBundledCanvasShaderSource(
-            at: "Shaders/mesh2d/mesh2d.glsl#frag",
-            from: Bundle.adaModule
-        )
     }
 
     public static func configureShaderDefines(
@@ -119,12 +85,6 @@ public struct ColorCanvasMaterial: CanvasMaterial {
         try canvasVariantModule(at: "Shaders/Materials/color_canvas_material.wesl", defines: defines)
     }
 
-    public static func fragmentShader() throws -> AssetHandle<ShaderSource> {
-        return try loadBundledCanvasShaderSource(
-            at: "Shaders/Materials/color_canvas_material.glsl",
-            from: Bundle.adaModule
-        )
-    }
 }
 
 /// Circle material will render circle on mesh.
@@ -170,10 +130,4 @@ struct CircleCanvasMaterial: CanvasMaterial {
         try canvasVariantModule(at: "Shaders/Materials/circle_canvas_material.wesl", defines: defines)
     }
 
-    public static func fragmentShader() throws -> AssetHandle<ShaderSource> {
-        return try loadBundledCanvasShaderSource(
-            at: "Shaders/Materials/circle_canvas_material.glsl",
-            from: Bundle.adaModule
-        )
-    }
 }

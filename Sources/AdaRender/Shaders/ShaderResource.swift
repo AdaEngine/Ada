@@ -5,27 +5,6 @@
 //  Created by v.prusakov on 3/19/23.
 //
 
-import SPIRV_Cross
-
-extension ShaderStage {
-    init(from executionModel: SpvExecutionModel) {
-        switch executionModel {
-        case SpvExecutionModelFragment:
-            self = .fragment
-        case SpvExecutionModelVertex:
-            self = .vertex
-        case SpvExecutionModelGLCompute:
-            self = .compute
-        case SpvExecutionModelTessellationControl:
-            self = .tesselationControl
-        case SpvExecutionModelTessellationEvaluation:
-            self = .tesselationEvaluation
-        default:
-            self = .max
-        }
-    }
-}
-
 /// Name space for shader resources.
 public enum ShaderResource {
     public struct DescriptorSet: Codable, Sendable {
@@ -98,78 +77,6 @@ public enum ShaderResource {
         let binding: Int
         let type: ShaderValueType
         let offset: Int
-    }
-}
-
-extension ShaderResource.ResourceType {
-    var spvcResourceType: spvc_resource_type {
-        switch self {
-        case .uniformBuffer:
-            return SPVC_RESOURCE_TYPE_UNIFORM_BUFFER
-        case .storageBuffer:
-            return SPVC_RESOURCE_TYPE_STORAGE_BUFFER
-        case .sampler:
-            return SPVC_RESOURCE_TYPE_SEPARATE_SAMPLERS
-        case .storageImage:
-            return SPVC_RESOURCE_TYPE_STORAGE_IMAGE
-        case .image:
-            return SPVC_RESOURCE_TYPE_SEPARATE_IMAGE
-        case .sampledImage:
-            return SPVC_RESOURCE_TYPE_SAMPLED_IMAGE
-        case .pushConstantBuffer:
-            return SPVC_RESOURCE_TYPE_PUSH_CONSTANT
-        case .inputAttachment:
-            return SPVC_RESOURCE_TYPE_SUBPASS_INPUT
-        }
-    }
-}
-
-extension ShaderValueType {
-    init?(typeId: spvc_type_id, compiler: spvc_compiler) {
-        let type = unsafe spvc_compiler_get_type_handle(compiler, typeId)
-        let baseType = unsafe spvc_type_get_basetype(type)
-        switch baseType {
-        case SPVC_BASETYPE_BOOLEAN:
-            self = .bool
-        case SPVC_BASETYPE_FP16:
-            self = .half
-        case SPVC_BASETYPE_UINT8:
-            self = .char
-        case SPVC_BASETYPE_FP32:
-            let vectorCount = unsafe spvc_type_get_vector_size(type)
-            let columnCount = unsafe spvc_type_get_columns(type)
-
-            if columnCount == 3 {
-                self = .mat3
-                return
-            }
-
-            if columnCount == 4 {
-                self = .mat4
-                return
-            }
-
-            switch vectorCount {
-            case 1:
-                self = .float
-            case 2:
-                self = .vec2
-            case 3:
-                self = .vec3
-            case 4:
-                self = .vec4
-            default:
-                return nil
-            }
-        case SPVC_BASETYPE_INT16:
-            self = .short
-        case SPVC_BASETYPE_UINT64:
-            self = .uint
-        case SPVC_BASETYPE_INT64:
-            self = .int
-        default:
-            return nil
-        }
     }
 }
 
