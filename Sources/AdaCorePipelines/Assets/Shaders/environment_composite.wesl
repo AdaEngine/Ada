@@ -31,6 +31,7 @@ struct EnvironmentUniform {
     atmosphereSun: vec4f,
     atmospherePlanet: vec4f,
     atmosphereIlluminance: vec4f,
+    clouds: vec4f,
 }
 
 @group(0) @binding(0) var sceneColor: texture_2d<f32>;
@@ -48,6 +49,7 @@ struct EnvironmentUniform {
 @group(0) @binding(22) var aerialImage: texture_2d<f32>;
 @group(0) @binding(23) var transmittanceImage: texture_2d<f32>;
 @group(0) @binding(24) var aerialTransmittanceImage: texture_2d<f32>;
+@group(0) @binding(25) var cloudImage: texture_2d<f32>;
 
 const ATMOSPHERE_PI = 3.14159265359;
 
@@ -242,4 +244,15 @@ fn applyAerialPerspective(linearColor: vec3f, viewPosition: vec3f, uv: vec2f) ->
     transmitted = mix(vec3f(1.0), transmitted, near);
     let scale = environment.atmosphere.y;
     return linearColor * mix(vec3f(1.0), transmitted, clamp(scale, 0.0, 1.0)) + scattered * scale;
+}
+
+// The cloud layer over the sky. The texture holds premultiplied radiance and the transmittance of the clouds, at
+// reduced resolution, so it is filtered bilinearly.
+fn cloudsActive() -> bool {
+    return environment.clouds.x > 0.5;
+}
+
+fn applyClouds(sky: vec3f, uv: vec2f) -> vec3f {
+    let cloud = textureSampleLevel(cloudImage, linearSampler, uv, 0.0);
+    return sky * cloud.a + cloud.rgb;
 }

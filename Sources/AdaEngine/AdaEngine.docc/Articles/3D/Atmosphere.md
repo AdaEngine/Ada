@@ -130,6 +130,76 @@ A camera holds that memory only while the atmosphere is on, and nothing when it 
 off or a full-screen debug view is showing. The profiling report,
 `Render3DPerformanceMetrics.report()`, lists the total.
 
+## Clouds
+
+The atmosphere can carry one layer of procedural clouds. The clouds are lit by the sun and the sky of the same
+atmosphere, so they turn pink at sunset and grey under an overcast sky, and distant ones fade into the haze. Clouds are
+part of the atmosphere, so they are ignored while the atmosphere is off.
+
+```swift
+var environment = Environment3D()
+environment.atmosphere = Atmosphere3D(isEnabled: true)
+environment.atmosphere.clouds = VolumetricClouds3D(isEnabled: true, coverage: 0.6, windSpeed: 12)
+```
+
+Flat accessors `Environment3D.cloudsEnabled` and `Environment3D.cloudCoverage` reach the same settings from scripts and
+tools.
+
+| Setting | Meaning | Default |
+| --- | --- | --- |
+| `isEnabled` | Turns the cloud layer on. | `false` |
+| `coverage` | Fraction of the sky the layer covers, from `0` (clear) to `1` (overcast). | `0.5` |
+| `density` | How opaque the cloud material is. | `1` |
+| `cloudType` | Shape, from `0` (flat stratus) to `1` (tall cumulus). | `0.5` |
+| `baseAltitudeMeters`, `thicknessMeters` | Where the layer sits above the ground and how thick it is. | 1,500 m and 2,500 m |
+| `windDirection`, `windSpeed` | Direction (X and Z) and speed in meters per second the layer drifts. | east, 10 m/s |
+| `detailScale` | Scale of the fine erosion on the edges. | `1` |
+| `lightingScale`, `ambientScale` | Multipliers of the sun's light and the sky's light on the clouds. | `1` |
+| `time` | Seconds that position the layer. `nil` follows the engine clock. | `nil` |
+| `seed` | Seeds the noise, so the same seed always gives the same clouds. | `1` |
+| `quality` | Cost tier. See below. | Platform default |
+
+Out-of-range and non-finite values are clamped, and scenes saved before clouds existed load with them off. Clouds appear
+only where they change the image: a coverage or density of `0` draws and stores nothing.
+
+**Deterministic frames.** The layer drifts with `windDirection * windSpeed * time`. Pin `time` to a value to freeze the
+clouds, for example in screenshots and golden-frame tests; leave it `nil` to animate them with the engine clock.
+
+**Quality tiers.**
+
+| Tier | What it does | Default on |
+| --- | --- | --- |
+| `low` | No raymarch: one shaded 2D layer with the same noise, coverage and wind, at 40% of the width and height. | Browser |
+| `medium` | Raymarched volume with 32 view and 4 light steps at a quarter of the pixels. | Desktop |
+| `high` | Raymarched volume with 64 view and 6 light steps at half of the pixels. | Opt-in |
+
+**Cost.** The same benchmark (a 1920 by 1080 scene of 400 spheres, sun shadows and eight local lights, on one desktop
+Vulkan machine, best of six rounds, wall-clock with serialized passes) measured the clouds on top of the `medium`
+atmosphere. During that run the frame without any atmosphere took 9.2 ms, and the `medium` atmosphere added 1.0 ms, so
+this run was slower overall than the one quoted above. The clouds added about 1.6 ms (`low`), 2.6 ms (`medium`) and
+4.3 ms (`high`) on top of that. These are clearly above the design's targets of under 0.3 ms for `low` and under 1.0 ms
+for `medium`, so the clouds are expensive today: use `low` where frame time is tight, and keep clouds off for cameras
+that do not need them. The numbers carry about 0.3 ms of noise, and the run-to-run drift of the baseline shows that other
+load on the machine matters, so measure on your own hardware.
+
+A camera with clouds holds the cloud targets (four textures) and a small noise cache for as long as clouds draw. When they
+are off, the targets are released a few frames later, once no frame in flight can still read them. The noise is generated on
+the GPU the first time a seed is used and shared by every camera (about 1.4 MiB per seed); up to four seeds are kept. `Render3DPerformanceMetrics.report()` lists the cloud memory.
+
+**How the clouds are drawn.** Each frame the raymarch writes the clouds at reduced resolution with a different sample
+offset, and a resolve pass blends the result with the previous frame (reprojected with the camera's motion and clamped to
+the neighbouring colors) so the clouds are smooth without trails. A camera that jumps far (more than 3 km) or turns
+sharply (more than about 70 degrees in a frame), and a change of tier or size, restart the blend, and that first frame can
+look grainy. Changing the look (coverage, density, type, seed, wind) does not restart it: the clouds blend toward the new
+look over a few frames.
+
+**Limits.** Clouds are drawn over sky pixels only: they never cover geometry, and geometry that is farther away than a
+cloud is not hidden by it either. They do not appear in reflections, do not cast shadows on the ground, and are not verified
+with path-traced cameras. The cloud layer is one slab and the camera can be below, inside or above it. A ray that points at
+the ground shows only the clouds in front of the ground, so from below the layer you see clouds only above the horizon,
+while from inside or above it you also see the layer's top and sides below the horizon. Looking at the layer from above or
+from far away, the farthest clouds fade into the haze. There are no multiple layers.
+
 ## Combine With Other Effects
 
 - **Fog.** Height and distance fog still apply on top of the haze.
@@ -154,7 +224,7 @@ off or a full-screen debug view is showing. The profiling report,
 - The camera stays inside the atmosphere; planetary views from space are not a goal.
 - The ground below the horizon is a lit planet surface, so over an empty world the
   horizon is a clear edge. Cover the ground with geometry or fog to soften it.
-- Terrain and objects do not shadow the haze, and there are no clouds yet.
+- Terrain and objects do not shadow the haze, and clouds do not shadow anything.
 - Haze is computed from the camera's point of view for 8, 16 or 24 distance
   slices, depending on the tier. Very large `aerialPerspectiveMaxDistance` values
   spread those slices thinly.

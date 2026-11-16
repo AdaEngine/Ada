@@ -339,6 +339,18 @@ public struct Environment3D: Codable, Sendable {
         get { atmosphere.isEnabled }
         set { atmosphere.isEnabled = newValue }
     }
+    /// Turns the cloud layer of the atmosphere on or off.
+    public var cloudsEnabled: Bool {
+        get { atmosphere.clouds.isEnabled }
+        set { atmosphere.clouds.isEnabled = newValue }
+    }
+
+    /// Fraction of the sky the cloud layer covers.
+    public var cloudCoverage: Float {
+        get { atmosphere.clouds.coverage }
+        set { atmosphere.clouds.coverage = newValue }
+    }
+
     public var atmosphereIntensity: Float {
         get { atmosphere.intensity }
         set { atmosphere.intensity = newValue }

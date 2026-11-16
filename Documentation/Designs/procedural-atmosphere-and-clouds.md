@@ -336,3 +336,55 @@ is 112.5 KiB (`low`), 554.0 KiB (`medium`) and 808.0 KiB (`high`).
 - Golden frames exist for Vulkan only. The backend-agreement test carries a named allowance,
   `awaitingMetalReferences`, until Metal references are recorded on Apple hardware; browser results are unverified.
   Acceptance criterion 8 is covered by named CI or reported as blocked, never as passed.
+
+## 14. Stage B outcome and deviations (2026-11-16)
+
+Stage B (volumetric clouds) is implemented on Vulkan. This section records where it differs from section 4.5 and section
+4.6, and its measured cost is added to section 13 once measured.
+
+- **Compositing.** Clouds are composited over sky pixels only. The planned bilateral, depth-aware upsample is not needed
+  for that, because the cloud pass ignores scene depth and the composite uses the full-resolution sky mask. Clouds are
+  therefore never drawn over geometry, including very distant geometry, and they are not part of reflections.
+- **Noise sizes.** The shape noise is a 64-cubed volume (a 512 by 512 atlas of 8 by 8 slices) and the detail noise is
+  32-cubed (a 256 by 128 atlas), not 128-cubed, to keep first-use generation and memory small (about 1.4 MiB for all three
+  textures: 1,441,792 bytes). The weather map is 256 by 256. All three are generated on the GPU from the seed with periodic noise, so they tile.
+- **Output and history.** The resolve pass writes the same result to a history texture and to a fixed per-view display texture,
+  so the composite never reads a texture that depends on a copy of the store taken before the frame began.
+- **History.** The temporal blend is a separate resolve pass that reprojects a point in the middle of the layer with the
+  previous camera and clamps the history to the 3 by 3 neighbourhood of the fresh sample, with a history weight of 0.9. It restarts on
+  the first frame, on a jump of more than 3 km or a turn of more than about 72 degrees, and on a change of tier or size.
+  A change of look (coverage, density, type, seed or wind) blends in over a few frames and does not restart the history, and
+  the explicit `time` and the wind do not either.
+- **Resolution.** `medium` renders a quarter of the pixels and `high` half of the pixels. `low` has no raymarch: it shades one 2D layer
+  with the same noise at 40% of the width and height.
+- **Camera inside or above the layer.** The march starts at the camera when it is inside the slab, so flying through clouds is
+  supported at `medium` and `high`, and from above the layer the march starts at the top sphere. A ray that points at the ground
+  draws only the clouds in front of the ground. Each march is capped at 30 km inside the slab, and the
+  farthest clouds fade into the horizon with distance.
+- **Lighting.** The sun term uses the atmosphere's sun transmittance at the cloud, a dual-lobe phase function with three
+  scattering octaves, a powder term and four (`medium`) or six (`high`) light samples. Ambient light is the zenith colour of the sky-view
+  table, which is a simplification of the full ambient integral.
+- **Cost (section 7 targets not met).** Measured with the same benchmark as section 13, in a later run when the baseline
+  frame took 9.18 ms (against 5.55 ms earlier, so the machine was busier), best of six rounds, wall-clock:
+
+  | Case | Wall ms | Added over `+ atmosphere medium` |
+  | --- | ---: | ---: |
+  | `+ atmosphere medium` | 10.16 | none |
+  | `+ clouds low` | 11.72 | 1.56 |
+  | `+ clouds medium` | 12.80 | 2.64 |
+  | `+ clouds high` | 14.48 | 4.32 |
+
+  The targets were under 0.3 ms for `low` and under 1.0 ms for `medium`, so acceptance criterion 7 is not met for the clouds,
+  by a wider margin than for the atmosphere. The wall-clock method and its noise (about 0.3 ms) are the same as in section 13,
+  and no per-pass GPU timestamps exist to locate the cost. The likely costs are the light march and the three scattering octaves at every
+  cloud sample, the noise fetches, and the resolve pass; they were not profiled.
+- **Acceptance criterion 5 (golden frames).** The delivered golden frames are `clouds-noon`, `clouds-low-sun` (medium tier),
+  `clouds-low-tier` and `clouds-high-tier`, all at coverage 0.6. Coverage is covered by behavioural tests (monotonic
+  coverage of the sky for the medium and low tiers, no clouds at zero coverage) and not by goldens at low, medium and high
+  coverage. Ghosting is covered by a GPU test that turns the camera over several frames and compares the result with a settled frame at the
+  same pose, not by a pair of golden frames. The human accepts these two substitutions.
+- **Seams.** The noise atlases are periodic in z and clamped inside a tile in x and y, so there is a half-texel step at tile
+  boundaries (every 9 km for the shape noise, 1.1 km for the detail noise, 40 km for the weather map) that is not visible at the
+  resolution the clouds are drawn.
+- **Unverified.** Metal and browser results are unverified, and golden frames
+  exist for Vulkan only (`clouds-noon`, `clouds-low-sun`, `clouds-low-tier`).

@@ -38,6 +38,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
     @Res<Bloom3DViews> private var bloomViews
     @Res<VolumetricFog3DViews> private var volumetricViews
     @Res<Atmosphere3DViews> private var atmosphereViews
+    @Res<Clouds3DViews> private var cloudViews
     @Res<AutoExposure3DViews> private var autoExposureViews
     @Res<ColorCorrection3DViews> private var colorCorrection
 
@@ -51,6 +52,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
         _bloomViews.update(from: world)
         _volumetricViews.update(from: world)
         _atmosphereViews.update(from: world)
+        _cloudViews.update(from: world)
         _autoExposureViews.update(from: world)
         _colorCorrection.update(from: world)
         query.update(from: world)
@@ -172,6 +174,8 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                     settings, sun: Atmosphere3DSun(light: sun, settings: settings), cameraAltitude: viewUniform.viewMatrix.inverse.origin.y
                 )
             }
+            let cloudTexture = atmosphereTables != nil && environment.atmosphere.cloudsActive ? cloudViews.output(view: source.entityId) : nil
+            if cloudTexture != nil { uniform.clouds = Vector4(1, 0, 0, 0) }
             let giTexture = environment.screenSpaceGI.isEnabled
                 ? context.world.getResource(ScreenSpaceGI3DViews.self)?.textures[source.entityId]?.filtered : nil
             uniform.diffuseGI = Vector4(giTexture == nil ? 0 : 1, environment.screenSpaceGI.sanitized.bias, 0, 0)
@@ -236,6 +240,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                         .init(binding: 22, shaderStages: .fragment, resource: .texture(atmosphereTables?.aerial ?? Texture2D.whiteTexture)),
                         .init(binding: 23, shaderStages: .fragment, resource: .texture(atmosphereTables?.transmittance ?? Texture2D.whiteTexture)),
                         .init(binding: 24, shaderStages: .fragment, resource: .texture(atmosphereTables?.aerialTransmittance ?? Texture2D.whiteTexture)),
+                        .init(binding: 25, shaderStages: .fragment, resource: .texture(cloudTexture ?? Texture2D.whiteTexture)),
                     ]
                 ),
                 index: 0

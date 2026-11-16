@@ -82,6 +82,8 @@ struct Environment3DUniform: Sendable {
     var atmospherePlanet: Vector4 = .zero
     /// rgb: sun illuminance, w: aerial depth slice count.
     var atmosphereIlluminance: Vector4 = .zero
+    /// x: the cloud layer is drawn over the sky.
+    var clouds: Vector4 = .zero
 }
 
 public struct ScreenSpaceReflectionScratch: Resource, Sendable {

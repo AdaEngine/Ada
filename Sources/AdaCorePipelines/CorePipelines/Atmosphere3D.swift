@@ -10,7 +10,7 @@ public enum AtmosphereQuality3D: String, Codable, Sendable, CaseIterable {
     case low, medium, high
 
     /// `low` in the browser, `medium` everywhere else.
-    public static var platformDefault: AtmosphereQuality3D {
+    public static var platformDefault: Self {
         #if arch(wasm32)
         .low
         #else
@@ -37,6 +37,8 @@ public struct Atmosphere3D: Codable, Sendable, Equatable {
     public var tintsSunLight: Bool
     public var fallbackSunDirection: Vector3
     public var quality: AtmosphereQuality3D
+    /// A cloud layer lit by this atmosphere. Ignored while the atmosphere is off.
+    public var clouds: VolumetricClouds3D
 
     public init(
         isEnabled: Bool = false,
@@ -54,7 +56,8 @@ public struct Atmosphere3D: Codable, Sendable, Equatable {
         aerialPerspectiveMaxDistance: Float = 32_000,
         tintsSunLight: Bool = false,
         fallbackSunDirection: Vector3 = Vector3(0.3, 0.8, 0.5).normalized,
-        quality: AtmosphereQuality3D = .platformDefault
+        quality: AtmosphereQuality3D = .platformDefault,
+        clouds: VolumetricClouds3D = VolumetricClouds3D()
     ) {
         self.isEnabled = isEnabled
         self.intensity = intensity
@@ -72,17 +75,18 @@ public struct Atmosphere3D: Codable, Sendable, Equatable {
         self.tintsSunLight = tintsSunLight
         self.fallbackSunDirection = fallbackSunDirection
         self.quality = quality
+        self.clouds = clouds
     }
 
     private enum CodingKeys: CodingKey {
         case isEnabled, intensity, rayleighScale, mieScale, mieAnisotropy, ozoneScale, groundAlbedo, groundRadiusMeters,
              atmosphereHeightMeters, sunDiscScale, sunDiscIntensity, aerialPerspectiveScale, aerialPerspectiveMaxDistance,
-             tintsSunLight, fallbackSunDirection, quality
+             tintsSunLight, fallbackSunDirection, quality, clouds
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        let defaults = Atmosphere3D()
+        let defaults = Self()
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? defaults.isEnabled
         intensity = try container.decodeIfPresent(Float.self, forKey: .intensity) ?? defaults.intensity
         rayleighScale = try container.decodeIfPresent(Float.self, forKey: .rayleighScale) ?? defaults.rayleighScale
@@ -99,6 +103,7 @@ public struct Atmosphere3D: Codable, Sendable, Equatable {
         tintsSunLight = try container.decodeIfPresent(Bool.self, forKey: .tintsSunLight) ?? defaults.tintsSunLight
         fallbackSunDirection = try container.decodeIfPresent(Vector3.self, forKey: .fallbackSunDirection) ?? defaults.fallbackSunDirection
         quality = try container.decodeIfPresent(AtmosphereQuality3D.self, forKey: .quality) ?? defaults.quality
+        clouds = try container.decodeIfPresent(VolumetricClouds3D.self, forKey: .clouds) ?? defaults.clouds
     }
 
     /// Whether the atmosphere can change the image. A camera that returns `false` pays nothing for it.
@@ -106,9 +111,14 @@ public struct Atmosphere3D: Codable, Sendable, Equatable {
         isEnabled && finiteRenderValue(intensity, fallback: Self().intensity, range: 0...64) > 0
     }
 
+    /// Whether the cloud layer is drawn: it needs an atmosphere that changes the image, and clouds that do.
+    var cloudsActive: Bool {
+        changesImage && clouds.changesImage
+    }
+
     /// Settings clamped to ranges the shaders handle, replacing non-finite values with defaults.
-    var sanitized: Atmosphere3D {
-        let defaults = Atmosphere3D()
+    var sanitized: Self {
+        let defaults = Self()
         var direction = fallbackSunDirection
         let finite = direction.x.isFinite && direction.y.isFinite && direction.z.isFinite
         if !finite || direction.length < 1e-6 {
@@ -116,7 +126,7 @@ public struct Atmosphere3D: Codable, Sendable, Equatable {
         } else {
             direction = direction.normalized
         }
-        return Atmosphere3D(
+        return Self(
             isEnabled: isEnabled,
             intensity: finiteRenderValue(intensity, fallback: defaults.intensity, range: 0...64),
             rayleighScale: finiteRenderValue(rayleighScale, fallback: defaults.rayleighScale, range: 0...10),
@@ -132,7 +142,8 @@ public struct Atmosphere3D: Codable, Sendable, Equatable {
             aerialPerspectiveMaxDistance: finiteRenderValue(aerialPerspectiveMaxDistance, fallback: defaults.aerialPerspectiveMaxDistance, range: 1...1_000_000),
             tintsSunLight: tintsSunLight,
             fallbackSunDirection: direction,
-            quality: quality
+            quality: quality,
+            clouds: clouds.sanitized
         )
     }
 }

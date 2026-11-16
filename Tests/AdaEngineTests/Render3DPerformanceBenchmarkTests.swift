@@ -182,6 +182,18 @@ extension Render3DGPUTests {
                 Configuration(name: "+ atmosphere low", detail: "bare + physical sky, low tier") { bare(&$0); $0.atmosphere = Atmosphere3D(isEnabled: true, quality: .low) },
                 Configuration(name: "+ atmosphere medium", detail: "bare + physical sky, medium tier") { bare(&$0); $0.atmosphere = Atmosphere3D(isEnabled: true, quality: .medium) },
                 Configuration(name: "+ atmosphere high", detail: "bare + physical sky, high tier") { bare(&$0); $0.atmosphere = Atmosphere3D(isEnabled: true, quality: .high) },
+                Configuration(name: "+ clouds low", detail: "atmosphere + shaded 2D cloud layer") {
+                    bare(&$0)
+                    $0.atmosphere = Atmosphere3D(isEnabled: true, quality: .medium, clouds: VolumetricClouds3D(isEnabled: true, time: 30, quality: .low))
+                },
+                Configuration(name: "+ clouds medium", detail: "atmosphere + raymarched clouds, quarter resolution") {
+                    bare(&$0)
+                    $0.atmosphere = Atmosphere3D(isEnabled: true, quality: .medium, clouds: VolumetricClouds3D(isEnabled: true, time: 30, quality: .medium))
+                },
+                Configuration(name: "+ clouds high", detail: "atmosphere + raymarched clouds, half resolution") {
+                    bare(&$0)
+                    $0.atmosphere = Atmosphere3D(isEnabled: true, quality: .medium, clouds: VolumetricClouds3D(isEnabled: true, time: 30, quality: .high))
+                },
                 Configuration(name: "+ grading", detail: "bare + vignette, saturation, contrast") {
                     bare(&$0)
                     $0.postProcess.vignette.intensity = 0.4

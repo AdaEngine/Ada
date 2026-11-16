@@ -23,7 +23,7 @@ struct GoldenBackendAgreementTests {
 
     /// Vulkan-only references that wait for a Metal reference, which has to be recorded on Apple hardware. Record the
     /// frames in `GoldenFrames/saga-metal`, then remove the names from this set so the backends are compared again.
-    private static let awaitingMetalReferences: Set<String> = ["atmosphere-noon", "atmosphere-low-sun", "atmosphere-night"]
+    private static let awaitingMetalReferences: Set<String> = ["atmosphere-noon", "atmosphere-low-sun", "atmosphere-night", "clouds-noon", "clouds-low-sun", "clouds-low-tier", "clouds-high-tier"]
 
     /// Largest per-channel step and fraction of pixels allowed to differ between backends.
     static let agreement = GoldenFrame.Tolerance(channelSteps: 12, differingFraction: 0.02)

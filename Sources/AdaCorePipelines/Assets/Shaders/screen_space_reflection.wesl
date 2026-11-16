@@ -1,7 +1,7 @@
 import package::fullscreen::{FullscreenVertex, fullscreenVertex};
 import package::environment_composite::{
     sceneColor, normalRoughness, viewPositionMetallic, linearSampler, gBufferSampler, environment,
-    srgbToLinear, presentColor, applyFog, atmosphereActive, atmosphereSky, applyAerialPerspective,
+    srgbToLinear, presentColor, applyFog, atmosphereActive, atmosphereSky, applyAerialPerspective, cloudsActive, applyClouds,
 };
 
 @group(0) @binding(5) var environmentImage: texture_2d<f32>;
@@ -296,7 +296,11 @@ fn ssr_fragment(input: FullscreenVertex) -> @location(0) vec4f {
         let viewFar = environment.inverseProjection * vec4f(ndc, 1.0, 1.0);
         let viewRay = normalize(viewFar.xyz / viewFar.w);
         // The HDR scene holds premultiplied transparent geometry and particles at sky pixels.
-        let skyWithForeground = foreground.rgb + sampleSky(viewRay, true) * (1.0 - clamp(foreground.a, 0.0, 1.0));
+        var displayedSky = sampleSky(viewRay, true);
+        if cloudsActive() {
+            displayedSky = applyClouds(displayedSky, uv);
+        }
+        let skyWithForeground = foreground.rgb + displayedSky * (1.0 - clamp(foreground.a, 0.0, 1.0));
         return composite(skyWithForeground, viewRay * 1000.0, environment.fogRange.x, true, input);
     }
 

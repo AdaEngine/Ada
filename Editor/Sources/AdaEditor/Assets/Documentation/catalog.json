@@ -3403,6 +3403,84 @@
       },
       {
         "kind": "heading",
+        "text": "Clouds",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The atmosphere can carry one layer of procedural clouds. The clouds are lit by the sun and the sky of the same\natmosphere, so they turn pink at sunset and grey under an overcast sky, and distant ones fade into the haze. Clouds are\npart of the atmosphere, so they are ignored while the atmosphere is off.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "var environment = Environment3D()\nenvironment.atmosphere = Atmosphere3D(isEnabled: true)\nenvironment.atmosphere.clouds = VolumetricClouds3D(isEnabled: true, coverage: 0.6, windSpeed: 12)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Flat accessors `Environment3D.cloudsEnabled` and `Environment3D.cloudCoverage` reach the same settings from scripts and\ntools.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Setting | Meaning | Default |\n| --- | --- | --- |\n| `isEnabled` | Turns the cloud layer on. | `false` |\n| `coverage` | Fraction of the sky the layer covers, from `0` (clear) to `1` (overcast). | `0.5` |\n| `density` | How opaque the cloud material is. | `1` |\n| `cloudType` | Shape, from `0` (flat stratus) to `1` (tall cumulus). | `0.5` |\n| `baseAltitudeMeters`, `thicknessMeters` | Where the layer sits above the ground and how thick it is. | 1,500 m and 2,500 m |\n| `windDirection`, `windSpeed` | Direction (X and Z) and speed in meters per second the layer drifts. | east, 10 m/s |\n| `detailScale` | Scale of the fine erosion on the edges. | `1` |\n| `lightingScale`, `ambientScale` | Multipliers of the sun's light and the sky's light on the clouds. | `1` |\n| `time` | Seconds that position the layer. `nil` follows the engine clock. | `nil` |\n| `seed` | Seeds the noise, so the same seed always gives the same clouds. | `1` |\n| `quality` | Cost tier. See below. | Platform default |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Out-of-range and non-finite values are clamped, and scenes saved before clouds existed load with them off. Clouds appear\nonly where they change the image: a coverage or density of `0` draws and stores nothing.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Deterministic frames.** The layer drifts with `windDirection * windSpeed * time`. Pin `time` to a value to freeze the\nclouds, for example in screenshots and golden-frame tests; leave it `nil` to animate them with the engine clock.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Quality tiers.**",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Tier | What it does | Default on |\n| --- | --- | --- |\n| `low` | No raymarch: one shaded 2D layer with the same noise, coverage and wind, at 40% of the width and height. | Browser |\n| `medium` | Raymarched volume with 32 view and 4 light steps at a quarter of the pixels. | Desktop |\n| `high` | Raymarched volume with 64 view and 6 light steps at half of the pixels. | Opt-in |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Cost.** The same benchmark (a 1920 by 1080 scene of 400 spheres, sun shadows and eight local lights, on one desktop\nVulkan machine, best of six rounds, wall-clock with serialized passes) measured the clouds on top of the `medium`\natmosphere. During that run the frame without any atmosphere took 9.2 ms, and the `medium` atmosphere added 1.0 ms, so\nthis run was slower overall than the one quoted above. The clouds added about 1.6 ms (`low`), 2.6 ms (`medium`) and\n4.3 ms (`high`) on top of that. These are clearly above the design's targets of under 0.3 ms for `low` and under 1.0 ms\nfor `medium`, so the clouds are expensive today: use `low` where frame time is tight, and keep clouds off for cameras\nthat do not need them. The numbers carry about 0.3 ms of noise, and the run-to-run drift of the baseline shows that other\nload on the machine matters, so measure on your own hardware.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A camera with clouds holds the cloud targets (four textures) and a small noise cache for as long as clouds draw. When they\nare off, the targets are released a few frames later, once no frame in flight can still read them. The noise is generated on\nthe GPU the first time a seed is used and shared by every camera (about 1.4 MiB per seed); up to four seeds are kept. `Render3DPerformanceMetrics.report()` lists the cloud memory.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**How the clouds are drawn.** Each frame the raymarch writes the clouds at reduced resolution with a different sample\noffset, and a resolve pass blends the result with the previous frame (reprojected with the camera's motion and clamped to\nthe neighbouring colors) so the clouds are smooth without trails. A camera that jumps far (more than 3 km) or turns\nsharply (more than about 70 degrees in a frame), and a change of tier or size, restart the blend, and that first frame can\nlook grainy. Changing the look (coverage, density, type, seed, wind) does not restart it: the clouds blend toward the new\nlook over a few frames.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Limits.** Clouds are drawn over sky pixels only: they never cover geometry, and geometry that is farther away than a\ncloud is not hidden by it either. They do not appear in reflections, do not cast shadows on the ground, and are not verified\nwith path-traced cameras. The cloud layer is one slab and the camera can be below, inside or above it. A ray that points at\nthe ground shows only the clouds in front of the ground, so from below the layer you see clouds only above the horizon,\nwhile from inside or above it you also see the layer's top and sides below the horizon. Looking at the layer from above or\nfrom far away, the farthest clouds fade into the haze. There are no multiple layers.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
         "text": "Combine With Other Effects",
         "level": 2,
         "links": []
@@ -3421,7 +3499,7 @@
       },
       {
         "kind": "text",
-        "text": "• The camera stays inside the atmosphere; planetary views from space are not a goal.\n• The ground below the horizon is a lit planet surface, so over an empty world the\n  horizon is a clear edge. Cover the ground with geometry or fog to soften it.\n• Terrain and objects do not shadow the haze, and there are no clouds yet.\n• Haze is computed from the camera's point of view for 8, 16 or 24 distance\n  slices, depending on the tier. Very large `aerialPerspectiveMaxDistance` values\n  spread those slices thinly.\n• The shaders are shared by every SAGA backend, but this feature was checked only on\n  the Vulkan backend. Metal and browser results have not been verified, and their\n  golden-frame references are not recorded yet.",
+        "text": "• The camera stays inside the atmosphere; planetary views from space are not a goal.\n• The ground below the horizon is a lit planet surface, so over an empty world the\n  horizon is a clear edge. Cover the ground with geometry or fog to soften it.\n• Terrain and objects do not shadow the haze, and clouds do not shadow anything.\n• Haze is computed from the camera's point of view for 8, 16 or 24 distance\n  slices, depending on the tier. Very large `aerialPerspectiveMaxDistance` values\n  spread those slices thinly.\n• The shaders are shared by every SAGA backend, but this feature was checked only on\n  the Vulkan backend. Metal and browser results have not been verified, and their\n  golden-frame references are not recorded yet.",
         "level": 0,
         "links": []
       }
