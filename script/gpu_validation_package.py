@@ -57,6 +57,8 @@ for relative in [
     "Tests/AdaRenderTests/BoundedResourceCacheTests.swift",
     "Tests/AdaRenderTests/RenderGraphDiagnosticsTests.swift",
     "Tests/AdaRenderTests/RenderUpscalingTests.swift",
+    "Tests/AdaRenderTests/DLSSSelectionTests.swift",
+    "Tests/AdaRenderTests/DLSSStatusTests.swift",
     "Tests/AdaRenderTests/MeshletGeometryTests.swift",
     "Tests/AdaRenderTests/MeshletLODGeometryTests.swift",
     "Tests/AdaEngineTests/Render3DMeshletTests.swift",

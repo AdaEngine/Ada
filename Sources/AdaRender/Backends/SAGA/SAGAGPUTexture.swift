@@ -65,6 +65,10 @@
             }
             if descriptor.textureUsage.contains(.write) {
                 usage.insert(.copySource)
+                #if SAGA_NATIVE
+                // Vendor reconstruction (DLSS) writes its output as a storage image; only the Vulkan renderer needs this.
+                if descriptor.pixelFormat == .rgba_16f || descriptor.pixelFormat == .rgba_32f { usage.insert(.storageBinding) }
+                #endif
             }
             if descriptor.textureUsage.contains(.renderTarget) {
                 usage.formUnion([.renderAttachment, .copySource])

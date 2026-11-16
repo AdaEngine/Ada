@@ -166,6 +166,7 @@
         private var vertexBuffers: [Int: BufferBinding] = [:]
         private var uniforms: [ComputeBindingSlot: BufferBinding] = [:]
         private var textures: [ComputeBindingSlot: SAGAGPUTexture] = [:]
+        private var accelerationStructures: [ComputeBindingSlot: SAGAAccelerationStructure] = [:]
         private var samplers: [ComputeBindingSlot: SAGASampler] = [:]
         private var index: (buffer: SAGABuffer, format: IndexFormat, offset: Int)?
         private var viewport: RenderViewport?
@@ -311,6 +312,8 @@
                     textures[slot] = texture.gpuTexture as? SAGAGPUTexture
                 case let .sampler(sampler):
                     samplers[slot] = sampler as? SAGASampler
+                case let .accelerationStructure(structure):
+                    accelerationStructures[slot] = structure as? SAGAAccelerationStructure
                 }
             }
         }
@@ -472,6 +475,7 @@
             let vertex: [(slot: UInt32, buffer: ResourceSlot<ResourceID>, offset: UInt64)]
             let uniforms: [(ComputeBindingSlot, ResourceSlot<ResourceID>, UInt64, UInt64)]
             let textures: [(ComputeBindingSlot, ResourceSlot<ResourceID>)]
+            let accelerationStructures: [(ComputeBindingSlot, ResourceSlot<ResourceID>)]
             let samplers: [(ComputeBindingSlot, ResourceSlot<ResourceID>)]
             let raster: RenderRasterState
             let retained: [AnyObject]
@@ -500,6 +504,10 @@
                 var result: [ComputeBindingSlot: ResourceID] = [:]
                 for (slot, texture) in textures where pipeline.textureSlots.contains(slot) {
                     result[slot] = try texture.get()
+                }
+                // A render command binds acceleration structures through its texture map, by pipeline slot.
+                for (slot, structure) in accelerationStructures where pipeline.accelerationStructureSlots.contains(slot) {
+                    result[slot] = try structure.get()
                 }
                 return result
             }
@@ -530,6 +538,10 @@
                 retained.append(texture)
                 return (slot, texture.sampledSlot)
             }
+            let accelerationList = accelerationStructures.map { slot, structure -> (ComputeBindingSlot, ResourceSlot<ResourceID>) in
+                retained.append(structure)
+                return (slot, structure.slot)
+            }
             let samplerList = samplers.map { slot, sampler -> (ComputeBindingSlot, ResourceSlot<ResourceID>) in
                 retained.append(sampler)
                 return (slot, sampler.slot)
@@ -556,6 +568,7 @@
                 vertex: vertex,
                 uniforms: uniformList,
                 textures: textureList,
+                accelerationStructures: accelerationList,
                 samplers: samplerList,
                 raster: drawRaster,
                 retained: retained

@@ -315,7 +315,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Atmosphere\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• Terrain\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Atmosphere\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• DLSS Upscaling\n• Hardware Path Tracing\n• Terrain\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
         "level": 0,
         "links": [
           {
@@ -357,6 +357,14 @@
           {
             "title": "Pipelined Rendering",
             "destination": "PipelinedRendering"
+          },
+          {
+            "title": "DLSS Upscaling",
+            "destination": "DLSSUpscaling"
+          },
+          {
+            "title": "Hardware Path Tracing",
+            "destination": "HardwarePathTracing"
           },
           {
             "title": "Terrain",
@@ -3500,6 +3508,232 @@
       {
         "kind": "text",
         "text": "• The camera stays inside the atmosphere; planetary views from space are not a goal.\n• The ground below the horizon is a lit planet surface, so over an empty world the\n  horizon is a clear edge. Cover the ground with geometry or fog to soften it.\n• Terrain and objects do not shadow the haze, and clouds do not shadow anything.\n• Haze is computed from the camera's point of view for 8, 16 or 24 distance\n  slices, depending on the tier. Very large `aerialPerspectiveMaxDistance` values\n  spread those slices thinly.\n• The shaders are shared by every SAGA backend, but this feature was checked only on\n  the Vulkan backend. Metal and browser results have not been verified, and their\n  golden-frame references are not recorded yet.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "DLSSUpscaling",
+    "title": "DLSS Upscaling",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/3D/DLSSUpscaling.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Render a 3D view below its output resolution and reconstruct it with NVIDIA DLSS Super Resolution, or denoise a\npath-traced view with DLSS Ray Reconstruction. DLSS is optional: without it a camera uses the portable temporal\nreconstruction that ships with the engine, and nothing else changes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Requirements",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• An NVIDIA GeForce RTX GPU with a current driver, running the Vulkan renderer (Windows today).\n• The NVIDIA DLSS SDK. Its license is NVIDIA's, so AdaEngine never contains or downloads it. Clone\n  `https://github.com/NVIDIA/DLSS` yourself and accept its terms before using it.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Set up the runtime",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Build the small AdaEngine bridge once against your copy of the SDK. It writes `adaengine_ngx.dll` and copies the NGX\nlibraries next to it:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "python ada_tool.py build ngx-bridge --sdk path/to/DLSS --output path/to/ngx",
+        "language": "bash",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Point the engine at that folder with the `ADAENGINE_NGX_SDK_PATH` environment variable, or put the files next to the\ngame executable. Both the bridge and `nvngx_dlss.dll` must be in the same folder; ship `nvngx_dlssd.dll` too if you use\nRay Reconstruction. Only absolute folders are searched, never the current directory or `PATH`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Use it on a camera",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Choose DLSS on the camera's temporal upscaling settings. `renderScale` is the ratio of internal to output resolution,\nand the engine picks the closest DLSS preset:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "camera.temporalUpscaling = .init(renderScale: 0.5, method: .dlss)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Render scale | Preset |\n| --- | --- |\n| 1 | DLAA |\n| about 0.67 | Quality |\n| about 0.58 | Balanced |\n| 0.5 | Performance |\n| about 0.33 | Ultra Performance |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`.automatic` (the default) uses DLSS when it is available and the portable reconstruction otherwise. `.dlss` asks for\nDLSS and falls back to `.portable` when it cannot run. `.portable` never uses DLSS; choose it to keep the portable\nreconstruction on an RTX machine where the bridge is installed.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Check what ran",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "DLSS initializes on the first frames after startup. Until it is ready, `.dlss` and `.automatic` cameras use the\nportable reconstruction.\nRead the `TemporalReconstructionStatuses` resource from the render world (the world that runs the render systems) to see, per camera, the method that was\nrequested, the method in effect, the DLSS preset and, when DLSS was not used, the reason:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "if let status = statuses[cameraID], let reason = status.fallbackReason {\n    print(\"DLSS not used: \\(reason)\")\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Ray Reconstruction",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A path-traced view whose camera uses DLSS and traces at the DLSS input size is denoised and upscaled in one step by\nRay Reconstruction. Leave `pathTracing.denoiser` on `.automatic`, or set `.rayReconstruction` to request it. When it\ncannot run, the view uses the portable denoiser and the path tracing statistics report why in `denoiserFallback`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Limits",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• DLSS runs only through the Vulkan renderer on Windows; Linux, Metal and the web player use the portable\n  reconstruction.\n• Frame generation and the other DLSS features are not supported.\n• A DLSS failure at run time turns DLSS off for every camera for the rest of the session and the portable\n  reconstruction takes over. The frame that failed keeps whatever its output held.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "HardwarePathTracing",
+    "title": "Hardware Path Tracing",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/3D/HardwarePathTracing.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Let a path-traced view find ray intersections with the GPU's ray-tracing hardware instead of a shader BVH. The image,\nlighting and denoisers stay the same; only the intersection step changes, and the shader BVH remains the fallback\nwherever hardware cannot be used.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Requirements",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• The Vulkan renderer (Windows or Linux) on a device that supports ray queries. It has been verified on an NVIDIA\n  GeForce RTX 4070 only.\n• Path tracing enabled on the view's environment. See the path tracing guide for the tracer itself.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Metal, D3D12, Android and the browser keep the shader BVH.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Choose the intersection",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`PathTracing3D.intersection` selects the traversal:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "environment.pathTracing = .init(isEnabled: true, samplesPerPixel: 4, maximumBounces: 3, resolutionScale: 0.5, historyLimit: 32)\n// .automatic is the default: hardware when the device and the whole view can use it, otherwise the shader BVH.\nenvironment.pathTracing.intersection = .automatic\n// Force the shader BVH, for reference renders or to compare the two.\nenvironment.pathTracing.intersection = .software",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A view falls back to the shader BVH as a whole; it never mixes the two in one frame. Switching between them restarts the\nview's accumulation, like any other scene change.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Check what ran",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Render3DPathTracingStatistics`, a resource of the render world, reports per view which traversal ran and why hardware\nwas not used:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "if let status = statistics.snapshots[String(cameraID)] {\n    print(status.implementation)            // \"vulkan-ray-query\" or \"portable-shader-bvh\"\n    if let reason = status.intersectionFallback { print(\"Hardware not used: \\(reason)\") }\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A view reports a reason when the device has no ray queries, when the scene has skinned meshes, or when a build or shader\nfailure turned hardware off (it then stays off for the rest of the session). Asking for `.software` reports no reason.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "What the hardware path does",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• Each mesh part gets one bottom-level acceleration structure, built once from its geometry and shared by every\n  placement of that part. Parts that disappear release theirs.\n• The top-level structure lists every placed part with its transform. It is rebuilt when the scene changes and keeps\n  its capacity otherwise.\n• Shading, lights, the sky, the denoisers and DLSS Ray Reconstruction read the same triangle and material tables as the\n  shader BVH, so the picture matches it. Alpha-tested and stochastically transparent materials, single-sided surfaces and\n  shadow-caster filtering follow the same rules.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Limits",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• Meshes with skinning make the view use the shader BVH. Morph targets already reject tracing, as before.\n• The scene budget is unchanged: 131072 triangles.\n• The CPU still prepares the shading tables when the scene changes, so hardware saves the BVH work, not that preparation.\n• Performance depends on the scene. On the author's RTX 4070, in a synthetic scene of about 85 thousand triangles at\n  640 by 480 (unoptimized build, wall-clock time per frame including CPU work), hardware was clearly faster when the\n  trace was the bottleneck (8 samples per pixel: about 30 to 45 percent less frame time). At 2 samples per pixel it was\n  about 5 percent slower with double-sided materials and up to about 18 percent slower with single-sided materials. When\n  one object moved every frame it was 11 to 14 percent faster. Measure your own scene, and set `.software` if hardware\n  is slower for you.\n• Hardware ray queries are used on the Vulkan renderer only.",
         "level": 0,
         "links": []
       }

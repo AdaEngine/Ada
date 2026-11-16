@@ -1,6 +1,8 @@
 // WESL port of path_tracing_3d.glsl. One fullscreen pass selected by `pu.u_Frame.y`:
 // 0 trace, 1 temporal, 2 guide, 3 wavelet denoise, 4 reconstruct, 5 Ray Reconstruction guides.
 
+@if(ADA_PATH_TRACING_RAY_QUERY) enable wgpu_ray_query;
+
 struct PathVertex {
     @builtin(position) position: vec4f,
     @location(0) uv: vec2f,
@@ -22,7 +24,7 @@ struct PathUniform {
     u_Horizon: vec4f,
     u_Ground: vec4f,
     u_Sky: vec4f, // environment texture enabled, intensity, rotation, procedural enabled
-    u_Hybrid: vec4f, // x: first hit from the raster G-buffer
+    u_Hybrid: vec4f, // x: first hit from the raster G-buffer, y: denoiser strength (1 is the plain filter)
     u_PreviousViewProjection: mat4x4f, // unjittered, previous frame of this view
     u_PreviousView: mat4x4f,
     u_Denoise: vec4f, // x: wavelet step, y: minimum history weight, z: trace writes demodulated light, w: final remodulates
@@ -44,6 +46,8 @@ struct PathUniform {
 @group(0) @binding(13) var u_Emission: texture_2d<f32>; // G-buffer emission
 @group(0) @binding(14) var u_InputB: texture_2d<f32>;   // pass-specific second input
 @group(0) @binding(15) var u_InputC: texture_2d<f32>;   // pass-specific third input
+// The ray-query variant traces this top-level structure instead of walking the BVH textures.
+@if(ADA_PATH_TRACING_RAY_QUERY) @group(0) @binding(16) var u_Scene: acceleration_structure;
 
 const PI: f32 = 3.141592653589793;
 
@@ -123,6 +127,56 @@ fn boxHit(origin: vec3f, direction: vec3f, lo: vec3f, hi: vec3f, distance: f32) 
     return true;
 }
 
+// Hardware variant of intersectScene: a ray query against the top-level structure. A hit's triangle is the instance's
+// first triangle (its custom data) plus the primitive index, which indexes the same triangle table the BVH variant reads.
+// Candidates are accepted with the same rules as the BVH variant: single-sided materials reject back faces, alpha-test and
+// stochastic coverage reject by alpha. Shadow rays see only shadow-casting instances (mask bit 0) and stop at the first hit.
+@if(ADA_PATH_TRACING_RAY_QUERY)
+fn intersectScene(origin: vec3f, direction: vec3f, distance: ptr<function, f32>, bary: ptr<function, vec3f>, shadowRay: bool) -> i32 {
+    var hit = -1;
+    *bary = vec3f(0.0);
+    var query: ray_query;
+    rayQueryInitialize(&query, u_Scene, RayDesc(select(0u, 4u, shadowRay), select(255u, 1u, shadowRay), pu.u_Trace.y, *distance, origin, direction));
+    while rayQueryProceed(&query) {
+        let candidate = rayQueryGetCandidateIntersection(&query);
+        let index = (i32(candidate.instance_custom_data) + i32(candidate.primitive_index)) * 12;
+        let a = tri(index);
+        let m = i32(a.w) * 5;
+        let mode = i32(material(m + 4).x);
+        let doubleSided = material(m + 2).w >= 0.5;
+        // Opaque double-sided surfaces, the common case, need no further checks.
+        if mode == 0 && doubleSided {
+            rayQueryConfirmIntersection(&query);
+            continue;
+        }
+        // Facing comes from the world-space triangle, exactly as in the BVH variant.
+        let b = tri(index + 1);
+        let c = tri(index + 2);
+        let determinant = dot(b.xyz - a.xyz, cross(direction, c.xyz - a.xyz));
+        if !doubleSided && determinant < 0.0 {
+            continue;
+        }
+        let weights = vec3f(1.0 - candidate.barycentrics.x - candidate.barycentrics.y, candidate.barycentrics.x, candidate.barycentrics.y);
+        let uv = tri(index + 6).xy * weights.x + tri(index + 7).xy * weights.y + tri(index + 8).xy * weights.z;
+        let alpha = material(m).w * atlas(material(m + 3).x, uv).a;
+        if mode == 1 && alpha < material(m + 2).z {
+            continue;
+        }
+        if mode == 2 && randomValue() > alpha {
+            continue;
+        }
+        rayQueryConfirmIntersection(&query);
+    }
+    let committed = rayQueryGetCommittedIntersection(&query);
+    if committed.kind != 0u {
+        hit = (i32(committed.instance_custom_data) + i32(committed.primitive_index)) * 12;
+        *bary = vec3f(1.0 - committed.barycentrics.x - committed.barycentrics.y, committed.barycentrics.x, committed.barycentrics.y);
+        *distance = committed.t;
+    }
+    return hit;
+}
+
+@if(!ADA_PATH_TRACING_RAY_QUERY)
 // Returns the closest actual world triangle, with optional cast-shadow filtering.
 fn intersectScene(origin: vec3f, direction: vec3f, distance: ptr<function, f32>, bary: ptr<function, vec3f>, shadowRay: bool) -> i32 {
     var hit = -1;
@@ -527,7 +581,11 @@ fn waveletPass(vUV: vec2f) -> vec4f {
         }
     }
     mean = mean / 9.0;
-    let sigma = 4.0 * sqrt(max(square / 9.0 - mean * mean, 0.0)) + 0.0001;
+    // Strength above 1 widens the tolerance, most of all where the temporal history is short (just-moved or newly visible
+    // pixels, stored in alpha), so noisy fresh pixels are smoothed hard while converged ones keep their detail.
+    let strength = max(pu.u_Hybrid.y, 1.0);
+    let tolerance = strength + (strength - 1.0) * 6.0 / max(center.a, 1.0);
+    let sigma = 4.0 * tolerance * sqrt(max(square / 9.0 - mean * mean, 0.0)) + 0.0001;
     let depth = length(textureSampleLevel(u_Position, u_Nearest, vUV, 0.0).xyz);
     let centerLuminance = luminance(center.rgb);
     var kernel = array<f32, 3>(0.375, 0.25, 0.0625);

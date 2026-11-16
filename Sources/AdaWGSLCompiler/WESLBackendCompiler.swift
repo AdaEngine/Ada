@@ -82,7 +82,7 @@ public enum WESLBackendCompiler {
         _ module: WESLHostCompiler.Artifact,
         entryPoint: WESLHostCompiler.EntryPoint
     ) throws -> [UniformBufferLayout] {
-        let ir = try IndependentShaderCompiler().parseAndValidate(.wgsl(module.wgsl)).module
+        let ir = try IndependentShaderCompiler().parseAndValidate(.wgsl(module.wgsl), capabilities: WESLHostCompiler.validationCapabilities).module
         guard let entry = ir.entryPoints.first(where: { $0.name == entryPoint.name && $0.stage.rawValue == entryPoint.stage }) else {
             throw ShaderFailure.unsupported("Unknown WESL uniform-reflection entry point '\(entryPoint.name)'")
         }

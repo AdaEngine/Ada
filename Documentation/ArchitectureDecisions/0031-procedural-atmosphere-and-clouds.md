@@ -1,4 +1,4 @@
-# ADR-0030: Procedural Atmosphere and Volumetric Clouds
+# ADR-0031: Procedural Atmosphere and Volumetric Clouds
 
 Date: 2026-11-16. Status: accepted for the implemented Vulkan path; Metal and browser results are not yet verified.
 Scope: [approved design](../Designs/procedural-atmosphere-and-clouds.md) (stage A atmosphere, stage B clouds).
