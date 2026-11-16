@@ -47,5 +47,6 @@ For more details and guides, check out the tutorials below.
 - <doc:DLSSUpscaling>
 - <doc:HardwarePathTracing>
 - <doc:Terrain>
+- <doc:ProceduralNoise>
 - <doc:VisionOSWindowed>
 - <doc:WESLShaders>

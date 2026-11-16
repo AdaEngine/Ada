@@ -315,7 +315,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Atmosphere\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• DLSS Upscaling\n• Hardware Path Tracing\n• Terrain\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Atmosphere\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• DLSS Upscaling\n• Hardware Path Tracing\n• Terrain\n• Procedural Noise\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
         "level": 0,
         "links": [
           {
@@ -369,6 +369,10 @@
           {
             "title": "Terrain",
             "destination": "Terrain"
+          },
+          {
+            "title": "Procedural Noise",
+            "destination": "ProceduralNoise"
           },
           {
             "title": "visionOS Windowed Mode",
@@ -5070,6 +5074,121 @@
         "text": "Run with `ADAENGINE_STALL_PROBE=1` to print slow operations, including `App.Update.*` and `Schedule.*`\nspans for each world. With pipelining on, the scene's update on the main thread shrinks to its simulation\nand extraction while its render world appears as a separate span. The Sponza technical example also\nprints per-second frame statistics with `ADAENGINE_SPONZA_FRAME_LOG=1`.",
         "level": 0,
         "links": []
+      }
+    ]
+  },
+  {
+    "id": "ProceduralNoise",
+    "title": "Procedural Noise",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/ProceduralNoise.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Use a noise generator as a deterministic scalar field for terrain heights,\nprocedural placement, or volume density. Import `Math` directly, or use its\nre-export from `AdaEngine`. No GPU or editor state is needed.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Sample seeded Perlin noise",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`PerlinNoise2D` and `PerlinNoise3D` return values within `-1...1` for finite\ncoordinates and frequency. Fixed seeds and coordinates produce repeatable samples;\nsampling does not advance a random generator. These are hashed-gradient Perlin\nvariants with quintic interpolation, not bit-compatible implementations of the\ncanonical permutation-table algorithm. 2D noise is its own field, not a 3D slice.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import Math\n\nlet perlin = PerlinNoise2D(seed: 1234)\nlet heightVariation = perlin.sample(at: Vector2(12.5, 8.25))\nlet volume = PerlinNoise3D(seed: 1234)\nlet density = volume.sample(at: Vector3(12.5, 8.25, -2))",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Layer terrain detail with FBM",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`FractalNoise` combines samples at increasing frequencies and decreasing\namplitudes. This example computes a height; it does not modify a terrain entity.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "let terrain = FractalNoise(\n    source: PerlinNoise2D(seed: 1234),\n    octaves: 5,\n    frequency: 0.02,\n    lacunarity: 2,\n    persistence: 0.5\n)\nlet worldX: Float = 32\nlet worldZ: Float = -16\nlet height = terrain.sample(at: Vector2(worldX, worldZ)) * 20",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `octaves`: number of layers, clamped to `1...32`.\n• `frequency`: base coordinate scale. Nonfinite/non-positive settings become `1`.\n• `lacunarity`: frequency multiplier between octaves. Nonfinite/non-positive settings become `2`.\n• `persistence`: amplitude multiplier between octaves, clamped to `0...1`.\n  Nonfinite settings become `0.5`. Zero uses only the first octave.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Output is divided by the sum of active octave amplitudes. Sources bounded to\n`-1...1` stay within that range; custom source ranges are not clipped.\nThe optional `sample(at:frequency:)` argument multiplies the base frequency,\nincluding when fractal fields are nested. Zero or negative call frequencies are\nvalid coordinate transforms; the initializer's positive settings have the\nnormalization rules above.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Implement a custom generator",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Noise` has an associated `Point` type inferred from the sampling method. A 2D\nimplementation cannot accidentally be called with a 3D point. A custom field only\nneeds to be `Sendable` and implement one method:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "struct RidgeNoise: Noise {\n    func sample(at point: Vector2, frequency: Double) -> Double {\n        let x = Double(point.x) * frequency\n        return 1 - abs(Math.sin(x))\n    }\n}\n\nlet ridges = FractalNoise(source: RidgeNoise(), frequency: 0.1)\nlet ridgeHeight = ridges.sample(at: Vector2(10, 20))",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use the same type for a custom terrain field that composes several generators.\nAn immutable struct is usually sufficient; no base class or shared mutable seed\nis necessary. `Noise.sample(at:)` also works in generic code, using unit frequency.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Limits and invalid input",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Vector2/Vector3 store Float coordinates. Double interpolation cannot recover\nprecision already lost in a large world position; use local coordinates before\nconversion for fine detail far from the origin. No serialization, shader noise,\nterrain wiring, or cross-library sample compatibility is provided here.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Perlin sampling returns NaN for nonfinite inputs or coordinate-scaling overflow.\nFBM returns NaN for nonfinite call frequency or active-octave frequency overflow,\nand propagates invalid samples from its source. Custom sources define their own\ncoordinate validation. Check `isFinite` before storing a computed terrain height;\ninvalid sample input is not silently converted to a valid height.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "See Terrain for the separate terrain creation and editing API.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Terrain",
+            "destination": "Terrain"
+          }
+        ]
       }
     ]
   },
