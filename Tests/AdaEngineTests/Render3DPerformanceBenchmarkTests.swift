@@ -179,6 +179,9 @@ extension Render3DGPUTests {
                     bare(&$0)
                     $0.fog = Fog3D(isEnabled: true, density: 0.02, volumetric: VolumetricFog3D(isEnabled: true, steps: 48, maxDistance: 40))
                 },
+                Configuration(name: "+ atmosphere low", detail: "bare + physical sky, low tier") { bare(&$0); $0.atmosphere = Atmosphere3D(isEnabled: true, quality: .low) },
+                Configuration(name: "+ atmosphere medium", detail: "bare + physical sky, medium tier") { bare(&$0); $0.atmosphere = Atmosphere3D(isEnabled: true, quality: .medium) },
+                Configuration(name: "+ atmosphere high", detail: "bare + physical sky, high tier") { bare(&$0); $0.atmosphere = Atmosphere3D(isEnabled: true, quality: .high) },
                 Configuration(name: "+ grading", detail: "bare + vignette, saturation, contrast") {
                     bare(&$0)
                     $0.postProcess.vignette.intensity = 0.4

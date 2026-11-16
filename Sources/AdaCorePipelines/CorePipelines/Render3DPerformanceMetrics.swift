@@ -20,6 +20,7 @@ public final class Render3DPerformanceMetrics: Resource, Sendable {
         var maximum: Double = 0
     }
     private let state = Mutex<[String: Accumulator]>([:])
+    private let memory = Mutex<[String: Int]>([:])
     private let warmupSamples: Int
     /// Profiling-only serialization isolates pass durations from dependent GPU work.
     public let synchronizesPasses: Bool
@@ -37,6 +38,16 @@ public final class Render3DPerformanceMetrics: Resource, Sendable {
         await withCheckedContinuation { continuation in
             command.addCompletedHandler { continuation.resume() }
             command.commit()
+        }
+    }
+
+    /// Latest GPU memory held per resource, in bytes. Resources that hold nothing are absent.
+    public var memoryBytes: [String: Int] { memory.withLock { $0 } }
+
+    /// Records how many bytes `resource` currently holds, replacing the previous figure. Zero removes the entry.
+    public func record(memory resource: String, bytes: Int) {
+        memory.withLock { values in
+            if bytes > 0 { values[resource] = bytes } else { values.removeValue(forKey: resource) }
         }
     }
 
@@ -68,8 +79,17 @@ public final class Render3DPerformanceMetrics: Resource, Sendable {
     /// logs and developer overlays; returns a single line while nothing has been measured yet.
     public func report() -> String {
         let measured = samples.sorted { $0.averageMilliseconds > $1.averageMilliseconds }
-        guard !measured.isEmpty else {
+        let held = memoryBytes.sorted { $0.key < $1.key }
+        guard !measured.isEmpty || !held.isEmpty else {
             return "No GPU pass timings recorded yet."
+        }
+        func kibibytes(_ bytes: Int) -> String {
+            let tenths = Int((Double(bytes) / 1024 * 10).rounded())
+            return "\(tenths / 10).\(tenths % 10) KiB"
+        }
+        let memoryLines = held.map { "memory " + $0.key + " " + kibibytes($0.value) }
+        guard !measured.isEmpty else {
+            return memoryLines.joined(separator: "\n")
         }
         func milliseconds(_ value: Double) -> String {
             let thousandths = Int((value * 1000).rounded())
@@ -92,7 +112,7 @@ public final class Render3DPerformanceMetrics: Resource, Sendable {
             )
         }
         lines.append(column("total", nameWidth, alignRight: false) + column(milliseconds(totalAverageMilliseconds), 9))
-        return lines.joined(separator: "\n")
+        return (lines + memoryLines).joined(separator: "\n")
     }
 
     public var samples: [Sample] {

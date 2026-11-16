@@ -1,7 +1,7 @@
 import package::fullscreen::{FullscreenVertex, fullscreenVertex};
 import package::environment_composite::{
     sceneColor, normalRoughness, viewPositionMetallic, linearSampler, gBufferSampler, environment,
-    srgbToLinear, presentColor, applyFog,
+    srgbToLinear, presentColor, applyFog, atmosphereActive, atmosphereSky, applyAerialPerspective,
 };
 
 @group(0) @binding(5) var environmentImage: texture_2d<f32>;
@@ -63,13 +63,8 @@ fn rotateSky(direction: vec3f, angle: f32) -> vec3f {
     return vec3f(rotated.x, direction.y, rotated.y);
 }
 
-fn proceduralSky(direction: vec3f) -> vec3f {
-    let height = clamp(direction.y, -1.0, 1.0);
-    let hemisphere = select(environment.groundColor.rgb, environment.zenithColor.rgb, height >= 0.0);
-    let sky = mix(environment.horizonColor.rgb, hemisphere, pow(abs(height), 0.55));
-    if environment.environmentFlags.w < 0.5 {
-        return sky;
-    }
+// Procedural stars as radiance, without the sky behind them.
+fn starLayer(direction: vec3f) -> vec3f {
     let gridPosition = skyUV(direction) * vec2f(220.0, 110.0);
     var hashInput = fract(vec3f(floor(gridPosition), environment.starfield.w) * vec3f(0.1031, 0.1030, 0.0973));
     hashInput += dot(hashInput, hashInput.yzx + 33.33);
@@ -81,12 +76,28 @@ fn proceduralSky(direction: vec3f) -> vec3f {
     let star = (1.0 - smoothstep(0.0, 0.11, distanceToStar)) * starExists;
     let glow = (1.0 - smoothstep(0.0, 0.42, distanceToStar)) * starExists * 0.22;
     let starColor = mix(vec3f(1.0, 0.72, 0.46), vec3f(0.58, 0.76, 1.0), fract(existence * 47.0));
-    return sky + starColor * (star + glow) * environment.starfield.y;
+    return starColor * (star + glow) * environment.starfield.y;
+}
+
+fn proceduralSky(direction: vec3f) -> vec3f {
+    let height = clamp(direction.y, -1.0, 1.0);
+    let hemisphere = select(environment.groundColor.rgb, environment.zenithColor.rgb, height >= 0.0);
+    let sky = mix(environment.horizonColor.rgb, hemisphere, pow(abs(height), 0.55));
+    if environment.environmentFlags.w < 0.5 {
+        return sky;
+    }
+    return sky + starLayer(direction);
 }
 
 // Preserve implicit LOD for authored sky textures, including calls from the reflective surface branch.
 @diagnostic(off, derivative_uniformity)
-fn sampleSky(viewDirection: vec3f) -> vec3f {
+fn sampleSky(viewDirection: vec3f, showsSun: bool) -> vec3f {
+    // An enabled atmosphere owns the sky, whatever the skybox settings say.
+    if atmosphereActive() {
+        let atmosphereDirection = normalize((environment.inverseView * vec4f(viewDirection, 0.0)).xyz);
+        let stars = select(vec3f(0.0), starLayer(atmosphereDirection), environment.environmentFlags.w > 0.5);
+        return atmosphereSky(atmosphereDirection, stars, showsSun);
+    }
     if environment.environmentFlags.x < 0.5 {
         return srgbToLinear(environment.clearColor.rgb);
     }
@@ -98,6 +109,32 @@ fn sampleSky(viewDirection: vec3f) -> vec3f {
         return srgbToLinear(textureSample(environmentImage, linearSampler, skyUV(direction)).rgb) * environment.environmentFlags.z;
     }
     return srgbToLinear(proceduralSky(direction)) * environment.environmentFlags.z;
+}
+
+// Sky seen in a reflection. The sky-view table has no mip levels, so a rough surface averages sixteen taps on a spiral
+// whose cone widens with roughness. The spiral is rotated per pixel so the blur reads as fine grain, which the display
+// dither hides, rather than as contour rings. Without an atmosphere this is the plain sky sample.
+fn sampleSkyReflection(viewDirection: vec3f, roughness: f32, pixel: vec2f) -> vec3f {
+    if !atmosphereActive() {
+        return sampleSky(viewDirection, false);
+    }
+    let center = normalize((environment.inverseView * vec4f(viewDirection, 0.0)).xyz);
+    let spread = roughness * roughness * 2.0;
+    if spread < 0.02 {
+        return atmosphereSky(center, vec3f(0.0), false);
+    }
+    let helper = select(vec3f(0.0, 1.0, 0.0), vec3f(1.0, 0.0, 0.0), abs(center.y) > 0.99);
+    let tangent = normalize(cross(helper, center));
+    let bitangent = cross(center, tangent);
+    let rotation = fract(52.9829189 * fract(dot(pixel, vec2f(0.06711056, 0.00583715)))) * 6.2831853;
+    var sum = vec3f(0.0);
+    for (var index = 0; index < 16; index++) {
+        let radius = sqrt((f32(index) + 0.5) / 16.0) * spread;
+        let angle = f32(index) * 2.3999632 + rotation;
+        let offset = tangent * (cos(angle) * radius) + bitangent * (sin(angle) * radius);
+        sum += atmosphereSky(normalize(center + offset), vec3f(0.0), false);
+    }
+    return sum / 16.0;
 }
 
 fn edgeVisibility(uv: vec2f) -> f32 {
@@ -239,7 +276,11 @@ fn probeReflection(viewPosition: vec3f, viewDirection: vec3f, roughness: f32) ->
 }
 
 fn composite(color: vec3f, position: vec3f, skyAmount: f32, isSky: bool, input: FullscreenVertex) -> vec4f {
-    let fogged = applyFog(color, position, skyAmount, isSky, input.uv);
+    var shaded = color;
+    if atmosphereActive() && !isSky {
+        shaded = applyAerialPerspective(color, position, input.uv);
+    }
+    let fogged = applyFog(shaded, position, skyAmount, isSky, input.uv);
     return vec4f(presentColor(fogged, input.uv, input.position.xy), 1.0);
 }
 
@@ -255,7 +296,7 @@ fn ssr_fragment(input: FullscreenVertex) -> @location(0) vec4f {
         let viewFar = environment.inverseProjection * vec4f(ndc, 1.0, 1.0);
         let viewRay = normalize(viewFar.xyz / viewFar.w);
         // The HDR scene holds premultiplied transparent geometry and particles at sky pixels.
-        let skyWithForeground = foreground.rgb + sampleSky(viewRay) * (1.0 - clamp(foreground.a, 0.0, 1.0));
+        let skyWithForeground = foreground.rgb + sampleSky(viewRay, true) * (1.0 - clamp(foreground.a, 0.0, 1.0));
         return composite(skyWithForeground, viewRay * 1000.0, environment.fogRange.x, true, input);
     }
 
@@ -286,7 +327,7 @@ fn ssr_fragment(input: FullscreenVertex) -> @location(0) vec4f {
     if environment.diffuseGI.z > 0.5 {
         return composite(baseColor, position, 1.0, false, input);
     }
-    let sky = sampleSky(reflectionDirection);
+    let sky = sampleSkyReflection(reflectionDirection, roughness, input.position.xy);
     let fresnel = pow(1.0 - clamp(dot(-viewDirection, normal), 0.0, 1.0), 5.0);
     var reflectivity = mix(0.04, 1.0, metallic) * mix(1.0, fresnel, 0.35);
     reflectivity *= (1.0 - roughness * 0.7) * environment.reflectionQuality.y;
@@ -299,7 +340,7 @@ fn ssr_fragment(input: FullscreenVertex) -> @location(0) vec4f {
             visibility = edgeVisibility(hit.uv);
         }
     }
-    let ambient = sampleSky(normal) * (0.035 + 0.035 * (1.0 - roughness));
+    let ambient = sampleSky(normal, false) * (0.035 + 0.035 * (1.0 - roughness));
     let reflectionResult = mix(sky, reflectedColor, visibility);
     return composite(baseColor + (ambient + reflectionResult * reflectivity) * ao, position, 1.0, false, input);
 }

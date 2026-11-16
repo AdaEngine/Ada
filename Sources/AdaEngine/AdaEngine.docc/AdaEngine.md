@@ -40,6 +40,7 @@ For more details and guides, check out the tutorials below.
 - <doc:ImageDecoders>
 - <doc:AnimationAuthoring>
 - <doc:AnimationIK>
+- <doc:Atmosphere>
 - <doc:GameDiagnosticsOverlay>
 - <doc:MovieMaker>
 - <doc:PipelinedRendering>

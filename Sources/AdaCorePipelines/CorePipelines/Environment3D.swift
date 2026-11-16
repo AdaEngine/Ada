@@ -138,6 +138,8 @@ public struct Environment3D: Codable, Sendable {
     public var postProcess: PostProcess3D = PostProcess3D()
     /// Distance and height fog applied in linear HDR before tone mapping.
     public var fog: Fog3D = Fog3D()
+    /// Physically based sky driven by the primary directional light. Off by default.
+    public var atmosphere: Atmosphere3D = Atmosphere3D()
     /// Evaluate only the local lights that reach each screen tile. Disabling it falls back to the flat per-pixel loop.
     public var tiledLocalLights: Bool = true
 
@@ -333,6 +335,14 @@ public struct Environment3D: Codable, Sendable {
         get { postProcess.bloom.threshold }
         set { postProcess.bloom.threshold = newValue }
     }
+    public var atmosphereEnabled: Bool {
+        get { atmosphere.isEnabled }
+        set { atmosphere.isEnabled = newValue }
+    }
+    public var atmosphereIntensity: Float {
+        get { atmosphere.intensity }
+        set { atmosphere.intensity = newValue }
+    }
     public var fogEnabled: Bool {
         get { fog.isEnabled }
         set { fog.isEnabled = newValue }
@@ -385,7 +395,7 @@ public struct Environment3D: Codable, Sendable {
 
     private enum CodingKeys: CodingKey {
         case skybox, skyboxUsesImageBasedLighting, screenSpaceReflection, imageBasedLighting, shadows,
-             ambientOcclusion, antiAliasing, meshVisibility, localShadows, debugView, postProcess, fog, tiledLocalLights, localEnvironmentProbe, screenSpaceGI, pathTracing, contactShadows, irradianceProbes, distanceField
+             ambientOcclusion, antiAliasing, meshVisibility, localShadows, debugView, postProcess, fog, tiledLocalLights, localEnvironmentProbe, screenSpaceGI, pathTracing, contactShadows, irradianceProbes, distanceField, atmosphere
     }
 
     public init(from decoder: Decoder) throws {
@@ -408,6 +418,7 @@ public struct Environment3D: Codable, Sendable {
         debugView = try container.decodeIfPresent(DebugView3D.self, forKey: .debugView) ?? DebugView3D.none
         postProcess = try container.decodeIfPresent(PostProcess3D.self, forKey: .postProcess) ?? PostProcess3D()
         fog = try container.decodeIfPresent(Fog3D.self, forKey: .fog) ?? Fog3D()
+        atmosphere = try container.decodeIfPresent(Atmosphere3D.self, forKey: .atmosphere) ?? Atmosphere3D()
         tiledLocalLights = try container.decodeIfPresent(Bool.self, forKey: .tiledLocalLights) ?? true
     }
 }

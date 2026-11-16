@@ -37,6 +37,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
     @Res<ExtractedDebugLines3D> private var overlays
     @Res<Bloom3DViews> private var bloomViews
     @Res<VolumetricFog3DViews> private var volumetricViews
+    @Res<Atmosphere3DViews> private var atmosphereViews
     @Res<AutoExposure3DViews> private var autoExposureViews
     @Res<ColorCorrection3DViews> private var colorCorrection
 
@@ -49,6 +50,7 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
         _overlays.update(from: world)
         _bloomViews.update(from: world)
         _volumetricViews.update(from: world)
+        _atmosphereViews.update(from: world)
         _autoExposureViews.update(from: world)
         _colorCorrection.update(from: world)
         query.update(from: world)
@@ -163,6 +165,13 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                 probeMinimum: Vector4(probe?.minimum ?? .zero, 0),
                 probeMaximum: Vector4(probe?.maximum ?? .zero, 0)
             )
+            let atmosphereTables = environment.atmosphere.changesImage ? atmosphereViews.tables(view: source.entityId) : nil
+            if atmosphereTables != nil {
+                let settings = environment.atmosphere.sanitized
+                uniform.applyAtmosphere(
+                    settings, sun: Atmosphere3DSun(light: sun, settings: settings), cameraAltitude: viewUniform.viewMatrix.inverse.origin.y
+                )
+            }
             let giTexture = environment.screenSpaceGI.isEnabled
                 ? context.world.getResource(ScreenSpaceGI3DViews.self)?.textures[source.entityId]?.filtered : nil
             uniform.diffuseGI = Vector4(giTexture == nil ? 0 : 1, environment.screenSpaceGI.sanitized.bias, 0, 0)
@@ -223,6 +232,10 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                         .init(binding: 6, shaderStages: .fragment, resource: .texture(environment.imageBasedLighting?.asset.asset?.radiance ?? Texture2D.whiteTexture)),
                         .init(binding: 7, shaderStages: .fragment, resource: .sampler((environment.imageBasedLighting?.asset.asset?.radiance ?? Texture2D.whiteTexture).sampler)),
                         .init(binding: 5, shaderStages: .fragment, resource: .texture(environmentTexture)),
+                        .init(binding: 21, shaderStages: .fragment, resource: .texture(atmosphereTables?.skyView ?? Texture2D.whiteTexture)),
+                        .init(binding: 22, shaderStages: .fragment, resource: .texture(atmosphereTables?.aerial ?? Texture2D.whiteTexture)),
+                        .init(binding: 23, shaderStages: .fragment, resource: .texture(atmosphereTables?.transmittance ?? Texture2D.whiteTexture)),
+                        .init(binding: 24, shaderStages: .fragment, resource: .texture(atmosphereTables?.aerialTransmittance ?? Texture2D.whiteTexture)),
                     ]
                 ),
                 index: 0

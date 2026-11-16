@@ -184,13 +184,20 @@ public struct Main3DRenderNode: RenderNode {
             } else if !pathTracingOverlaysOnly {
                 gpuVisibility.clearOutput(for: source.entityId)
             }
-            let directionalLight =
+            var directionalLight =
                 lighting.directionalLight
                 ?? ExtractedDirectionalLight3D(
                     directionToLight: Vector3(0.35, 0.7, 0.45).normalized,
                     radiance: .one,
                     intensity: lighting.hasAuthoredLights ? 0 : 3.2
                 )
+            if let atmosphere = environments.environments[source.entityId]?.atmosphere, atmosphere.changesImage, atmosphere.tintsSunLight,
+                lighting.directionalLight != nil, environments.environments[source.entityId]?.debugView.replacesFinalImage != true {
+                // The air between the camera and the sun dims and reddens the light; opt-in so existing light setups keep their look.
+                directionalLight.radiance *= Atmosphere3DMath.sunTransmittance(
+                    atmosphere: atmosphere.sanitized, altitude: uniform.viewMatrix.inverse.origin.y, sunDirection: directionalLight.directionToLight
+                )
+            }
             let viewDirectionToLight = (uniform.viewMatrix * Vector4(directionalLight.directionToLight, 0)).xyz.normalized
             let shadowsEnabled = shadow.isEnabled && directionalLight.castsShadows && shadow.colorTexture != nil
             let lightConstants = lightingScratch.cache.write(
