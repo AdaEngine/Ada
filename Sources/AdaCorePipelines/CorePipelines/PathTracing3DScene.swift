@@ -32,7 +32,18 @@ struct PathTracing3DScene: Sendable {
     var nodeCount = 0
     var triangleCount = 0
     var digest: UInt64?
+    /// Counts every change of the prepared scene, including moving objects.
     var generation: UInt64 = 0
+    /// Counts changes of the scene's content (meshes, instances, materials, textures, flags) but not of where things are.
+    /// Denoisers keep their history across moving objects and restart it only when this changes.
+    private(set) var structureGeneration: UInt64 = 0
+    private var structureDigest: UInt64?
+    /// One entry per placed part in table order, and the parts' geometry, for hardware ray queries (see `hardwareOrder`).
+    private(set) var placements: [PathTracing3DPlacement] = []
+    private(set) var parts: [PathTracing3DPartKey: Mesh.Part] = [:]
+    /// True when the triangle table keeps one entry for every index-buffer triangle (degenerate ones as empty entries), so a
+    /// hardware hit's primitive index addresses the table directly. The BVH is not built in this mode.
+    private(set) var hardwareOrder = false
     private(set) var preparedVertexCount = 0
     private(set) var preparedPartVisitCount = 0
     private var images: [ObjectIdentifier: Image] = [:]
@@ -60,7 +71,10 @@ struct PathTracing3DScene: Sendable {
         return parts
     }
 
-    mutating func prepare(_ sources: [Mesh3DRenderSource], skinning: Skinning3DUniforms?, device: RenderDevice, textureTileSize: Int = 128) async throws {
+    mutating func prepare(
+        _ sources: [Mesh3DRenderSource], skinning: Skinning3DUniforms?, device: RenderDevice, textureTileSize: Int = 128,
+        hardwareOrder wantsHardwareOrder: Bool = false
+    ) async throws {
         let preparedSources = sources.compactMap { source -> PreparedSource? in
             guard source.instances?.isEmpty != true else {
                 return nil
@@ -73,8 +87,11 @@ struct PathTracing3DScene: Sendable {
         preparedPartVisitCount = 0
         try Self.validateWorkBudget(preparedSources)
         var hash = FrameDigest3D()
+        // Transforms and skinning poses: where things are, as opposed to what they are.
+        var motion = FrameDigest3D()
         let requestedTileSize = textureTileSize >= 512 ? 512 : (textureTileSize >= 256 ? 256 : 128)
         hash.combine(UInt64(requestedTileSize))
+        hash.combine(wantsHardwareOrder ? UInt64(1) : 0)
         var materialList: [PBRMaterial] = []
         var materialIDs: [RID: Int] = [:]
         var textures: [Texture2D] = []
@@ -86,15 +103,15 @@ struct PathTracing3DScene: Sendable {
             if source.skinningBuffer != nil && (skinning?.matrices(for: source.entity).isEmpty ?? true) {
                 throw PathTracing3DError.unsupported("The current skinning palette is unavailable for path tracing")
             }
-            hash.combine(UInt64(source.entity)); hash.combine(source.transform)
+            hash.combine(UInt64(source.entity)); motion.combine(source.transform)
             hash.combine(UInt64(source.instances?.count ?? 1))
             hash.combine(source.instances == nil ? UInt64(0) : 1)
             for instance in source.instances ?? [] {
-                hash.combine(instance.id); hash.combine(instance.transform); hash.combine(instance.color)
+                hash.combine(instance.id); motion.combine(instance.transform); hash.combine(instance.color)
             }
             hash.combine(source.castShadows ? UInt64(1) : 0); hash.combine(source.receiveShadows ? UInt64(1) : 0)
             if source.skinningBuffer != nil {
-                for matrix in skinning?.matrices(for: source.entity) ?? [] { hash.combine(matrix) }
+                for matrix in skinning?.matrices(for: source.entity) ?? [] { motion.combine(matrix) }
             }
             for model in source.mesh.models {
                 for part in model.parts {
@@ -133,7 +150,9 @@ struct PathTracing3DScene: Sendable {
                 }
             }
         }
-        if digest == hash.value {
+        var full = hash
+        full.combine(motion.value)
+        if digest == full.value {
             return
         }
         guard textures.count <= Self.maximumTextures else { throw PathTracing3DError.unsupported("Path tracing texture budget exceeded (256)") }
@@ -180,6 +199,10 @@ struct PathTracing3DScene: Sendable {
         }
         var tintMaterials: [TintKey: Int] = [:]
         var geometry: [PathTracing3DBVH.Triangle] = []
+        var placed: [PathTracing3DPlacement] = []
+        var placedParts: [PathTracing3DPartKey: Mesh.Part] = [:]
+        // A table entry that no ray can hit, standing in for a triangle the BVH variant would skip.
+        let emptyTriangle = PathTracing3DBVH.Triangle(vertices: Array(repeating: .zero, count: 12))
         for prepared in preparedSources {
             let source = prepared.source
             let palette = source.skinningBuffer == nil ? [] : skinning?.matrices(for: source.entity) ?? []
@@ -208,6 +231,16 @@ struct PathTracing3DScene: Sendable {
                         }
                     }
                     let descriptor = part.meshDescriptor
+                    if wantsHardwareOrder {
+                        let key = PathTracing3DPartKey(
+                            vertexBuffer: ObjectIdentifier(part.vertexBuffer), indexBuffer: ObjectIdentifier(part.indexBuffer),
+                            indexCount: min(part.indexCount, descriptor.indicies.count)
+                        )
+                        placed.append(PathTracing3DPlacement(
+                            key: key, transform: transform, castsShadows: source.castShadows, triangleCount: key.indexCount / 3
+                        ))
+                        placedParts[key] = part
+                    }
                     let sourcePositions = descriptor.positions.elements, sourceNormals = descriptor.normals?.elements ?? []
                     let joints = descriptor[MeshDescriptor.jointIndices]?.elements, weights = descriptor[MeshDescriptor.jointWeights]?.elements
                     let uv0 = descriptor.textureCoordinates?.elements ?? [], uv1 = descriptor[MeshDescriptor.textureCoordinates1]?.elements ?? []
@@ -236,12 +269,18 @@ struct PathTracing3DScene: Sendable {
                     }
                     for offset in stride(from: 0, to: min(part.indexCount, descriptor.indicies.count) - 2, by: 3) {
                         let ids = (0..<3).map { Int(descriptor.indicies[offset + $0]) }
-                        guard ids.allSatisfy({ sourcePositions.indices.contains($0) }) else { continue }
+                        guard ids.allSatisfy({ sourcePositions.indices.contains($0) }) else {
+                            if wantsHardwareOrder { geometry.append(emptyTriangle) }
+                            continue
+                        }
                         let first = vertex(ids[0]), second = vertex(ids[1]), third = vertex(ids[2])
                         let a = first.position, b = second.position, c = third.position
                         guard LocalLighting3DMath.isFinite(a), LocalLighting3DMath.isFinite(b), LocalLighting3DMath.isFinite(c),
                             (b - a).cross(c - a).squaredLength > 1e-16
-                        else { continue }
+                        else {
+                            if wantsHardwareOrder { geometry.append(emptyTriangle) }
+                            continue
+                        }
                         let flags = Float((source.castShadows ? 1 : 0) + (source.receiveShadows ? 2 : 0))
                         var vertices = [Vector4(a, Float(material)), Vector4(b, flags), Vector4(c, 0)]
                         vertices += [Vector4(first.normal, 0), Vector4(second.normal, 0), Vector4(third.normal, 0)]
@@ -257,14 +296,25 @@ struct PathTracing3DScene: Sendable {
                 }
             }
         }
-        // Periodic rebuilding keeps the refitted hierarchy useful after large scene rearrangements.
-        if generation % 120 == 0 { hierarchy = PathTracing3DBVH(geometry) } else { hierarchy.refit(geometry) }
-        let bvh = hierarchy
-        nodes = Self.dataTexture(bvh.packedNodes, label: "Path tracing BVH")
-        triangles = Self.dataTexture(bvh.triangles.flatMap(\.vertices), label: "Path tracing triangles")
+        hardwareOrder = wantsHardwareOrder
+        placements = placed; parts = placedParts
+        if wantsHardwareOrder {
+            // Ray queries replace the BVH: keep the table in index order and give the shader an unused one-texel node table.
+            nodes = Self.dataTexture([.zero], label: "Path tracing BVH (unused)")
+            triangles = Self.dataTexture(geometry.flatMap(\.vertices), label: "Path tracing triangles")
+            nodeCount = 0
+        } else {
+            // Periodic rebuilding keeps the refitted hierarchy useful after large scene rearrangements.
+            if generation % 120 == 0 { hierarchy = PathTracing3DBVH(geometry) } else { hierarchy.refit(geometry) }
+            let bvh = hierarchy
+            nodes = Self.dataTexture(bvh.packedNodes, label: "Path tracing BVH")
+            triangles = Self.dataTexture(bvh.triangles.flatMap(\.vertices), label: "Path tracing triangles")
+            nodeCount = bvh.nodes.count
+        }
         materials = Self.dataTexture(materialData, label: "Path tracing materials")
-        nodeCount = bvh.nodes.count; triangleCount = geometry.count
-        digest = hash.value; generation &+= 1
+        triangleCount = geometry.count
+        digest = full.value; generation &+= 1
+        if structureDigest != hash.value { structureDigest = hash.value; structureGeneration &+= 1 }
     }
 
     // Count eligible input work, including degenerate triangles, before allocating expanded geometry.

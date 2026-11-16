@@ -1,9 +1,10 @@
 # Portable world-space path tracing
 
-This experimental mode traces actual scene triangles in a fragment shader BVH on
-the existing Metal/WebGPU renderer. It does not use RTX/DXR/Metal hardware ray
-intersection units. It is a correctness and integration starting point, not a
-claim of Doom or Indiana Jones performance or image quality.
+This experimental mode traces actual scene triangles on the SAGA renderer (Vulkan, Metal or WebGPU).
+Intersections run in a fragment shader BVH on every backend. On Vulkan devices that support ray queries they run
+on the GPU's ray-tracing hardware instead, with the BVH as the fallback; see the DocC article
+`HardwarePathTracing` and the `PathTracing3D.intersection` setting. It is a correctness and integration starting
+point, not a claim of Doom or Indiana Jones performance or image quality.
 
 ```swift
 // Prefer the dedicated presentation shader in a tracing-only application.
@@ -81,8 +82,9 @@ then:
 5. filters with four à-trous iterations guided by normal, depth and local luminance variance;
 6. multiplies the base colour back and adds emission.
 
-Camera and light motion keep history; adding, removing, switching or retuning a light, scene, material or setting
-changes restart it. On an RTX 4070 at 1260×523 the chain costs about 1.1 ms of GPU time.
+Camera, light and object motion keep history (moving objects use a higher history weight so the new lighting follows
+quickly, and the reprojection guides reject history that no longer matches); adding or removing a mesh, or changing a
+light, material or setting, restarts it. Plain accumulation (`.off`) restarts on any change, including motion. On an RTX 4070 at 1260×523 the chain costs about 1.1 ms of GPU time.
 
 **Ray Reconstruction.** The tracer writes one fresh sample per frame and diffuse albedo, specular albedo and world
 normals with roughness as guides. DLSS Ray Reconstruction then denoises and upscales in one step, replacing Super
@@ -98,7 +100,8 @@ geometry refits the CPU hierarchy; count changes and periodic rebuilds refresh i
 four-tap reconstruction brings a reduced `resolutionScale` back to output resolution.
 
 `Render3DPathTracingStatistics.snapshots` reports actual encoded frames, resets,
-accumulation, triangles, lights, traced dimensions, implementation name and a
+accumulation, triangles, lights, traced dimensions, the implementation (`vulkan-ray-query` or
+`portable-shader-bvh`), why hardware ray queries were not used (`intersectionFallback`) and a
 failure reason. Unsupported scenes report a reason and retain raster surface
 lighting. The dedicated presentation shader does not restore SSR or procedural
 sky on that fallback.
@@ -108,8 +111,9 @@ Current limits:
 - 1–8 samples/pixel and surface interactions; the default three interactions
   allow two indirect surface bounces. Radiance and ray distance are bounded.
 - 131072 triangles, 256 texture tiles. There is no silent geometry truncation.
-- Moving geometry currently prepares CPU triangles, refits the BVH and uploads it; there is no
-  BLAS/TLAS instancing, GPU skinning/refit or hardware RT acceleration.
+- Moving geometry currently prepares CPU triangles and uploads them. The shader BVH refits; the hardware path
+  instead rebuilds a top-level acceleration structure over per-part bottom-level structures. There is no GPU
+  skinning or refit: skinned meshes make a view use the shader BVH.
 - Mesh morph targets and shadow-casting custom shader graphs reject the tracing view explicitly.
   Clearcoat, sheen, anisotropy, parallax, vertex color and emissive thresholds
   are not reproduced by the base metallic/roughness tracing material.

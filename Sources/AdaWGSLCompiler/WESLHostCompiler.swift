@@ -5,6 +5,14 @@ import SAGAValidation
 
 /// Links local WESL source files in-process and validates the generated WGSL.
 public enum WESLHostCompiler {
+    /// Host-side validation accepts ray queries (`enable wgpu_ray_query`) so shaders that use them can be linked; whether a
+    /// device supports them is decided when the stage is compiled for that device.
+    static let validationCapabilities: ShaderCapabilities = {
+        var capabilities = ShaderCapabilities.referenceDefault
+        capabilities.insert(.rayQuery)
+        return capabilities
+    }()
+
     public struct Artifact: Codable, Sendable {
         public let wgsl: String
         public let sources: [String]
@@ -29,7 +37,7 @@ public enum WESLHostCompiler {
         roots["package"] = packageRoot.resolvingSymlinksInPath().standardizedFileURL
         var linker = WESLLinker(roots: roots, features: features)
         let linked = try linker.link(module)
-        let validated = try IndependentShaderCompiler().parseAndValidate(.wgsl(linked.wgsl))
+        let validated = try IndependentShaderCompiler().parseAndValidate(.wgsl(linked.wgsl), capabilities: validationCapabilities)
         let entries = validated.module.entryPoints.map { EntryPoint(name: $0.name, stage: $0.stage.rawValue) }
         return Artifact(wgsl: linked.wgsl, sources: linked.sources, entryPoints: entries)
     }
@@ -51,7 +59,7 @@ public enum WESLHostCompiler {
         var linker = WESLLinker(roots: roots, features: features)
         linker.sourceOverrides[module] = source
         let linked = try linker.link(module)
-        let validated = try IndependentShaderCompiler().parseAndValidate(.wgsl(linked.wgsl))
+        let validated = try IndependentShaderCompiler().parseAndValidate(.wgsl(linked.wgsl), capabilities: validationCapabilities)
         let entries = validated.module.entryPoints.map { EntryPoint(name: $0.name, stage: $0.stage.rawValue) }
         return Artifact(wgsl: linked.wgsl, sources: linked.sources, entryPoints: entries)
     }

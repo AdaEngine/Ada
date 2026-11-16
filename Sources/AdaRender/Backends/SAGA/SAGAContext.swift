@@ -34,6 +34,10 @@
         let visibilityPipelines = Mutex<SAGAVisibilityPipelines?>(nil)
         #endif
         let supportsPresentation: Bool
+        #if SAGA_NATIVE && os(Windows) && canImport(SAGAVulkan)
+        /// The DLSS runtime of this context's Vulkan device, set by the native backend.
+        let dlssSession = Mutex<SAGADLSSSession?>(nil)
+        #endif
         let queue: OrderedGPUWorkQueue<Device>
         /// Waits for each submission and logs device errors. Enabled by `globalThis.__adaSAGADebug = true`.
         /// `ADAENGINE_SAGA_DEBUG=1` turns on error and missing-binding reports for every context.

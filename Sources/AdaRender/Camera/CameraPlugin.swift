@@ -214,7 +214,11 @@ func ConfigurateRenderViewTarget(
             mode: camera.rasterizationRateMap != nil ? .disabled : camera.temporalUpscaling.map { .spatial(renderScale: $0.renderScale) } ?? (unsafe RenderEngine.configurations.upscaling),
             // The portable temporal method needs no vendor SDK, so it can lower the render size on every device.
             supportsSpatialUpscaling: renderDevice.renderDevice.supportsSpatialUpscaling
-                || (camera.temporalUpscaling.map { $0.method == .portable || renderDevice.renderDevice.supportsTemporalUpscaling } ?? false)
+                || (camera.temporalUpscaling.map { settings in
+                    let status = renderDevice.renderDevice.dlssStatus
+                    let method = settings.method.resolved(dlssAvailable: status.isAvailable, unavailableReason: status.unavailableReason).method
+                    return method == .portable || renderDevice.renderDevice.supportsTemporalUpscaling
+                } ?? false)
         )
         let viewportScale = Float(viewportSize.width) / Float(outputSize.width)
         camera.viewport.rect = pixelPerfect != nil

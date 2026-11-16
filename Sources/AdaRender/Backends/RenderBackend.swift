@@ -64,6 +64,15 @@ public protocol RenderDevice: AnyObject, Sendable {
     /// Whether the device supports temporal reconstruction of color, depth and motion.
     var supportsTemporalUpscaling: Bool { get }
 
+    /// Whether NVIDIA DLSS can run on this device, and why not when it cannot.
+    var dlssStatus: DLSSRuntimeStatus { get }
+
+    /// Whether shaders can trace rays against acceleration structures (ray queries) on this device.
+    var supportsRayQueries: Bool { get }
+
+    /// Creates an acceleration structure, or nil when the device cannot trace rays.
+    func createAccelerationStructure(_ kind: AccelerationStructureKind) -> (any AccelerationStructure)?
+
     /// Supports five HDR geometry targets (40 bytes per pixel), used for material-correct IBL/SSR blending.
     var supportsHybridReflections: Bool { get }
     /// A sixth color attachment for a linear diffuse surface response in the 3D pass.
@@ -170,6 +179,9 @@ extension RenderDevice {
     public var supportsMultiDrawIndirect: Bool { false }
     public var supportsSpatialUpscaling: Bool { false }
     public var supportsTemporalUpscaling: Bool { false }
+    public var dlssStatus: DLSSRuntimeStatus { .unavailable(reason: "DLSS is not supported by this renderer") }
+    public var supportsRayQueries: Bool { false }
+    public func createAccelerationStructure(_: AccelerationStructureKind) -> (any AccelerationStructure)? { nil }
     public var supportsHybridReflections: Bool { false }
     public var supportsLightingSurfaceBuffer: Bool { false }
     public func createTemporalUpscaler(inputSize _: SizeInt, outputSize _: SizeInt) -> (any TemporalUpscaler)? { nil }

@@ -11,6 +11,7 @@
     import SAGA
     import SAGACore
     import SAGATypes
+    import Synchronization
 
     @_spi(Internal)
     public final class SAGARenderDevice: RenderDevice, @unchecked Sendable {
@@ -22,7 +23,17 @@
         // The browser path starts without the optional GPU-driven features of the native backend.
         public var supportsInstancedVertexInputs: Bool { true }
         public var supportsSpatialUpscaling: Bool { false }
-        public var supportsTemporalUpscaling: Bool { false }
+        public var supportsTemporalUpscaling: Bool { dlssStatus.isAvailable }
+        #if SAGA_NATIVE
+            /// Probed once: discovery touches the file system and the result cannot change while the process runs.
+            public var dlssStatus: DLSSRuntimeStatus {
+                #if os(Windows)
+                    context.dlssSession.withLock { $0 }?.status ?? .unavailable(reason: "DLSS is not set up for this renderer")
+                #else
+                    .unavailable(reason: "DLSS needs the Vulkan renderer")
+                #endif
+            }
+        #endif
         /// The combined geometry pass writes five RGBA16Float targets and one RGBA8Unorm surface target.
         /// SAGA's attachment budget charges eight bytes per sample for each of those formats.
         private var supportsWideGeometryTargets: Bool {
@@ -108,6 +119,29 @@
         }
 
         #if SAGA_NATIVE || SAGA_METAL
+        /// Hardware ray queries are verified on the Vulkan backend only; Metal reports false until it has coverage.
+        public var supportsRayQueries: Bool {
+            #if SAGA_NATIVE
+                context.capabilities.features.contains(.rayQuery)
+            #else
+                false
+            #endif
+        }
+
+        public func createAccelerationStructure(_ kind: AccelerationStructureKind) -> (any AccelerationStructure)? {
+            guard supportsRayQueries else { return nil }
+            return SAGAAccelerationStructure(context: context, kind: kind)
+        }
+
+        public func createTemporalUpscaler(inputSize: SizeInt, outputSize: SizeInt) -> (any TemporalUpscaler)? {
+            #if SAGA_NATIVE && os(Windows) && canImport(SAGAVulkan)
+                guard let session = context.dlssSession.withLock({ $0 }) else { return nil }
+                return SAGADLSSUpscaler(session: session, context: context, inputSize: inputSize, outputSize: outputSize)
+            #else
+                return nil
+            #endif
+        }
+
         public func createGPUVisibilityProcessor() -> (any GPUVisibilityProcessor)? {
             do {
                 return try SAGAVisibilityProcessor(context: context)

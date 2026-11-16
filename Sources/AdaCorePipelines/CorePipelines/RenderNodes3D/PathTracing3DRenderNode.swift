@@ -15,7 +15,10 @@ public struct PathTracing3DStatus: Codable, Sendable {
     public var width = 0
     public var height = 0
     public var failure: String?
+    /// `"vulkan-ray-query"` or `"portable-shader-bvh"` (see ``PathTracingTraversalSelection``).
     public var implementation = "portable-shader-bvh"
+    /// Why GPU ray queries were not used, if they were not.
+    public var intersectionFallback: String?
     /// Whether the first hit came from the raster G-buffer (full model detail) rather than a traced primary ray.
     public var hybridFirstHit = false
     /// The denoiser that ran: `rayReconstruction`, `portable` or `off` (see ``PathTracingDenoiser``).
@@ -70,6 +73,8 @@ struct PathTracing3DViews: Resource {
         var guideTargets: [RenderTexture] = []
         var rayReconstructionGuides: RayReconstructionGuides?
         var digest: UInt64?
+        /// The scene generation of the previous frame, to tell moving objects from an unchanged scene.
+        var sceneGeneration: UInt64?
         var status = PathTracing3DStatus()
         var active = false
         /// Light table reused while the lights are unchanged. A changed table gets a new texture, because
@@ -82,9 +87,43 @@ struct PathTracing3DViews: Resource {
     var entries: [Entity.ID: Entry] = [:]
     var uniforms = FrameUniformCache3D<PathTracing3DUniform>()
     var pipeline: (any RenderPipeline)?
+    /// The ray-query variant of the trace pipeline, and the structures it traces.
+    var hardwarePipeline: (any RenderPipeline)?
+    var structures = PathTracing3DAccelerationStructures()
+    /// The scene generation the top-level structure was built for.
+    var structuresGeneration: UInt64?
+    /// Why hardware could not be used after a build or compile failure; the software tracer is used from then on.
+    var hardwareFailure: String?
     var nearest: (any Sampler)?
     var linear: (any Sampler)?
     var lastFailure: String?
+
+    /// Releases the acceleration structures, for example when no view traces any more.
+    mutating func resetStructures() {
+        structures.removeAll()
+        structuresGeneration = nil
+    }
+
+    /// The pipeline whose intersection step is a ray query, or nil when its shader variant cannot be created.
+    mutating func getHardwarePipeline(_ device: RenderDevice) -> (any RenderPipeline)? {
+        if let hardwarePipeline { return hardwarePipeline }
+        do {
+            let module = try ShaderModule.createBuiltinVariant(
+                at: "Shaders/path_tracing_3d.wesl", from: .adaModule, defines: ["ADA_PATH_TRACING_RAY_QUERY"]
+            )
+            var descriptor = RenderPipelineDescriptor(
+                vertex: module.requiredShader(for: .vertex), fragment: module.getShader(for: .fragment),
+                debugName: "World-space path tracing (ray query)", backfaceCulling: false, depthPixelFormat: .none
+            )
+            descriptor.colorAttachments = [.init(format: .rgba_16f)]
+            let result = device.createRenderPipeline(from: descriptor)
+            hardwarePipeline = result
+            return result
+        } catch {
+            hardwareFailure = "The ray-query shader variant could not be created: \(error)"
+            return nil
+        }
+    }
 
     mutating func getPipeline(_ device: RenderDevice) -> any RenderPipeline {
         if let pipeline { return pipeline }
@@ -97,6 +136,70 @@ struct PathTracing3DViews: Resource {
         nearest = device.createSampler(from:.init(minFilter:.nearest,magFilter:.nearest,mipFilter:.notMipmapped))
         linear = device.createSampler(from:.init(minFilter:.linear,magFilter:.linear,mipFilter:.notMipmapped))
         return result
+    }
+}
+
+extension PathTracing3DViews {
+    /// Builds the structures the ray-query variant traces: each new part's bottom-level structure, then the top-level
+    /// structure when the scene or the set of structures changed. Encoded into `commands` ahead of the trace passes.
+    mutating func buildStructures(
+        scene: PathTracing3DScene, device: RenderDevice, commands: CommandBuffer
+    ) -> (any AccelerationStructure)? {
+        func fail(_ reason: String) -> (any AccelerationStructure)? {
+            hardwareFailure = reason
+            return nil
+        }
+        let plan = PathTracing3DInstancePlan.make(scene.placements)
+        guard !plan.instances.isEmpty else { return fail("The scene has no traceable triangles for ray queries") }
+        var triangleCounts: [PathTracing3DPartKey: Int] = [:]
+        for placement in scene.placements where placement.triangleCount > 0 { triangleCounts[placement.key] = placement.triangleCount }
+        var rebuild = structuresGeneration != scene.generation
+        var bottoms: [PathTracing3DPartKey: any AccelerationStructure] = [:]
+        for (key, count) in triangleCounts {
+            guard let resolved = structures.resolveBottom(key, triangleCount: count, retaining: scene.parts[key].map { [$0.vertexBuffer as AnyObject, $0.indexBuffer as AnyObject] } ?? [], create: {
+                device.createAccelerationStructure(.bottomLevel(triangleCapacity: $0))
+            }) else { return fail("A bottom-level acceleration structure could not be created") }
+            bottoms[key] = resolved.structure
+            guard resolved.isNew else { continue }
+            rebuild = true
+            guard let part = scene.parts[key] else { return fail("A part has no geometry for its acceleration structure") }
+            let positions = part.meshDescriptor.positions.elements
+            var floats: [Float] = []
+            floats.reserveCapacity(positions.count * 3)
+            for position in positions { floats += [position.x, position.y, position.z] }
+            var indices = Array(part.meshDescriptor.indicies.prefix(key.indexCount))
+            guard !floats.isEmpty, !indices.isEmpty else { return fail("A part has no triangles for its acceleration structure") }
+            let vertexBuffer = unsafe floats.withUnsafeMutableBytes {
+                unsafe device.createBuffer(label: "Path tracing BLAS vertices", bytes: $0.baseAddress!, length: $0.count, options: .storageShared)
+            }
+            let indexBuffer = unsafe indices.withUnsafeMutableBytes {
+                unsafe device.createIndexBuffer(format: .uInt32, bytes: UnsafeRawPointer($0.baseAddress!), length: $0.count)
+            }
+            let geometry = AccelerationStructureGeometry(
+                vertexBuffer: vertexBuffer, vertexStride: 12, vertexCount: positions.count, indexBuffer: indexBuffer, indexCount: indices.count
+            )
+            do { try geometry.validate() } catch { return fail("Invalid acceleration structure geometry: \(error)") }
+            guard commands.encodeBuild(of: resolved.structure, geometry: geometry) else {
+                return fail("The device could not build a bottom-level acceleration structure")
+            }
+        }
+        structures.retain(Set(triangleCounts.keys))
+        guard let top = structures.resolveTop(instanceCount: plan.instances.count, create: {
+            device.createAccelerationStructure(.topLevel(instanceCapacity: $0))
+        }) else { return fail("The top-level acceleration structure could not be created") }
+        if top.isNew { rebuild = true }
+        if rebuild {
+            let instances = plan.instances.compactMap { instance in
+                bottoms[instance.key].map {
+                    AccelerationStructureInstance(structure: $0, transform: instance.transform, mask: instance.mask, instanceID: instance.firstTriangle)
+                }
+            }
+            guard instances.count == plan.instances.count, commands.encodeBuild(of: top.structure, instances: instances) else {
+                return fail("The device could not build the top-level acceleration structure")
+            }
+            structuresGeneration = scene.generation
+        }
+        return top.structure
     }
 }
 
@@ -133,19 +236,39 @@ public struct PathTracing3DRenderNode: RenderNode {
         guard settings.isEnabled, environment.debugView != .meshlets, !environment.debugView.showsWireframe, let color = target.sceneColor3DTexture,
             let normal = target.normalRoughness3DTexture, let position = target.viewPositionMetallic3DTexture else {
             resources.entries.removeValue(forKey:id); statistics.discard(id)
-            if resources.entries.isEmpty { resources.scene = PathTracing3DScene() }
+            if resources.entries.isEmpty { resources.scene = PathTracing3DScene(); resources.resetStructures() }
             return []
         }
         // Raster-only detail is seen through the G-buffer first hit; the tracer intersects its proxies instead.
         let sources = context.world.getResource(ExtractedMesh3DSources.self)?.pathTracedMeshes ?? []
         var scene = resources.scene
-        do { try await scene.prepare(sources,skinning:context.world.getResource(Skinning3DUniforms.self),device:device.renderDevice,
-                                    textureTileSize:settings.textureTileSize) }
+        let sceneBlocker = sources.contains { $0.skinningBuffer != nil }
+            ? "Skinned meshes are not supported by hardware ray queries" : resources.hardwareFailure
+        var selection = PathTracingTraversalSelection.select(
+            settings.intersection, deviceSupportsRayQueries: device.renderDevice.supportsRayQueries, sceneBlocker: sceneBlocker
+        )
+        if selection.traversal == .hardwareRayQuery, resources.getHardwarePipeline(device.renderDevice) == nil {
+            selection = PathTracingTraversalSelection.select(
+                settings.intersection, deviceSupportsRayQueries: true, sceneBlocker: resources.hardwareFailure
+            )
+        }
+        var hardware = selection.traversal == .hardwareRayQuery
+        do {
+            try await scene.prepare(sources,skinning:context.world.getResource(Skinning3DUniforms.self),device:device.renderDevice,
+                                    textureTileSize:settings.textureTileSize,hardwareOrder:hardware)
+            if hardware, scene.placements.isEmpty {
+                // Nothing to trace is not a hardware failure: use the shader BVH for this scene, and retry hardware when it changes.
+                hardware = false
+                selection = PathTracingTraversalSelection(traversal: .softwareBVH, fallbackReason: "The scene has no traceable triangles for ray queries")
+                try await scene.prepare(sources,skinning:context.world.getResource(Skinning3DUniforms.self),device:device.renderDevice,
+                                        textureTileSize:settings.textureTileSize,hardwareOrder:false)
+            }
+        }
         catch {
             let reason = String(describing:error)
             var status = PathTracing3DStatus(); status.failure = reason
             statistics.record(status,view:id); resources.entries.removeValue(forKey:id)
-            if resources.entries.isEmpty { resources.scene = PathTracing3DScene() }
+            if resources.entries.isEmpty { resources.scene = PathTracing3DScene(); resources.resetStructures() }
             if resources.lastFailure != reason {
                 FileHandle.standardError.write(Data("AdaEngine path tracing unavailable: \(reason)\n".utf8)); resources.lastFailure = reason
             }
@@ -176,9 +299,12 @@ public struct PathTracing3DRenderNode: RenderNode {
         }
         let denoises = denoiser != .off
         var hash = FrameDigest3D()
-        hash.combine(scene.generation)
+        // Denoised views keep their history while objects move (the reprojection guides reject history that no longer
+        // matches); only a change of the scene's content restarts it. Plain accumulation restarts on any change.
+        hash.combine(denoises ? scene.structureGeneration : scene.generation)
         if !denoises { hash.combine(uniform.viewMatrix); hash.combine(uniform.projectionMatrix) }
         hash.combine(UInt64(denoiser == .off ? 0 : (denoiser == .portable ? 1 : 2)))
+        hash.combine(hardware ? UInt64(1) : 0)
         hash.combine(UInt64(settings.samplesPerPixel)); hash.combine(UInt64(settings.maximumBounces)); hash.combine(UInt64(settings.historyLimit))
         hash.combine(settings.maximumDistance); hash.combine(settings.rayBias); hash.combine(settings.maximumRadiance)
         var lights: [Vector4] = []
@@ -214,11 +340,15 @@ public struct PathTracing3DRenderNode: RenderNode {
         hash.combine(linearEnvironment ? UInt64(1) : 0)
         if let environmentTexture { hash.combine(UInt64(bitPattern:Int64(ObjectIdentifier(environmentTexture).hashValue))) }
         let historyRestarted = entry.digest != hash.value || entry.denoiser != denoiser
+        // Objects moved since the last frame: follow the new lighting faster than a still scene would.
+        let objectsMoved = denoises && !historyRestarted && entry.sceneGeneration != nil && entry.sceneGeneration != scene.generation
+        entry.sceneGeneration = scene.generation
         if entry.digest != hash.value { entry.status.accumulatedFrames = 0; entry.status.historyResets += 1; entry.digest = hash.value }
         let previous = entry.index
         entry.index = 1-entry.index
         let current = entry.index
-        let pipeline = resources.getPipeline(device.renderDevice)
+        let softwarePipeline = resources.getPipeline(device.renderDevice)
+        let pipeline = hardware ? resources.hardwarePipeline ?? softwarePipeline : softwarePipeline
         guard let nearest = resources.nearest, let linear = resources.linear else { return [] }
         var lightDigest = FrameDigest3D()
         for value in lights { lightDigest.combine(value) }
@@ -235,14 +365,18 @@ public struct PathTracing3DRenderNode: RenderNode {
             ? target.diffuseSurface3DTexture.flatMap { albedo in target.reflectionResponse3DTexture.map { (albedo,$0) } } : nil
         let jittered = temporalViewUniform(uniform,target:target)
         let viewProjection = uniform.projectionMatrix * uniform.viewMatrix
+        // A stronger denoiser also averages over more frames, and follows moving objects a little slower (it smooths harder).
+        let baseHistoryWeight = max(0.005, settings.minimumHistoryWeight / settings.denoiserStrength)
+        let historyWeight = objectsMoved ? max(baseHistoryWeight, PathTracing3D.movingHistoryWeight / settings.denoiserStrength.squareRoot()) : baseHistoryWeight
         var constants = PathTracing3DUniform(inverseProjection:jittered.projectionMatrix.inverse,inverseView:uniform.viewMatrix.inverse,
             counts:Vector4(Float(scene.nodeCount),Float(lights.count/4),Float(settings.samplesPerPixel),Float(settings.maximumBounces)),
             trace:Vector4(settings.maximumDistance,settings.rayBias,settings.maximumRadiance,Float(min(entry.status.accumulatedFrames,settings.historyLimit-1))),
             frame:Vector4(Float(entry.status.encodedFrames%1000000),0,Float(atlas.height/scene.tileSize),linearEnvironment ? 1 : 0),
             zenith:sky.zenithColor.asVector,horizon:sky.horizonColor.asVector,ground:sky.groundColor.asVector,sky:skyParameters,
-            hybrid:Vector4(hybridSurface == nil ? 0 : 1,0,0,0),
+            hybrid:Vector4(hybridSurface == nil ? 0 : 1,settings.denoiserStrength,0,0),
             previousViewProjection:entry.previousViewProjection ?? viewProjection,previousView:entry.previousView ?? uniform.viewMatrix,
-            denoise:Vector4(1,settings.minimumHistoryWeight,denoises ? 1 : 0,denoises ? 1 : 0))
+            denoise:Vector4(1,historyWeight,
+                denoises ? 1 : 0,denoises ? 1 : 0))
         // Shader passes: 0 trace, 1 temporal, 2 guide, 3 wavelet, 4 final. Inputs never alias the pass's destination.
         struct Step { var shader: Int; var destination: RenderTexture; var a: Texture; var b: Texture?; var c: Texture?; var spacing: Float; var label: String }
         var steps: [Step] = []
@@ -269,7 +403,9 @@ public struct PathTracing3DRenderNode: RenderNode {
                 spacing:1,label:"Path tracing temporal reprojection"))
             steps.append(Step(shader:2,destination:entry.guides[current],a:entry.trace,b:nil,c:nil,spacing:1,label:"Path tracing reprojection guide"))
             var input: Texture = entry.targets[current]
-            for (iteration, spacing) in [Float(1),2,4,8].enumerated() {
+            // Strong denoising adds a wider final step on top of the four plain iterations.
+            let spacings: [Float] = settings.denoiserStrength >= 2 ? [1, 2, 4, 8, 16] : [1, 2, 4, 8]
+            for (iteration, spacing) in spacings.enumerated() {
                 let output = entry.filters[iteration % 2]
                 steps.append(Step(shader:3,destination:output,a:input,b:nil,c:nil,spacing:spacing,label:"Path tracing wavelet filter"))
                 input = output
@@ -280,6 +416,17 @@ public struct PathTracing3DRenderNode: RenderNode {
             steps.append(Step(shader:4,destination:color,a:entry.targets[current],b:nil,c:nil,spacing:1,label:"Path tracing reconstruction"))
         }
         let command = renderContext.commandQueue.makeCommandBuffer(); command.label = "World-space path tracing"
+        var topLevel: (any AccelerationStructure)?
+        if hardware {
+            topLevel = resources.buildStructures(scene: scene, device: device.renderDevice, commands: command)
+            if topLevel == nil {
+                // Software tracing resumes next frame; this frame's trace pass cannot run without its structure.
+                resources.entries[id] = nil; resources.structures.removeAll(); resources.structuresGeneration = nil
+                statistics.discard(id)
+                command.commit()
+                return []
+            }
+        }
         for (passIndex, step) in steps.enumerated() {
             let destination = step.destination
             constants.frame.y = Float(step.shader)
@@ -301,11 +448,14 @@ public struct PathTracing3DRenderNode: RenderNode {
                 .init(binding:12,shaderStages:.fragment,resource:.texture(hybridSurface?.0 ?? Texture2D.whiteTexture)),
                 .init(binding:13,shaderStages:.fragment,resource:.texture(hybridSurface?.1 ?? Texture2D.whiteTexture)),
                 .init(binding:14,shaderStages:.fragment,resource:.texture(step.b ?? Texture2D.whiteTexture)),
-                .init(binding:15,shaderStages:.fragment,resource:.texture(step.c ?? Texture2D.whiteTexture))]),index:0)
+                .init(binding:15,shaderStages:.fragment,resource:.texture(step.c ?? Texture2D.whiteTexture))]
+                + (topLevel.map { [.init(binding:16,shaderStages:.fragment,resource:.accelerationStructure($0))] } ?? [])),index:0)
             pass.draw(type:.triangle,vertexStart:0,vertexCount:3,instanceCount:1); pass.endRenderPass()
         }
         entry.status.encodedFrames += 1; entry.status.accumulatedFrames = min(entry.status.accumulatedFrames+1,settings.historyLimit)
         entry.status.hybridFirstHit = hybridSurface != nil
+        entry.status.implementation = selection.traversal.rawValue
+        entry.status.intersectionFallback = selection.fallbackReason
         entry.status.denoiser = denoiser.rawValue
         entry.status.denoiserFallback = settings.denoiser == .rayReconstruction && denoiser != .rayReconstruction ? reconstructionUnavailable : nil
         entry.previousViewProjection = viewProjection

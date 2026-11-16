@@ -26,7 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from script.ada_tools.cli import parser
 from script.ada_tools.context import Context, DownloadRedirects, PIN, ToolError, download, extract_tar, extract_zip
-from script.ada_tools import environment, studio, web
+from script.ada_tools import environment, ngx, studio, web
 from script.ada_tools.web import PreviewHandler
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -73,6 +73,44 @@ class CLIParsingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--source", result.stdout)
         self.assertIn("--debug", result.stdout)
+
+    def test_ngx_bridge_target_takes_the_sdk_and_an_output_directory(self):
+        args = parser().parse_args(["build", "ngx-bridge", "--sdk", "sdk", "--output", "out", "--dry-run"])
+        self.assertEqual((args.target, args.sdk, args.output, args.dry_run), ("ngx-bridge", Path("sdk"), Path("out"), True))
+
+    def test_ngx_sdk_validation_names_every_missing_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            missing = ngx.validate_sdk(Path(directory), "windows")
+            self.assertGreaterEqual(len(missing), 3)
+            self.assertTrue(any(name.endswith("nvsdk_ngx_vk.h") for name in missing))
+            self.assertTrue(any(name.endswith("nvngx_dlss.dll") for name in missing))
+            root = Path(directory)
+            for name in ngx.required_files("windows"):
+                (root / name).parent.mkdir(parents=True, exist_ok=True)
+                (root / name).write_bytes(b"x")
+            self.assertEqual(ngx.validate_sdk(root, "windows"), [])
+
+    def test_ngx_bridge_dry_run_writes_nothing_and_reports_the_library(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sdk = root / "sdk"
+            for name in ngx.required_files("windows"):
+                (sdk / name).parent.mkdir(parents=True, exist_ok=True)
+                (sdk / name).write_bytes(b"x")
+            output = root / "out"
+            args = parser().parse_args(["build", "ngx-bridge", "--sdk", str(sdk), "--output", str(output), "--dry-run"])
+            ctx = Context(args, root=root, host="windows")
+            before = set(root.rglob("*"))
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                result = ngx.bridge(ctx, args)
+            self.assertEqual(result, output.resolve() / "adaengine_ngx.dll")
+            self.assertEqual(set(root.rglob("*")), before)
+
+    def test_ngx_bridge_refuses_hosts_without_a_build_recipe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = parser().parse_args(["build", "ngx-bridge", "--sdk", directory, "--dry-run"])
+            with self.assertRaises(ToolError):
+                ngx.bridge(Context(args, root=directory, host="macos"), args)
 
     def test_prepare_dry_run_never_writes_for_any_host(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -86,10 +86,20 @@ struct Temporal3DViews: Resource {
     var frame = 0
 }
 
+/// The temporal reconstruction in effect for each source camera, updated every frame.
+public struct TemporalReconstructionStatuses: Resource {
+    public internal(set) var statuses: [Entity.ID: TemporalReconstructionStatus] = [:]
+
+    public init() {}
+
+    public subscript(camera: Entity.ID) -> TemporalReconstructionStatus? { statuses[camera] }
+}
+
 @PlainSystem(dependencies: [.after("AdaCorePipelines.PrepareEnvironment3DTexturesSystem")])
 struct PrepareTemporal3DSystem {
     @Query<Camera, CameraRenderGraph, Ref<RenderViewTarget>, GlobalViewUniform, ExtractedCameraSource> private var cameras
     @ResMut<Temporal3DViews> private var views
+    @ResMut<TemporalReconstructionStatuses> private var statuses
     @Res<RenderDeviceHandler> private var device
     @Res<ExtractedCameraRenderViewTargets?> private var cameraTargets
 
@@ -99,18 +109,21 @@ struct PrepareTemporal3DSystem {
         views.frame &+= 1
         var active: [Entity.ID] = []
         cameras.forEach { camera, graph, target, uniform, source in
+            let dlss = device.renderDevice.dlssStatus
             guard camera.isActive, camera.rasterizationRateMap == nil, graph.subgraphLabel == .main3D,
                 let settings = camera.temporalUpscaling,
-                settings.method == .portable || device.renderDevice.supportsTemporalUpscaling,
+                case let resolution = settings.method.resolved(dlssAvailable: dlss.isAvailable, unavailableReason: dlss.unavailableReason),
+                resolution.method == .portable || device.renderDevice.supportsTemporalUpscaling,
                 let input = target.mainTexture, let output = target.outputTexture
             else { return }
             active.append(source.entityId)
             var entry = views.entries.removeValue(forKey: source.entityId) ?? Temporal3DViews.Entry()
-            if entry.inputSize != input.size || entry.outputSize != output.size || entry.method != settings.method {
-                entry.scaler = settings.method == .portable
+            statuses.statuses[source.entityId] = TemporalReconstructionStatus(settings: settings, resolution: resolution)
+            if entry.inputSize != input.size || entry.outputSize != output.size || entry.method != resolution.method {
+                entry.scaler = resolution.method == .portable
                     ? PortableTemporal3DUpscaler(device: device.renderDevice, inputSize: input.size, outputSize: output.size, view: source.entityId)
                     : device.renderDevice.createTemporalUpscaler(inputSize: input.size, outputSize: output.size)
-                entry.method = settings.method
+                entry.method = resolution.method
                 entry.inputSize = input.size
                 entry.outputSize = output.size
                 entry.encoded = false
@@ -170,6 +183,7 @@ struct PrepareTemporal3DSystem {
         // backend feature while the source camera still requests temporal reconstruction.
         let retained = cameraTargets?.temporalCameraIDs ?? Set(active)
         for id in views.entries.keys where !retained.contains(id) { views.entries.removeValue(forKey: id) }
+        for id in statuses.statuses.keys where views.entries[id] == nil && !active.contains(id) { statuses.statuses.removeValue(forKey: id) }
     }
 }
 

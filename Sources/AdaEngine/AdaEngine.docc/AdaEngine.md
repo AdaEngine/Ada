@@ -43,6 +43,8 @@ For more details and guides, check out the tutorials below.
 - <doc:GameDiagnosticsOverlay>
 - <doc:MovieMaker>
 - <doc:PipelinedRendering>
+- <doc:DLSSUpscaling>
+- <doc:HardwarePathTracing>
 - <doc:Terrain>
 - <doc:VisionOSWindowed>
 - <doc:WESLShaders>

@@ -1,10 +1,37 @@
 import Math
 
 public enum TemporalReconstructionMethod: String, Codable, Sendable {
-    /// Use the backend-provided temporal upscaler when available.
+    /// DLSS when it is available, otherwise the vendor-independent `.portable` reconstruction.
     case automatic
     /// Vendor-independent shader reconstruction (TAA at scale 1, temporal upscaling below 1).
     case portable
+    /// NVIDIA DLSS Super Resolution. Falls back to ``portable`` with a reason when DLSS is unavailable.
+    case dlss
+}
+
+/// The method that actually runs for a camera, and why a requested method was not used.
+public struct TemporalReconstructionResolution: Equatable, Sendable {
+    public var method: TemporalReconstructionMethod
+    public var fallbackReason: String?
+}
+
+extension TemporalReconstructionMethod {
+    /// Applies DLSS availability to the requested method.
+    ///
+    /// `.automatic` uses DLSS when available and otherwise the builtin `.portable` reconstruction.
+    /// `.dlss` uses DLSS when available and otherwise falls back to ``portable`` with `unavailableReason`.
+    public func resolved(dlssAvailable: Bool, unavailableReason: String?) -> TemporalReconstructionResolution {
+        switch self {
+        case .automatic:
+            return TemporalReconstructionResolution(method: dlssAvailable ? .dlss : .portable, fallbackReason: nil)
+        case .portable:
+            return TemporalReconstructionResolution(method: .portable, fallbackReason: nil)
+        case .dlss:
+            return dlssAvailable
+                ? TemporalReconstructionResolution(method: .dlss, fallbackReason: nil)
+                : TemporalReconstructionResolution(method: .portable, fallbackReason: unavailableReason ?? "DLSS is unavailable")
+        }
+    }
 }
 
 /// Per-camera temporal reconstruction. Unsupported devices use spatial scaling or native resolution.

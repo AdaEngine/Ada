@@ -49,6 +49,7 @@
         let uniformSlots: Set<ComputeBindingSlot>
         let storageSlots: Set<ComputeBindingSlot>
         let textureSlots: Set<ComputeBindingSlot>
+        let accelerationStructureSlots: Set<ComputeBindingSlot>
         let samplerSlots: Set<ComputeBindingSlot>
 
         #if SAGA_METAL_NATIVE_PASS
@@ -101,6 +102,7 @@
             self.uniformSlots = Set(stages.flatMap { $0.uniformBindings.map { slot($0.binding) } })
             self.storageSlots = Set(stages.flatMap { $0.storageBindings.map { slot($0.binding) } })
             self.textureSlots = Set(stages.flatMap { $0.sampledTextures.map { slot($0.binding) } })
+            self.accelerationStructureSlots = Set(stages.flatMap { $0.accelerationStructures.map { slot($0.binding) } })
             self.samplerSlots = Set(stages.flatMap { $0.samplerBindings.map { slot($0.binding) } })
             self.vertexInputLocations = vertexStage.vertexInputs.map(\.location)
             let layouts = Self.vertexLayouts(for: descriptor)

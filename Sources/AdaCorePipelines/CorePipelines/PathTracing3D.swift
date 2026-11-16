@@ -13,6 +13,43 @@ public enum PathTracingDenoiser: String, Codable, Sendable, CaseIterable {
     case off
 }
 
+/// How a path-traced view finds ray intersections.
+public enum PathTracingIntersection: String, Codable, Sendable, CaseIterable {
+    /// GPU ray queries when the device and the whole view support them; the shader BVH otherwise.
+    case automatic
+    /// Always the shader BVH, for reference renders and comparisons.
+    case software
+}
+
+/// The traversal a view actually uses, and why hardware was not used when it was not.
+public struct PathTracingTraversalSelection: Equatable, Sendable {
+    public enum Traversal: String, Sendable {
+        case hardwareRayQuery = "vulkan-ray-query"
+        case softwareBVH = "portable-shader-bvh"
+    }
+    public var traversal: Traversal
+    public var fallbackReason: String?
+
+    /// Whether `.automatic` chooses hardware ray queries when they are available. The measurements behind this are in
+    /// `Documentation/Plans/hardware-path-tracing.md`; set it to false to make `.automatic` use the shader BVH.
+    static let automaticPrefersHardware = true
+
+    /// Chooses the traversal. `sceneBlocker` names why the scene cannot use hardware (skinned or morphed meshes, budgets,
+    /// a failed build), or is nil when it can.
+    public static func select(
+        _ intersection: PathTracingIntersection, deviceSupportsRayQueries: Bool, sceneBlocker: String?
+    ) -> PathTracingTraversalSelection {
+        guard intersection == .automatic, automaticPrefersHardware else {
+            return PathTracingTraversalSelection(traversal: .softwareBVH, fallbackReason: nil)
+        }
+        guard deviceSupportsRayQueries else {
+            return PathTracingTraversalSelection(traversal: .softwareBVH, fallbackReason: "The device does not support ray queries")
+        }
+        if let sceneBlocker { return PathTracingTraversalSelection(traversal: .softwareBVH, fallbackReason: sceneBlocker) }
+        return PathTracingTraversalSelection(traversal: .hardwareRayQuery, fallbackReason: nil)
+    }
+}
+
 /// Experimental world-space path tracing on the portable GPU backend.
 /// Intersections run in a shader BVH; this does not claim hardware RT acceleration.
 public struct PathTracing3D: Codable, Equatable, Sendable {
@@ -31,9 +68,15 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
     public var rayBias: Float = 0.002
     /// Denoiser selection. See ``PathTracingDenoiser``.
     public var denoiser: PathTracingDenoiser = .automatic
+    /// Intersection selection. See ``PathTracingIntersection``.
+    public var intersection: PathTracingIntersection = .automatic
     /// Smallest weight a new frame gets in the portable denoiser's history. Smaller values converge to less noise
     /// in still views; larger ones follow moving lights faster.
     public var minimumHistoryWeight: Float = 1.0 / 32
+    /// How hard the portable denoiser smooths, from 1 (the plain edge-aware filter) to 8. Larger values add a wider
+    /// final filter step and smooth pixels with little history, such as around moving objects, much more, at the cost of
+    /// softer detail. It does not affect DLSS Ray Reconstruction or plain accumulation.
+    public var denoiserStrength: Float = 1
 
     public init(isEnabled: Bool = false, samplesPerPixel: Int = 1, maximumBounces: Int = 3,
                 resolutionScale: Float = 0.5, historyLimit: Int = 32) {
@@ -43,6 +86,9 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
         self.resolutionScale = resolutionScale
         self.historyLimit = historyLimit
     }
+
+    /// Smallest weight a new frame gets in the portable denoiser's history while objects move.
+    static let movingHistoryWeight: Float = 0.1
 
     var sanitized: Self {
         var result = self
@@ -55,12 +101,13 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
         result.rayBias = finiteRenderValue(rayBias, fallback: 0.002, range: 0.0001...0.1)
         result.historyLimit = min(max(historyLimit, 1), 1024)
         result.minimumHistoryWeight = finiteRenderValue(minimumHistoryWeight, fallback: 1.0 / 32, range: 0.005...1)
+        result.denoiserStrength = finiteRenderValue(denoiserStrength, fallback: 1, range: 1...8)
         return result
     }
 
     private enum CodingKeys: CodingKey {
         case isEnabled, samplesPerPixel, maximumBounces, resolutionScale, textureTileSize, maximumDistance, maximumRadiance, historyLimit, rayBias
-        case denoiser, minimumHistoryWeight
+        case denoiser, minimumHistoryWeight, intersection, denoiserStrength
     }
 
     public init(from decoder: Decoder) throws {
@@ -76,5 +123,7 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
         rayBias = try c.decodeIfPresent(Float.self, forKey: .rayBias) ?? 0.002
         denoiser = try c.decodeIfPresent(PathTracingDenoiser.self, forKey: .denoiser) ?? .automatic
         minimumHistoryWeight = try c.decodeIfPresent(Float.self, forKey: .minimumHistoryWeight) ?? 1.0 / 32
+        intersection = try c.decodeIfPresent(PathTracingIntersection.self, forKey: .intersection) ?? .automatic
+        denoiserStrength = try c.decodeIfPresent(Float.self, forKey: .denoiserStrength) ?? 1
     }
 }

@@ -131,6 +131,7 @@ public struct Core3DPlugin: Plugin {
         app
             .insertResource(Render3DTemporalStatistics())
             .insertResource(Temporal3DViews())
+            .insertResource(TemporalReconstructionStatuses())
             .insertResource(Temporal3DPipelines(device: renderDevice))
             .insertResource(ActiveMotion3DPass())
             .insertResource(RenderPipelines(configurator: Motion3DPipeline()))
