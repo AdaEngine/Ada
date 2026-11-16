@@ -74,6 +74,16 @@ struct Environment3DUniform: Sendable {
     var probeMinimum: Vector4 = .zero
     var probeMaximum: Vector4 = .zero
     var diffuseGI: Vector4 = .zero
+    /// x: atmosphere active, y: aerial-perspective scale, z: sun-disc radiance scale, w: sun-disc angular radius.
+    var atmosphere: Vector4 = .zero
+    /// xyz: unit vector toward the sun.
+    var atmosphereSun: Vector4 = .zero
+    /// x: ground radius, y: top radius, z: camera radius, w: aerial-perspective range.
+    var atmospherePlanet: Vector4 = .zero
+    /// rgb: sun illuminance, w: aerial depth slice count.
+    var atmosphereIlluminance: Vector4 = .zero
+    /// x: the cloud layer is drawn over the sky.
+    var clouds: Vector4 = .zero
 }
 
 public struct ScreenSpaceReflectionScratch: Resource, Sendable {

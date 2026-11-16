@@ -21,6 +21,10 @@ struct GoldenBackendAgreementTests {
         "emissive-bloom-exposure-minus1": "Metal reference predates the current bloom code",
     ]
 
+    /// Vulkan-only references that wait for a Metal reference, which has to be recorded on Apple hardware. Record the
+    /// frames in `GoldenFrames/saga-metal`, then remove the names from this set so the backends are compared again.
+    private static let awaitingMetalReferences: Set<String> = ["atmosphere-noon", "atmosphere-low-sun", "atmosphere-night", "clouds-noon", "clouds-low-sun", "clouds-low-tier", "clouds-high-tier"]
+
     /// Largest per-channel step and fraction of pixels allowed to differ between backends.
     static let agreement = GoldenFrame.Tolerance(channelSteps: 12, differingFraction: 0.02)
 
@@ -40,7 +44,7 @@ struct GoldenBackendAgreementTests {
     @Test func sagaMetalAndVulkanReferencesAgree() throws {
         let vulkan = try Self.names(in: "saga")
         let metal = try Self.names(in: "saga-metal")
-        #expect(vulkan == metal, "SAGA Metal and Vulkan need references for the same scenes.")
+        #expect(vulkan.subtracting(Self.awaitingMetalReferences) == metal, "SAGA Metal and Vulkan need references for the same scenes.")
         try Self.compareReferences(vulkan.intersection(metal), "saga", "saga-metal")
     }
 
@@ -63,7 +67,10 @@ struct GoldenBackendAgreementTests {
         // SAGA native skips the temporal path and renders wireframe solid, but every other frame exists on both.
         #expect(metal.subtracting(saga).isSubset(of: ["pbr-spheres-wireframe"]) || metal.subtracting(saga).isEmpty, "Metal-only references: \(metal.subtracting(saga).sorted())")
         // The shaded-wireframe view has no Metal reference yet; record it on Apple hardware and drop this allowance.
-        #expect(saga.subtracting(metal).isSubset(of: ["pbr-spheres-shadedWireframe"]), "SAGA-only references: \(saga.subtracting(metal).sorted())")
+        #expect(
+            saga.subtracting(metal).isSubset(of: Set(["pbr-spheres-shadedWireframe"]).union(Self.awaitingMetalReferences)),
+            "SAGA-only references: \(saga.subtracting(metal).sorted())"
+        )
     }
 }
 #endif

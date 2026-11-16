@@ -315,7 +315,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• DLSS Upscaling\n• Hardware Path Tracing\n• Terrain\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Atmosphere\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• DLSS Upscaling\n• Hardware Path Tracing\n• Terrain\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
         "level": 0,
         "links": [
           {
@@ -341,6 +341,10 @@
           {
             "title": "Animation IK and pose modifiers",
             "destination": "AnimationIK"
+          },
+          {
+            "title": "Atmosphere",
+            "destination": "Atmosphere"
           },
           {
             "title": "Game diagnostics overlay",
@@ -3268,6 +3272,242 @@
       {
         "kind": "text",
         "text": "The initial profile covers the macOS workbench, one fixture project and the X translation handle. Play game scenarios, OS dialogs, and file drags use separate verification paths.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "Atmosphere",
+    "title": "Atmosphere",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/3D/Atmosphere.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Give a 3D camera a physically based sky. The atmosphere scatters the sun's light\nthe way air does, so the sky turns from blue at noon to orange near the horizon\nand dark at night, the sun appears as a disc that the air reddens, and distant\ngeometry fades into haze.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The atmosphere is part of a camera's `Environment3D` and is off by default. A\ncamera that leaves it off draws and stores nothing for it, and its image is\nunchanged. The engine still compiles the four small table shaders once at startup\nand keeps a few small constant buffers, whether or not any camera uses them.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Turn It On",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The sky is driven by the scene's primary directional light, so a scene needs a\n`DirectionalLightComponent` as well as the camera setting. A directional light\nshines along its local +Z axis. Rotating the light about X therefore moves the\nsun through the sky: with the rotation below the sun sits 10 degrees above the\nhorizon.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "let camera = Camera(renderTarget: target)   // the texture or window the camera draws to\n\nvar environment = Environment3D()\nenvironment.atmosphere = Atmosphere3D(isEnabled: true)\n\napp.main.spawn(\n    \"Camera\",\n    bundle: Camera3D(camera: camera, transform: Transform(position: [0, 2, 0]), environment: environment)\n)\n\napp.main.spawn(\"Sun\") {\n    DirectionalLightComponent(radiance: [1, 0.95, 0.85], intensity: 3, castShadows: true)\n    Transform(rotation: Quat(axis: Vector3(1, 0, 0), angle: .pi - 0.17))\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`Core3DPlugin` must be installed, as it is for any 3D rendering. Change the light's\nrotation at run time to move the sun; the sky follows on the next frame. With no\ndirectional light the atmosphere uses `fallbackSunDirection` with a white sun of\nstrength 1.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "You can also switch it from scripts and tools through the flat accessors\n`Environment3D.atmosphereEnabled` and `Environment3D.atmosphereIntensity`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "What You See",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• **Sky.** An enabled atmosphere replaces the gradient and the equirectangular\n  sky texture as the visible sky, whatever the `skybox` settings say.\n• **Sun disc.** Drawn analytically at the sun's direction, reddened by the air in\n  front of it and slightly darker toward its edge. `sunDiscScale` sets its size\n  (`0` hides it) and `sunDiscIntensity` its brightness. The disc is 100 times as\n  bright as the sun's illuminance before `sunDiscIntensity` scales it, so lower the\n  value if bloom is too strong.\n• **Stars.** If the skybox starfield is enabled, stars begin to fade in when the sun\n  is about 6 degrees above the horizon, are fully visible once it is about 9 degrees\n  below it, and are dimmed by the air in front of them.\n• **Aerial perspective.** Geometry gains the light scattered along the view ray, so\n  far objects turn hazy and bluish, and the light of the surface itself is dimmed\n  and reddened per color channel. `aerialPerspectiveScale` sets how strong the\n  haze is (`0` removes it) and `aerialPerspectiveMaxDistance` how far, in meters,\n  the effect is computed. Haze is applied before height fog.\n• **Reflections.** Surfaces without image-based lighting reflect the sky. The\n  reflection is blurred by roughness, so a rough metal sphere shows a soft sky and\n  a smooth one shows the horizon. The sun disc is left out of reflections;\n  the light's own specular highlight covers it.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Settings",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Setting | Meaning | Default |\n| --- | --- | --- |\n| `isEnabled` | Turns the atmosphere on. | `false` |\n| `intensity` | Multiplies the sun's light in the atmosphere. | `1` |\n| `rayleighScale`, `mieScale`, `ozoneScale` | Thickness of molecules, haze and the ozone layer. Larger `mieScale` gives a hazier sky. | `1` |\n| `mieAnisotropy` | How strongly haze scatters toward the sun (`-0.99` to `0.99`). | `0.8` |\n| `groundAlbedo` | Reflectivity of the planet below the horizon. | `0.3` |\n| `groundRadiusMeters`, `atmosphereHeightMeters` | Planet radius and atmosphere thickness. | Earth: 6,360,000 and 100,000 |\n| `sunDiscScale`, `sunDiscIntensity` | Size and brightness of the sun disc. | `1` |\n| `aerialPerspectiveScale`, `aerialPerspectiveMaxDistance` | Haze strength and range. | `1`, 32,000 m |\n| `tintsSunLight` | Also dims and reddens the directional light itself. See below. | `false` |\n| `fallbackSunDirection` | Direction toward the sun when no directional light exists. | up, slightly forward |\n| `quality` | Cost tier. See below. | Platform default |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Values outside their valid range are clamped, and non-finite values fall back to\nthe defaults, so a bad setting never produces a broken image. Scenes saved before\nthe atmosphere existed load with it off.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The world is Y-up and the ground is at height 0, so a camera's height above the\nground is its Y position. Heights below zero count as zero.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Tint the Sun's Light",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "By default the atmosphere changes only what you see; the directional light keeps the\ncolor and strength you gave it, so existing lighting and exposure setups do not\nchange. Set `tintsSunLight` to `true` to apply the sun's transmittance to the light\nas well. A low sun then lights the scene dimmer and redder, and the light goes out\nonce the planet blocks the sun. This needs a directional light; the fallback sun is\nnever tinted. The tint is computed per camera from the camera's height and the sun's\ndirection, and it applies to the main lighting pass. Volumetric fog light shafts and\nthe fog's sun glow keep using the untinted light.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Quality",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`quality` chooses the table sizes and how many steps each table uses.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Tier | Use | Sky table | Haze slices | GPU memory per camera |\n| --- | --- | --- | --- | --- |\n| `low` | Default in the browser. Fewest steps and smallest tables. | 96 by 54 | 8 of 16 by 16 | 112.5 KiB |\n| `medium` | Default on desktop. | 192 by 108 | 16 of 32 by 32 | 554.0 KiB |\n| `high` | Smoothest gradients near the horizon and in the sunset sky. | 256 by 144 | 24 of 32 by 32 | 808.0 KiB |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Changing a camera's tier replaces its tables on the next frame.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Cost.** On one desktop Vulkan machine, a 1920 by 1080 scene of 400 spheres with\nsun shadows and eight local lights took about 5.5 ms per frame without the\natmosphere. Turning it on added roughly 0.6 to 1.0 ms with a still camera, and the\nthree tiers differed by less than the run-to-run noise (about 0.3 ms), so most of\nthe cost is the composite and the reflection blur, not the tables. These figures are\nwall-clock frame times with serialized passes, not GPU timestamps, which SAGA does\nnot provide. They are a guide, not a guarantee: the design's targets of under\n0.5 ms for `medium` and under 0.3 ms for `low` have not been met. Run the repository's benchmark\n(`ADAENGINE_PERF=1 swift test -c release --filter Render3DGPUTests/Benchmarks`) on\nyour own hardware for numbers you can trust. A camera that does not move under a\nstill sun redraws no tables at all, and a camera that only turns skips the sky table.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The tables for the sky's color and the light that reaches the ground are rebuilt\nonly when you change the medium (the scales, the albedo, the planet size or the\ntier). Moving the sun or the camera updates only the per-frame sky and haze tables.\nA camera holds that memory only while the atmosphere is on, and nothing when it is\noff or a full-screen debug view is showing. The profiling report,\n`Render3DPerformanceMetrics.report()`, lists the total.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Clouds",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The atmosphere can carry one layer of procedural clouds. The clouds are lit by the sun and the sky of the same\natmosphere, so they turn pink at sunset and grey under an overcast sky, and distant ones fade into the haze. Clouds are\npart of the atmosphere, so they are ignored while the atmosphere is off.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "var environment = Environment3D()\nenvironment.atmosphere = Atmosphere3D(isEnabled: true)\nenvironment.atmosphere.clouds = VolumetricClouds3D(isEnabled: true, coverage: 0.6, windSpeed: 12)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Flat accessors `Environment3D.cloudsEnabled` and `Environment3D.cloudCoverage` reach the same settings from scripts and\ntools.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Setting | Meaning | Default |\n| --- | --- | --- |\n| `isEnabled` | Turns the cloud layer on. | `false` |\n| `coverage` | Fraction of the sky the layer covers, from `0` (clear) to `1` (overcast). | `0.5` |\n| `density` | How opaque the cloud material is. | `1` |\n| `cloudType` | Shape, from `0` (flat stratus) to `1` (tall cumulus). | `0.5` |\n| `baseAltitudeMeters`, `thicknessMeters` | Where the layer sits above the ground and how thick it is. | 1,500 m and 2,500 m |\n| `windDirection`, `windSpeed` | Direction (X and Z) and speed in meters per second the layer drifts. | east, 10 m/s |\n| `detailScale` | Scale of the fine erosion on the edges. | `1` |\n| `lightingScale`, `ambientScale` | Multipliers of the sun's light and the sky's light on the clouds. | `1` |\n| `time` | Seconds that position the layer. `nil` follows the engine clock. | `nil` |\n| `seed` | Seeds the noise, so the same seed always gives the same clouds. | `1` |\n| `quality` | Cost tier. See below. | Platform default |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Out-of-range and non-finite values are clamped, and scenes saved before clouds existed load with them off. Clouds appear\nonly where they change the image: a coverage or density of `0` draws and stores nothing.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Deterministic frames.** The layer drifts with `windDirection * windSpeed * time`. Pin `time` to a value to freeze the\nclouds, for example in screenshots and golden-frame tests; leave it `nil` to animate them with the engine clock.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Quality tiers.**",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Tier | What it does | Default on |\n| --- | --- | --- |\n| `low` | No raymarch: one shaded 2D layer with the same noise, coverage and wind, at 40% of the width and height. | Browser |\n| `medium` | Raymarched volume with 32 view and 4 light steps at a quarter of the pixels. | Desktop |\n| `high` | Raymarched volume with 64 view and 6 light steps at half of the pixels. | Opt-in |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Cost.** The same benchmark (a 1920 by 1080 scene of 400 spheres, sun shadows and eight local lights, on one desktop\nVulkan machine, best of six rounds, wall-clock with serialized passes) measured the clouds on top of the `medium`\natmosphere. During that run the frame without any atmosphere took 9.2 ms, and the `medium` atmosphere added 1.0 ms, so\nthis run was slower overall than the one quoted above. The clouds added about 1.6 ms (`low`), 2.6 ms (`medium`) and\n4.3 ms (`high`) on top of that. These are clearly above the design's targets of under 0.3 ms for `low` and under 1.0 ms\nfor `medium`, so the clouds are expensive today: use `low` where frame time is tight, and keep clouds off for cameras\nthat do not need them. The numbers carry about 0.3 ms of noise, and the run-to-run drift of the baseline shows that other\nload on the machine matters, so measure on your own hardware.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A camera with clouds holds the cloud targets (four textures) and a small noise cache for as long as clouds draw. When they\nare off, the targets are released a few frames later, once no frame in flight can still read them. The noise is generated on\nthe GPU the first time a seed is used and shared by every camera (about 1.4 MiB per seed); up to four seeds are kept. `Render3DPerformanceMetrics.report()` lists the cloud memory.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**How the clouds are drawn.** Each frame the raymarch writes the clouds at reduced resolution with a different sample\noffset, and a resolve pass blends the result with the previous frame (reprojected with the camera's motion and clamped to\nthe neighbouring colors) so the clouds are smooth without trails. A camera that jumps far (more than 3 km) or turns\nsharply (more than about 70 degrees in a frame), and a change of tier or size, restart the blend, and that first frame can\nlook grainy. Changing the look (coverage, density, type, seed, wind) does not restart it: the clouds blend toward the new\nlook over a few frames.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Limits.** Clouds are drawn over sky pixels only: they never cover geometry, and geometry that is farther away than a\ncloud is not hidden by it either. They do not appear in reflections, do not cast shadows on the ground, and are not verified\nwith path-traced cameras. The cloud layer is one slab and the camera can be below, inside or above it. A ray that points at\nthe ground shows only the clouds in front of the ground, so from below the layer you see clouds only above the horizon,\nwhile from inside or above it you also see the layer's top and sides below the horizon. Looking at the layer from above or\nfrom far away, the farthest clouds fade into the haze. There are no multiple layers.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Combine With Other Effects",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• **Fog.** Height and distance fog still apply on top of the haze.\n• **Image-based lighting.** If a camera has an image-based lighting asset, the\n  material lighting pass still uses it for ambient light and its reflections. The\n  composite pass, which draws the visible sky and the sky reflected by surfaces that\n  have no such asset, uses the atmosphere. Lighting surfaces from the sky itself\n  is not available yet.\n• **Exposure and brightness.** The sky is high-dynamic-range light that scales with\n  the directional light's `intensity` and with the atmosphere's `intensity`. It is\n  usually brighter than the old gradient, so with auto exposure on the whole frame\n  darkens to compensate. If the sky looks washed out, lower the light's intensity or\n  the exposure rather than the atmosphere's scales.\n• **Path tracing.** The atmosphere has not been verified with path-traced cameras,\n  and the tables are still built for them whether or not the path tracer uses the\n  sky. Leave the atmosphere off on those cameras.\n• **`AtmosphereMaterial`.** That material is a separate planet-shell effect for\n  space scenes. It does not use these settings.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Limits",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• The camera stays inside the atmosphere; planetary views from space are not a goal.\n• The ground below the horizon is a lit planet surface, so over an empty world the\n  horizon is a clear edge. Cover the ground with geometry or fog to soften it.\n• Terrain and objects do not shadow the haze, and clouds do not shadow anything.\n• Haze is computed from the camera's point of view for 8, 16 or 24 distance\n  slices, depending on the tier. Very large `aerialPerspectiveMaxDistance` values\n  spread those slices thinly.\n• The shaders are shared by every SAGA backend, but this feature was checked only on\n  the Vulkan backend. Metal and browser results have not been verified, and their\n  golden-frame references are not recorded yet.",
         "level": 0,
         "links": []
       }
