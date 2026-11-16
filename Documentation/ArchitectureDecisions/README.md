@@ -61,6 +61,8 @@ describes the intended design even when its implementation is still planned.
 | [ADR-0021](0021-hybrid-ray-tracing.md) | Accepted | Planned | Hybrid ray tracing |
 | [ADR-0027](0027-3d-rendering-pipeline-gap-roadmap.md) | Accepted | Partial (Stages 0 and 1 first slices; not released) | 3D pipeline gap analysis and staged roadmap: post stack, materials/glTF extensions, morph targets, transparency, atmosphere, lighting scale, content features, diagnostics |
 | [ADR-0028](0028-meshlets-and-portable-cluster-culling.md) | Proposed | Planned | Offline meshlet assets, CPU reference and portable Metal/WebGPU cluster culling with indexed compaction; native mesh shaders deferred |
+| [ADR-0030](0030-backend-neutral-acceleration-structures.md) | Accepted | Partial (local foundation; not released) | Backend-neutral acceleration-structure API for GPU ray queries |
+
 
 ## 2D rendering decisions
 

@@ -28,8 +28,8 @@ platform-specific features (DLSS, MetalFX) that SAGA does not express today.
   null device. Shader compilation also special-cases `.headless` (`ShaderCompiler.swift`).
 - Platform features are optional factories on `RenderDevice`: `createTemporalUpscaler`, `supportsSpatialUpscaling`,
   GPU visibility / meshlet / shadow-cull processors, multi-draw-indirect flags. Unsupported backends return `nil` and the
-  engine falls back (CPU culling, spatial fallback). MetalFX is in the Metal backend; DLSS goes through Dawn interop in
-  the WebGPU backend; FSR 1 and a portable temporal upscaler are shader passes.
+  engine falls back (CPU culling, spatial fallback). MetalFX is in the Metal backend; DLSS runs through SAGA's native Vulkan pass and the NGX bridge (see
+  [dlss-upscaling](dlss-upscaling.md)); FSR 1 and a portable temporal upscaler are shader passes.
 - SAGA has no upscaler or native-interop concept.
 
 ## Goals and non-goals
@@ -88,8 +88,8 @@ Plan: C1 ships with Stage B; C2 replaces it when SAGA provides it. (Open questio
   existing `TemporalUpscaler` protocol and the spatial-scaler path against that hook. They keep the packaging they have
   today (DLSS is already an optional native artifact) and report unavailable when the hook or the SDK is missing.
 - FSR 1 and the portable temporal upscaler are ordinary shader passes on SAGA and need no interop; they are the
-  documented fallback everywhere the native upscalers are missing. DLSS on Windows stays out of scope until the
-  external pass is verified, as the cutover plan already states.
+  documented fallback everywhere the native upscalers are missing. DLSS on Windows (Vulkan, through the `NativePass`
+  hook) is implemented; see [dlss-upscaling](dlss-upscaling.md).
 
 ### GPU feature processors
 

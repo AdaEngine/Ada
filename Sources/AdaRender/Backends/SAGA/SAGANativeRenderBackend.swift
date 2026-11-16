@@ -53,6 +53,8 @@
         /// - Parameter windowless: Disable swapchain support for offscreen tests and tools.
         ///   Defaults to `ADAENGINE_SAGA_WINDOWLESS=1`.
         init(windowless: Bool = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_WINDOWLESS"] == "1") throws {
+            // NGX needs extra Vulkan extensions, so DLSS is prepared before the instance and device are created.
+            let dlss = SAGADLSSSession.prepare()
             guard let adapter = VulkanBackend.requestAdapter() else { throw SetupError.noAdapter }
             let backend = windowless
                 ? try VulkanBackend.makeDevice(adapter: adapter)
@@ -64,6 +66,8 @@
                 shaderOutput: .spirv,
                 makeDevice: { try await Device.make(backend: backend) }
             )
+            context.dlssSession.withLock { $0 = dlss }
+            dlss.start(on: context)
             self.device = SAGARenderDevice(context: context)
             self.device.windows = self
         }

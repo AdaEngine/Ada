@@ -6,7 +6,7 @@ import sys
 import urllib.error
 
 from .context import Context, ToolError
-from . import environment, studio, web
+from . import environment, ngx, studio, web
 
 
 def positive(value):
@@ -62,6 +62,9 @@ def parser():
     for target in ("studio", "engine"):
         command = targets.add_parser(target, parents=[common])
         build_options(command, profile=True)
+    command = targets.add_parser("ngx-bridge", parents=[common], help="Build the optional NVIDIA DLSS bridge from a locally installed SDK (Windows)")
+    command.add_argument("--sdk", type=Path, help="Root of the NVIDIA/DLSS SDK checkout")
+    command.add_argument("--output", type=Path, help="Directory for adaengine_ngx.dll and the NGX libraries")
     command = targets.add_parser("playground", parents=[common], help="Build the existing Studio DOM frontend")
     command.add_argument("--cloud-panels", type=Path, help="adawebsite dist-panels directory")
     command = targets.add_parser("wasm", parents=[common], help="Export release DOM Studio + AdaWebPlayer (WSL on Windows)")
@@ -96,6 +99,8 @@ def main(argv=None):
         elif args.command == "build":
             if args.target == "playground":
                 result = web.playground(ctx, args)
+            elif args.target == "ngx-bridge":
+                result = ngx.bridge(ctx, args)
             elif args.target == "wasm":
                 args.studio_origin = args.studio_origin or ["http://127.0.0.1:8080"]
                 result = web.wasm(ctx, args)

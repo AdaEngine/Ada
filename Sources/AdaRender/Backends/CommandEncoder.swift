@@ -124,6 +124,16 @@ public protocol CommandBuffer: AnyObject {
     /// - Returns: `true` when the upscale was encoded; otherwise `false` so the caller can use a fallback pass.
     func encodeSpatialUpscale(source: Texture, destination: Texture) -> Bool
 
+    /// Encodes the build of a bottom-level structure from triangles.
+    ///
+    /// - Returns: `true` when the build was encoded; `false` when the backend cannot build acceleration structures.
+    func encodeBuild(of structure: any AccelerationStructure, geometry: AccelerationStructureGeometry) -> Bool
+
+    /// Encodes the build of a top-level structure from instances of built bottom-level structures.
+    ///
+    /// - Returns: `true` when the build was encoded; `false` when the backend cannot build acceleration structures.
+    func encodeBuild(of structure: any AccelerationStructure, instances: [AccelerationStructureInstance]) -> Bool
+
     /// Commits the command buffer for execution on the GPU.
     ///
     /// After calling this method, the command buffer is submitted to the GPU
@@ -149,6 +159,10 @@ extension CommandBuffer {
     public func encodeSpatialUpscale(source _: Texture, destination _: Texture) -> Bool {
         false
     }
+
+    public func encodeBuild(of _: any AccelerationStructure, geometry _: AccelerationStructureGeometry) -> Bool { false }
+
+    public func encodeBuild(of _: any AccelerationStructure, instances _: [AccelerationStructureInstance]) -> Bool { false }
 }
 
 // MARK: - Blit Command Encoder
@@ -302,6 +316,8 @@ public struct RenderResourceSet {
             case uniformBuffer(UniformBuffer, offset: Int)
             case texture(Texture)
             case sampler(Sampler)
+            /// A top-level acceleration structure bound for ray queries.
+            case accelerationStructure(any AccelerationStructure)
         }
 
         public let binding: Int
