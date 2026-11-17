@@ -8,7 +8,6 @@ import Testing
 
 @Suite("Font Constants Builder Tests")
 struct FontConstantsBuilderTests {
-
     @Test("generates font constants from fonts config")
     func generatesFontConstants() throws {
         let temporaryDirectory = FileManager.default.temporaryDirectory
@@ -60,7 +59,7 @@ private func textureAtlasBuilderToolPath() throws -> URL {
     let executableName = "TextureAtlasBuilderTool"
     #endif
 
-    var candidates: [URL] = []
+    var candidates = [Bundle.module.bundleURL.deletingLastPathComponent().appendingPathComponent(executableName)]
     if let executableDirectory = Bundle.main.executableURL?.deletingLastPathComponent() {
         candidates.append(executableDirectory.appendingPathComponent(executableName))
     }

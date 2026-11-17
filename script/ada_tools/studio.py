@@ -46,7 +46,7 @@ def build(ctx, args):
             ctx.run(["xcodebuild", "-project", ctx.root / "Editor/AdaEditor.xcodeproj", "-scheme", "AdaEditor-Standalone",
                      "-configuration", mode.capitalize(), "-destination", "platform=macOS", "-derivedDataPath", scratch,
                      *(["DEBUG_INFORMATION_FORMAT=dwarf-with-dsym"] if profiling(args) else []),
-                     "CODE_SIGNING_ALLOWED=NO", "CODE_SIGNING_REQUIRED=NO", "build"], log=ctx.cache / f"{label}-{mode}-build.log")
+                     "ARCHS=arm64", "CODE_SIGNING_ALLOWED=NO", "CODE_SIGNING_REQUIRED=NO", "build"], log=ctx.cache / f"{label}-{mode}-build.log")
             app = scratch / "Build/Products" / mode.capitalize() / "Ada Studio.app"
             ctx.run(["/usr/bin/codesign", "--force", "--deep", "--sign", "-", "--entitlements",
                      ctx.root / "Editor/Platforms/AdaEditor-Standalone.entitlements", app])

@@ -56,7 +56,7 @@ if [[ -z "$studio_source" ]]; then
     xcodegen generate --spec "$studio_root/Editor/project.yml"
     xcodebuild -project "$studio_root/Editor/AdaEditor.xcodeproj" \
         -scheme AdaEditor-Standalone -configuration Release -destination 'platform=macOS' \
-        -derivedDataPath "$studio_derived_data" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+        -derivedDataPath "$studio_derived_data" ARCHS=arm64 CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
     studio_source="$studio_derived_data/Build/Products/Release/Ada Studio.app"
     # Local source builds use an ad-hoc signature; prebuilt bundles keep their signatures.
     /usr/bin/codesign --force --deep --sign - \

@@ -46,7 +46,7 @@ to select a different checkout.
 | Host | Release installation | Debug installation |
 | --- | --- | --- |
 | Windows x64 | `%LOCALAPPDATA%/Programs/Ada Studio` | `%LOCALAPPDATA%/Programs/Ada Studio Debug` |
-| macOS | `~/Applications/Ada Studio.app` | `~/Applications/Ada Studio Debug.app` |
+| macOS (Apple Silicon) | `~/Applications/Ada Studio.app` | `~/Applications/Ada Studio Debug.app` |
 | Linux x64/ARM64 | `$XDG_DATA_HOME/ada-studio` | `$XDG_DATA_HOME/ada-studio-debug` |
 
 On Linux, `XDG_DATA_HOME` defaults to `~/.local/share`. On macOS the CLI builds

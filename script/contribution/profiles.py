@@ -105,7 +105,12 @@ def build_checks(root, paths, config, paths_file, logs, quick=False, runtime=Non
                 scratch = config["swift_scratch"] + ("-editor" if package == "Editor" else "")
                 common = ["--package-path", package, "--scratch-path", scratch]
                 jobs = ["--jobs", "2"] if sys.platform == "win32" else []
-                test_options = ["--skip-build", "--no-parallel"] if sys.platform == "win32" else ["--parallel"]
+                if sys.platform == "win32":
+                    test_options = ["--skip-build", "--no-parallel"]
+                elif sys.platform == "darwin" and package == ".":
+                    test_options = ["--no-parallel"]
+                else:
+                    test_options = ["--parallel"]
                 checks.append(Check(prefix + "-build", "analysis", ["swift", "build", "--build-tests", "-v", *jobs, *common], timeout=timeout))
                 selected = [p for p in swift_paths if p.startswith("Editor/") == (package == "Editor")]
                 checks.append(adapter(prefix + "-analysis", "analysis") if selected else

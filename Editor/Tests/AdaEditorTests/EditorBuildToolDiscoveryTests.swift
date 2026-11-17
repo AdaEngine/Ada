@@ -25,7 +25,9 @@ struct EditorBuildToolDiscoveryTests {
         try fixture.executable("Android/Sdk/build-tools/35.0.0/aapt2")
         try fixture.directory("Android/Sdk/build-tools/36.0.0")
         let result = EditorBuildToolDiscovery.discover(environment: fixture.environment, home: fixture.root)
-        #expect(result["ANDROID_NDK_HOME"] == fixture.root.appendingPathComponent("Android/Sdk/ndk/27.1").path)
+        let ndk = try #require(result["ANDROID_NDK_HOME"])
+        #expect(URL(fileURLWithPath: ndk).resolvingSymlinksInPath()
+            == fixture.root.appendingPathComponent("Android/Sdk/ndk/27.1").resolvingSymlinksInPath())
         #expect(result["ANDROID_BUILD_TOOLS_VERSION"] == "35.0.0")
     }
 
@@ -41,7 +43,8 @@ struct EditorBuildToolDiscoveryTests {
         var environment = fixture.environment
         environment["JAVA_HOME"] = java.deletingLastPathComponent().deletingLastPathComponent().path
         let first = EditorBuildToolDiscovery.discover(environment: environment, home: fixture.root)
-        #expect(first["SWIFT_EXECUTABLE"] == swift.path)
+        let swiftPath = try #require(first["SWIFT_EXECUTABLE"])
+        #expect(URL(fileURLWithPath: swiftPath).resolvingSymlinksInPath() == swift.resolvingSymlinksInPath())
         #expect(first["JAVA_HOME"] != environment["JAVA_HOME"])
         try fixture.executable("JDK/bin/javac")
         #expect(EditorBuildToolDiscovery.discover(environment: environment, home: fixture.root)["JAVA_HOME"] == environment["JAVA_HOME"])
@@ -120,9 +123,11 @@ struct EditorBuildToolDiscoveryTests {
         try fixture.executable("Android/Sdk/platform-tools/adb")
         try fixture.file("Android/Sdk/ndk/27.1/source.properties")
         var configuration = EditorBuildExportConfiguration()
-        let found = ["ANDROID_HOME": fixture.root.appendingPathComponent("Android/Sdk").path,
-                     "ANDROID_NDK_HOME": fixture.root.appendingPathComponent("Android/Sdk/ndk/27.1").path,
-                     "ANDROID_BUILD_TOOLS_VERSION": "35.0.0"]
+        let found = [
+            "ANDROID_HOME": fixture.root.appendingPathComponent("Android/Sdk").path,
+            "ANDROID_NDK_HOME": fixture.root.appendingPathComponent("Android/Sdk/ndk/27.1").path,
+            "ANDROID_BUILD_TOOLS_VERSION": "35.0.0"
+        ]
         #expect(configuration.applyDiscoveredTools(found, for: .android, unchangedSince: configuration) == 3)
     }
 
@@ -132,9 +137,14 @@ struct EditorBuildToolDiscoveryTests {
         init() throws {
             root = FileManager.default.temporaryDirectory.appendingPathComponent("Ada tools Тест " + UUID().uuidString)
             try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-            environment = ["LOCALAPPDATA": root.path, "ProgramFiles": root.appendingPathComponent("Program Files").path,
-                           "ProgramFiles(x86)": root.appendingPathComponent("Program Files x86").path,
-                           "SystemDrive": root.path, "PATH": "", "ANDROID_HOME": root.appendingPathComponent("Android/Sdk").path]
+            environment = [
+                "LOCALAPPDATA": root.path,
+                "ProgramFiles": root.appendingPathComponent("Program Files").path,
+                "ProgramFiles(x86)": root.appendingPathComponent("Program Files x86").path,
+                "SystemDrive": root.path,
+                "PATH": "",
+                "ANDROID_HOME": root.appendingPathComponent("Android/Sdk").path
+            ]
         }
         func remove() { try? FileManager.default.removeItem(at: root) }
         func directory(_ relative: String) throws {

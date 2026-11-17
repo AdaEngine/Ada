@@ -7,18 +7,13 @@ struct EditorBuildSDK: Sendable {
     let compilerRoot: URL
 
     static func appBundle(containing executable: URL) -> URL? {
-        var url = executable.resolvingSymlinksInPath().deletingLastPathComponent()
-        // `deletingLastPathComponent()` of "/" yields "/.." on current Foundation, so compare
-        // path components instead of URLs; otherwise a non-bundle launch never terminates.
-        while url.pathComponents.count > 1 {
-            if url.pathExtension == "app" {
-                return url
-            }
-            let parent = url.deletingLastPathComponent().standardizedFileURL
-            guard parent.pathComponents.count < url.pathComponents.count else { break }
-            url = parent
+        let bin = executable.resolvingSymlinksInPath().deletingLastPathComponent()
+        let contents = bin.deletingLastPathComponent()
+        let app = contents.deletingLastPathComponent()
+        guard bin.lastPathComponent == "MacOS", contents.lastPathComponent == "Contents", app.pathExtension == "app" else {
+            return nil
         }
-        return nil
+        return app
     }
 
     static func locate(

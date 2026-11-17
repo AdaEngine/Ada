@@ -1,0 +1,3 @@
+ARCHS[sdk=macosx*] = arm64
+CODE_SIGN_STYLE[sdk=macosx*] = Manual
+CODE_SIGN_IDENTITY[sdk=macosx*] = -

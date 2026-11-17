@@ -5,6 +5,15 @@ import Testing
 
 @Suite("Editor distribution channels")
 struct EditorDistributionTests {
+    #if os(macOS)
+    @Test func swiftPMToolsAreOutsideTheStudioApplication() {
+        let xcode = URL(fileURLWithPath: "/Applications/Xcode.app")
+        let helper = xcode.appendingPathComponent("Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/libexec/swift/pm/swiftpm-testing-helper")
+        #expect(EditorBuildSDK.appBundle(containing: helper) == nil)
+        #expect(EditorDistribution.current == .standalone)
+    }
+    #endif
+
     #if os(Windows)
     @Test("Windows Studio always provides the standalone distribution")
     func windowsIsStandalone() {

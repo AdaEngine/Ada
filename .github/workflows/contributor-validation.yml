@@ -50,10 +50,17 @@ jobs:
     name: Applicable contributor checks
     runs-on: macos-26
     timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: AdaEngine
+    env:
+      ADAENGINE_PACKAGE_PATH: ${{ github.workspace }}/AdaEngine
+      ADA_MCP_LOCAL_PATH: ${{ github.workspace }}/.build-tools/contributor-mcp
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          path: AdaEngine
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -62,6 +69,14 @@ jobs:
       - name: Determine actual changed paths
         id: scope
         run: python script/check_contribution.py ci-files --output .build-tools/contribution/ci-paths.json
+      - name: Check out the pinned local MCP dependency
+        if: steps.scope.outputs.swift == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: AdaEngine/AdaMCP
+          ref: ed7bb9076f9f8c91e2584ca9b7201df0e03defb1
+          path: .build-tools/contributor-mcp
+          persist-credentials: false
       - uses: maxim-lobanov/setup-xcode@v1
         if: steps.scope.outputs.swift == 'true'
         with:
@@ -72,18 +87,34 @@ jobs:
       - uses: pnpm/action-setup@v4
         if: steps.scope.outputs.web == 'true'
         with:
-          package_json_file: Editor/WebUI/package.json
+          package_json_file: AdaEngine/Editor/WebUI/package.json
       - name: Install frontend dependencies
         if: steps.scope.outputs.web == 'true'
-        working-directory: Editor/WebUI
+        working-directory: AdaEngine/Editor/WebUI
         run: pnpm install --frozen-lockfile
       - name: Run the actual applicable profile
-        run: python script/check_contribution.py check --files-from .build-tools/contribution/ci-paths.json
+        run: |
+          paths=.build-tools/contribution/ci-paths.json
+          runtime=()
+          if jq -e '
+            map(select((startswith("Editor/Sources/") or startswith("Sources/") or startswith("Editor/WebUI/"))
+                       and (endswith(".md") or contains(".docc/") or startswith("Editor/Sources/AdaEditor/Assets/Documentation/") | not)))
+            | length > 0 and all(.[];
+              . == "Editor/Sources/AdaEditor/EditorDistribution.swift"
+              or . == "Editor/Sources/AdaEditor/Tooling/EditorBuildSDK.swift"
+              or . == "Editor/Sources/AdaEditor/Tooling/EditorAdaScriptLint.swift")
+          ' "$paths" >/dev/null; then
+            runtime+=(--runtime-command '["swift","test","--package-path","Editor","--scratch-path",".build-tools/contribution/swift-build-editor","--skip-build","--filter","EditorDistributionTests|EditorAdaScriptLintTests"]')
+          fi
+          python script/check_contribution.py check --files-from "$paths" "${runtime[@]}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: contributor-quality
-          path: .build-tools/contribution/
+          path: |
+            AdaEngine/.build-tools/contribution/checks/**/paths.json
+            AdaEngine/.build-tools/contribution/checks/**/report.json
+            AdaEngine/.build-tools/contribution/checks/**/*.log
           if-no-files-found: ignore
 
   gate:

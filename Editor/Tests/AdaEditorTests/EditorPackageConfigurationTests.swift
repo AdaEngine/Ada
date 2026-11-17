@@ -9,7 +9,7 @@ struct EditorPackageConfigurationTests {
         let manifest = try String(contentsOf: editorRoot.appendingPathComponent("Package.swift"), encoding: .utf8)
 
         #expect(manifest.contains("name: \"AdaEditor\""))
-        #expect(manifest.contains(".package(name: \"AdaEngine\", path: adaEngineLocalPath)"))
+        #expect(manifest.contains(".package(name: \"AdaEngine\", path: adaEngineLocalPath,"))
         #expect(manifest.contains("name: \"AdaEditor\""))
         #expect(manifest.contains(".product(name: \"AdaEngine\", package: \"AdaEngine\")"))
         #expect(manifest.contains(".product(name: \"AdaScriptCompilerCore\", package: \"AdaEngine\")"))
