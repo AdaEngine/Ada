@@ -46,6 +46,58 @@ def fixture(directory, host="windows"):
         path.write_text(value, encoding="utf-8")
 
 
+class BuildProgressTests(unittest.TestCase):
+    def test_interactive_timer_updates_while_compiler_is_silent(self):
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+
+        stderr = Terminal()
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stderr(stderr):
+            ctx = Context(argparse.Namespace(), root=directory)
+            log = Path(directory) / "compiler.log"
+            ctx.run([sys.executable, "-c", "import time; time.sleep(1.3); print('compiled')"], log=log)
+            self.assertEqual(log.read_text(encoding="utf-8"), "compiled\n")
+
+        output = stderr.getvalue()
+        self.assertIn("Building... 00:00 elapsed", output)
+        self.assertIn("Building... 00:01 elapsed", output)
+        self.assertRegex(output, r"Build elapsed: \d\d:\d\d\ncompiled\n")
+
+    def test_redirected_compiler_failure_keeps_log_and_plain_output(self):
+        stderr = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stderr(stderr):
+            ctx = Context(argparse.Namespace(), root=directory)
+            log = Path(directory) / "compiler.log"
+            with self.assertRaisesRegex(ToolError, r"Command failed \(7\)"):
+                ctx.run([sys.executable, "-c", "print('error: failed'); raise SystemExit(7)"], log=log)
+            self.assertEqual(log.read_text(encoding="utf-8"), "error: failed\n")
+
+        output = stderr.getvalue()
+        self.assertIn("Compiler log: " + str(log), output)
+        self.assertIn("error: failed\n", output)
+        self.assertNotIn("\r", output)
+        self.assertNotIn("elapsed", output)
+
+    def test_interactive_timer_fits_narrow_terminal(self):
+        class Terminal(io.StringIO):
+            def isatty(self):
+                return True
+
+            def fileno(self):
+                return 2
+
+        stderr = Terminal()
+        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stderr(stderr):
+            ctx = Context(argparse.Namespace(), root=directory)
+            with patch("script.ada_tools.context.os.get_terminal_size", return_value=os.terminal_size((18, 24))):
+                ctx.run([sys.executable, "-c", "pass"], log=Path(directory) / "compiler.log")
+
+        frames = [line for line in stderr.getvalue().split("\r")[1:] if line.startswith(("|", "/", "-", "\\"))]
+        self.assertTrue(frames)
+        self.assertTrue(all(len(frame) < 18 for frame in frames), "Timer frame wraps in a narrow terminal")
+
+
 class CLIParsingTests(unittest.TestCase):
     def test_default_prepare_selects_all_profiles(self):
         self.assertEqual(parser().parse_args(["prepare"]).components, [])

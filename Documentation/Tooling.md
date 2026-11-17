@@ -148,8 +148,11 @@ python ada_tool.py build studio --debug --scratch-path /path/to/isolated-build
 `build engine` compiles the AdaEngine target. `build studio` prepares native
 dependencies and builds the app; it prints the binary directory or macOS `.app`.
 Use `install studio` for a complete runnable distribution on Windows/Linux.
-Build logs are saved in the host CLI cache. Build stages appear in the terminal
-as they run; the last 30 log lines are also printed when compilation finishes.
+Build logs are saved in the host CLI cache. In an interactive terminal,
+`build engine`, `build studio`, and `install studio` from source show a spinner
+and an elapsed timer while the compiler runs, even during quiet periods. The
+compiler duration and the last 30 log lines appear when compilation finishes.
+Redirected output keeps its usual line format.
 A failing compiler exits nonzero with the log location. Default builds use their
 own scratch directory, leaving the shared SwiftPM `.build` intact. If an explicitly
 reused scratch cache belongs to another compiler, choose a new `--scratch-path`.

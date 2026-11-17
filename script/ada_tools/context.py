@@ -1,6 +1,7 @@
 """Shared process, download and host configuration helpers (standard library only)."""
 from collections import deque
 import hashlib
+from itertools import cycle
 import json
 import ntpath
 import os
@@ -13,6 +14,8 @@ import stat
 import subprocess
 import sys
 import tarfile
+import threading
+import time
 import urllib.request
 import urllib.parse
 import zipfile
@@ -23,6 +26,76 @@ PIN = json.loads((ROOT / "Tools/ada-toolchain.json").read_text(encoding="utf-8")
 
 class ToolError(RuntimeError):
     """An actionable CLI error, displayed without a Python traceback."""
+
+
+class _BuildProgress:
+    def __init__(self, output):
+        self.output = output
+        self.started = time.monotonic()
+        self.width = 0
+        self.lock = threading.Lock()
+        self.done = threading.Event()
+        self.thread = threading.Thread(target=self._animate) if output.isatty() else None
+
+    def __enter__(self):
+        if self.thread is not None:
+            try:
+                self.thread.start()
+            except BaseException:
+                self.done.set()
+                raise
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        if self.thread is not None:
+            self.done.set()
+            self.thread.join()
+            if exc_type is None:
+                self._clear()
+                print(f"Build elapsed: {self._elapsed()}", file=self.output, flush=True)
+            elif self.width:
+                # Ctrl-C may have already echoed at the end of the status line.
+                print(file=self.output, flush=True)
+
+    def _elapsed(self):
+        minutes, seconds = divmod(int(time.monotonic() - self.started), 60)
+        return f"{minutes:02d}:{seconds:02d}"
+
+    def _available_columns(self):
+        try:
+            columns = os.get_terminal_size(self.output.fileno()).columns
+        except OSError:
+            columns = 0
+        # Leave the last column free so a redraw cannot wrap on narrow terminals.
+        return (columns or 80) - 1
+
+    def _clear(self):
+        if self.width:
+            self.output.write("\r" + " " * min(self.width, self._available_columns()) + "\r")
+            self.width = 0
+
+    def _animate(self):
+        for frame in cycle("|/-\\"):
+            if self.done.is_set():
+                break
+            elapsed = self._elapsed()
+            status = f"{frame} Building... {elapsed} elapsed"
+            columns = self._available_columns()
+            if len(status) > columns:
+                status = f"{frame} {elapsed}"[:columns]
+            with self.lock:
+                self.output.write("\r" + status.ljust(min(self.width, columns)))
+                self.output.flush()
+                self.width = len(status)
+            if self.done.wait(0.2):
+                break
+
+    def forward(self, line):
+        with self.lock:
+            self._clear()
+            if self.thread is not None and not line.endswith("\n"):
+                line += "\n"
+            print(line, end="", file=self.output, flush=True)
 
 
 class Context:
@@ -102,13 +175,14 @@ class Context:
             with log.open("w", encoding="utf-8") as stream:
                 with subprocess.Popen(invocation, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, **options) as process:
                     try:
-                        for line in process.stdout:
-                            stream.write(line)
-                            tail.append(line)
-                            if re.match(r"^(?:\[\d+/\d+\]|Building for|Build complete!|error:)", line):
-                                stream.flush()
-                                print(line, end="", file=sys.stderr, flush=True)
-                        result = subprocess.CompletedProcess(invocation, process.wait(), stdout="")
+                        with _BuildProgress(sys.stderr) as progress:
+                            for line in process.stdout:
+                                stream.write(line)
+                                tail.append(line)
+                                if re.match(r"^(?:\[\d+/\d+\]|Building for|Build complete!|error:)", line):
+                                    stream.flush()
+                                    progress.forward(line)
+                            result = subprocess.CompletedProcess(invocation, process.wait(), stdout="")
                     except BaseException:
                         process.kill()
                         process.wait()
