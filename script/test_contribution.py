@@ -60,7 +60,10 @@ class ProfileTests(unittest.TestCase):
 
     def test_renderer_requires_real_gpu_and_runtime_checks(self):
         checks = build_checks(REPO, ["Sources/AdaRender/RenderEngine.swift"], CONFIG, REPO / "files.json", REPO)
-        self.assertIn("webgpu", [check.name for check in checks])
+        gpu = next(check for check in checks if check.name == "gpu")
+        self.assertEqual(gpu.argv, ["bash", "script/validate_gpu.sh"])
+        self.assertTrue(gpu.tests and gpu.required_output)
+        self.assertIn("gpu", CONFIG["pre_push"]["ci_checks"])
         self.assertEqual(next(check for check in checks if check.name == "runtime-smoke").status, "blocked")
 
     def test_editor_and_root_tests_both_selected_for_shared_change(self):

@@ -1,8 +1,8 @@
 import AdaApp
+@_spi(Internal) @testable import AdaRender
 import AdaTransform
 import AdaUtils
 import Math
-@_spi(Internal) @testable import AdaRender
 import Testing
 
 @testable import AdaCorePipelines
@@ -91,22 +91,25 @@ struct Temporal3DIntegrationTests {
         }
     }
 
-    @Test
-    func unsupportedBackendLeavesTemporalDisabledAndUsesTheOrdinarySceneTarget() async throws {
+    @Test(arguments: [TemporalReconstructionMethod.automatic, .dlss])
+    func unavailableDLSSUsesPortableReconstruction(method: TemporalReconstructionMethod) async throws {
         try setup()
         let world = World()
+        let device = HeadlessRenderBackend().renderDevice
         world.insertResource(Temporal3DViews())
-        world.insertResource(RenderDeviceHandler(renderDevice: HeadlessRenderBackend().renderDevice))
+        world.insertResource(TemporalReconstructionStatuses())
+        world.insertResource(RenderDeviceHandler(renderDevice: device))
         var camera = Camera()
-        camera.temporalUpscaling = .init()
+        camera.temporalUpscaling = .init(method: method)
         var target = RenderViewTarget()
         target.mainTexture = RenderTexture(size: [128, 128], scaleFactor: 1, format: .bgra8)
         target.outputTexture = target.mainTexture
+        let source = world.spawn().id
         let entity = world.spawn {
             camera
             target
             GlobalViewUniform()
-            ExtractedCameraSource(entityId: world.spawn().id)
+            ExtractedCameraSource(entityId: source)
             CameraRenderGraph(subgraphLabel: .main3D, inputSlot: Core3DPlugin.InputNode.view)
         }
         let system = PrepareTemporal3DSystem(world: world)
@@ -114,10 +117,15 @@ struct Temporal3DIntegrationTests {
         system.update(context: WorldUpdateContext(world: world, scheduler: "Temporal test"))
         await system.queries.finish(world)
         let result = try #require(entity.components[RenderViewTarget.self])
-        #expect(!result.temporalUpscalingActive)
-        #expect(result.temporalJitter == .zero)
-        #expect(result.mainTexture === target.mainTexture)
-        #expect(world.getResource(Temporal3DViews.self)?.entries.isEmpty == true)
+        let presentation = try #require(result.temporalPresentationTexture)
+        #expect(result.temporalUpscalingActive)
+        #expect(result.mainTexture === presentation)
+        #expect(result.outputTexture === target.outputTexture)
+        #expect(world.getResource(Temporal3DViews.self)?.entries[source]?.method == .portable)
+        let status = try #require(world.getResource(TemporalReconstructionStatuses.self)?[source])
+        #expect(status.requested == method)
+        #expect(status.active == .portable)
+        #expect(status.fallbackReason == (method == .dlss ? device.dlssStatus.unavailableReason : nil))
     }
 
     @Test

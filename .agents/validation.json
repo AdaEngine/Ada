@@ -230,7 +230,7 @@
         ],
         "reason": "Unavailable local validation remains mandatory on the configured CI host; its result is not assumed successful"
       },
-      "webgpu": {
+      "gpu": {
         "targets": [
           {
             "workflow": ".github/workflows/contributor-validation.yml",
