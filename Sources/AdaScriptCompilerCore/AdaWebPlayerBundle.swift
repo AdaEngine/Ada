@@ -131,7 +131,12 @@ public enum AdaWebPlayerBundle {
                 try file.resourceValues(forKeys: [.isDirectoryKey]).isDirectory != true,
                 AdaWebLegacyShader.containsLegacySource(at: file, declaredExtension: fileExtension)
             else { continue }
-            throw AdaWebPlayerProjectError.invalid("Player template contains a legacy shader at `\(path)`. Re-export the player template.")
+            #if os(Windows)
+                let relativePath = path.replacingOccurrences(of: "\\", with: "/")
+            #else
+                let relativePath = path
+            #endif
+            throw AdaWebPlayerProjectError.invalid("Player template contains a legacy shader at `\(relativePath)`. Re-export the player template.")
         }
     }
 

@@ -9,6 +9,7 @@ on:
       - 'script/test_ada_tool.py'
       - 'script/*studio*'
       - 'Tools/ada-toolchain.json'
+      - '.github/actions/setup-ubuntu-swift/action.yml'
       - '.github/workflows/ada-tool.yml'
   push:
     branches: [main, develop]
@@ -19,6 +20,7 @@ on:
       - 'script/test_ada_tool.py'
       - 'script/*studio*'
       - 'Tools/ada-toolchain.json'
+      - '.github/actions/setup-ubuntu-swift/action.yml'
       - '.github/workflows/ada-tool.yml'
   workflow_dispatch:
 
@@ -28,6 +30,7 @@ permissions:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         os: [windows-2022, macos-26, ubuntu-24.04]
     runs-on: ${{ matrix.os }}
@@ -43,5 +46,10 @@ jobs:
         with:
           branch: swift-6.3.1-release
           tag: 6.3.1-RELEASE
+      - name: Set up Swift on Ubuntu
+        if: runner.os == 'Linux'
+        uses: ./.github/actions/setup-ubuntu-swift
+      - name: Check Swift availability
+        run: swift --version
       - name: Test CLI and installation transactions
         run: python script/test_ada_tool.py

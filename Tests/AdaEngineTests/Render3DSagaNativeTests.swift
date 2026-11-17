@@ -23,11 +23,15 @@
                 try scene.configure { $0.gpuOcclusionEnabled = true }
                 let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
                 var compacted = ordinary
+                // Read back each preparation frame so the next frame sees completed SAGA resource work.
                 for _ in 0..<4 {
-                    compacted = try await scene.render(.none)
+                    compacted = try await scene.render(.none, frames: 1)
                     if world.getResource(GPUVisibility3DState.self)?.output(for: scene.camera.id) != nil { break }
                 }
-                let output = try #require(world.getResource(GPUVisibility3DState.self)?.output(for: scene.camera.id))
+                let output = try #require(
+                    world.getResource(GPUVisibility3DState.self)?.output(for: scene.camera.id),
+                    "GPU visibility must produce indirect draws after the preparation frames."
+                )
                 #expect(output.drawCount > 0)
                 let comparison = GoldenFrame.compare(compacted, ordinary, tolerance: GoldenFrame.activeTolerance)
                 #expect(comparison.passes(GoldenFrame.activeTolerance))
