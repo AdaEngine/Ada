@@ -91,15 +91,16 @@ struct Temporal3DIntegrationTests {
         }
     }
 
-    @Test
-    func unavailableDLSSFallsBackToPortableTemporalReconstruction() async throws {
+    @Test(arguments: [TemporalReconstructionMethod.automatic, .dlss])
+    func unavailableDLSSUsesPortableReconstruction(method: TemporalReconstructionMethod) async throws {
         try setup()
         let world = World()
+        let device = HeadlessRenderBackend().renderDevice
         world.insertResource(Temporal3DViews())
         world.insertResource(TemporalReconstructionStatuses())
-        world.insertResource(RenderDeviceHandler(renderDevice: HeadlessRenderBackend().renderDevice))
+        world.insertResource(RenderDeviceHandler(renderDevice: device))
         var camera = Camera()
-        camera.temporalUpscaling = .init(method: .dlss)
+        camera.temporalUpscaling = .init(method: method)
         var target = RenderViewTarget()
         target.mainTexture = RenderTexture(size: [128, 128], scaleFactor: 1, format: .bgra8)
         target.outputTexture = target.mainTexture
@@ -116,14 +117,17 @@ struct Temporal3DIntegrationTests {
         system.update(context: WorldUpdateContext(world: world, scheduler: "Temporal test"))
         await system.queries.finish(world)
         let result = try #require(entity.components[RenderViewTarget.self])
-        let status = try #require(world.getResource(TemporalReconstructionStatuses.self)?[source])
-        #expect(status.requested == .dlss)
-        #expect(status.active == .portable)
-        #expect(status.fallbackReason != nil)
+        let presentation = try #require(result.temporalPresentationTexture)
         #expect(result.temporalUpscalingActive)
         #expect(result.temporalJitter != .zero)
+        #expect(result.mainTexture === presentation)
         #expect(result.mainTexture !== target.mainTexture)
+        #expect(result.outputTexture === target.outputTexture)
         #expect(world.getResource(Temporal3DViews.self)?.entries[source]?.method == .portable)
+        let status = try #require(world.getResource(TemporalReconstructionStatuses.self)?[source])
+        #expect(status.requested == method)
+        #expect(status.active == .portable)
+        #expect(status.fallbackReason == (method == .dlss ? device.dlssStatus.unavailableReason : nil))
     }
 
     @Test

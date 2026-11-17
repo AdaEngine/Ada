@@ -37,8 +37,12 @@ struct SAGAIndexedIndirectTests {
         vertex.compiledShader = try device.compileShader(from: vertex)
         fragment.compiledShader = try device.compileShader(from: fragment)
         let pipeline = device.createRenderPipeline(from: .init(
-            vertex: vertex, fragment: fragment, debugName: "GPU-written indirect arguments",
-            backfaceCulling: false, depthPixelFormat: .none, colorAttachments: [.init(format: .rgba8)]
+            vertex: vertex,
+            fragment: fragment,
+            debugName: "GPU-written indirect arguments",
+            backfaceCulling: false,
+            depthPixelFormat: .none,
+            colorAttachments: [.init(format: .rgba8)]
         ))
         let indices: [UInt32] = [0, 1, 2]
         let index = try unsafe indices.withUnsafeBytes { bytes in
@@ -46,14 +50,14 @@ struct SAGAIndexedIndirectTests {
             return unsafe device.createIndexBuffer(label: "Indirect triangle indices", format: .uInt32, bytes: pointer, length: bytes.count)
         }
         let visible = Texture2D(
-            gpuTexture: device.createTexture(from: .init(
-                width: 8, height: 8, pixelFormat: .rgba8, textureUsage: [.renderTarget, .read], textureType: .texture2D
-            )), sampler: device.createSampler(from: .init()), size: [8, 8]
+            gpuTexture: device.createTexture(from: .init(width: 8, height: 8, pixelFormat: .rgba8, textureUsage: [.renderTarget, .read], textureType: .texture2D)),
+            sampler: device.createSampler(from: .init()),
+            size: [8, 8]
         )
         let empty = Texture2D(
-            gpuTexture: device.createTexture(from: .init(
-                width: 8, height: 8, pixelFormat: .rgba8, textureUsage: [.renderTarget, .read], textureType: .texture2D
-            )), sampler: device.createSampler(from: .init()), size: [8, 8]
+            gpuTexture: device.createTexture(from: .init(width: 8, height: 8, pixelFormat: .rgba8, textureUsage: [.renderTarget, .read], textureType: .texture2D)),
+            sampler: device.createSampler(from: .init()),
+            size: [8, 8]
         )
         let stride = MemoryLayout<IndexedIndirectArguments>.stride
         let arguments = try #require(device.createBuffer(label: "Indirect words", length: 2 * stride, options: .storageShared) as? SAGABuffer)
@@ -81,9 +85,12 @@ struct SAGAIndexedIndirectTests {
             ]))
             pass.setRenderPipelineState(pipeline)
             pass.setIndexBuffer(index, offset: 0)
-            #expect(!pass.drawIndexedIndirect(arguments: arguments, offset: 1))
-            #expect(!pass.drawIndexedIndirect(arguments: arguments, offset: stride + 4))
-            #expect(pass.drawIndexedIndirect(arguments: arguments, offset: offset))
+            let acceptedMisalignedOffset = pass.drawIndexedIndirect(arguments: arguments, offset: 1)
+            #expect(!acceptedMisalignedOffset)
+            let acceptedOutOfRangeOffset = pass.drawIndexedIndirect(arguments: arguments, offset: stride + 4)
+            #expect(!acceptedOutOfRangeOffset)
+            let acceptedValidOffset = pass.drawIndexedIndirect(arguments: arguments, offset: offset)
+            #expect(acceptedValidOffset)
             pass.endRenderPass()
         }
         commands.commit()

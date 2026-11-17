@@ -1,0 +1,14 @@
+name: Set up the pinned Swift on Ubuntu
+description: Set up the Ubuntu Swift toolchain selected by Tools/ada-toolchain.json.
+
+runs:
+  using: composite
+  steps:
+    - id: pin
+      shell: bash
+      run: |
+        version=$(python3 -c 'import json; print(json.load(open("Tools/ada-toolchain.json"))["swift"]["linux"])')
+        printf 'version=%s\n' "$version" >> "$GITHUB_OUTPUT"
+    - uses: swift-actions/setup-swift@364295d9c23900ce04d4e5cc708387921b4e50f9 # v3
+      with:
+        swift-version: ${{ steps.pin.outputs.version }}

@@ -1,0 +1,42 @@
+name: SwiftPM Test on Ubuntu
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  Ubuntu:
+    name: Ubuntu with SwiftPM
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      ADAENGINE_HEADLESS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-ubuntu-swift
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libx11-dev libasound2-dev libvulkan-dev
+      - name: Swift version
+        run: swift --version
+      - name: Build and test
+        # Use the same serial engine test execution as Windows for shared renderer state.
+        run: |
+          swift build --jobs 2 --product AdaEnginePackageTests
+          swift build --jobs 2 --product TextureAtlasBuilderTool
+          swift test --skip-build --no-parallel
+      - name: Test Mesh Terrain authoring kernel
+        run: |
+          swift build --jobs 2 --traits MeshTerrainAuthoring --product AdaEnginePackageTests
+          swift test --traits MeshTerrainAuthoring --skip-build --no-parallel --filter 'MeshTerrain|TriangleBoolean|TriangleIndexEdges'
+      - name: Build native Vulkan renderer
+        env:
+          ADAENGINE_HEADLESS: "0"
+        run: swift build --scratch-path "$RUNNER_TEMP/ada-vulkan" --jobs 2 --target AdaRender

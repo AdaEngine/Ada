@@ -10,6 +10,7 @@ import json
 import os
 from pathlib import Path
 import plistlib
+import re
 import shutil
 import stat
 import subprocess
@@ -47,21 +48,52 @@ def fixture(directory, host="windows"):
 
 
 class BuildProgressTests(unittest.TestCase):
-    def test_interactive_timer_updates_while_compiler_is_silent(self):
+    def run_silent_compiler(self, *, columns, progress_updates):
+        elapsed = set()
+
         class Terminal(io.StringIO):
             def isatty(self):
                 return True
 
+            def fileno(self):
+                return 2
+
+            def write(self, text):
+                written = super().write(text)
+                frame = re.match(r"\r[|/\\-] (?:Building\.\.\. )?(\d\d:\d\d)", text)
+                if frame and frame[1] not in elapsed:
+                    elapsed.add(frame[1])
+                    if len(elapsed) == progress_updates:
+                        progress_seen.touch()
+                return written
+
+        # Keep the real child silent and alive until the terminal receives the required updates.
+        compiler = (
+            "import sys, time\n"
+            "from pathlib import Path\n"
+            "progress_seen = Path(sys.argv[1])\n"
+            "deadline = time.monotonic() + 30\n"
+            "while not progress_seen.exists():\n"
+            "    if time.monotonic() >= deadline:\n"
+            "        raise SystemExit('Timed out waiting for elapsed build progress')\n"
+            "    time.sleep(0.02)\n"
+            "print('compiled')\n"
+        )
         stderr = Terminal()
         with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stderr(stderr):
             ctx = Context(argparse.Namespace(), root=directory)
             log = Path(directory) / "compiler.log"
-            ctx.run([sys.executable, "-c", "import time; time.sleep(1.3); print('compiled')"], log=log)
+            progress_seen = Path(directory) / "progress-seen"
+            with patch("script.ada_tools.context.os.get_terminal_size", return_value=os.terminal_size((columns, 24))):
+                ctx.run([sys.executable, "-c", compiler, progress_seen], log=log)
             self.assertEqual(log.read_text(encoding="utf-8"), "compiled\n")
 
-        output = stderr.getvalue()
-        self.assertIn("Building... 00:00 elapsed", output)
-        self.assertIn("Building... 00:01 elapsed", output)
+        return stderr.getvalue()
+
+    def test_interactive_timer_updates_while_compiler_is_silent(self):
+        output = self.run_silent_compiler(columns=80, progress_updates=2)
+        updates = re.findall(r"Building\.\.\. (\d\d:\d\d) elapsed", output)
+        self.assertGreaterEqual(len(set(updates)), 2)
         self.assertRegex(output, r"Build elapsed: \d\d:\d\d\ncompiled\n")
 
     def test_redirected_compiler_failure_keeps_log_and_plain_output(self):
@@ -80,25 +112,22 @@ class BuildProgressTests(unittest.TestCase):
         self.assertNotIn("elapsed", output)
 
     def test_interactive_timer_fits_narrow_terminal(self):
-        class Terminal(io.StringIO):
-            def isatty(self):
-                return True
-
-            def fileno(self):
-                return 2
-
-        stderr = Terminal()
-        with tempfile.TemporaryDirectory() as directory, contextlib.redirect_stderr(stderr):
-            ctx = Context(argparse.Namespace(), root=directory)
-            with patch("script.ada_tools.context.os.get_terminal_size", return_value=os.terminal_size((18, 24))):
-                ctx.run([sys.executable, "-c", "pass"], log=Path(directory) / "compiler.log")
-
-        frames = [line for line in stderr.getvalue().split("\r")[1:] if line.startswith(("|", "/", "-", "\\"))]
+        output = self.run_silent_compiler(columns=18, progress_updates=1)
+        frames = [line for line in output.split("\r")[1:] if line.startswith(("|", "/", "-", "\\"))]
         self.assertTrue(frames)
         self.assertTrue(all(len(frame) < 18 for frame in frames), "Timer frame wraps in a narrow terminal")
 
 
 class CLIParsingTests(unittest.TestCase):
+    def dump_package(self, env, directory=ROOT):
+        # Cold hosted runners may need to compile the Swift package manifest before returning its JSON.
+        result = subprocess.run(
+            ["swift", "package", "--disable-sandbox", "dump-package"],
+            cwd=directory, env=env, capture_output=True, text=True, timeout=120,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
     def test_default_prepare_selects_all_profiles(self):
         self.assertEqual(parser().parse_args(["prepare"]).components, [])
 
@@ -322,10 +351,7 @@ class CLIParsingTests(unittest.TestCase):
     def test_web_manifest_excludes_legacy_shader_compilers_on_wasi(self):
         env = os.environ.copy()
         env["ADAENGINE_WEB_EXPORT"] = "1"
-        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
-                                capture_output=True, text=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        manifest = json.loads(result.stdout)
+        manifest = self.dump_package(env)
         render = next(target for target in manifest["targets"] if target["name"] == "AdaRender")
         legacy = {"SPIRVCompiler", "SPIRV-Cross", "glslang"}
         wasi_compilers = []
@@ -344,10 +370,7 @@ class CLIParsingTests(unittest.TestCase):
                         "ADAENGINE_SAGA_METAL"):
             env.pop(setting, None)
         env["ADAENGINE_HEADLESS"] = "1"
-        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
-                                capture_output=True, text=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        manifest = json.loads(result.stdout)
+        manifest = self.dump_package(env)
         render = next(target for target in manifest["targets"] if target["name"] == "AdaRender")
         shader_compilers = {"AdaWGSLCompiler", "SPIRVCompiler", "SPIRV-Cross", "glslang"}
         active_compilers = set()
@@ -365,10 +388,8 @@ class CLIParsingTests(unittest.TestCase):
         for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL",
                         "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_PACKAGE_PATH"):
             env.pop(setting, None)
-        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
-                                capture_output=True, text=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        target = next(item for item in json.loads(result.stdout)["targets"] if item["name"] == "AdaRender")
+        manifest = self.dump_package(env)
+        target = next(item for item in manifest["targets"] if item["name"] == "AdaRender")
         for setting in target["settings"]:
             if setting["kind"].get("define", {}).get("_0") in {"METAL", "LEGACY_GLSL_COMPILER"}:
                 platforms = setting.get("condition", {}).get("platformNames") or ["all"]
@@ -380,15 +401,6 @@ class CLIParsingTests(unittest.TestCase):
                 self.assertNotIn("watchos", platforms, "watchOS must not select Metal or its legacy compiler")
 
     def test_engine_shader_resources_have_no_legacy_bundle(self):
-        env = os.environ.copy()
-        for setting in ("ADAENGINE_ANDROID", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL",
-                        "ADAENGINE_SAGA_METAL_NATIVE_PASS", "ADAENGINE_SAGA_PACKAGE_PATH"):
-            env.pop(setting, None)
-        command = ["swift", "package", "--disable-sandbox", "dump-package"]
-        result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True, text=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        targets = {target["name"]: target for target in json.loads(result.stdout)["targets"]}
-        self.assertFalse({"AdaLegacyShaders", "SPIRVCompiler", "SPIRV-Cross", "glslang"}.intersection(targets))
         self.assertFalse((ROOT / "LegacyShaders").exists())
         for target in ("AdaCorePipelines", "AdaRender", "AdaUI", "AdaSpine", "AdaSprite", "AdaText", "AdaTilemap"):
             assets = ROOT / "Sources" / target / "Assets"
@@ -401,12 +413,9 @@ class CLIParsingTests(unittest.TestCase):
                         "ADAENGINE_SAGA_PACKAGE_PATH"):
             env.pop(setting, None)
         profiles = ({}, {"ADAENGINE_HEADLESS": "1"}, {"ADAENGINE_WEB_EXPORT": "1"}, {"ADAENGINE_ANDROID": "1"})
-        command = ["swift", "package", "--disable-sandbox", "dump-package"]
         for profile in profiles:
             with self.subTest(profile=profile):
-                result = subprocess.run(command, cwd=ROOT, env=env | profile, capture_output=True, text=True, timeout=30)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                manifest = json.loads(result.stdout)
+                manifest = self.dump_package(env | profile)
                 targets = {target["name"]: target for target in manifest["targets"]}
                 self.assertFalse({"AdaLegacyShaders", "SPIRVCompiler", "SPIRV-Cross", "glslang"}.intersection(targets))
                 if not profile and sys.platform == "darwin":
@@ -424,10 +433,8 @@ class CLIParsingTests(unittest.TestCase):
             source = Path(temporary) / "AdaEngine"
             source.mkdir()
             shutil.copy2(ROOT / "Package.swift", source)
-            result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=source, env=env,
-                                    capture_output=True, text=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        targets = {target["name"]: target for target in json.loads(result.stdout)["targets"]}
+            manifest = self.dump_package(env, directory=source)
+        targets = {target["name"]: target for target in manifest["targets"]}
         self.assertFalse({"AdaLegacyShaders", "glslang", "SPIRVCompiler", "SPIRV-Cross"}.intersection(targets))
         products = {edge["product"][0] for edge in targets["AdaRender"]["dependencies"] if "product" in edge}
         self.assertIn("SAGAMetal" if sys.platform == "darwin" else "SAGAVulkan", products)
@@ -448,14 +455,10 @@ class CLIParsingTests(unittest.TestCase):
             (sdk / "sdk.json").write_text(json.dumps({"schemaVersion": 1, "engine": "AdaEngine", "saga": "SAGA"}))
             moved = root / "Moved BuildSDK"
             sdk.rename(moved)
-            command = ["swift", "package", "--disable-sandbox", "dump-package"]
             for override, expected in ((None, moved / "SAGA"), (root / "Alternate SAGA", root / "Alternate SAGA")):
                 with self.subTest(override=override):
                     profile = env | ({"ADAENGINE_SAGA_PACKAGE_PATH": str(override)} if override else {})
-                    result = subprocess.run(command, cwd=moved / "AdaEngine", env=profile,
-                                            capture_output=True, text=True, timeout=30)
-                    self.assertEqual(result.returncode, 0, result.stderr)
-                    dependencies = json.loads(result.stdout)["dependencies"]
+                    dependencies = self.dump_package(profile, directory=moved / "AdaEngine")["dependencies"]
                     paths = [Path(package["path"]) for edge in dependencies for package in edge.get("fileSystem", [])
                              if package.get("nameForTargetDependencyResolutionOnly") == "SAGA"]
                     self.assertEqual(paths, [expected])
@@ -466,10 +469,8 @@ class CLIParsingTests(unittest.TestCase):
                         "ADAENGINE_SAGA_METAL_NATIVE_PASS"):
             env.pop(setting, None)
         env["ADAENGINE_ANDROID"] = "1"
-        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
-                                capture_output=True, text=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        render = next(target for target in json.loads(result.stdout)["targets"] if target["name"] == "AdaRender")
+        manifest = self.dump_package(env)
+        render = next(target for target in manifest["targets"] if target["name"] == "AdaRender")
         legacy = {"SPIRVCompiler", "SPIRV-Cross", "glslang"}
         vulkan_platforms = {"linux", "windows", "android"}
         linked = []
@@ -486,10 +487,7 @@ class CLIParsingTests(unittest.TestCase):
         for setting in ("ADAENGINE_SAGA_PACKAGE_PATH", "ADAENGINE_WEB_EXPORT", "ADAENGINE_HEADLESS", "ADAENGINE_SAGA_METAL"):
             env.pop(setting, None)
         env["ADAENGINE_ANDROID"] = "1"
-        result = subprocess.run(["swift", "package", "--disable-sandbox", "dump-package"], cwd=ROOT, env=env,
-                                capture_output=True, text=True, timeout=30)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        manifest = json.loads(result.stdout)
+        manifest = self.dump_package(env)
         saga = [package for dependency in manifest["dependencies"] for package in dependency.get("sourceControl", [])
                 if package["identity"] == "saga"]
         self.assertEqual(len(saga), 1, "Vulkan manifest still requires a sibling SAGA checkout")
