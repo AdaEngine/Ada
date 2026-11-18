@@ -104,7 +104,7 @@ struct UIShadowMaterial: UIShaderMaterial {
         descriptor.debugName = "UI Shadow"
         descriptor.fragment = fragment
         descriptor.vertexDescriptor = vertexDescriptor
-        descriptor.backfaceCulling = true
+        descriptor.backfaceCulling = false
         descriptor.colorAttachments = [
             RenderPipelineColorAttachmentDescriptor(
                 format: .bgra8,

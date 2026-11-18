@@ -18,6 +18,31 @@ struct RenderingClipTests {
         try Application.prepareForTest()
     }
 
+    @Test
+    func transparentSubtreeLeavesOnlyVisibleSiblingInDrawCommands() {
+        let tester = ViewTester {
+            ZStack {
+                Canvas { context, size in
+                    context.clip(to: Rect(origin: .zero, size: size)) { clipped in
+                        clipped.drawRect(Rect(origin: .zero, size: size), color: .blue)
+                    }
+                }
+                .opacity(0)
+
+                Color.red
+            }
+        }
+
+        let context = UIGraphicsContext()
+        tester.containerView.viewTree.rootNode.draw(with: context)
+        let colors = context.getDrawCommands().compactMap { command -> Color? in
+            guard case let .drawQuad(_, _, color) = command else { return nil }
+            return color
+        }
+
+        #expect(colors == [.red], "A fully transparent subtree must leave no draw commands")
+    }
+
     @Test(arguments: [false, true], [Float(1), 2])
     func nestedScrollViewportClipsFollowAncestorScrolling(horizontalOuter: Bool, scale: Float) throws {
         let tester = ViewTester {

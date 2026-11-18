@@ -23,7 +23,9 @@ import Logging
 enum AdaApplicationEntry {
     @MainActor static func main() async throws {
         #if os(Windows)
-        if try EditorWindowsCloudAuthentication.receiveLaunchCallback(CommandLine.arguments) { return }
+        if try EditorWindowsCloudAuthentication.receiveLaunchCallback(CommandLine.arguments) {
+            return
+        }
         #endif
         #if os(macOS) || os(Windows) || os(Linux)
             if EditorCLI.isInvocation(CommandLine.arguments) {
@@ -120,7 +122,11 @@ struct AdaEditorApp: App {
             ProjectOpeningView()
             #endif
         }
-        .windowMode(.windowed)
+        #if os(macOS)
+            .windowMode(launchProject == nil ? .windowed : .fullScreenWindowed)
+        #else
+            .windowMode(.windowed)
+        #endif
         .windowTitle("Ada Editor")
         .windowTitleBar(
             WindowTitleBar(
@@ -165,8 +171,10 @@ struct AdaEditorApp: App {
                             to orient first. Use editor.scene.get before editor.scene.apply and pass the returned revision. Structured scene edits
                             update the open document, enter Ada Editor undo history, and are saved through the editor's normal save/autosave path.
                             Use editor.build.start/editor.test.start/editor.play.start for project tasks, editor.task.status to poll, and editor.output.read for logs.
-                            To see or play the game use editor.play.capture or render.capture_screenshot (both return the running game's camera frame, never the editor) and editor.play.run_scenario (timed input, frames, state, logs).
-                            Use editor.gravity.* tools for project-aware Gravity LSP operations on .ada and .gravity files. Runtime ECS changes made with automation.run are not saved to scene files.
+                            To see or play the game use editor.play.capture or render.capture_screenshot (both return the running game's camera frame, \
+                            never the editor) and editor.play.run_scenario (timed input, frames, state, logs).
+                            Use editor.gravity.* tools for project-aware Gravity LSP operations on .ada and .gravity files. \
+                            Runtime ECS changes made with automation.run are not saved to scene files.
                             Use editor.web.search/fetch for external references and editor.web.download to save internet assets under Assets or Downloads.
                             Use editor.store.search with popular sorting to recommend community assets, and editor.store.asset to inspect licenses before suggesting downloads.
                             Use editor.docs.search/read and editor.components.describe for offline references and exact component payloads.

@@ -8,6 +8,7 @@ import AdaRender
 /// A reflected material that renders into an AdaUI view bounds as a quad.
 ///
 /// Use this with ``CustomMaterial`` and ``View/shaderEffect(_:placement:)``.
+/// Group 0, binding 2 is reserved for the renderer's view projection.
 public protocol UIShaderMaterial: ReflectedMaterial {}
 
 extension UIShaderMaterial {
@@ -28,7 +29,7 @@ extension UIShaderMaterial {
         descriptor.debugName = "UI Shader Material \(String(describing: Self.self))"
         descriptor.fragment = fragment
         descriptor.vertexDescriptor = vertexDescriptor
-        descriptor.backfaceCulling = true
+        descriptor.backfaceCulling = false
         descriptor.colorAttachments = [
             RenderPipelineColorAttachmentDescriptor(
                 format: .bgra8,

@@ -24,6 +24,12 @@
         "links": []
       },
       {
+        "kind": "text",
+        "text": "On macOS, project windows open maximized within the display's usable area.",
+        "level": 0,
+        "links": []
+      },
+      {
         "kind": "heading",
         "text": "Explore and edit",
         "level": 2,
