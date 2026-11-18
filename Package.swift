@@ -1480,7 +1480,7 @@ if let sagaPath = sagaCheckoutPath {
     package.dependencies.append(.package(name: "SAGA", path: sagaPath))
 } else {
     // SAGA Metal compositor submission and native Vulkan surface presentation.
-    let sagaRevision = "16295c09102cca4998badb1a38dbd8218270aad4"
+    let sagaRevision = "b4778ced1da4b26e850b020d0f4cfe223d95d5c7"
     package.dependencies.append(.package(
         url: "https://github.com/AdaEngine/SAGA.git",
         revision: sagaRevision

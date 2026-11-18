@@ -126,6 +126,21 @@ public final class RenderEngine: RenderBackend, Sendable {
         try self.renderBackend.destroyWindow(windowId)
     }
 
+    #if os(Windows)
+        /// Keeps the native window alive until the render backend has released its surface.
+        /// Call after removing the render window with `destroyWindow`.
+        @MainActor
+        package func afterPendingWindowRetirement(_ completion: @escaping @MainActor @Sendable () -> Void) {
+            #if SAGA_RENDER && SAGA_NATIVE && canImport(SAGAVulkan) && canImport(SAGACompiler)
+                if let saga = renderBackend as? SAGANativeRenderBackend {
+                    saga.context.queue.enqueueCleanup { await completion() }
+                    return
+                }
+            #endif
+            completion()
+        }
+    #endif
+
     func getRenderWindow(for windowId: WindowID) -> RenderWindow? {
         self.renderBackend.getRenderWindow(for: windowId)
     }

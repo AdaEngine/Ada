@@ -258,15 +258,31 @@
         }
 
         override func closeWindow(_ window: UIWindow) {
-            guard let systemWindow = window.systemWindow as? WindowsSystemWindow else {
-                fatalError("System window not exist.")
+            guard windows[window.id] != nil, let systemWindow = window.systemWindow as? WindowsSystemWindow else {
+                return
             }
 
+            let handle = UInt(bitPattern: systemWindow.hwnd)
+            let hide: @Sendable () -> Void = {
+                unsafe _ = ShowWindow(HWND(bitPattern: handle), SW_HIDE)
+            }
+            uiThread.sync(hide)
             self.resetTextInputDecoderState(for: window.id)
             unsafe windowMinimumSizes.removeValue(forKey: window.id)
             self.removeWindow(window, setActiveAnotherIfNeeded: true)
-            _ = self.uiThread.sync {
-                unsafe DestroyWindow(systemWindow.hwnd)
+            unsafe windowHandles.removeValue(forKey: window.id)
+
+            // The window procedure still uses an unretained UIWindow until DestroyWindow returns.
+            let destroy: @MainActor @Sendable () -> Void = { [uiThread, window] in
+                let destroyNativeWindow: @Sendable () -> Void = {
+                    unsafe _ = DestroyWindow(HWND(bitPattern: handle))
+                }
+                withExtendedLifetime(window) { uiThread.sync(destroyNativeWindow) }
+            }
+            if let renderer = unsafe RenderEngine.shared {
+                renderer.afterPendingWindowRetirement(destroy)
+            } else {
+                destroy()
             }
         }
 

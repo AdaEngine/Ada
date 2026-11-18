@@ -12,8 +12,8 @@
     import SAGA
     import SAGABackend
     import SAGACompiler
-    import SAGAShaderIR
     import SAGACore
+    import SAGAShaderIR
     import SAGATypes
     import Synchronization
 
@@ -61,7 +61,8 @@
         ) {
             self.debugErrors = debugErrors
             if debugErrors {
-                FileHandle.standardError.write(Data("[SAGA] debug error logging enabled\n".utf8))
+                // Desktop applications can start without a standard error handle.
+                try? FileHandle.standardError.write(contentsOf: Data("[SAGA] debug error logging enabled\n".utf8))
             }
             self.capabilities = capabilities
             self.supportsPresentation = supportsPresentation
@@ -71,7 +72,7 @@
                 context: makeDevice,
                 onError: { error in
                     errorLog.record("\(error)")
-                    FileHandle.standardError.write(Data("[SAGA] device operation failed: \(error)\n".utf8))
+                    try? FileHandle.standardError.write(contentsOf: Data("[SAGA] device operation failed: \(error)\n".utf8))
                 }
             )
         }
@@ -92,7 +93,9 @@
             let key = colors.map { String($0.rawValue) }.joined(separator: ",") + "|" + (depth.map { String($0.rawValue) } ?? "-")
                 + "|" + (rasterizationLayer.map(String.init) ?? "-")
             return clearPipelines.withLock { cache in
-                if let existing = cache[key] { return existing }
+                if let existing = cache[key] {
+                    return existing
+                }
                 let slot = ResourceSlot<SAGATypes.RenderPipeline>()
                 cache[key] = slot
                 let output = shaderOutput
