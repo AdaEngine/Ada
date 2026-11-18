@@ -49,7 +49,7 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
     /// `ADAENGINE_SAGA_TRACE=1` writes each job's origin to stderr as it starts and ends, to find a stalled job.
     private static var traces: Bool { ProcessInfo.processInfo.environment["ADAENGINE_SAGA_TRACE"] == "1" }
     private static func trace(_ message: String) {
-        FileHandle.standardError.write(Data(("[SAGA queue] " + message + "\n").utf8))
+        try? FileHandle.standardError.write(contentsOf: Data("[SAGA queue] \(message)\n".utf8))
     }
 
     private struct State {
