@@ -2,6 +2,7 @@
     @testable import AdaRender
     import AdaUtils
     import Math
+    import MetalKit
     import SAGABackend
     import SAGACore
     import SAGAShaderIR
@@ -43,6 +44,37 @@
             #expect(removed.withLock { $0 } == [11], "An attached surface must retire even if device setup failed")
             #expect(context.errorLog.all.count == 1)
         }
+
+        #if os(macOS)
+            @MainActor
+            @Test
+            func metalWindowDoesNotQueueAnotherFrameWhilePresentationIsPending() async throws {
+                let backend = try SAGAMetalRenderBackend()
+                let windowID = WindowID()
+                let size = SizeInt(width: 16, height: 16)
+                let view = MTKView(frame: CGRect(x: 0, y: 0, width: 16, height: 16))
+                try backend.createWindow(windowID, for: view, size: size)
+                let swapchain = try #require(backend.renderDevice.createSwapchain(from: windowID))
+
+                let release = BackendCompletion()
+                backend.context.queue.enqueueCleanup {
+                    try await release.wait(timeout: .seconds(5))
+                }
+                let drawable = try #require(swapchain.getNextDrawable(backend.renderDevice))
+                try drawable.present()
+
+                #expect(
+                    swapchain.getNextDrawable(backend.renderDevice) == nil,
+                    "Metal must apply backpressure while a window presentation is pending"
+                )
+
+                await release.finish(.success(()))
+                await backend.context.queue.drain()
+                #expect(swapchain.getNextDrawable(backend.renderDevice) != nil)
+                try backend.destroyWindow(windowID)
+                await backend.context.queue.drain()
+            }
+        #endif
 
         private static func unavailableContext() throws -> SAGAContext {
             SAGAContext(

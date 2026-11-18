@@ -127,6 +127,12 @@ public struct RenderSystem {
             for window in windows {
                 try window.currentDrawable?.present()
             }
+            #if os(macOS) && SAGA_METAL && canImport(SAGACompiler)
+                // Finish this frame before the next update generates more GPU work.
+                if let drawable = windows.lazy.compactMap({ $0.currentDrawable as? SAGADrawable }).first {
+                    await drawable.waitForPresentation()
+                }
+            #endif
         } catch {
             assertionFailure("Failed to execute render graph \(error)")
         }

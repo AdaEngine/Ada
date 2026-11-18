@@ -531,7 +531,11 @@ public struct UIDrawPass: DrawPass {
             var bindings: [RenderResourceSet.Binding] = []
 
             for (_, buffer) in descriptorSet.uniformsBuffers {
-                guard let uniformBuffer = materialData.uniformBufferSet[buffer.name] else {
+                // The render pass owns the projection, even when an effect reflects that binding.
+                guard
+                    groupIndex != 0 || buffer.binding != GlobalBufferIndex.viewUniform,
+                    let uniformBuffer = materialData.uniformBufferSet[buffer.name]
+                else {
                     continue
                 }
 

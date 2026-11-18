@@ -82,13 +82,20 @@
             layer.contentsScale = CGFloat(view.scaleFactor)
             layer.isOpaque = view.isOpaque
             let id = try metal.addSurface(MetalPresentationSurface(layer: layer, onPresented: onPresented))
+            #if os(macOS)
+                // Display-linked updates can outpace Metal's presentation queue.
+                let waitsForPresentation = true
+            #else
+                let waitsForPresentation = false
+            #endif
             let window = SAGAWindow(
                 context: context,
                 windowId: windowId,
                 size: size,
                 scaleFactor: surface.scaleFactor,
                 pixelFormat: surface.prefferedPixelFormat,
-                surfaceID: id
+                surfaceID: id,
+                waitsForPresentation: waitsForPresentation
             )
             windows.withLock {
                 $0[windowId] = WindowBinding(window: window, scaleFactor: { [weak view] in view?.scaleFactor ?? 1 })

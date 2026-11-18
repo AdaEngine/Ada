@@ -35,8 +35,13 @@
         private let state: Mutex<State>
 
         init(
-            context: SAGAContext, windowId: WindowID, size: SizeInt, scaleFactor: Float,
-            pixelFormat: PixelFormat, surfaceID: UInt32? = 0, waitsForPresentation: Bool = false
+            context: SAGAContext,
+            windowId: WindowID,
+            size: SizeInt,
+            scaleFactor: Float,
+            pixelFormat: PixelFormat,
+            surfaceID: UInt32? = 0,
+            waitsForPresentation: Bool = false
         ) {
             self.context = context
             self.windowId = windowId
@@ -159,5 +164,15 @@
         func present() throws {
             window.present(backbuffer)
         }
+
+        #if os(macOS) && SAGA_METAL
+            func waitForPresentation() async {
+                await withCheckedContinuation { continuation in
+                    window.context.queue.enqueueCleanup {
+                        continuation.resume()
+                    }
+                }
+            }
+        #endif
     }
 #endif

@@ -63,6 +63,9 @@ final class OpacityViewNodeModifier: ViewModifierNode {
     }
 
     override func draw(with context: UIGraphicsContext) {
+        guard opacity != 0, context.opacity != 0 else {
+            return
+        }
         if let layer {
             var context = context
             context.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)

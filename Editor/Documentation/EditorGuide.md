@@ -7,6 +7,8 @@ visible action surfaces and states, themed fields, colored vector-axis badges an
 
 Use **Create new project** on the welcome screen, or choose **File > Open Project** to open an existing project. AdaScript projects use `.ada` source files. Projects with native Swift code also use Swift Package Manager.
 
+On macOS, project windows open maximized within the display's usable area.
+
 ## Explore and edit
 
 The Project Navigator shows project files. Select a source file to edit it, or a `.ascn` scene to open the scene viewport. Use the scene hierarchy to select entities and the Inspector to edit their components. Use **File > New File** to create files and **File > Import Assets** to bring assets into the project.
