@@ -237,6 +237,63 @@
                 #expect(backend.context.errorLog.all.isEmpty, "SAGA device errors: \(backend.context.errorLog.all)")
             }
 
+        @Test(.enabled(if: Self.available))
+        @MainActor
+        func nativeWindowClosesAfterPendingPresentationRetires() async throws {
+            let windowClass = Array("STATIC".utf16) + [0]
+            let hwnd = try #require(
+                unsafe windowClass.withUnsafeBufferPointer { name in
+                    unsafe CreateWindowExW(
+                        0,
+                        name.baseAddress,
+                        nil,
+                        DWORD(WS_OVERLAPPEDWINDOW),
+                        0,
+                        0,
+                        96,
+                        96,
+                        nil,
+                        nil,
+                        GetModuleHandleW(nil),
+                        nil
+                    )
+                }
+            )
+            let handle = UInt(bitPattern: hwnd)
+            defer {
+                if IsWindow(hwnd) { DestroyWindow(hwnd) }
+            }
+
+            let backend = try SAGANativeRenderBackend(windowless: false)
+            let renderer = RenderEngine(renderBackend: backend)
+            let windowID = WindowID()
+            try renderer.createWindow(
+                windowID,
+                for: WindowsSurface(windowId: windowID, windowHwnd: UnsafeMutableRawPointer(hwnd)),
+                size: SizeInt(width: 64, height: 64)
+            )
+            let device = renderer.renderDevice
+            let swapchain = try #require(device.createSwapchain(from: windowID))
+            let drawable = try #require(swapchain.getNextDrawable(device))
+            let (release, gate) = AsyncStream<Void>.makeStream()
+            defer { gate.finish() }
+            backend.context.queue.enqueueCleanup {
+                var waiting = release.makeAsyncIterator()
+                _ = await waiting.next()
+            }
+            try drawable.present()
+            try renderer.destroyWindow(windowID)
+            let closed = await withCheckedContinuation { continuation in
+                renderer.afterPendingWindowRetirement {
+                    continuation.resume(returning: unsafe DestroyWindow(HWND(bitPattern: handle)))
+                }
+                #expect(unsafe IsWindow(hwnd))
+                gate.finish()
+            }
+            #expect(closed)
+            #expect(backend.context.errorLog.all.isEmpty, "SAGA device errors: \(backend.context.errorLog.all)")
+        }
+
         @Test(.enabled(if: SAGAVulkanDeviceTests.available))
         @MainActor
         func twoWindowsPresentAndTheFirstSurfaceCanBeRecreated() async throws {
