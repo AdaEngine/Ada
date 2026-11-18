@@ -108,9 +108,10 @@ def build_checks(root, paths, config, paths_file, logs, quick=False, runtime=Non
                 test_timeout = timeout
                 if sys.platform == "win32":
                     test_options = ["--skip-build", "--no-parallel"]
-                elif sys.platform == "darwin" and package == ".":
-                    test_options = ["--no-parallel"]
-                    test_timeout = timeout * 2
+                elif sys.platform == "darwin":
+                    test_options = ["--skip-build", "--no-parallel"]
+                    if package == ".":
+                        test_timeout = timeout * 2
                 else:
                     test_options = ["--parallel"]
                 checks.append(Check(prefix + "-build", "analysis", ["swift", "build", "--build-tests", "-v", *jobs, *common], timeout=timeout))
