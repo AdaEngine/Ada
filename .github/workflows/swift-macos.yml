@@ -27,7 +27,7 @@ jobs:
           run: python3 script/test_install_studio_macos.py
 
         - name: Test
-          run: swift test --parallel
+          run: swift test --no-parallel
 
         - name: Test Mesh Terrain authoring kernel
           env:

@@ -105,13 +105,21 @@ def build_checks(root, paths, config, paths_file, logs, quick=False, runtime=Non
                 scratch = config["swift_scratch"] + ("-editor" if package == "Editor" else "")
                 common = ["--package-path", package, "--scratch-path", scratch]
                 jobs = ["--jobs", "2"] if sys.platform == "win32" else []
-                test_options = ["--skip-build", "--no-parallel"] if sys.platform == "win32" else ["--parallel"]
+                test_timeout = timeout
+                if sys.platform == "win32":
+                    test_options = ["--skip-build", "--no-parallel"]
+                elif sys.platform == "darwin":
+                    test_options = ["--skip-build", "--no-parallel"]
+                    if package == ".":
+                        test_timeout = timeout * 2
+                else:
+                    test_options = ["--parallel"]
                 checks.append(Check(prefix + "-build", "analysis", ["swift", "build", "--build-tests", "-v", *jobs, *common], timeout=timeout))
                 selected = [p for p in swift_paths if p.startswith("Editor/") == (package == "Editor")]
                 checks.append(adapter(prefix + "-analysis", "analysis") if selected else
                               Check(prefix + "-analysis", "analysis", status="not_applicable",
                                     reason="No existing Swift source changed in " + package))
-                checks.append(Check(prefix + "-tests", "tests", ["swift", "test", *test_options, *jobs, *common], tests=True, timeout=timeout))
+                checks.append(Check(prefix + "-tests", "tests", ["swift", "test", *test_options, *jobs, *common], tests=True, timeout=test_timeout))
     if "web" in profiles:
         selected = [str(root / p) for p in paths if p.startswith("Editor/WebUI/")
                     and Path(p).suffix in (".js", ".jsx", ".mjs", ".ts", ".tsx", ".css") and (root / p).is_file()]

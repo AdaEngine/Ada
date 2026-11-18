@@ -287,6 +287,7 @@ class CLIParsingTests(unittest.TestCase):
                 elif host == "macos":
                     self.assertIn("-scheme AdaEditor-Standalone", plan)
                     self.assertIn("-configuration Debug", plan)
+                    self.assertIn("ARCHS=arm64", plan)
                 else:
                     self.assertIn("--configuration debug", plan)
                 self.assertEqual(list(root.iterdir()), [])

@@ -110,10 +110,13 @@ struct NavigationInteractivePopTests {
         host.touch(212, .moved)
         host.touch(212, .ended)
         host.model.path.append("replacement")
-        await Task.yield()
-        try await Task.sleep(for: .milliseconds(120))
-        #expect(host.model.path.count == 2)
-        #expect(host.stack.navigationContext.path.count == 2)
+        let replacementPath = host.model.path
+        for _ in 0..<50 where host.stack.navigationContext.path != replacementPath {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(replacementPath.count == 2)
+        #expect(host.model.path == replacementPath)
+        #expect(host.stack.navigationContext.path == replacementPath)
     }
 
     @Test

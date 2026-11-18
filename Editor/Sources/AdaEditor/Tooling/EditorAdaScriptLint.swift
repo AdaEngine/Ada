@@ -18,6 +18,7 @@ enum EditorAdaScriptLint {
             guard directoryValues.isSymbolicLink != true else {
                 continue
             }
+            let directoryComponents = directory.resolvingSymlinksInPath().pathComponents
             guard let files = FileManager.default.enumerator(
                 at: directory,
                 includingPropertiesForKeys: [.isRegularFileKey, .isSymbolicLinkKey],
@@ -37,11 +38,15 @@ enum EditorAdaScriptLint {
                     files.skipDescendants()
                     continue
                 }
-                guard values.isRegularFile == true, ["ada", "gravity"].contains(file.pathExtension.lowercased()),
-                    visited.insert(file.standardizedFileURL).inserted else {
+                guard values.isRegularFile == true, ["ada", "gravity"].contains(file.pathExtension.lowercased()) else {
                     continue
                 }
-                let relative = String(file.path.dropFirst(directory.path.count + 1))
+                let resolvedFile = file.resolvingSymlinksInPath()
+                let fileComponents = resolvedFile.pathComponents
+                guard fileComponents.starts(with: directoryComponents), visited.insert(resolvedFile).inserted else {
+                    continue
+                }
+                let relative = fileComponents.dropFirst(directoryComponents.count).joined(separator: "/")
                 if folder == sourcePath, !project.includesSource(relativePath: relative) {
                     continue
                 }

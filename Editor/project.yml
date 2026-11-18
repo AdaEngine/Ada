@@ -1,4 +1,7 @@
 name: AdaEditor
+settings:
+  base:
+    "ARCHS[sdk=macosx*]": arm64
 options:
   bundleIdPrefix: org.adaengine
   fileTypes:
@@ -15,6 +18,22 @@ packages:
   AdaEditor:
     path: .
 targets:
+  AdaEditor-Standalone-Release:
+    type: ""
+    platform: macOS
+    legacy:
+      toolPath: /usr/bin/env
+      workingDirectory: $(PROJECT_DIR)
+      arguments: >-
+        "XCODE_XCCONFIG_FILE=$(PROJECT_DIR)/Platforms/StandaloneLocalRelease.xcconfig"
+        /usr/bin/xcodebuild
+        -project AdaEditor.xcodeproj
+        -scheme AdaEditor-Standalone
+        -configuration Release
+        -destination platform=macOS,arch=arm64
+        -derivedDataPath ../.build-tools/ada-tool/macos-arm64/build/studio
+        build
+      passSettings: false
   AdaEditorUpdater:
     type: framework
     platform: macOS
@@ -31,8 +50,13 @@ targets:
         SWIFT_VERSION: "6.0"
         SKIP_INSTALL: true
         ENABLE_HARDENED_RUNTIME: true
-        DEVELOPMENT_TEAM: 8PYCRS3EA3
-        CODE_SIGN_STYLE: Automatic
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGN_STYLE: Manual
+        Release:
+          DEVELOPMENT_TEAM: 8PYCRS3EA3
+          CODE_SIGN_STYLE: Automatic
     dependencies:
       - package: Sparkle
         product: Sparkle
@@ -151,9 +175,15 @@ targets:
         ENABLE_HARDENED_RUNTIME: true
         ADAEDITOR_DISTRIBUTION: standalone
         CODE_SIGN_ENTITLEMENTS: Platforms/AdaEditor-Standalone.entitlements
-        DEVELOPMENT_TEAM: 8PYCRS3EA3
-        CODE_SIGN_STYLE: Automatic
-        "CODE_SIGN_IDENTITY[sdk=macosx*]": Apple Development
+      configs:
+        Debug:
+          CODE_SIGN_IDENTITY: "-"
+          CODE_SIGN_STYLE: Manual
+          ENABLE_HARDENED_RUNTIME: false
+        Release:
+          DEVELOPMENT_TEAM: 8PYCRS3EA3
+          CODE_SIGN_STYLE: Automatic
+          "CODE_SIGN_IDENTITY[sdk=macosx*]": Apple Development
     dependencies:
       - target: AdaEditorUpdater
         embed: true
@@ -224,9 +254,13 @@ targets:
             --output "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/BuildSDK"
           if [[ "${CODE_SIGNING_ALLOWED:-YES}" != "NO" ]]; then
             identity="${EXPANDED_CODE_SIGN_IDENTITY:--}"
-            /usr/bin/codesign --force --timestamp --options runtime --sign "${identity}" \
+            timestamp="--timestamp"
+            if [[ "${identity}" == "-" ]]; then
+              timestamp="--timestamp=none"
+            fi
+            /usr/bin/codesign --force "${timestamp}" --options runtime --sign "${identity}" \
               --entitlements "${SRCROOT}/Platforms/AdaEditor-Standalone.entitlements" "${cli_binary}"
-            /usr/bin/codesign --force --timestamp --options runtime --sign "${identity}" \
+            /usr/bin/codesign --force "${timestamp}" --options runtime --sign "${identity}" \
               "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/BuildSDK/AdaScript/gravity"
           fi
   AdaEditor-iPadOS:
@@ -463,13 +497,6 @@ targets:
           /usr/bin/ditto "${source_ui_resources}" "${destination_ui_resources}"
           /usr/bin/ditto "${source_a2ui_resources}" "${destination_a2ui_resources}"
 schemes:
-  AdaEditor-Standalone:
-    build:
-      targets:
-        AdaEditor-Standalone: all
-    run:
-      config: Release
-      executable: AdaEditor-Standalone
   AdaEditor-macOS:
     build:
       targets:
@@ -511,9 +538,17 @@ schemes:
       targets:
         AdaEditor-Standalone: all
     run:
-      config: Release
+      config: Debug
       executable: AdaEditor-Standalone
+    profile:
+      config: Release
     archive:
+      config: Release
+  AdaEditor-Standalone-Release:
+    build:
+      targets:
+        AdaEditor-Standalone-Release: [run]
+    run:
       config: Release
   AdaPlayer-iOS:
     build:

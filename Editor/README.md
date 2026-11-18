@@ -157,7 +157,17 @@ xcodegen generate
 open AdaEditor.xcodeproj
 ```
 
-The generated project uses the local `AdaEditor` SwiftPM package. To build and run the editor, select the `AdaEditor (Editor)` scheme that Xcode creates for the package's executable product.
+To build and run Ada Studio on Apple Silicon in Xcode, select the
+`AdaEditor-Standalone` scheme and the **My Mac** destination. Run uses Debug
+and a local ad-hoc signature.
+
+For a local Release build in Xcode, select `AdaEditor-Standalone-Release` and
+choose **Product > Build** (⌘B). This scheme invokes `xcodebuild` with Apple
+Silicon settings for the app and its Swift package dependencies. Open the
+ad-hoc signed `Ada Studio.app` from
+`.build-tools/ada-tool/macos-arm64/build/studio/Build/Products/Release` under
+the repository root. The same output directory is used by
+`python3 ada_tool.py build studio`.
 
 ## Command Line
 

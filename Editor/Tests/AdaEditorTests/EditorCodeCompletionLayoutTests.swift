@@ -1,3 +1,4 @@
+import Foundation
 import Math
 import Testing
 
@@ -8,6 +9,9 @@ struct EditorCodeCompletionLayoutTests {
     @Test("Snippet markers become an editable selection, and Enter keeps the default name")
     @MainActor
     func snippetPlaceholderAcceptsDefault() throws {
+        let projectDirectory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: projectDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: projectDirectory) }
         let item = EditorCompletionItem(
             label: "func",
             detail: nil,
@@ -20,14 +24,14 @@ struct EditorCodeCompletionLayoutTests {
             id: "main",
             title: "main.ada",
             relativePath: "main.ada",
-            absolutePath: "/tmp/main.ada",
+            absolutePath: projectDirectory.appendingPathComponent("main.ada").path,
             language: .ada,
             content: "fu",
             completionItems: [item],
             completionPosition: EditorSourceLocation(line: 0, character: 2)
         )
         let viewModel = EditorViewModel(
-            project: EditorProjectReference(name: "Game", path: "/tmp"),
+            project: EditorProjectReference(name: "Game", path: projectDirectory.path),
             workbench: EditorWorkbenchViewModel(activeEditorTab: "main.ada", openDocuments: [.text(document)], activeDocumentID: document.id)
         )
 

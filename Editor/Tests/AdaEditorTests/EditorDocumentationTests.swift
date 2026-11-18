@@ -57,7 +57,7 @@ struct EditorDocumentationTests {
             let model = EditorDocumentationViewModel()
             let window = EditorDocumentationWindowController.makeWindow(viewModel: model)
             defer { window.close() }
-            #expect(window.title == "Ada Documentation")
+            #expect(window.title == L10n.tr("Ada Documentation"))
             #expect(window.contentViewController is NSHostingController<EditorDocumentationView>)
             #expect(window.minSize.width == 760)
             model.select("AdaScripting")
@@ -69,11 +69,12 @@ struct EditorDocumentationTests {
         @Test
         func nativeReaderReusesWindowAndRoutesClose() throws {
             _ = NSApplication.shared
+            let title = L10n.tr("Ada Documentation")
             #expect(EditorDocumentationWindowController.open())
-            let window = try #require(NSApp.windows.first { $0.title == "Ada Documentation" && $0.isVisible })
+            let window = try #require(NSApp.windows.first { $0.title == title && $0.isVisible })
             defer { window.close() }
             #expect(EditorDocumentationWindowController.open())
-            #expect(NSApp.windows.filter { $0.title == "Ada Documentation" && $0.isVisible }.count == 1)
+            #expect(NSApp.windows.filter { $0.title == title && $0.isVisible }.count == 1)
             // The test runner has no foreground key window. Supply the actual reader window as the routing target.
             #expect(EditorDocumentationWindowController.handleMenuCommand(.closeEditor, keyWindow: nil) == nil)
             #expect(EditorDocumentationWindowController.handleMenuCommand(.closeEditor, keyWindow: window) == true)

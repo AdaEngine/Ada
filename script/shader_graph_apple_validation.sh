@@ -51,6 +51,7 @@ case "$check" in
     # Preserve the failing gate's status while still exercising native export.
     metal_status=0
     ADAENGINE_GOLDEN_SAGA=1 ADAENGINE_SPRITE_SAGA_SMOKE=1 \
+      ADAENGINE_SHADER_SOURCE_ROOT="$root" \
       ADAENGINE_GOLDEN_OUTPUT="$evidence/metal-frames" \
       swift test --package-path "$package" --scratch-path "$RUNNER_TEMP/metal-validation-build" \
       --jobs 3 --disable-sandbox --no-parallel \

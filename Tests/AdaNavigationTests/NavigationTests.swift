@@ -33,7 +33,7 @@ struct NavigationTests {
     func slopedSurface() async throws {
         var geometry = Geometry()
         geometry.quad([0, 0, 0], [0, 0, 10], [10, 5, 10], [10, 5, 0])
-        let settings = NavigationBakeSettings(agent: .init(maximumClimb: 0.3))
+        let settings = NavigationBakeSettings(agent: .init(maximumClimb: 0.3), cellSize: 0.1, cellHeight: 0.05)
         let mesh = try await makeMesh(geometry, settings: settings)
         let path = try await mesh.findPath(from: [1, 0.5, 1], to: [9, 4.5, 9])
         #expect(path.status == .complete)
@@ -300,18 +300,22 @@ private struct Geometry {
     }
 
     mutating func floor(x: ClosedRange<Float>, z: ClosedRange<Float>, y: Float = 0) {
-        quad([x.lowerBound, y, z.lowerBound], [x.lowerBound, y, z.upperBound],
-             [x.upperBound, y, z.upperBound], [x.upperBound, y, z.lowerBound])
+        quad(
+            [x.lowerBound, y, z.lowerBound],
+            [x.lowerBound, y, z.upperBound],
+            [x.upperBound, y, z.upperBound],
+            [x.upperBound, y, z.lowerBound]
+        )
     }
 
-    static func floor() -> Geometry {
-        var result = Geometry()
+    static func floor() -> Self {
+        var result = Self()
         result.floor(x: 0...10, z: 0...10)
         return result
     }
 
-    static func ring() -> Geometry {
-        var result = Geometry()
+    static func ring() -> Self {
+        var result = Self()
         result.floor(x: 0...4, z: 0...12)
         result.floor(x: 8...12, z: 0...12)
         result.floor(x: 4...8, z: 0...4)
@@ -319,8 +323,8 @@ private struct Geometry {
         return result
     }
 
-    static func islands() -> Geometry {
-        var result = Geometry()
+    static func islands() -> Self {
+        var result = Self()
         result.floor(x: 0...4, z: 0...4)
         result.floor(x: 8...12, z: 0...4)
         return result

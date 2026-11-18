@@ -22,4 +22,6 @@ if /usr/bin/grep -Fqx "$build_rpath" <<< "$rpaths"; then
     else
         /usr/bin/install_name_tool -rpath "$build_rpath" "$bundle_rpath" "$binary"
     fi
+elif ! /usr/bin/grep -Fqx "$bundle_rpath" <<< "$rpaths"; then
+    /usr/bin/install_name_tool -add_rpath "$bundle_rpath" "$binary"
 fi
