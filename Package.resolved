@@ -1,5 +1,5 @@
 {
-  "originHash" : "df2ee12b8380d114955fb6b580269cdea25d88ff609178aa0f7e54cae5eade40",
+  "originHash" : "50e88df9427402e9eadefe8a502a5a16366ed7a6b8f3ddefe6f9d50a157ca267",
   "pins" : [
     {
       "identity" : "javascriptkit",
@@ -15,7 +15,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/AdaEngine/SAGA.git",
       "state" : {
-        "revision" : "b4778ced1da4b26e850b020d0f4cfe223d95d5c7"
+        "revision" : "7062fb9e3d07522b00d443a38aa8596352b02927"
       }
     },
     {
