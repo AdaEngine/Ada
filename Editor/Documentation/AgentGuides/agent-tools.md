@@ -52,6 +52,17 @@ game creation and iteration. It covers playable loops, persistent authoring,
 controls/HUD, and build/simulation/visible Play verification using the host's
 available tools; catalog discovery does not enforce model selection.
 
+The bundled genre library adds 69 `ada-genre-*` skills plus the `ada-genres`
+router (brief matching, camera-token legend, online stand-in levels),
+`ada-genres-mashups` and `ada-genres-art-direction`, adapted from the
+MIT-licensed Claude-Code-Game-Studios genre sheets (attribution footer per
+skill, `NOTICE.md` in the skills root). `ada-game-builder` and
+`ada-autonomous-studio` point at them when a brief names or implies a genre.
+`editor.skills.read` returns `SKILL.md` content only, so every loadable sheet
+is a top-level skill directory; the router's `SOURCES.md` is repository
+traceability, not tool-readable. User guide:
+[AgentGenreSkills.md](../AgentGenreSkills.md).
+
 Scripted asset generation ([ADR-0026](../../../Documentation/ArchitectureDecisions/0026-scripted-asset-generation-and-autonomous-studio.md)):
 `editor.voxel.generate` (`.vox`), `editor.model.generate` (`.glb`), `editor.audio.generate` (`.wav`)
 and `editor.sprite.generate` (`.png`) run an agent-authored AdaScript `build` function in an isolated VM and

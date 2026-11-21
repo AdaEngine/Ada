@@ -42,6 +42,8 @@ Ask once, in one message, only what would change the game materially, at most fi
 
 ## 3. Design document
 
+When the brief names or implies a genre, load `ada-genres` and the matching `ada-genre-*` skill first: its defaults feed the camera, rules, content counts and acceptance criteria; joined genres also need `ada-genres-mashups`, and an undecided look needs `ada-genres-art-direction` for the art direction section.
+
 Write `DESIGN.md` with these sections, short and concrete:
 
 1. **Pitch**: one sentence, and the player's fantasy.

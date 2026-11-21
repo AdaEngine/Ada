@@ -91,6 +91,10 @@ The public [make-game workflow](https://github.com/PlayableIntelligence/game-cre
 was reviewed as a reference for game-development phases and iteration; the
 bundled instructions are written for AdaEngine's own authoring and runtime paths.
 
+A bundled genre library backs the workflow: 69 genre skills plus shared
+matching, mashup and art-direction skills, loaded on demand when a brief names
+or implies a genre. See [Genre skills for game-building agents](AgentGenreSkills.md).
+
 ## Studio interaction flows
 
 Use a separate macOS workbench session to replay [Studio interaction flows](StudioInteractionFlows.md) from YAML. The same file can run through the CLI or the host's AdaMCP tool.
