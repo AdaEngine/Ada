@@ -101,6 +101,9 @@ struct EditorScreenshotFixesTests {
 
     @Test("runtime worlds separate game logs from editor logs including child tasks")
     func runtimeLogSources() async {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         let store = RuntimeLogStore(capacity: 10)
         store.setEnabled(true)
         let app = AppWorlds(main: World(name: "Log routing test"))
@@ -124,7 +127,8 @@ struct EditorScreenshotFixesTests {
         model.showBottomPanel = true
         model.activeOutputTab = "Problems"
         model.activateLeftBottomTool(logs)
-        #expect(model.activeOutputTab == "Output")
+        let expectedConsoleTab = EditorDistribution.current == .standalone ? "Terminal" : "Output"
+        #expect(model.activeOutputTab == expectedConsoleTab)
         #expect(model.showBottomPanel)
     }
 

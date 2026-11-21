@@ -64,6 +64,9 @@ struct EditorVRInteractionTests {
 
     @Test("Native ornament hosting removes embedded tool strips and tabs but keeps the same source pane")
     func nativeOrnamentHosting() async throws {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -115,6 +118,9 @@ struct EditorVRInteractionTests {
 
     @Test("The real enum picker opens on touch and persists the selected visibility")
     func enumPickerTouch() throws {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }

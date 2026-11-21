@@ -163,6 +163,9 @@ struct EditorTileMapLifetimeTests {
 
     @Test("Palette columns adapt to inspector resizing and retain selection and textures")
     func adaptivePaletteColumns() async throws {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         let fixture = try fixture()
         defer { try? FileManager.default.removeItem(at: fixture.root) }
         var map = fixture.map

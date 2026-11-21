@@ -81,6 +81,9 @@ struct EditorTileOrientationTests {
 
     @Test("Brush and selected-cell menus apply choices through the actual sidebar")
     func sidebarMenus() throws {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         let fixture = try fixture()
         defer { try? FileManager.default.removeItem(at: fixture.url.deletingLastPathComponent()) }
         let model = fixture.model

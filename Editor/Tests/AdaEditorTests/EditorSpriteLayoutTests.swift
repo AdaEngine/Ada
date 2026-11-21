@@ -18,6 +18,9 @@ struct EditorSpriteLayoutTests {
 
     @Test("Inspector presets and mode menus edit the runtime layout through AdaUI events")
     func inspectorMenus() throws {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         var scene = EditorSceneModel.default(projectName: "Layout")
         let entity = scene.addEntity(preset: .empty)
         let type = EditorBuiltInComponentType.sprite

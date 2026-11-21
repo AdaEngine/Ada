@@ -106,6 +106,9 @@ struct EditorViewportPresentationTests {
 
     @Test("Camera changes refresh rulers and status without rebuilding their host")
     func cameraChangesStayLocal() async throws {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless
             RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "ViewportPresentationTests")))

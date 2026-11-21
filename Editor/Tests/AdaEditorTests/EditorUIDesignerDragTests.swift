@@ -94,6 +94,9 @@ struct EditorUIDesignerDragTests {
     }
 
     @Test func hierarchyAndCanvasDragsUseTheSameRuntimeGeometry() async throws {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         let text = UINodeDescription(type: "Text", arguments: ["text": .init(value: .string("Drag me"))])
         let model = try makeModel(.init(root: .init(type: "VStack", children: [text])))
         let container = makeContainer(model)

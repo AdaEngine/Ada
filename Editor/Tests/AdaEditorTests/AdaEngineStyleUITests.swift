@@ -447,6 +447,9 @@ struct AdaEngineStyleUITests {
     @Test("scene hierarchy rows show icons separators selection and hover")
     @MainActor
     func sceneHierarchyRowsExposeVisualStates() throws {
+        let previousLanguage = EditorLocalization.shared.preference
+        defer { EditorLocalization.shared.preference = previousLanguage }
+        EditorLocalization.shared.preference = .english
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless
             let app = AppWorlds(main: World(name: "SceneHierarchyRowTests"))
