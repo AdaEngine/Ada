@@ -165,6 +165,7 @@ final class DragGestureRecognizer: GestureRecognizer {
         let dx = touch.location.x - touchStart.location.x, dy = touch.location.y - touchStart.location.y
         return touch.time - touchStart.time < minimumPressDuration && dx * dx + dy * dy >= minimumDistance * minimumDistance
     }
+    let coalescesMouseMoves: Bool
     private let onChanged: ((DragGesture.Value) -> Void)?
     private let onEnded: ((DragGesture.Value) -> Void)?
 
@@ -174,11 +175,13 @@ final class DragGestureRecognizer: GestureRecognizer {
     init(
         minimumDistance: Float,
         minimumPressDuration: TimeInterval = 0,
+        coalescesMouseMoves: Bool = false,
         onChanged: ((DragGesture.Value) -> Void)?,
         onEnded: ((DragGesture.Value) -> Void)?
     ) {
         self.minimumDistance = minimumDistance
         self.minimumPressDuration = minimumPressDuration
+        self.coalescesMouseMoves = coalescesMouseMoves
         self.onChanged = onChanged
         self.onEnded = onEnded
     }

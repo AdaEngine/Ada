@@ -116,8 +116,7 @@ public struct UIRenderNode: RenderNode {
                 let output = target.outputTexture,
                 let pipelines = context.world.getResource(PixelPerfectPipelines.self),
                 let pictures = context.world.getResource(PixelPerfectPictures.self),
-                let layout = PixelPerfectLayout(settings: settings, outputSize: Size(width: Float(output.width), height: Float(output.height)))
-            {
+                let layout = PixelPerfectLayout(settings: settings, outputSize: Size(width: Float(output.width), height: Float(output.height))) {
                 texture = pictures.picture(for: source.entityId, size: SizeInt(width: output.width, height: output.height))
                 uiViewport = Rect(x: 0, y: 0, width: Float(texture.width), height: Float(texture.height))
                 pixelPerfectPresent = (layout, settings, pictures, pipelines)
@@ -238,6 +237,7 @@ public struct UIRenderNode: RenderNode {
             }
 
             var renderPass: RenderCommandEncoder?
+            var geometryLeases: [UIGeometryBufferPool.Lease] = []
 
             for item in renderItems.items
             where item.isWindowOverlay == isWindowOverlay && (item.windowId == nil || item.windowId == targetWindowId) {
@@ -259,6 +259,7 @@ public struct UIRenderNode: RenderNode {
                 }
 
                 if let activePass = renderPass {
+                    geometryLeases.append(contentsOf: item.drawData.geometryLeases)
                     // Reset scissor for each item so clip state from previous draws
                     // never leaks into non-clipped UI primitives.
                     activePass.setScissorRect(renderTargetScissor)
@@ -273,6 +274,7 @@ public struct UIRenderNode: RenderNode {
             }
 
             renderPass?.endRenderPass()
+            commandBuffer.retainUIGeometry(geometryLeases)
             commandBuffer.commit()
             drewWindowOverlay = isWindowOverlay
         }

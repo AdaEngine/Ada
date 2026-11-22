@@ -13,7 +13,7 @@ import AdaUtils
 import Math
 
 /// Append text rendering systems to the scene.
-public struct TextPlugin: Plugin {
+public struct TextPlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
     public func setup(in app: AppWorlds) {

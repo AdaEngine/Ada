@@ -14,7 +14,7 @@
     import SAGATypes
     import Synchronization
     #if SAGA_METAL_NATIVE_PASS
-    import SAGAMetal
+    @_spi(IndexedDrawGrouping) import SAGAMetal
     import SAGAShaderIR
     #endif
 
@@ -33,12 +33,26 @@
         }
     }
 
-    final class SAGACommandBuffer: CommandBuffer, @unchecked Sendable {
+    final class SAGACommandBuffer: CommandBufferWithDeferredRetention, @unchecked Sendable {
+        private static let tracesSubmission = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_TRACE_GROUPING"] == "1"
         var label: String?
         let context: SAGAContext
         private var builders: [SAGACommandBuilder] = []
+        #if SAGA_METAL_NATIVE_PASS
+        private var groupableDraws: [Int: MetalIndexedDrawGrouping] = [:]
+
+        func recordIndexedDrawGrouping(_ grouping: IndexedDrawGrouping) {
+            groupableDraws[builders.count] = switch grouping {
+            case .ui: .ui
+            case .shadowDepth: .shadowDepth
+            case .geometry: .geometry
+            }
+        }
+        #endif
         private var completedHandlers: [@Sendable () -> Void] = []
+        private var submissionObservers: [@Sendable (Bool) -> Void] = []
         private var timingHandlers: [@Sendable (Double?) -> Void] = []
+        private var retainedResources: [any Sendable] = []
 
         init(context: SAGAContext) {
             self.context = context
@@ -65,33 +79,74 @@
             SAGABlitCommandEncoder(buffer: self)
         }
 
+        func retainUntilRetired(_ resource: any Sendable) {
+            retainedResources.append(resource)
+        }
+
         func commit() {
+            #if SAGA_METAL_NATIVE_PASS
+            let groupableDraws = self.groupableDraws
+            self.groupableDraws = [:]
+            #endif
             let builders = self.builders
             self.builders = []
             let completed = completedHandlers
+            let observers = submissionObservers
+            submissionObservers = []
+            let reportResult: @Sendable (Bool) -> Void = { success in
+                observers.forEach { $0(success) }
+            }
             let timing = timingHandlers
+            let resources = retainedResources
             let hasCompletionHandlers = !completed.isEmpty || !timing.isEmpty
             let debugErrors = context.debugErrors
+            let submissionLabel = label ?? "-"
             completedHandlers = []
             timingHandlers = []
+            retainedResources = []
             let notifyCompletion: @Sendable () -> Void = {
                 timing.forEach { $0(nil) }
                 completed.forEach { $0() }
             }
-            context.queue.enqueue(onUnavailable: hasCompletionHandlers ? notifyCompletion : nil) { device in
-                defer { notifyCompletion() }
+            let notifyUnavailable: @Sendable () -> Void = {
+                reportResult(false)
+                notifyCompletion()
+            }
+            let unavailable = hasCompletionHandlers || !observers.isEmpty ? notifyUnavailable : nil
+            context.queue.enqueue(onUnavailable: unavailable) { device in
+                var reportsFailureOnExit = !observers.isEmpty
+                defer {
+                    if reportsFailureOnExit { reportResult(false) }
+                    notifyCompletion()
+                    withExtendedLifetime(resources) {}
+                }
                 guard !builders.isEmpty else {
-                    if hasCompletionHandlers {
+                    if hasCompletionHandlers || !observers.isEmpty {
                         // Even an empty frame fence must retire after earlier device work.
                         let fence = try await device.submitResourceUse([])
                         try await fence.wait()
+                        reportsFailureOnExit = false
+                        reportResult(true)
                     }
                     return
                 }
                 let commands = try builders.map { try $0() }
                 let ticket: CommandTicket
                 do {
+                    #if SAGA_METAL_NATIVE_PASS
+                    if !groupableDraws.isEmpty {
+                        ticket = try await MetalIndexedDrawGrouping.$commands.withValue(groupableDraws) {
+                            try await device.submitCommands(commands)
+                        }
+                    } else {
+                        ticket = try await device.submitCommands(commands)
+                    }
+                    #else
                     ticket = try await device.submitCommands(commands)
+                    #endif
+                    if Self.tracesSubmission {
+                        print("ADA-SAGA\t\(Date().timeIntervalSince1970)\t\(ticket.sequence)\t\(submissionLabel)")
+                    }
                 } catch {
                     if debugErrors {
                         print("[SAGA] submit failed with \(error): \(commands.count) commands")
@@ -101,6 +156,20 @@
                 }
                 if hasCompletionHandlers || debugErrors {
                     try await ticket.wait()
+                    reportsFailureOnExit = false
+                    reportResult(true)
+                } else if !resources.isEmpty || !observers.isEmpty {
+                    // Observe retirement off the ordered bridge without delaying later submissions.
+                    reportsFailureOnExit = false
+                    Task {
+                        do {
+                            _ = try await ticket.wait()
+                            reportResult(true)
+                        } catch {
+                            reportResult(false)
+                        }
+                        withExtendedLifetime(resources) {}
+                    }
                 }
                 if debugErrors {
                     for error in await device.takeUncapturedErrors() {
@@ -108,6 +177,10 @@
                     }
                 }
             }
+        }
+
+        func observeSubmissionResult(_ observer: @escaping @Sendable (Bool) -> Void) {
+            submissionObservers.append(observer)
         }
 
         func addCompletedHandler(_ handler: @escaping @Sendable () -> Void) {
@@ -160,6 +233,7 @@
         private var drewInPass = false
         #if SAGA_METAL_NATIVE_PASS
         var rateMap: MetalRasterizationRateBinding?
+        var indexedDrawGrouping: IndexedDrawGrouping?
         #endif
 
         private var pipeline: SAGARenderPipeline?
@@ -385,6 +459,11 @@
             )
             let indexSlot = index.buffer.slot
             let indexBinding = (format: index.format, offset: UInt64(index.offset), length: UInt64(index.buffer.length - index.offset))
+            #if SAGA_METAL_NATIVE_PASS
+            if let indexedDrawGrouping {
+                buffer.recordIndexedDrawGrouping(indexedDrawGrouping)
+            }
+            #endif
             emit { target in
                 .renderIndexed(
                     pipeline: try state.pipeline.slot.get(),
@@ -659,6 +738,7 @@
 
         func copyBufferToBuffer(source: Buffer, sourceOffset: Int, destination: Buffer, destinationOffset: Int, size: Int) {
             guard let from = source as? SAGABuffer, let to = destination as? SAGABuffer else { return }
+            to.excludeFromShadowCache()
             let (src, dst) = (from.slot, to.slot)
             buffer.append {
                 .copy(
@@ -693,6 +773,7 @@
             destination: Buffer, destinationOffset: Int, destinationBytesPerRow: Int, destinationBytesPerImage: Int
         ) {
             guard let from = source.gpuTexture as? SAGAGPUTexture, let to = destination as? SAGABuffer else { return }
+            to.excludeFromShadowCache()
             let layout = TextureBufferLayout(
                 offset: UInt64(destinationOffset), bytesPerRow: UInt32(destinationBytesPerRow),
                 rowsPerImage: destinationBytesPerRow > 0 ? UInt32(destinationBytesPerImage / destinationBytesPerRow) : nil

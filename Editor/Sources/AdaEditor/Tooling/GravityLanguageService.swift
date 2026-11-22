@@ -20,29 +20,34 @@ struct EditorGravityLanguageService: Sendable {
         text: String,
         position: EditorSourceLocation
     ) -> [EditorCompletionItem] {
-        let lspPosition = lspPosition(from: position, in: text)
+        let lines = EditorSourceLines.split(text)
+        let lspPosition = lspPosition(from: position, in: lines)
         return completionItems(
             languageService().completions(text: text, position: lspPosition),
-            text: text
+            lines: lines
         )
     }
 
     static func semanticTokens(text: String) -> [EditorSemanticToken] {
-        languageService().semanticTokens(text: text)
-            .compactMap { token in
-                guard token.range.start.line == token.range.end.line else {
-                    return nil
-                }
-                let start = editorPosition(from: token.range.start, in: text)
-                let end = editorPosition(from: token.range.end, in: text)
-                return EditorSemanticToken(
-                    line: start.line,
-                    startCharacter: start.character,
-                    length: max(0, end.character - start.character),
-                    type: token.kind.rawValue,
-                    modifiers: []
-                )
+        let tokens = languageService().semanticTokens(text: text)
+        guard !tokens.isEmpty else {
+            return []
+        }
+        let lines = EditorSourceLines.split(text)
+        return tokens.compactMap { token in
+            guard token.range.start.line == token.range.end.line else {
+                return nil
             }
+            let start = editorPosition(from: token.range.start, in: lines)
+            let end = editorPosition(from: token.range.end, in: lines)
+            return EditorSemanticToken(
+                line: start.line,
+                startCharacter: start.character,
+                length: max(0, end.character - start.character),
+                type: token.kind.rawValue,
+                modifiers: []
+            )
+        }
     }
 
     static func hover(text: String, position: EditorSourceLocation) -> EditorSymbolHover? {
@@ -104,23 +109,27 @@ struct EditorGravityLanguageService: Sendable {
         workspace.setProjectTypeChecking(projectTypeChecking(for: fileURL))
         let uri = fileURL.standardizedFileURL.absoluteString
         workspace.change(uri: uri, text: text, version: nil)
-        return (workspace.analysis(for: uri)?.diagnostics ?? [])
-            .map { diagnostic in
-                EditorDiagnostic(
-                    filePath: fileURL.standardizedFileURL.path,
-                    range: editorRange(from: diagnostic.range, in: text),
-                    severity: diagnostic.severity == .error ? .error : .warning,
-                    message: diagnostic.message,
-                    source: diagnostic.code == nil ? "adascript-lsp" : "adascript-lint",
-                    code: diagnostic.code
-                )
-            }
+        let diagnostics = workspace.analysis(for: uri)?.diagnostics ?? []
+        guard !diagnostics.isEmpty else {
+            return []
+        }
+        let lines = EditorSourceLines.split(text)
+        return diagnostics.map { diagnostic in
+            EditorDiagnostic(
+                filePath: fileURL.standardizedFileURL.path,
+                range: editorRange(from: diagnostic.range, in: lines),
+                severity: diagnostic.severity == .error ? .error : .warning,
+                message: diagnostic.message,
+                source: diagnostic.code == nil ? "adascript-lsp" : "adascript-lint",
+                code: diagnostic.code
+            )
+        }
     }
 
     static func editorLocation(lspLine: Int, utf16Character: Int, text: String) -> EditorSourceLocation {
         editorPosition(
             from: GravitySourcePosition(line: max(0, lspLine), utf16Column: max(0, utf16Character)),
-            in: text
+            in: EditorSourceLines.split(text)
         )
     }
 
@@ -129,14 +138,15 @@ struct EditorGravityLanguageService: Sendable {
     }
 
     static func quickFixes(text: String, position: EditorSourceLocation) -> [EditorSourceQuickFix] {
-        let sourcePosition = lspPosition(from: position, in: text)
+        let lines = EditorSourceLines.split(text)
+        let sourcePosition = lspPosition(from: position, in: lines)
         return languageService().quickFixes(
             text: text,
             range: GravitySourceRange(start: sourcePosition, end: sourcePosition)
         ).map { fix in
             EditorSourceQuickFix(
                 title: fix.title,
-                range: editorRange(from: fix.replacementRange, in: text),
+                range: editorRange(from: fix.replacementRange, in: lines),
                 originalText: fix.newText == "struct" ? "class" : "struct",
                 replacement: fix.newText
             )
@@ -151,9 +161,10 @@ struct EditorGravityLanguageService: Sendable {
     ) -> [EditorCompletionItem] {
         workspace.setHostConstructors(hostConstructors())
         workspace.change(uri: uri, text: text, version: nil)
+        let lines = EditorSourceLines.split(text)
         return completionItems(
-            workspace.completions(uri: uri, position: lspPosition(from: position, in: text)),
-            text: text
+            workspace.completions(uri: uri, position: lspPosition(from: position, in: lines)),
+            lines: lines
         )
     }
 
@@ -188,14 +199,14 @@ struct EditorGravityLanguageService: Sendable {
 
     private static func completionItems(
         _ completions: [GravityCompletion],
-        text: String
+        lines: [String]
     ) -> [EditorCompletionItem] {
         completions.map { completion in
             EditorCompletionItem(
                 label: completion.label,
                 detail: completion.detail,
                 insertText: completion.insertText,
-                replacementRange: editorRange(from: completion.replacementRange, in: text),
+                replacementRange: editorRange(from: completion.replacementRange, in: lines),
                 sortText: completion.sortText,
                 kind: completionKind(for: completion)
             )
@@ -221,7 +232,10 @@ struct EditorGravityLanguageService: Sendable {
     }
 
     private static func lspPosition(from position: EditorSourceLocation, in text: String) -> GravitySourcePosition {
-        let lines = EditorSourceLines.split(text)
+        lspPosition(from: position, in: EditorSourceLines.split(text))
+    }
+
+    private static func lspPosition(from position: EditorSourceLocation, in lines: [String]) -> GravitySourcePosition {
         guard lines.indices.contains(position.line) else {
             return GravitySourcePosition(line: position.line, utf16Column: position.character)
         }
@@ -232,14 +246,17 @@ struct EditorGravityLanguageService: Sendable {
     }
 
     private static func editorRange(from range: GravitySourceRange, in text: String) -> EditorSourceRange {
+        editorRange(from: range, in: EditorSourceLines.split(text))
+    }
+
+    private static func editorRange(from range: GravitySourceRange, in lines: [String]) -> EditorSourceRange {
         EditorSourceRange(
-            start: editorPosition(from: range.start, in: text),
-            end: editorPosition(from: range.end, in: text)
+            start: editorPosition(from: range.start, in: lines),
+            end: editorPosition(from: range.end, in: lines)
         )
     }
 
-    private static func editorPosition(from position: GravitySourcePosition, in text: String) -> EditorSourceLocation {
-        let lines = EditorSourceLines.split(text)
+    private static func editorPosition(from position: GravitySourcePosition, in lines: [String]) -> EditorSourceLocation {
         guard lines.indices.contains(position.line) else {
             return EditorSourceLocation(line: position.line, character: position.utf16Column)
         }

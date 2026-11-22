@@ -2,6 +2,7 @@
 import AdaInput
 @_spi(Internal) import AdaUI
 import Math
+import Observation
 import Testing
 
 @testable import AdaEditor
@@ -218,6 +219,61 @@ struct EditorWorkspaceResizeTests {
         print("Workspace \(panel) drag: \(started.duration(to: clock.now)), panel builds: \(counter.builds - beforeBuilds)")
     }
 
+    @Test("right divider follows input without restarting other layouts", arguments: [false, true])
+    func rightDividerPreservesStationaryLayout(animating: Bool) async throws {
+        let model = EditorViewModel(project: nil)
+        model.showLeftPanel = true
+        model.showRightPanel = true
+        let counter = ResizeLayoutCounter()
+        let animation = ResizeAnimationState()
+        let animatedView = UINodeSelector.accessibilityIdentifier("test.unrelatedAnimation")
+        let container = UIContainerView(
+            rootView: ZStack(anchor: .topLeading) {
+                EditorWorkspaceView(
+                    viewModel: model,
+                    leftPanel: { ResizeLayoutProbe(counter: counter) { Color.red } },
+                    mainPanel: { Color.blue },
+                    rightPanel: { Color.green },
+                    bottomPanel: { Color.gray }
+                )
+                ResizeAnimatedLayout(state: animation) {
+                    Color.clear.accessibilityIdentifier("test.unrelatedAnimation")
+                }
+            }
+        )
+        container.frame = Rect(x: 0, y: 0, width: 1200, height: 700)
+        container.bounds.size = container.frame.size
+        await settle(container)
+        let selector = UINodeSelector.accessibilityIdentifier("AdaEditor.Workspace.ResizeRight")
+        let handle = try container.uiNode(matching: selector).absoluteFrame
+        let start = Point(handle.midX, handle.midY)
+        container.onMouseEvent(
+            MouseEvent(window: RID(), button: .left, mousePosition: start, phase: .began, modifierKeys: [], time: 0)
+        )
+        await settle(container)
+        let placements = counter.placements
+        if animating {
+            withAnimation(.linear(duration: 2)) { animation.offset = 200 }
+            await settle(container)
+        }
+        let animationStart = try container.uiNode(matching: animatedView).absoluteFrame.minX
+        let endpoint = start + Point(-40, 0)
+        container.onMouseEvent(
+            MouseEvent(window: RID(), button: .left, mousePosition: endpoint, phase: .changed, modifierKeys: [], time: 0)
+        )
+        await settle(container)
+        #expect(try container.uiNode(matching: selector).absoluteFrame.midX == endpoint.x)
+        if animating {
+            let position = try container.uiNode(matching: animatedView).absoluteFrame.minX
+            #expect(position > animationStart && position < 200)
+        } else {
+            #expect(counter.placements == placements)
+        }
+        container.onMouseEvent(
+            MouseEvent(window: RID(), button: .left, mousePosition: endpoint, phase: .ended, modifierKeys: [], time: 0)
+        )
+    }
+
     private func layout(size: Size, left: Float = 260, right: Float = 300, bottom: Float = 180) -> EditorWorkspaceLayout {
         EditorWorkspaceLayout(
             size: size,
@@ -258,6 +314,31 @@ struct EditorWorkspaceResizeTests {
 }
 
 @MainActor
+@Observable
+private final class ResizeAnimationState {
+    var offset: Float = 0
+}
+
+private struct ResizeAnimatedLayout: Layout {
+    let state: ResizeAnimationState
+
+    func sizeThatFits(_ proposal: ProposedViewSize, subviews _: Subviews, cache _: inout Void) -> Size {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: Rect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
+        var proposal = ProposedViewSize.zero
+        proposal.width = 10
+        proposal.height = 10
+        subviews.first?.place(
+            at: Point(bounds.minX + state.offset, bounds.minY),
+            anchor: .topLeading,
+            proposal: proposal
+        )
+    }
+}
+
+@MainActor
 private final class ResizeBuildCounter {
     var builds = 0
 }
@@ -268,5 +349,23 @@ private struct ResizeBodyProbe: View {
         counter.builds += 1
         return Color.blue
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+    }
+}
+
+@MainActor
+private final class ResizeLayoutCounter {
+    var placements = 0
+}
+
+private struct ResizeLayoutProbe: Layout {
+    let counter: ResizeLayoutCounter
+
+    func sizeThatFits(_ proposal: ProposedViewSize, subviews _: Subviews, cache _: inout Void) -> Size {
+        proposal.replacingUnspecifiedDimensions()
+    }
+
+    func placeSubviews(in bounds: Rect, proposal: ProposedViewSize, subviews: Subviews, cache _: inout Void) {
+        counter.placements += 1
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading, proposal: proposal)
     }
 }

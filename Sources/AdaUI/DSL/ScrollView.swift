@@ -449,7 +449,7 @@ final class ScrollViewNode: LayoutViewContainerNode {
 
         accumulativePoint.x += delta.x * 100
         accumulativePoint.y += delta.y * 100
-        setContentOffset(rubberBandOffset(initialOffset - accumulativePoint))
+        setContentOffset(rubberBandOffset(initialOffset - accumulativePoint), deferringWheelRefresh: true)
     }
 
     private func finishWheelInteraction() {
@@ -561,12 +561,39 @@ final class ScrollViewNode: LayoutViewContainerNode {
         return clamped
     }
 
-    private func setContentOffset(_ newValue: Point) {
+    // Wheel offsets still advance for every input. A consecutive wheel run only
+    // needs to mount the rows and invalidate drawing for its final offset.
+    private static var deferredWheelScrolls: [ObjectIdentifier: ScrollViewNode]?
+
+    static func beginWheelBatch() {
+        precondition(deferredWheelScrolls == nil)
+        deferredWheelScrolls = [:]
+    }
+
+    static func finishWheelBatch() {
+        guard let scrolls = deferredWheelScrolls else {
+            return
+        }
+        deferredWheelScrolls = nil
+        for scroll in scrolls.values {
+            scroll.refreshAfterContentOffsetChange()
+        }
+    }
+
+    private func setContentOffset(_ newValue: Point, deferringWheelRefresh: Bool = false) {
         guard contentOffset != newValue else {
             return
         }
 
         contentOffset = newValue
+        if deferringWheelRefresh, Self.deferredWheelScrolls != nil {
+            Self.deferredWheelScrolls?[ObjectIdentifier(self)] = self
+        } else {
+            refreshAfterContentOffsetChange()
+        }
+    }
+
+    private func refreshAfterContentOffsetChange() {
         _ = refreshLazyScrollContent()
         self.invalidateNearestLayer()
         if let containerView = self.owner?.containerView {

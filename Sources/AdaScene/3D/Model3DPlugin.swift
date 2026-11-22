@@ -388,7 +388,13 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
                 instanceCount: Int(batchRange.count)
             )
         }
+        let canGroupDraw = !isMotion && !isContact && normalTexture === Self.flatNormalTexture
+            && pbrMaterial.map {
+                $0.graphMaterial == nil && $0.heightTexture == nil && $0.shaderFeatures.isEmpty && $0.effectiveAlphaMode != .blend
+            } == true
+        if canGroupDraw { renderEncoder.allowIndexedDrawGrouping(.geometry) }
         drawSurface()
+        if canGroupDraw { renderEncoder.allowIndexedDrawGrouping(nil) }
         if !isMotion && !isContact, world.getResource(Wireframe3DResources.self)?.isEnabled == true {
             let resources = world.getRefResource(Wireframe3DResources.self)
             resources.wrappedValue.drawingEdges = true

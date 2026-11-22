@@ -1385,7 +1385,7 @@
   "Restart connection": "Restart connection",
   "Restore Locked Libraries": "Restore Locked Libraries",
   "Restore purchases": "Restore purchases",
-  "Results and requests for attention appear in the system while AdaEditor is inactive. Notification history is always available in the editor.": "Results and requests for attention appear in the system while AdaEditor is inactive. Notification history is always available in the editor.",
+  "Results and requests for attention appear in the system while AdaEditor is inactive. The editor keeps notification history for the current session.": "Results and requests for attention appear in the system while AdaEditor is inactive. The editor keeps notification history for the current session.",
   "Retry": "Retry",
   "Reveal File": "Reveal File",
   "Reveal Project in File Manager": "Reveal Project in File Manager",

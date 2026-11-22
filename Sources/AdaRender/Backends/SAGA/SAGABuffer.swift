@@ -7,7 +7,9 @@
     import Foundation
     import SAGA
     import SAGACore
+    import SAGAShaderIR
     import SAGATypes
+    import Synchronization
 
     extension ResourceOptions {
         /// Every AdaRender buffer may be written by the CPU and read by any pipeline stage.
@@ -21,23 +23,51 @@
     /// The buffer keeps a CPU shadow so ``contents()`` can hand out a writable pointer that is uploaded by ``unmap()``.
     @_spi(Internal)
     public class SAGABuffer: Buffer, @unchecked Sendable {
+        private struct Upload: Sendable {
+            let slot: ResourceSlot<ResourceID>
+            let offset: UInt64
+            let bytes: [UInt8]
+        }
+
         let context: SAGAContext
         let slot: ResourceSlot<ResourceID>
         let usage: BufferUsage
         public let length: Int
         public var label: String?
         @unsafe private let shadow: UnsafeMutableRawPointer
+        private let tracksShadowInput: Bool
+        private let shadowGeneration = Mutex<UInt64?>(0)
 
-        init(context: SAGAContext, label: String?, length: Int, usage: BufferUsage) {
+        init(context: SAGAContext, label: String?, length: Int, usage: BufferUsage, tracksShadowInput: Bool = false) {
             self.context = context
             self.usage = usage
             self.label = label
             self.length = length
+            self.tracksShadowInput = tracksShadowInput
             unsafe self.shadow = UnsafeMutableRawPointer.allocate(byteCount: max(length, 1), alignment: 16)
             unsafe self.shadow.initializeMemory(as: UInt8.self, repeating: 0, count: max(length, 1))
             self.slot = context.createBuffer(
                 BufferDescriptor(label: label ?? "", size: UInt64(length), usage: usage)
             )
+        }
+
+        var shadowRasterRevision: UInt64? {
+            tracksShadowInput ? shadowGeneration.withLock { $0 } : nil
+        }
+
+        var hasUntrackedShadowWrites: Bool {
+            tracksShadowInput && shadowGeneration.withLock { $0 == nil }
+        }
+
+        func markShadowInputChanged() {
+            if tracksShadowInput {
+                shadowGeneration.withLock { generation in generation = generation.map { $0 &+ 1 } }
+            }
+        }
+
+        func excludeFromShadowCache() {
+            // A write encoded for later submission need not be covered by a future CPU upload.
+            if tracksShadowInput { shadowGeneration.withLock { $0 = nil } }
         }
 
         deinit {
@@ -89,10 +119,33 @@
         }
 
         private func upload(offset: Int, byteCount: Int) {
+            markShadowInputChanged()
             let bytes = unsafe [UInt8](UnsafeRawBufferPointer(start: shadow + offset, count: byteCount))
             let slot = self.slot
-            context.queue.enqueue { device in
-                _ = try await device.writeBuffer(try slot.get(), offset: UInt64(offset), bytes: bytes)
+            if context.shaderOutput == .msl {
+                context.queue.enqueueAdjacent(Upload(slot: slot, offset: UInt64(offset), bytes: bytes)) { device, uploads in
+                    do {
+                        let commands = try uploads.map {
+                            try BufferCommand.writeBytes(buffer: $0.slot.get(), offset: $0.offset, bytes: $0.bytes)
+                        }
+                        _ = try await device.submitCommands(commands)
+                    } catch {
+                        // Preserve the valid neighbors if one upload was rejected before submission.
+                        var firstFailure: (any Error)?
+                        for upload in uploads {
+                            do {
+                                _ = try await device.writeBuffer(try upload.slot.get(), offset: upload.offset, bytes: upload.bytes)
+                            } catch {
+                                if firstFailure == nil { firstFailure = error }
+                            }
+                        }
+                        if let firstFailure { throw firstFailure }
+                    }
+                }
+            } else {
+                context.queue.enqueue { device in
+                    _ = try await device.writeBuffer(try slot.get(), offset: UInt64(offset), bytes: bytes)
+                }
             }
         }
     }
@@ -114,7 +167,7 @@
 
         init(context: SAGAContext, label: String?, length: Int, binding: Int) {
             self.binding = binding
-            super.init(context: context, label: label, length: length, usage: ResourceOptions.storageShared.sagaUsage)
+            super.init(context: context, label: label, length: length, usage: ResourceOptions.storageShared.sagaUsage, tracksShadowInput: true)
         }
     }
 
@@ -124,7 +177,7 @@
 
         init(context: SAGAContext, label: String?, format: IndexBufferFormat, length: Int) {
             self.indexFormat = format
-            super.init(context: context, label: label, length: (length + 3) & ~3, usage: ResourceOptions.storageShared.sagaUsage)
+            super.init(context: context, label: label, length: (length + 3) & ~3, usage: ResourceOptions.storageShared.sagaUsage, tracksShadowInput: true)
         }
     }
 #endif

@@ -236,11 +236,8 @@ public struct UIGraphicsContext: Sendable {
     }
 
     /// Draws text run into the graphics context.
-    @inlinable
     public func draw(_ run: TextRun) {
-        for glyph in run {
-            self.draw(glyph)
-        }
+        commandQueue.pushGlyphs(run, transform: transform, opacity: opacity)
     }
 
     /// Draws text glyph into the graphics context.
@@ -378,6 +375,17 @@ extension UIGraphicsContext {
             lock.lock()
             defer { lock.unlock() }
             commands.append(command)
+        }
+
+        func pushGlyphs(_ run: TextRun, transform: Transform3D, opacity: Float) {
+            guard !run.isEmpty else {
+                return
+            }
+            lock.lock()
+            defer { lock.unlock() }
+            for glyph in run {
+                commands.append(.drawGlyph(glyph, transform: transform, opacity: opacity))
+            }
         }
 
         func push(contentsOf newCommands: [DrawCommand]) {

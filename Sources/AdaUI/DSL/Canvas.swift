@@ -6,6 +6,7 @@
 //
 
 import AdaInput
+import AdaUtils
 import Math
 
 /// A view type that supports immediate mode drawing.
@@ -24,7 +25,7 @@ public struct Canvas: View, ViewNodeBuilder {
     }
 
     /// Retains drawing commands until the revision changes. The revision is read
-    /// synchronously when drawing, so externally presented frames need no view rebuild.
+    /// during updates to request display and again when drawing to use the latest value.
     @_spi(Internal)
     public init(drawingRevision: @escaping () -> UInt64, render: @escaping RenderBlock) {
         self.render = render
@@ -41,11 +42,24 @@ class CanvasViewNode: ViewNode {
     private(set) var drawBlock: Canvas.RenderBlock
     private var drawingRevision: (() -> UInt64)?
     private var recordedRevision: UInt64?
+    private var requestedRevision: UInt64?
 
     init<Content: View>(content: Content, drawBlock: @escaping Canvas.RenderBlock, drawingRevision: (() -> UInt64)? = nil) {
         self.drawBlock = drawBlock
         self.drawingRevision = drawingRevision
         super.init(content: content)
+    }
+
+    override func update(_: TimeInterval) {
+        guard owner?.containerView != nil, let drawingRevision else {
+            return
+        }
+        let revision = drawingRevision()
+        guard revision != recordedRevision, revision != requestedRevision else {
+            return
+        }
+        requestedRevision = revision
+        setNeedsDisplay()
     }
 
     override func draw(with context: UIGraphicsContext) {
@@ -58,6 +72,7 @@ class CanvasViewNode: ViewNode {
                 invalidateLayerIfNeeded()
                 recordedRevision = revision
             }
+            requestedRevision = nil
             layer?.drawLayer(in: context)
             return
         }
@@ -75,6 +90,7 @@ class CanvasViewNode: ViewNode {
         self.drawBlock = otherNode.drawBlock
         self.drawingRevision = otherNode.drawingRevision
         recordedRevision = nil
+        requestedRevision = nil
         if drawingRevision == nil {
             layer = nil
         } else {
@@ -83,7 +99,9 @@ class CanvasViewNode: ViewNode {
     }
 
     override func createLayer() -> UILayer? {
-        guard drawingRevision != nil else { return nil }
+        guard drawingRevision != nil else {
+            return nil
+        }
         let layer = UILayer(frame: frame) { [weak self] context, size in
             self?.drawBlock(&context, size)
         }

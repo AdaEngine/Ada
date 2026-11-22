@@ -3,19 +3,19 @@
 //  AdaEngine
 //
 
-import Testing
+import AdaInput
 @testable import AdaPlatform
 @testable import AdaUI
 @testable import AdaUtils
-import AdaInput
 import Math
+import Testing
 
 private struct LazyVStackEnvironmentCounterKey: EnvironmentKey {
     static let defaultValue: Int = 0
 }
 
 extension EnvironmentValues {
-    fileprivate var lazyVStackEnvironmentCounter: Int {
+    var lazyVStackEnvironmentCounter: Int {
         get { self[LazyVStackEnvironmentCounterKey.self] }
         set { self[LazyVStackEnvironmentCounterKey.self] = newValue }
     }
@@ -23,13 +23,34 @@ extension EnvironmentValues {
 
 @MainActor
 struct LazyVStackTests {
+    @Test(arguments: [true, false])
+    func knownRowsOnlyMeasureForPlacement(knownHeight: Bool) {
+        let measurements = LazyVStackMeasurementRecorder()
+        let rowHeight: ((Int) -> Float)? = knownHeight ? { _ in 24 } : nil
+        let tester = ViewTester {
+            ScrollView(.vertical) {
+                LazyVStack([0], id: \.self, rowHeight: rowHeight) { _ in
+                    LazyVStackMeasuredRow(measurements: measurements)
+                }
+            }
+        }.setSize(Size(width: 120, height: 140)).performLayout()
+
+        #expect(measurements.proposals.contains { $0.height == 24 })
+        #expect(measurements.proposals.contains { $0.height == nil } == !knownHeight)
+        #expect(tester.containerView.viewTree.rootNode.findNodeById(AnyHashable(0))?.frame.height == 24)
+    }
+
     @Test("Known animated heights include offscreen and zero-height rows in scroll geometry")
     func knownHeightsDriveOffscreenScrollTargets() throws {
         let state = LazyVStackDynamicHeightState()
         state.expandedHeight = 0
         let tester = ViewTester {
             ScrollView(.vertical) {
-                LazyVStack(Array(0..<500), id: \.self, spacing: 0, estimatedRowHeight: 20,
+                LazyVStack(
+                    Array(0..<500),
+                    id: \.self,
+                    spacing: 0,
+                    estimatedRowHeight: 20,
                     rowHeight: { $0 == 0 ? state.expandedHeight : 20 }
                 ) { item in
                     EmptyView().frame(width: 120, height: item == 0 ? state.expandedHeight : 20)
@@ -45,6 +66,35 @@ struct LazyVStackTests {
         tester.invalidateContent().performLayout()
         scroll.scrollToViewNodeIfFoundIt(300, anchor: .top)
         #expect(scroll.contentOffset.y == 6_080)
+    }
+
+    @Test(arguments: [Float(5), -5])
+    func scrollTargetTracksReorderedRowsWithKnownHeights(spacing: Float) throws {
+        var items = Array(0..<100)
+        let makeRoot = {
+            ScrollView(.vertical) {
+                LazyVStack(
+                    items,
+                    id: \.self,
+                    spacing: spacing,
+                    estimatedRowHeight: 24,
+                    rowHeight: { $0 == 0 ? 40 : 24 }
+                ) { item in
+                    EmptyView().frame(width: 100, height: item == 0 ? 40 : 24)
+                        .accessibilityIdentifier("reordered-\(item)")
+                }
+            }
+        }
+        let tester = ViewTester(rootView: makeRoot()).setSize(Size(width: 120, height: 140)).performLayout()
+        let scroll = try #require(firstScrollView(in: tester.containerView.viewTree.rootNode))
+        scroll.scrollToViewNodeIfFoundIt(60, anchor: .top)
+        #expect(scroll.contentOffset.y == 60 * (24 + spacing) + 16)
+        items.swapAt(0, 60)
+        tester.containerView.updateRootView(makeRoot())
+        tester.performLayout()
+        scroll.scrollToViewNodeIfFoundIt(0, anchor: .top)
+        #expect(scroll.contentOffset.y == 60 * (24 + spacing))
+        #expect(tester.findNodeByAccessibilityIdentifier("reordered-0") != nil)
     }
 
     init() async throws {
@@ -434,13 +484,42 @@ private struct DynamicLazyVStackHeightList: View {
     }
 }
 
+private final class LazyVStackMeasurementRecorder {
+    var proposals: [ProposedViewSize] = []
+}
+
+private struct LazyVStackMeasuredRow: View, ViewNodeBuilder {
+    let measurements: LazyVStackMeasurementRecorder
+    var body: Never { fatalError("This fixture builds its node directly") }
+
+    func buildViewNode(in context: BuildContext) -> ViewNode {
+        let node = LazyVStackMeasuredRowNode(content: self)
+        node.updateEnvironment(context.environment)
+        return node
+    }
+}
+
+private final class LazyVStackMeasuredRowNode: ViewNode {
+    let measurements: LazyVStackMeasurementRecorder
+
+    init(content: LazyVStackMeasuredRow) {
+        self.measurements = content.measurements
+        super.init(content: content)
+    }
+
+    override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {
+        measurements.proposals.append(proposal)
+        return proposal.replacingUnspecifiedDimensions(by: Size(width: 120, height: 24))
+    }
+}
+
 private struct LazyVStackEnvironmentCountingRow: View, ViewNodeBuilder {
     typealias Body = Never
 
     let id: Int
     let counter: LazyVStackEnvironmentUpdateCounter
 
-    var body: Never { fatalError() }
+    var body: Never { fatalError("This fixture builds its node directly") }
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
         let node = LazyVStackEnvironmentCountingRowNode(

@@ -56,6 +56,23 @@ public struct BufferMapMode: OptionSet, Sendable {
 }
 
 extension Buffer {
+    /// Geometry storage version for the editor's shadow cache. Other buffers use the uncached path.
+    package var shadowRasterRevision: UInt64? {
+        #if os(macOS) && SAGA_RENDER && canImport(SAGACompiler)
+            (self as? SAGABuffer)?.shadowRasterRevision
+        #else
+            nil
+        #endif
+    }
+
+    package var hasUntrackedShadowWrites: Bool {
+        #if os(macOS) && SAGA_RENDER && canImport(SAGACompiler)
+            (self as? SAGABuffer)?.hasUntrackedShadowWrites ?? false
+        #else
+            false
+        #endif
+    }
+
     public func readData() async throws -> Data {
         unsafe Data(bytes: contents(), count: length)
     }

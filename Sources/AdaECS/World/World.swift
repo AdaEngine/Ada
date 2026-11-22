@@ -216,9 +216,7 @@ extension World {
                 "ada.world.name": .string(self.name ?? "UnknownWorld"),
             ]
         ) {
-            await self.schedulers.getScope(for: schedulerName) {
-                await $0.run(world: self, deltaTime: deltaTime)
-            }
+            await self.schedulers.run(schedulerName, world: self, deltaTime: deltaTime)
         }
     }
 }
@@ -390,6 +388,8 @@ extension World {
         self.addedEntities.removeAll(keepingCapacity: true)
         self.lastTick = self.incrementChangeTick()
     }
+
+    package var hasRemovedEntities: Bool { !removedEntities.isEmpty }
 
     /// Remove all data from world exclude resources.
     /// - Complexity: O(n)

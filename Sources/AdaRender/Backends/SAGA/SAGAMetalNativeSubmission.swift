@@ -66,6 +66,11 @@ extension MetalInterop {
             guard let buffer = use.resource as? SAGABuffer, buffer.context === context else {
                 throw NativePassError.foreignResource
             }
+            if case .read = use.access {
+                // Reading does not invalidate the tracked generation.
+            } else {
+                buffer.excludeFromShadowCache()
+            }
             return (buffer, use.access.saga)
         }
 

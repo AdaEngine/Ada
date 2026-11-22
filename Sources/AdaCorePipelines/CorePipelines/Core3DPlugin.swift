@@ -13,9 +13,10 @@ import AdaUtils
 import Math
 
 /// Plugin for RenderWorld added 3D render capatibilites.
-public struct Core3DPlugin: Plugin {
+public struct Core3DPlugin: Plugin, DeferredRenderSnapshotPlugin {
     private let includes2D: Bool
     private let pathTracingPresentation: Bool
+    private var studioShadowCache = false
 
     /// Enables depth-tested 2D content in the 3D graph. Requires `Core2DPlugin`.
     public init(includes2D: Bool = false) {
@@ -27,6 +28,15 @@ public struct Core3DPlugin: Plugin {
     public init(includes2D: Bool = false, pathTracingPresentation: Bool) {
         self.includes2D = includes2D
         self.pathTracingPresentation = pathTracingPresentation
+    }
+
+    @_spi(AdaEngine)
+    public func cachingStudioEditShadows() -> Self {
+        var plugin = self
+        #if os(macOS)
+        plugin.studioShadowCache = true
+        #endif
+        return plugin
     }
 
     /// Input slots of render graph.
@@ -45,14 +55,28 @@ public struct Core3DPlugin: Plugin {
         AssetsManager.registerAssetType(DistanceField3D.self)
 
         app.insertResource(DebugDraw3D())
+        RenderFrameWork.register(in: app.main) { world in
+            (world.getResource(DebugDraw3D.self)?.lineCount ?? 0) > 0
+        }
 
         guard let app = app.getSubworldBuilder(by: .renderWorld) else {
             return
         }
 
+        RenderFrameWork.register(in: app.main) { world in
+            guard let clouds = world.getResource(Clouds3DViews.self) else {
+                return false
+            }
+            return clouds.store.retiredCount > 0 || clouds.noise.retiredCount > 0
+        }
+
         let renderDevice = app.getResource(RenderDeviceHandler.self)
             .unwrap(message: "Failed to fetch RenderDevice from world")
             .renderDevice
+
+        if studioShadowCache {
+            app.insertResource(StudioShadowCache())
+        }
 
         var graph = RenderGraph(label: .main3D)
         let entryNode = graph.addEntryNode(inputs: [

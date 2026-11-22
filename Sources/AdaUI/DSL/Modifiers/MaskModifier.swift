@@ -13,7 +13,13 @@ extension View {
     ///
     /// The shape is resolved in the modified view's local bounds.
     public func mask<S: Shape>(_ shape: S) -> some View {
-        self.modifier(MaskShapeModifier(content: self, shape: shape))
+        mask(shape, isEnabled: true)
+    }
+
+    /// Enables a mask without replacing the modified view or its interaction state.
+    @_spi(AdaEngine)
+    public func mask<S: Shape>(_ shape: S, isEnabled: Bool) -> some View {
+        self.modifier(MaskShapeModifier(content: self, shape: shape, isEnabled: isEnabled))
     }
 }
 
@@ -22,11 +28,13 @@ private struct MaskShapeModifier<Content: View, S: Shape>: ViewModifier, ViewNod
 
     let content: Content
     let shape: S
+    let isEnabled: Bool
 
     func buildViewNode(in context: BuildContext) -> ViewNode {
         MaskShapeViewNode(
             contentNode: context.makeNode(from: content),
             shape: shape,
+            isEnabled: isEnabled,
             content: content
         )
     }
@@ -37,10 +45,12 @@ private final class MaskShapeViewNode<S: Shape>: ViewModifierNode {
     private var targetShapeData: S.AnimatableData?
     private weak var propertyController: UIAnimationController?
     private var shape: S
+    private var isEnabled: Bool
     private var path = Path()
 
-    init<Content: View>(contentNode: ViewNode, shape: S, content: Content) {
+    init<Content: View>(contentNode: ViewNode, shape: S, isEnabled: Bool, content: Content) {
         self.shape = shape
+        self.isEnabled = isEnabled
         super.init(contentNode: contentNode, content: content)
     }
 
@@ -55,6 +65,7 @@ private final class MaskShapeViewNode<S: Shape>: ViewModifierNode {
             return
         }
 
+        isEnabled = otherNode.isEnabled
         let startData = self.shape.animatableData
         let endData = otherNode.shape.animatableData
         let animationController = animationControllerForUpdate
@@ -104,6 +115,10 @@ private final class MaskShapeViewNode<S: Shape>: ViewModifierNode {
         context.environment = environment
 
         context.translateBy(x: self.frame.origin.x, y: -self.frame.origin.y)
+        guard isEnabled else {
+            contentNode.draw(with: context)
+            return
+        }
         if shape is RectangleShape,
             context.pushTransformedClipRect(Rect(origin: .zero, size: frame.size)) {
             contentNode.draw(with: context)
@@ -117,6 +132,8 @@ private final class MaskShapeViewNode<S: Shape>: ViewModifierNode {
     }
 
     private func updatePath() {
-        path = shape.path(in: Rect(origin: .zero, size: self.frame.size))
+        if isEnabled {
+            path = shape.path(in: Rect(origin: .zero, size: self.frame.size))
+        }
     }
 }

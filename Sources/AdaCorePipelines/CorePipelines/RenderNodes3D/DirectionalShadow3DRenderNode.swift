@@ -113,6 +113,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             activeViews = extracted
         }
         scratch.cache.retainViews(activeViews)
+        scratch.shadowMapCache.retainViews(activeViews)
         scratch.gpuCull.retainViews(activeViews)
         scratch.preparedCascades = scratch.preparedCascades.filter { activeViews.contains($0.key) }
         if activeViews.isEmpty { scratch.cpuCasters = DirectionalShadowCasters3D() }
@@ -139,6 +140,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             else {
                 shadow.isEnabled = false
                 scratch.preparedCascades.removeValue(forKey: source.entityId)
+                scratch.shadowMapCache.discard(view: source.entityId)
                 return
             }
 
@@ -172,9 +174,35 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                     resolution: tileResolution
                 )
             }
+            let visibility = environments.environments[source.entityId]?.meshVisibility ?? MeshVisibilitySettings3D()
+            shadow.viewProjection = cascades[0].viewProjection
+            shadow.viewProjection1 = cascades.count > 1 ? cascades[1].viewProjection : .identity
+            shadow.viewProjection2 = cascades.count > 2 ? cascades[2].viewProjection : .identity
+            shadow.cascadeSplits = Vector4(cascades[0].farDepth, cascades.count > 1 ? cascades[1].farDepth : far, far, Float(count))
+            shadow.blendFraction = finiteRenderValue(settings.blendFraction, fallback: 0.1, range: 0 ... 0.25)
+            shadow.isEnabled = true
+            if context.world.getResource(StudioShadowCache.self) != nil, ShadowMapCache3D.supports(colorTexture),
+                scratch.shadowMapCache.isUsable(for: source.entityId) {
+                let layers = ShadowCasterLayers3D(candidates.meshes)
+                if !layers.staticCasters.isEmpty {
+                    submitted = encodeCachedCascades(
+                        layers,
+                        cascades: cascades,
+                        view: source.entityId,
+                        uniform: viewUniform,
+                        visibility: visibility,
+                        resolution: tileResolution,
+                        color: colorTexture,
+                        depth: depthTexture,
+                        queue: renderContext.commandQueue
+                    )
+                    return
+                }
+            }
+            scratch.shadowMapCache.discard(view: source.entityId)
+            scratch.shadowMapCache.invalidateOutput(colorTexture)
             let commandBuffer = renderContext.commandQueue.makeCommandBuffer()
             commandBuffer.label = "Directional Shadow 3D Pass"
-            let visibility = environments.environments[source.entityId]?.meshVisibility ?? MeshVisibilitySettings3D()
             // Static casters are culled for every cascade in one GPU pass; the rest keep the CPU lists.
             scratch.casterRegistry.isEnabled = shadowCasterSettings.isEnabled
             scratch.casterRegistry.update(
@@ -332,18 +360,96 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                 commandBuffer.addCompletedTimingHandler { metrics.record(pass: "shadows", seconds: $0) }
             }
             submitted = commandBuffer
-            shadow.viewProjection = cascades[0].viewProjection
-            shadow.viewProjection1 = cascades.count > 1 ? cascades[1].viewProjection : .identity
-            shadow.viewProjection2 = cascades.count > 2 ? cascades[2].viewProjection : .identity
-            shadow.cascadeSplits = Vector4(cascades[0].farDepth, cascades.count > 1 ? cascades[1].farDepth : far, far, Float(count))
-            shadow.blendFraction = finiteRenderValue(settings.blendFraction, fallback: 0.1, range: 0 ... 0.25)
-            shadow.isEnabled = true
         }
 
         if let submitted {
             if let metrics { await metrics.commit(submitted) } else { submitted.commit() }
         }
         return []
+    }
+
+    private func encodeCachedCascades(
+        _ layers: ShadowCasterLayers3D,
+        cascades: [ShadowCascade3D],
+        view: Entity.ID,
+        uniform: GlobalViewUniform,
+        visibility: MeshVisibilitySettings3D,
+        resolution: Int,
+        color: RenderTexture,
+        depth: RenderTexture,
+        queue: CommandQueue
+    ) -> (any CommandBuffer)? {
+        let device = renderDevice.renderDevice
+        lists.reconcileHistory(sources: layers.staticCasters + layers.movingCasters)
+        let tiles = cascades.indices.map { index in
+            let projection = cascades[index].viewProjection
+            let rect = Rect(x: Float(index * resolution), y: 0, width: Float(resolution), height: Float(resolution))
+            let firstList = 200 + 2 * index
+            let key = layers.preparationKey(uniform: uniform, lightProjection: projection, settings: visibility)
+            let prepared = scratch.shadowMapCache.preparedDigest(view: view, tile: index, key: key, output: color, light: nil)
+            let pair = lists.prepareShadowCacheLayers(
+                layers,
+                view: view,
+                pass: firstList,
+                uniform: uniform,
+                lightProjection: projection,
+                settings: visibility,
+                device: device,
+                materials: &_materialUniforms.wrappedValue,
+                preparedDigest: prepared
+            )
+            var count = lists.count(view: view, pass: firstList)
+            count.merge(lists.count(view: view, pass: firstList + 1))
+            statistics.record(count, view: view, pass: index)
+            let constants = scratch.cache.write(
+                .init(viewProjection: projection, tileBounds: [rect.minX, rect.minY, rect.maxX, rect.maxY]),
+                view: view,
+                pass: index,
+                device: device
+            )
+            return ShadowMapCache3D.Tile(
+                index: index,
+                rect: rect,
+                projection: projection,
+                light: nil,
+                staticDigest: pair.digest,
+                preparationKey: key,
+                hasMovingCasters: pair.hasMoving,
+                firstList: firstList,
+                constants: constants
+            )
+        }
+        var batches = ShadowBatchEncoder3D(requiresMaterialBuffer: false)
+        let identity = skinningUniforms.identityBuffer
+        let preparedLists = lists
+        let materials = materialUniforms
+        let update = scratch.shadowMapCache.encode(
+            view: view,
+            output: color,
+            depth: depth,
+            tiles: tiles,
+            device: device,
+            queue: queue,
+            label: "Directional Shadow 3D Pass"
+        ) { tile, moving, encoder in
+            encodeCachedShadowTile(
+                tile,
+                isMoving: moving,
+                pass: encoder,
+                view: view,
+                lists: preparedLists,
+                batches: &batches,
+                pipelines: &_pipelines.wrappedValue,
+                materials: materials,
+                identity: identity,
+                device: device
+            )
+        }
+        if PerformanceStallProbe.isEnabled {
+            PerformanceStallProbe.mark("StudioShadowCache.directional static=\(update.staticTiles) output=\(update.composedTiles)")
+        }
+        if let metrics { update.command?.addCompletedTimingHandler { metrics.record(pass: "shadows", seconds: $0) } }
+        return update.command
     }
 
     private func prepareTexturesIfNeeded(count: Int, resolution: Int) {

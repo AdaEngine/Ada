@@ -15,10 +15,16 @@ final class EditorWorkbenchViewModel {
     var hoveredChip: String?
     var activeEditorTab: String
     var activeOutputTab: String
-    var openDocuments: [EditorWorkbenchDocument]
+    var openDocuments: [EditorWorkbenchDocument] {
+        didSet { refreshActiveDocumentRelativePath() }
+    }
     @ObservationIgnored var textSelections: [String: EditorTextSelection] = [:]
     var tileMapResourceRevision = 0
-    var activeDocumentID: String
+    var activeDocumentID: String {
+        didSet { refreshActiveDocumentRelativePath() }
+    }
+    // The file tree observes the active path without subscribing to document text and diagnostics.
+    private(set) var activeDocumentRelativePath: String?
     var secondaryDocumentIDs: Set<String> = []
     var primarySelectedDocumentID: String?
     var secondarySelectedDocumentID: String?
@@ -94,6 +100,7 @@ final class EditorWorkbenchViewModel {
         self.activeOutputTab = activeOutputTab
         self.openDocuments = openDocuments
         self.activeDocumentID = activeDocumentID
+        self.activeDocumentRelativePath = openDocuments.first { $0.id == activeDocumentID }?.relativePath
         self.codeColorPalette = codeColorPalette
         self.codeFontSize = codeFontSize
         self.codeFontFamily = codeFontFamily
@@ -132,6 +139,13 @@ final class EditorWorkbenchViewModel {
 
     func setDocumentEditedHandler(_ handler: @escaping (String) -> Void) {
         onDocumentEdited = handler
+    }
+
+    private func refreshActiveDocumentRelativePath() {
+        let path = openDocuments.first { $0.id == activeDocumentID }?.relativePath
+        if activeDocumentRelativePath != path {
+            activeDocumentRelativePath = path
+        }
     }
 
     var activeDocument: EditorWorkbenchDocument? {

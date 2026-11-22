@@ -273,7 +273,7 @@ struct EditorNotificationSettings: View {
                     .accessibilityIdentifier("AdaEditor.Notifications.Source.\(source.rawValue)")
                 }
             }
-            Text(L10n.text("Results and requests for attention appear in the system while AdaEditor is inactive. Notification history is always available in the editor."))
+            Text(L10n.text("Results and requests for attention appear in the system while AdaEditor is inactive. The editor keeps notification history for the current session."))
                 .font(.system(size: 12))
         }
         .foregroundColor(theme.editorColors.text)

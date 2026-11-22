@@ -110,6 +110,7 @@ class ViewNode: Identifiable {
     private static var inspectionRedrawRevisionCounter: UInt64 = 0
     private static var suppressedLayoutPropagationDepth = 0
     private static var layoutMutationRevision: UInt64 = 0
+    private static var suppressedInheritedFrameController: UIAnimationController?
 
     nonisolated var id: ObjectIdentifier {
         ObjectIdentifier(self)
@@ -373,8 +374,11 @@ class ViewNode: Identifiable {
         let newFrame = Rect(origin: offset, size: size)
         let updateAnimation = pendingLayoutAnimation
         pendingLayoutAnimation = nil
-        let layoutController = updateAnimation ?? (environment.animationController?.isPlaying == true ? environment.animationController : nil)
-        if updateAnimation != nil, layoutController == nil,
+        let inheritedController = environment.animationController
+        let suppressInherited = inheritedController != nil && inheritedController === Self.suppressedInheritedFrameController
+        let layoutController = updateAnimation ?? (!suppressInherited && inheritedController?.isPlaying == true ? inheritedController : nil)
+        let hasAnimationUpdate = updateAnimation != nil || (suppressInherited && frameAnimationController === inheritedController)
+        if hasAnimationUpdate, layoutController == nil,
            frameAnimationController?.isPlaying == true, frameAnimationTarget == newFrame {
             return
         }
@@ -416,7 +420,7 @@ class ViewNode: Identifiable {
                 }
             )
         } else {
-            if updateAnimation != nil, layoutController == nil, frameAnimationTarget != newFrame {
+            if hasAnimationUpdate, layoutController == nil, frameAnimationTarget != newFrame {
                 frameAnimationController?.removeAnimation(label: "frame-\(self.id)")
                 frameAnimationController = nil
                 frameAnimationTarget = nil
@@ -434,6 +438,13 @@ class ViewNode: Identifiable {
             let newAbsolute = absoluteFrame(using: newFrame)
             containerView.setNeedsDisplay(in: oldAbsolute.union(newAbsolute))
         }
+    }
+
+    static func withoutInheritingFrameAnimation(from controller: UIAnimationController, _ operation: () -> Void) {
+        let previous = suppressedInheritedFrameController
+        suppressedInheritedFrameController = controller
+        defer { suppressedInheritedFrameController = previous }
+        operation()
     }
 
     /// Updates view layout. Called when needs update UI layout.

@@ -27,26 +27,29 @@ enum TextShaper {
         font: FontResource,
         writingDirection: TextWritingDirection = .natural
     ) -> [ShapedGlyph] {
-        guard !text.isEmpty, let fontPath = font.handle.fontPath else {
+        guard
+            !text.isEmpty,
+            let shapingFont = font.handle.preparedShapingFont()
+        else {
             return []
         }
 
         let runs = directionalRuns(in: text, writingDirection: writingDirection)
-        return runs.flatMap { run in
-            shapeRun(
-                String(text[run.range]),
-                fontPath: fontPath.path,
-                font: font,
-                direction: run.direction,
-                clusterOffset: run.utf8Offset
-            )
+        return withExtendedLifetime(shapingFont) {
+            runs.flatMap { run in
+                unsafe shapeRun(
+                    String(text[run.range]),
+                    font: shapingFont.ref,
+                    direction: run.direction,
+                    clusterOffset: run.utf8Offset
+                )
+            }
         }
     }
 
     private static func shapeRun(
         _ text: String,
-        fontPath: String,
-        font: FontResource,
+        font: OpaquePointer,
         direction: Direction,
         clusterOffset: Int
     ) -> [ShapedGlyph] {
@@ -55,27 +58,16 @@ enum TextShaper {
             return []
         }
 
-        let variationAxes = font.handle.variationAxes.map { axis in
-            ada_font_variation_axis_t(tag: axis.tag, value: axis.value)
-        }
-        let shapedText = fontPath.withCString { fontPathPointer in
-            text.withCString { textPointer in
-                unsafe variationAxes.withUnsafeBufferPointer { axes in
-                    unsafe ada_text_shape_utf8_with_direction_and_variations(
-                        fontPathPointer,
-                        textPointer,
-                        Int32(utf8Count),
-                        direction == .rightToLeft
-                            ? ADA_TEXT_DIRECTION_RIGHT_TO_LEFT
-                            : ADA_TEXT_DIRECTION_LEFT_TO_RIGHT,
-                        axes.baseAddress,
-                        Int32(axes.count)
-                    )
-                }
-            }
+        let result = unsafe text.withCString { textPointer in
+            unsafe ada_shaping_font_shape_utf8(
+                font,
+                textPointer,
+                Int32(utf8Count),
+                direction == .rightToLeft ? ADA_TEXT_DIRECTION_RIGHT_TO_LEFT : ADA_TEXT_DIRECTION_LEFT_TO_RIGHT
+            )
         }
 
-        guard let shapedText else {
+        guard let shapedText = unsafe result else {
             return []
         }
 
@@ -84,11 +76,12 @@ enum TextShaper {
         }
 
         let shapedTextValue = unsafe shapedText.pointee
-        guard shapedTextValue.glyphCount > 0, let glyphs = shapedTextValue.glyphs else {
+        let glyphCount = unsafe Int(shapedTextValue.glyphCount)
+        guard glyphCount > 0, let glyphs = unsafe shapedTextValue.glyphs else {
             return []
         }
 
-        return (0..<Int(shapedTextValue.glyphCount))
+        return (0..<glyphCount)
             .map { index in
                 let glyph = unsafe glyphs[index]
                 return ShapedGlyph(

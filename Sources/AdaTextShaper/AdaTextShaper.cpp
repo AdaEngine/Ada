@@ -26,19 +26,11 @@ ada_shaped_text_t *ada_text_shape_utf8_with_variations(
     );
 }
 
-ada_shaped_text_t *ada_text_shape_utf8_with_direction_and_variations(
-    const char *fontPath,
-    const char *text,
-    int textLength,
-    ada_text_direction_t direction,
+static hb_font_t *prepareShapingFont(
+    hb_blob_t *blob,
     const ada_font_variation_axis_t *variationAxes,
     int variationAxesCount
 ) {
-    if (!fontPath || !text || textLength <= 0) {
-        return nullptr;
-    }
-
-    hb_blob_t *blob = hb_blob_create_from_file(fontPath);
     if (!blob) {
         return nullptr;
     }
@@ -60,8 +52,6 @@ ada_shaped_text_t *ada_text_shape_utf8_with_direction_and_variations(
     hb_ot_font_set_funcs(font);
     unsigned int upem = hb_face_get_upem(hb_font_get_face(font));
     hb_font_set_scale(font, static_cast<int>(upem), static_cast<int>(upem));
-    // AdaText's glyph geometry is normalized to one em, so expose advances and offsets in the same units.
-    const double inverseUpem = upem > 0 ? 1.0 / static_cast<double>(upem) : 1.0;
     if (variationAxes && variationAxesCount > 0) {
         hb_variation_t *variations = static_cast<hb_variation_t *>(
             std::calloc(variationAxesCount, sizeof(hb_variation_t))
@@ -79,9 +69,64 @@ ada_shaped_text_t *ada_text_shape_utf8_with_direction_and_variations(
         std::free(variations);
     }
 
+    hb_font_make_immutable(font);
+    return font;
+}
+
+ada_shaping_font_t *ada_shaping_font_create(
+    const char *fontPath,
+    const ada_font_variation_axis_t *variationAxes,
+    int variationAxesCount
+) {
+    if (!fontPath) {
+        return nullptr;
+    }
+    auto *file = hb_blob_create_from_file_or_fail(fontPath);
+    if (!file) {
+        return nullptr;
+    }
+    unsigned int size = 0;
+    const char *bytes = hb_blob_get_data(file, &size);
+    // Make the loaded face independent of later writes to the file or its mapping.
+    auto *snapshot = hb_blob_create_or_fail(bytes, size, HB_MEMORY_MODE_DUPLICATE, nullptr, nullptr);
+    hb_blob_destroy(file);
+    return prepareShapingFont(snapshot, variationAxes, variationAxesCount);
+}
+
+void ada_shaping_font_destroy(ada_shaping_font_t *font) {
+    if (font) {
+        hb_font_destroy(font);
+    }
+}
+
+ada_shaped_text_t *ada_text_shape_utf8_with_direction_and_variations(
+    const char *fontPath,
+    const char *text,
+    int textLength,
+    ada_text_direction_t direction,
+    const ada_font_variation_axis_t *variationAxes,
+    int variationAxesCount
+) {
+    if (!fontPath || !text || textLength <= 0) {
+        return nullptr;
+    }
+    auto *font = prepareShapingFont(hb_blob_create_from_file(fontPath), variationAxes, variationAxesCount);
+    auto *result = ada_shaping_font_shape_utf8(font, text, textLength, direction);
+    ada_shaping_font_destroy(font);
+    return result;
+}
+
+ada_shaped_text_t *ada_shaping_font_shape_utf8(
+    ada_shaping_font_t *font,
+    const char *text,
+    int textLength,
+    ada_text_direction_t direction
+) {
+    if (!font || !text || textLength <= 0) {
+        return nullptr;
+    }
     hb_buffer_t *buffer = hb_buffer_create();
     if (!buffer) {
-        hb_font_destroy(font);
         return nullptr;
     }
 
@@ -101,14 +146,12 @@ ada_shaped_text_t *ada_text_shape_utf8_with_direction_and_variations(
 
     if (!infos || !positions || glyphCount == 0) {
         hb_buffer_destroy(buffer);
-        hb_font_destroy(font);
         return nullptr;
     }
 
     auto *result = static_cast<ada_shaped_text_t *>(std::calloc(1, sizeof(ada_shaped_text_t)));
     if (!result) {
         hb_buffer_destroy(buffer);
-        hb_font_destroy(font);
         return nullptr;
     }
 
@@ -118,10 +161,12 @@ ada_shaped_text_t *ada_text_shape_utf8_with_direction_and_variations(
     if (!result->glyphs) {
         std::free(result);
         hb_buffer_destroy(buffer);
-        hb_font_destroy(font);
         return nullptr;
     }
 
+    // AdaText normalizes glyph geometry, advances and offsets to one em.
+    const unsigned int upem = hb_face_get_upem(hb_font_get_face(font));
+    const double inverseUpem = upem > 0 ? 1.0 / static_cast<double>(upem) : 1.0;
     result->glyphCount = static_cast<int>(glyphCount);
     for (unsigned int index = 0; index < glyphCount; index++) {
         result->glyphs[index].glyphIndex = infos[index].codepoint;
@@ -133,7 +178,6 @@ ada_shaped_text_t *ada_text_shape_utf8_with_direction_and_variations(
     }
 
     hb_buffer_destroy(buffer);
-    hb_font_destroy(font);
     return result;
 }
 

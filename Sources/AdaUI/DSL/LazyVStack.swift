@@ -98,7 +98,6 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
     typealias Content = LazyVStack<Data, ID, Row>
 
     private var items: [Data.Element]
-    private var idProvider: (Data.Element) -> AnyHashable
     private var alignment: HorizontalAlignment
     private var spacing: Float?
     private var estimatedRowHeight: Float
@@ -108,6 +107,8 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
     private var itemIDs: [AnyHashable]
     private var measuredHeights: [AnyHashable: Float] = [:]
     private var providedHeights: [AnyHashable: Float] = [:]
+    private var itemIndices: [AnyHashable: Int] = [:]
+    private var rowOffsets: [Float]?
 
     private var rowSpacing: Float {
         spacing ?? 8
@@ -115,7 +116,6 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
 
     init(content: Content) {
         self.items = content.items
-        self.idProvider = content.idProvider
         self.alignment = content.alignment
         self.spacing = content.spacing
         self.estimatedRowHeight = content.estimatedRowHeight
@@ -125,6 +125,7 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         self.itemIDs = content.items.map(content.idProvider)
         self.providedHeights = Self.providedHeights(for: content)
         super.init(content: content, nodes: [])
+        updateItemIndices()
     }
 
     override func update(from newNode: ViewNode) {
@@ -135,14 +136,14 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
 
         let previousEnvironmentVersion = environment.version
         let previouslyReusedRowsWithStableIDs = reuseRowsWithStableIDs
-        let updatedItemIDs = other.items.map(other.idProvider)
 
         self.environmentTransform = other.environmentTransform
         self.setContent(other.content)
         self.items = other.items
-        self.itemIDs = updatedItemIDs
+        self.itemIDs = other.itemIDs
+        self.itemIndices = other.itemIndices
+        rowOffsets = nil
         self.providedHeights = other.providedHeights
-        self.idProvider = other.idProvider
         self.alignment = other.alignment
         self.spacing = other.spacing
         self.estimatedRowHeight = other.estimatedRowHeight
@@ -156,6 +157,7 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         let environmentChanged = environment.version != previousEnvironmentVersion
         let reusePolicyChanged = reuseRowsWithStableIDs != previouslyReusedRowsWithStableIDs
         rebuildVisibleRows(
+            in: visibleRange(),
             updateExistingRows: !reuseRowsWithStableIDs || environmentChanged || reusePolicyChanged
         )
     }
@@ -179,7 +181,11 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
     }
 
     override func performLayout() {
-        rebuildVisibleRows(updateExistingRows: false)
+        let range = visibleRange()
+        if itemIndices.count != itemIDs.count || nodes.count != range.count
+            || !zip(range, nodes).allSatisfy({ itemIDs[$0.0] == nodeIdentity($0.1) }) {
+            rebuildVisibleRows(in: range, updateExistingRows: false)
+        }
 
         let width = frame.width
         let xOrigin: Float
@@ -197,6 +203,8 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         }
 
         var didMeasureNewHeight = false
+        var previousIndex = -2
+        var nextOffset: Float = 0
         for node in nodes {
             guard
                 let id = nodeIdentity(node),
@@ -205,15 +213,24 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
                 continue
             }
 
-            let proposal = ProposedViewSize(width: width, height: nil)
-            let measuredSize = node.sizeThatFits(proposal)
-            let measuredHeight = providedHeights[id] ?? max(0, measuredSize.height.isFinite ? measuredSize.height : estimatedRowHeight)
-            if providedHeights[id] == nil, measuredHeights[id] != measuredHeight {
-                measuredHeights[id] = measuredHeight
-                didMeasureNewHeight = true
+            let measuredHeight: Float
+            if let providedHeight = providedHeights[id] {
+                measuredHeight = providedHeight
+            } else {
+                let proposal = ProposedViewSize(width: width, height: nil)
+                let measuredSize = node.sizeThatFits(proposal)
+                measuredHeight = max(0, measuredSize.height.isFinite ? measuredSize.height : estimatedRowHeight)
+                if measuredHeights[id] != measuredHeight {
+                    measuredHeights[id] = measuredHeight
+                    didMeasureNewHeight = true
+                }
             }
 
-            let y = yOffset(for: index)
+            // Mounted rows are contiguous in the common case. Advance using the
+            // just-measured height so following rows move in the same layout pass.
+            let y = index == previousIndex + 1 ? nextOffset : yOffset(for: index)
+            previousIndex = index
+            nextOffset = (y + measuredHeight) + rowSpacing
             node.place(
                 in: Point(x: xOrigin, y: y),
                 anchor: anchor,
@@ -342,8 +359,7 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         performLayout()
     }
 
-    private func rebuildVisibleRows(updateExistingRows: Bool) {
-        let range = visibleRange()
+    private func rebuildVisibleRows(in range: Range<Int>, updateExistingRows: Bool) {
         let oldNodes = nodes
         var oldNodesByID: [AnyHashable: ViewNode] = [:]
         for node in oldNodes {
@@ -409,6 +425,20 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         let minY = max(0, viewport.minY - overscanExtent)
         let maxY = viewport.maxY + overscanExtent
 
+        // Overlapping rows can have nonmonotonic ends. Preserve the original
+        // scan for negative spacing rather than searching an unordered range.
+        if !providedHeights.isEmpty, rowSpacing >= 0, rowSpacing.isFinite, maxY.isFinite {
+            let offsets = offsetsForRows()
+            let start = firstRowIndex { index in
+                offsets[index] + height(for: itemIDs[index]) >= minY
+            }
+            if start < items.count {
+                let end = firstRowIndex { offsets[$0] > maxY }
+                return start..<max(start + 1, end)
+            }
+            return itemIDs.indices
+        }
+
         var firstVisibleIndex = 0
         var lastVisibleIndex = items.count - 1
         var y: Float = 0
@@ -448,9 +478,15 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
             return Rect(origin: .zero, size: frame.size)
         }
 
+        var origin = frame.origin
+        var ancestor = parent
+        while let node = ancestor, node !== scrollView {
+            origin += node.frame.origin
+            ancestor = node.parent
+        }
         return Rect(
-            x: scrollView.contentOffset.x - frame.origin.x,
-            y: scrollView.contentOffset.y - frame.origin.y,
+            x: scrollView.contentOffset.x - origin.x,
+            y: scrollView.contentOffset.y - origin.y,
             width: scrollView.frame.width,
             height: scrollView.frame.height
         )
@@ -479,10 +515,11 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
     }
 
     private func yOffset(for targetIndex: Int) -> Float {
-        guard targetIndex > 0 else {
-            return 0
+        if !providedHeights.isEmpty {
+            return offsetsForRows()[targetIndex]
         }
-
+        // Measured rows change during layout. Walk only the prefix we need;
+        // the placement loop then advances through contiguous mounted rows.
         var y: Float = 0
         for index in 0..<targetIndex {
             y += height(for: itemIDs[index])
@@ -491,12 +528,48 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         return y
     }
 
+    private func offsetsForRows() -> [Float] {
+        if let rowOffsets {
+            return rowOffsets
+        }
+        var offsets: [Float] = []
+        offsets.reserveCapacity(itemIDs.count)
+        var y: Float = 0
+        for id in itemIDs {
+            offsets.append(y)
+            y += height(for: id)
+            y += rowSpacing
+        }
+        rowOffsets = offsets
+        return offsets
+    }
+
+    private func firstRowIndex(where predicate: (Int) -> Bool) -> Int {
+        var lower = 0
+        var upper = itemIDs.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if predicate(middle) {
+                upper = middle
+            } else {
+                lower = middle + 1
+            }
+        }
+        return lower
+    }
+
+    private func updateItemIndices() {
+        itemIndices = Dictionary(itemIDs.enumerated().map { ($0.element, $0.offset) }, uniquingKeysWith: { first, _ in first })
+    }
+
     private func height(for id: AnyHashable) -> Float {
         providedHeights[id] ?? measuredHeights[id] ?? estimatedRowHeight
     }
 
     private static func providedHeights(for content: Content) -> [AnyHashable: Float] {
-        guard let rowHeight = content.rowHeight else { return [:] }
+        guard let rowHeight = content.rowHeight else {
+            return [:]
+        }
         return Dictionary(content.items.map { item in
             let height = rowHeight(item)
             return (content.idProvider(item), height.isFinite ? max(0, height) : content.estimatedRowHeight)
@@ -504,7 +577,7 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
     }
 
     private func indexForID(_ id: AnyHashable) -> Int? {
-        itemIDs.firstIndex(of: id)
+        itemIndices[id]
     }
 
     private func nodeIdentity(_ node: ViewNode) -> AnyHashable? {

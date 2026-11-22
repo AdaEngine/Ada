@@ -15,7 +15,7 @@ import AdaUtils
 import Logging
 import Math
 
-public struct UIPlugin: Plugin {
+public struct UIPlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
     @MainActor
@@ -41,6 +41,8 @@ public struct UIPlugin: Plugin {
             .insertResource(UIOverlayMounts())
             .insertResource(WindowFrameRequests())
 
+        RenderFrameWork.register(in: app.main, Self.collectLateFrameWork)
+
         guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
             return
         }
@@ -55,6 +57,7 @@ public struct UIPlugin: Plugin {
             .insertResource(UIViewUniform())
             .insertResource(UIRenderBuildState())
             .insertResource(UILayerDrawCache())
+            .insertResource(UIGeometryBufferPool())
             .insertResource(GlassBackgroundTexture())
             .insertResource(RenderPipelines(configurator: LinearGradientPipeline()))
             .insertResource(RenderPipelines(configurator: GlassPipeline()))
@@ -81,6 +84,40 @@ public struct UIPlugin: Plugin {
         } catch {
             Logger(label: "org.adaengine.UIRenderPlugin").error("\(error)")
         }
+    }
+
+    @MainActor
+    static func collectLateFrameWork(in world: World) -> Bool {
+        guard let manager = world.getResource(WindowManagerResource.self)?.windowManager else {
+            return false
+        }
+        let pending = world.getRefResource(UIWindowPendingDrawViews.self)
+        let redraw = world.getRefResource(UIRedrawRequest.self)
+        let requests = world.getRefResource(WindowFrameRequests.self)
+        var needsAllWindows = redraw.allWindows
+        requests.requestedWindowIDs.formUnion(redraw.windowIDs)
+        let contexts = world.getResource(UIContextPendingDraw.self)?.contexts ?? []
+        for context in contexts {
+            if let id = context.windowId {
+                requests.requestedWindowIDs.insert(id)
+            } else {
+                needsAllWindows = true
+            }
+        }
+        for window in manager.windows where window.canDraw {
+            let needsPresentation = window.consumePresentationRequest()
+            if needsAllWindows || needsPresentation || window.needsDisplay {
+                requests.requestedWindowIDs.insert(window.id)
+            }
+            if window.needsDisplay {
+                if !pending.windows.contains(where: { $0 === window }) {
+                    pending.windows.append(window)
+                }
+                redraw.wrappedValue.request(window.id)
+                window.needsDisplay = false
+            }
+        }
+        return redraw.needsRedraw || !contexts.isEmpty
     }
 }
 
@@ -299,7 +336,8 @@ public func UpdateWindowManager(
     _ contexts: ResMut<UIContextPendingDraw>,
     _ redrawRequest: ResMut<UIRedrawRequest>,
     _ frameRequests: ResMut<WindowFrameRequests>,
-    _ cameras: Query<Camera, WindowRenderOnDemand?>,
+    _ onDemandCameras: FilterQuery<Camera, With<WindowRenderOnDemand>>,
+    _ continuousCameras: FilterQuery<Camera, Without<WindowRenderOnDemand>>,
     _ primaryWindow: Res<PrimaryWindowId?>,
     _ input: ResMut<Input>,
     _ deltaTime: Res<DeltaTime>
@@ -309,9 +347,17 @@ public func UpdateWindowManager(
     redrawRequest.needsRedraw = false
     frameRequests.wrappedValue.beginFrame()
     let primaryID = primaryWindow.wrappedValue?.windowId
-    cameras.forEach { camera, onDemand in
-        guard camera.isActive, case let .window(window) = camera.renderTarget else { return }
-        frameRequests.wrappedValue.include(window, primary: primaryID, onDemand: onDemand != nil)
+    onDemandCameras.forEach { camera in
+        guard camera.isActive, case let .window(window) = camera.renderTarget else {
+            return
+        }
+        frameRequests.wrappedValue.include(window, primary: primaryID, onDemand: true)
+    }
+    continuousCameras.forEach { camera in
+        guard camera.isActive, case let .window(window) = camera.renderTarget else {
+            return
+        }
+        frameRequests.wrappedValue.include(window, primary: primaryID, onDemand: false)
     }
     let windowManager = windowManager.windowManager
     let deltaTime = deltaTime.deltaTime
@@ -333,7 +379,7 @@ public func UpdateWindowManager(
         }
         if window.canDraw && window.needsDisplay {
             pendingViews.windows.append(window)
-            redrawRequest.needsRedraw = true
+            redrawRequest.wrappedValue.request(window.id)
             window.needsDisplay = false
         }
     }
@@ -348,5 +394,20 @@ public struct UIContextPendingDraw: Resource {
 }
 
 public struct UIRedrawRequest: Resource {
-    public var needsRedraw: Bool = true
+    var allWindows = true
+    var windowIDs: Set<WindowID> = []
+
+    public var needsRedraw: Bool {
+        get { allWindows || !windowIDs.isEmpty }
+        set {
+            allWindows = newValue
+            if !newValue {
+                windowIDs.removeAll(keepingCapacity: true)
+            }
+        }
+    }
+
+    mutating func request(_ windowID: WindowID) {
+        windowIDs.insert(windowID)
+    }
 }

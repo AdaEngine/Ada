@@ -185,6 +185,8 @@ public struct UIDrawData: Sendable {
     /// Optional clip rectangle in viewport coordinates.
     public var clipRect: Rect?
 
+    var geometryLeases: [UIGeometryBufferPool.Lease] = []
+
     public init() {
         self.quadVertexBuffer = BufferData(label: "UI_QuadVertexBuffer", elements: [])
         self.quadIndexBuffer = BufferData(label: "UI_QuadIndexBuffer", elements: [])
@@ -220,6 +222,30 @@ public struct UIDrawData: Sendable {
         self.glyphIndexBuffer.write(to: device)
         self.glassVertexBuffer.write(to: device)
         self.glassIndexBuffer.write(to: device)
+    }
+
+    mutating func write(to device: any RenderDevice, using pool: UIGeometryBufferPool?) {
+        if let pool {
+            Self.borrowBuffer(for: &quadVertexBuffer, from: pool, device: device, leases: &geometryLeases)
+            Self.borrowBuffer(for: &quadIndexBuffer, from: pool, device: device, leases: &geometryLeases)
+            Self.borrowBuffer(for: &glyphVertexBuffer, from: pool, device: device, leases: &geometryLeases)
+            Self.borrowBuffer(for: &glyphIndexBuffer, from: pool, device: device, leases: &geometryLeases)
+        }
+        write(to: device)
+    }
+
+    private static func borrowBuffer<Element>(
+        for data: inout BufferData<Element>,
+        from pool: UIGeometryBufferPool,
+        device: any RenderDevice,
+        leases: inout [UIGeometryBufferPool.Lease]
+    ) {
+        guard !data.isEmpty else {
+            return
+        }
+        let lease = pool.acquire(label: data.label, byteCount: data.count * MemoryLayout<Element>.stride, device: device)
+        data.buffer = lease.buffer
+        leases.append(lease)
     }
 
     /// Clears all vertex, index, and texture data while keeping capacity.
@@ -300,6 +326,9 @@ public struct UIDrawPass: DrawPass {
             return
         }
 
+        renderEncoder.allowIndexedDrawGrouping(.ui)
+        defer { renderEncoder.allowIndexedDrawGrouping(nil) }
+
         // Note: The uniform buffer is already set by UIRenderNode with the
         // UI-specific orthographic projection (origin at top-left)
 
@@ -331,11 +360,13 @@ public struct UIDrawPass: DrawPass {
         }
 
         if !uiDrawData.shaderEffectIndexBuffer.isEmpty {
+            renderEncoder.allowIndexedDrawGrouping(nil)
             renderShaderEffects(
                 renderEncoder: renderEncoder,
                 uiDrawData: uiDrawData,
                 world: world
             )
+            renderEncoder.allowIndexedDrawGrouping(.ui)
         }
 
         // Render circles

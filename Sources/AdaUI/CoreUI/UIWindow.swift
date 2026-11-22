@@ -213,10 +213,20 @@ open class UIWindow: UIView {
         guard event.button == .left,
             let responder = capturedMouseResponders[.left]?.value,
             ownsResponder(responder), responder.canRespondToAction(event),
-            let container = responder as? any TextSelectionInputContainer else {
+            let container = responder as? any CapturedMouseInputContainer else {
             return false
         }
         return container.isSelectingTextWithMouse
+    }
+
+    func coalescesCapturedDrag(for event: MouseEvent) -> Bool {
+        guard event.button == .left,
+              let responder = capturedMouseResponders[.left]?.value,
+              ownsResponder(responder), responder.canRespondToAction(event),
+              let container = responder as? any CapturedMouseInputContainer else {
+            return false
+        }
+        return container.isDraggingWithCoalescedMouseMoves
     }
 
     /// Uses the same hit testing and pointer capture as dispatch. The window itself is the scene fallback.

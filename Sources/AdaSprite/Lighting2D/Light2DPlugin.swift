@@ -9,7 +9,7 @@ import AdaECS
 import AdaRender
 
 /// Adds Godot-style 2D lighting: ``Light2D``, ``LightOccluder2D``, ``LightModulate2D``, and composite passes on the main 2D subgraph.
-public struct Light2DPlugin: Plugin {
+public struct Light2DPlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
     @MainActor

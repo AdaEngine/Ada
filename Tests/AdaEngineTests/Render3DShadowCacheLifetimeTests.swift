@@ -1,4 +1,9 @@
 #if os(macOS) || os(Windows) || os(Linux)
+#if os(macOS) && SAGA_METAL_NATIVE_PASS
+import AdaAnimation
+import Foundation
+import Metal
+#endif
 @_spi(Internal) @testable import AdaApp
 @testable import AdaCorePipelines
 import AdaECS
@@ -41,7 +46,222 @@ extension Render3DGPUTests {
             _ = try #require(try await scene.device.readImage(from: scene.target))
         }
 
-        @Test
+            @Test
+            func replacingIndicesInvalidatesShadowCasterDigest() async throws {
+                let scene = try await Self.fixture()
+                try await Self.completeFrame(scene)
+                let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+                var caster = try #require(world.getResource(ExtractedMesh3DSources.self)?.meshes.first)
+                let before = try #require(ShadowSceneDigest3D.compute(sources: [caster], usesLOD: false))
+                var models = caster.mesh.models
+                let original = models[0].parts[0].indexBuffer
+                let bytes = Array(repeating: UInt8(0), count: original.length)
+                models[0].parts[0].indexBuffer = try bytes.withUnsafeBytes { buffer in
+                    let address = try #require(buffer.baseAddress)
+                    return scene.device.createIndexBuffer(format: original.indexFormat, bytes: address, length: buffer.count)
+                }
+                caster.mesh = Mesh(models: models)
+                let after = try #require(ShadowSceneDigest3D.compute(sources: [caster], usesLOD: false))
+                #expect(before != after, "Replacing index storage must invalidate the rendered shadow.")
+            }
+
+            #if os(macOS) && SAGA_METAL_NATIVE_PASS
+                private struct AnimatedFixture {
+                    let scene: MeshletBaselineFixtures.Scene
+                    let world: World
+                    let caster: Entity
+                    let staticCaster: Entity
+                    let light: Entity
+                }
+
+                private static func animatedFixture(cache: Bool) async throws -> AnimatedFixture {
+                    let scene = try await MeshletBaselineFixtures.empty(size: [144, 96], shadows: true)
+                    let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+                    if cache { world.insertResource(StudioShadowCache()) }
+                    var environment = try #require(scene.camera.components[Environment3D.self])
+                    environment.localShadows = .init(maximumLights: 1, resolution: 128)
+                    environment.shadowCascadeCount = 2
+                    environment.shadows.resolution = 256
+                    environment.meshVisibility.lod = false
+                    scene.camera.components[Environment3D.self] = environment
+                    let material = PBRMaterial()
+                    let cube = Mesh.generateCube(size: [0.8, 0.8, 0.8], renderDevice: scene.device)
+                    let staticCaster = scene.app.main.spawn("Static caster") {
+                        Mesh3DComponent(mesh: cube, materials: [material])
+                        Transform(position: [-1.25, 0, 4])
+                    }
+                    scene.app.main.spawn("Shadow receiver") {
+                        Mesh3DComponent(mesh: .generateCube(size: [8, 0.2, 8], renderDevice: scene.device), materials: [material])
+                        Transform(position: [0, -0.7, 4])
+                    }
+                    let light = scene.app.main.spawn("Shadow spotlight") {
+                        SpotLightComponent(intensity: 20, castShadows: true, range: 14)
+                        Transform(position: [0, 0, 0])
+                    }
+                    var descriptor = try #require(cube.models.first?.parts.first).meshDescriptor
+                    let count = descriptor.positions.elements.count
+                    descriptor[MeshDescriptor.jointIndices] = MeshBuffer(Array(repeating: Vector4.zero, count: count))
+                    descriptor[MeshDescriptor.jointWeights] = MeshBuffer(Array(repeating: Vector4(1, 0, 0, 0), count: count))
+                    let mesh = Mesh.generate(from: [descriptor], renderDevice: scene.device)
+                    let caster = scene.app.main.spawn("Skinned caster") {
+                        Mesh3DComponent(mesh: mesh, materials: [material])
+                        Transform(position: [0, 0, 3])
+                    }
+                    return .init(scene: scene, world: world, caster: caster, staticCaster: staticCaster, light: light)
+                }
+
+                private static func setJoint(_ position: Vector3, on caster: Entity) throws {
+                    let rig = try SkeletalRig(nodes: [
+                        .init(parentIndex: nil, restPose: .init(), restMatrix: .identity),
+                        .init(parentIndex: nil, restPose: .init(translation: position), restMatrix: Transform3D(translation: position)),
+                    ])
+                    var binding = SkinnedMesh3DComponent(
+                        modelRoot: caster.id,
+                        meshNodeIndex: 0,
+                        skin: .init(name: nil, joints: [1], skeletonRootIndex: 1, inverseBindMatrices: [.identity])
+                    )
+                    binding.updateMatrices(using: try SkeletalAnimationPlayer(rig: rig, clips: []))
+                    caster.components[SkinnedMesh3DComponent.self] = binding
+                }
+
+                private static func shadowDepth(_ texture: RenderTexture, on device: RenderDevice) async throws -> [Float] {
+                    let size = texture.size
+                    let bytesPerPixel = texture.pixelFormat == .r32f ? 4 : 16
+                    let rowBytes = (size.width * bytesPerPixel + 255) & ~255
+                    let byteCount = rowBytes * size.height
+                    let staging = device.createBuffer(label: "Shadow cache depth comparison", length: byteCount, options: .storageShared)
+                    try await MetalInterop.submitSAGAMetalPass(
+                        on: device,
+                        label: "Read shadow cache test",
+                        textures: [.init(texture)],
+                        buffers: [.init(staging, access: .write)]
+                    ) { commands, textures, buffers in
+                        let source = try #require(textures.first)
+                        let destination = try #require(buffers.first)
+                        let blit = try #require(commands.makeBlitCommandEncoder())
+                        blit.copy(
+                            from: source,
+                            sourceSlice: 0,
+                            sourceLevel: 0,
+                            sourceOrigin: MTLOrigin(),
+                            sourceSize: MTLSize(width: size.width, height: size.height, depth: 1),
+                            to: destination,
+                            destinationOffset: 0,
+                            destinationBytesPerRow: rowBytes,
+                            destinationBytesPerImage: byteCount
+                        )
+                        blit.endEncoding()
+                    }
+                    let data = try await staging.readData()
+                    return unsafe data.withUnsafeBytes { bytes in
+                        (0..<size.height).flatMap { y in
+                            (0..<size.width).map { x in
+                                bytes.loadUnaligned(fromByteOffset: y * rowBytes + x * bytesPerPixel, as: Float.self)
+                            }
+                        }
+                    }
+                }
+
+                private static func shadowMaps(_ fixture: AnimatedFixture) async throws -> (sun: [Float], spot: [Float], image: Image) {
+                    try await fixture.scene.app.update()
+                    let image = try #require(try await fixture.scene.device.readImage(from: fixture.scene.target))
+                    let sun = try #require(fixture.world.getResource(DirectionalShadow3D.self)?.colorTexture)
+                    let spot = try #require(fixture.world.getResource(LocalShadow3DViews.self)?.entries[fixture.scene.camera.id]?.color)
+                    return (try await shadowDepth(sun, on: fixture.scene.device), try await shadowDepth(spot, on: fixture.scene.device), image)
+                }
+
+                private static func removeStaticTriangles(_ fixture: AnimatedFixture) async throws {
+                    let mesh = try #require(fixture.staticCaster.components[Mesh3DComponent.self]?.mesh)
+                    let buffer = try #require(mesh.models.first?.parts.first?.indexBuffer)
+                    try await MetalInterop.submitSAGAMetalPass(
+                        on: fixture.scene.device,
+                        label: "Change static shadow topology",
+                        buffers: [.init(buffer, access: .write)]
+                    ) { commands, _, buffers in
+                        let destination = try #require(buffers.first)
+                        let blit = try #require(commands.makeBlitCommandEncoder())
+                        blit.fill(buffer: destination, range: 0..<buffer.length, value: 0)
+                        blit.endEncoding()
+                    }
+                }
+
+                @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
+                func editShadowCacheMatchesFullDrawOnTheFirstChangedFrame() async throws {
+                    let cached = try await Self.animatedFixture(cache: true)
+                    let reference = try await Self.animatedFixture(cache: false)
+                    for fixture in [cached, reference] {
+                        try Self.setJoint(.zero, on: fixture.caster)
+                        try await Self.completeFrame(fixture.scene, frames: 4)
+                    }
+                    var previousSun: [Float] = []
+                    var previousSpot: [Float] = []
+                    var previousStaticWrites = 0
+                    var previousProjection = Transform3D.identity
+                    for step in 0...6 {
+                        for fixture in [cached, reference] {
+                            let joint: Vector3 = step < 2 ? [Float(step) * 0.55, 0, 0] : [2.5, 0, 0]
+                            if step < 3 { try Self.setJoint(joint, on: fixture.caster) }
+                            if step == 2 {
+                                let transform = Transform(
+                                    rotation: Quat(axis: .up, angle: 0.24),
+                                    position: [-2, 1, -11]
+                                )
+                                fixture.scene.camera.components[Transform.self] = transform
+                                // CameraSystem consumes the global pose before the normal post-update transform propagation.
+                                fixture.scene.camera.components[GlobalTransform.self] = GlobalTransform(matrix: transform.matrix)
+                            }
+                            if step == 3 { fixture.scene.app.main.removeEntity(fixture.caster) }
+                            if step == 4 {
+                                fixture.light.components[Transform.self] = Transform(position: [0.25, 0, 0])
+                            }
+                            if step == 5 { try await Self.removeStaticTriangles(fixture) }
+                            if step == 6 {
+                                var environment = try #require(fixture.scene.camera.components[Environment3D.self])
+                                environment.shadows.resolution = 512
+                                environment.localShadows.resolution = 256
+                                fixture.scene.camera.components[Environment3D.self] = environment
+                            }
+                        }
+                        let actual = try await Self.shadowMaps(cached)
+                        let expected = try await Self.shadowMaps(reference)
+                        let compare: ([Float], [Float]) -> Bool = { a, b in
+                            a.count == b.count && zip(a, b).allSatisfy { abs($0 - $1) < 0.00001 }
+                        }
+                        #expect(compare(actual.sun, expected.sun), "Directional shadow is out of date on frame \(step).")
+                        #expect(compare(actual.spot, expected.spot), "Spot shadow is out of date on frame \(step).")
+                        #expect(
+                            GoldenFrame.compare(actual.image, expected.image, tolerance: GoldenFrame.activeTolerance).passes(
+                                GoldenFrame.activeTolerance
+                            ),
+                            "The composed frame differs from the full draw on frame \(step)."
+                        )
+                        let scratch = try #require(cached.world.getResource(DirectionalShadow3DScratch.self))
+                        let projection = try #require(cached.world.getResource(DirectionalShadow3D.self)).viewProjection
+                        let writes = scratch.shadowMapCache.totalStaticTilesDrawn
+                        if step == 0 { #expect(writes > 0) }
+                        if step == 1 {
+                            #expect(writes == previousStaticWrites, "Joint movement must reuse the static shadow atlas.")
+                            #expect(!compare(previousSun, actual.sun), "The joint must actually move the directional shadow.")
+                            #expect(!compare(previousSpot, actual.spot), "The joint must actually move the local shadow.")
+                        }
+                        if step == 2 {
+                            #expect(projection != previousProjection, "The camera move must change a cascade projection in this frame.")
+                            #expect(writes > previousStaticWrites, "The new camera projection must rebuild its cascades.")
+                        }
+                        if step == 4 { #expect(!compare(previousSpot, actual.spot), "The light must actually move the local shadow.") }
+                        if step == 5 {
+                            #expect(!compare(previousSun, actual.sun), "The GPU write must actually remove the static caster's shadow.")
+                        }
+                        if step == 6 { #expect(writes > previousStaticWrites, "A new atlas must rasterize the current static casters.") }
+                        previousStaticWrites = writes
+                        previousProjection = projection
+                        previousSun = actual.sun
+                        previousSpot = actual.spot
+                    }
+                }
+            #endif
+
+            @Test
         func deferredProxyKeepsActualAtlasUntilSourceCameraIsRemoved() async throws {
             let scene = try await Self.fixture()
             try await Self.completeFrame(scene, frames: 4)

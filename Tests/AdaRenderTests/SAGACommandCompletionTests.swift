@@ -1,4 +1,4 @@
-#if SAGA_METAL
+#if SAGA_METAL || SAGA_METAL_NATIVE_PASS
     @testable import AdaRender
     import AdaUtils
     import Math
@@ -10,18 +10,25 @@
     import Synchronization
     import Testing
 
+    #if SAGA_METAL_NATIVE_PASS && os(macOS)
+        import SAGAMetal
+    #endif
+
     struct SAGACommandCompletionTests {
         @Test
         func completionRunsWhenTheDeviceCannotBeCreated() async throws {
             let context = try Self.unavailableContext()
             let commands = SAGACommandBuffer(context: context)
             let completions = Mutex(0)
+            let outcomes = Mutex<[Bool]>([])
+            commands.observeSubmissionResult { success in outcomes.withLock { $0.append(success) } }
             commands.addCompletedHandler { completions.withLock { $0 += 1 } }
             commands.addCompletedTimingHandler { _ in completions.withLock { $0 += 1 } }
             commands.commit()
             await context.queue.drain()
 
             #expect(completions.withLock { $0 } == 2, "A failed device must still notify both handlers")
+            #expect(outcomes.withLock { $0 } == [false])
             #expect(context.errorLog.all.count == 1)
         }
 
@@ -76,6 +83,79 @@
             }
         #endif
 
+        #if SAGA_METAL_NATIVE_PASS && os(macOS)
+            @MainActor
+            @Test
+            func nativeSubmissionKeepsResourcesUntilMetalCompletes() async throws {
+                let device = try MetalBackend.makeDevice()
+                let context = SAGAContext(
+                    capabilities: device.capabilities,
+                    supportsPresentation: false,
+                    shaderOutput: .msl,
+                    debugErrors: false,
+                    makeDevice: { try await Device.make(backend: device) }
+                )
+                let event = try #require(device.metalDevice.makeSharedEvent())
+                defer {
+                    if event.signaledValue == 0 {
+                        event.signaledValue = 1
+                    }
+                }
+
+                let committed = BackendCompletion()
+                let bridgeAdvanced = BackendCompletion()
+                let resourceReleased = BackendCompletion()
+                let metalFinished = BackendCompletion()
+                let observedRetirement = BackendCompletion()
+                let outcomes = Mutex<[Bool]>([])
+                let gpuFinishedAtRelease = Mutex(false)
+                let pass = NativePass.onMainActor(label: "Hold GPU retirement", uses: []) { context in
+                    let metal = try #require(context as? MetalNativePassContext)
+                    metal.commandBuffer.encodeWaitForEvent(event, value: 1)
+                    metal.commandBuffer.encodeSignalEvent(event, value: 2)
+                    metal.commandBuffer.addCompletedHandler { command in
+                        let result: Result<Void, GPUError> = command.status == .completed
+                            ? .success(())
+                            : .failure(.validation("Metal did not complete the native pass"))
+                        Task { await metalFinished.finish(result) }
+                    }
+                    metal.addCommittedHandler { Task { await committed.finish(.success(())) } }
+                }
+
+                let commands = SAGACommandBuffer(context: context)
+                commands.append { .native(pass) }
+                commands.observeSubmissionResult { success in
+                    outcomes.withLock { $0.append(success && event.signaledValue == 2) }
+                    Task { await observedRetirement.finish(.success(())) }
+                }
+                weak var resource: RetainedResourceProbe?
+                do {
+                    let probe = RetainedResourceProbe {
+                        gpuFinishedAtRelease.withLock { $0 = event.signaledValue == 2 }
+                        Task { await resourceReleased.finish(.success(())) }
+                    }
+                    resource = probe
+                    commands.retainUntilRetired(probe)
+                }
+                commands.commit()
+                context.queue.enqueueCleanup { await bridgeAdvanced.finish(.success(())) }
+
+                try await committed.wait(timeout: .seconds(5))
+                try await bridgeAdvanced.wait(timeout: .seconds(5))
+                #expect(event.signaledValue == 0)
+                #expect(resource != nil)
+                #expect(outcomes.withLock { $0 }.isEmpty)
+
+                event.signaledValue = 1
+                try await resourceReleased.wait(timeout: .seconds(5))
+                try await metalFinished.wait(timeout: .seconds(5))
+                try await observedRetirement.wait(timeout: .seconds(5))
+                #expect(outcomes.withLock { $0 } == [true], "Observation must report success only after Metal retirement.")
+                #expect(gpuFinishedAtRelease.withLock { $0 })
+                #expect(context.errorLog.all.isEmpty)
+            }
+        #endif
+
         private static func unavailableContext() throws -> SAGAContext {
             SAGAContext(
                 capabilities: try DeviceCapabilities(maxBufferSize: 4096, maxTextureDimension2D: 64),
@@ -121,6 +201,61 @@
 
             #expect(callbacksSawRetirement.withLock { $0 } == [true, true], "Callbacks must observe completed device work")
             #expect(context.errorLog.all.isEmpty)
+        }
+
+        @Test
+        func retainedResourcesDoNotDelayQueueAcceptance() async throws {
+            let capabilities = try DeviceCapabilities(maxBufferSize: 4096, maxTextureDimension2D: 64)
+            let backend = HeldSubmissionBackend(capabilities: capabilities)
+            let context = SAGAContext(
+                capabilities: capabilities,
+                supportsPresentation: false,
+                shaderOutput: .msl,
+                debugErrors: false,
+                makeDevice: { try await Device.make(backend: backend) }
+            )
+            let slot = context.createBuffer(.init(size: 4, usage: .copyDestination))
+            let commands = SAGACommandBuffer(context: context)
+            commands.append { .writeBytes(buffer: try slot.get(), offset: 0, bytes: [1, 2, 3, 4]) }
+            let deallocated = BackendCompletion()
+            let releasedAfterRetirement = Mutex(false)
+            weak var resource: RetainedResourceProbe?
+            do {
+                let probe = RetainedResourceProbe {
+                    releasedAfterRetirement.withLock { $0 = backend.isRetired }
+                    Task { await deallocated.finish(.success(())) }
+                }
+                resource = probe
+                commands.retainUntilRetired(probe)
+            }
+            commands.commit()
+            let bridgeAdvanced = BackendCompletion()
+            context.queue.enqueueCleanup { await bridgeAdvanced.finish(.success(())) }
+
+            do {
+                try await backend.started.wait(timeout: .seconds(2))
+                try await bridgeAdvanced.wait(timeout: .seconds(2))
+                #expect(resource != nil)
+                #expect(!backend.isRetired)
+            } catch {
+                await backend.release.finish(.success(()))
+                throw error
+            }
+            await backend.release.finish(.success(()))
+            try await deallocated.wait(timeout: .seconds(2))
+            #expect(releasedAfterRetirement.withLock { $0 })
+        }
+    }
+
+    private final class RetainedResourceProbe: Sendable {
+        private let onRelease: @Sendable () -> Void
+
+        init(onRelease: @escaping @Sendable () -> Void) {
+            self.onRelease = onRelease
+        }
+
+        deinit {
+            onRelease()
         }
     }
 

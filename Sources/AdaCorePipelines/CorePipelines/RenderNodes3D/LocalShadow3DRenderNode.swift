@@ -5,6 +5,7 @@ import AdaUtils
 import Math
 
 struct LocalShadow3DScratch: Resource {
+    var shadowMapCache = ShadowMapCache3D()
     var cache = FrameUniformCache3D<DirectionalShadowViewUniform>()
     var gpuCull = GPUShadowCull3D()
 }
@@ -88,6 +89,7 @@ public struct LocalShadow3DRenderNode: RenderNode {
         }
         for id in views.entries.keys where !active.contains(id) { views.entries.removeValue(forKey: id) }
         scratch.cache.retainViews(active)
+        scratch.shadowMapCache.retainViews(active)
         scratch.gpuCull.retainViews(active)
         statistics.retainViews(active)
         uniforms.retainViews(active)
@@ -155,6 +157,7 @@ public struct LocalShadow3DRenderNode: RenderNode {
             guard !entry.allocator.slots.isEmpty, !candidates.meshes.isEmpty else {
                 // A light without shadow resources still contributes full unshadowed PBR lighting.
                 entry.allocator.select([], cameraPosition: cameraPosition, budget: 0)
+                scratch.shadowMapCache.discard(view: source.entityId)
                 statistics.record(view: source.entityId, scene: _lighting.wrappedValue, entry: entry)
                 views.entries[source.entityId] = entry
                 return
@@ -181,6 +184,19 @@ public struct LocalShadow3DRenderNode: RenderNode {
                 views.entries[source.entityId] = entry
                 return
             }
+            let layers: ShadowCasterLayers3D?
+            if settings.reusesStaticFaces, context.world.getResource(StudioShadowCache.self) != nil,
+                ShadowMapCache3D.supports(color), scratch.shadowMapCache.isUsable(for: source.entityId) {
+                let partition = ShadowCasterLayers3D(candidates.meshes)
+                layers = partition.staticCasters.isEmpty || partition.movingCasters.isEmpty ? nil : partition
+            } else {
+                layers = nil
+            }
+            if layers == nil {
+                scratch.shadowMapCache.discard(view: source.entityId)
+            } else {
+                lists.reconcileHistory(sources: candidates.meshes)
+            }
 
             // Prepare every face and fingerprint it before encoding, so unchanged faces can be left alone.
             struct Face {
@@ -189,25 +205,28 @@ public struct LocalShadow3DRenderNode: RenderNode {
                 var isClean: Bool
             }
             var faces: [Face] = []
+            var cachedTiles: [ShadowMapCache3D.Tile] = []
             var digests: [Int: UInt64] = [:]
             var matrixDigests: [Int: UInt64] = [:]
             // With the casters unchanged since the faces were last prepared, a face whose matrix is also unchanged
             // draws what it drew before, so its list needs no rebuilding at all.
             let digestStart = PerformanceStallProbe.begin()
-            let sceneDigest = settings.reusesStaticFaces
+            let sceneDigest = layers == nil && settings.reusesStaticFaces
                 ? ShadowSceneDigest3D.compute(sources: candidates.meshes, usesLOD: environment.meshVisibility.lod)
                 : nil
             PerformanceStallProbe.end("LocalShadow.SceneDigest", since: digestStart, count: candidates.meshes.count)
             let sceneUnchanged = sceneDigest != nil && sceneDigest == entry.sceneDigest
             // Static casters are culled for every redrawn face in one GPU pass; the rest keep the CPU lists.
-            registry.update(
-                sources: candidates.meshes,
-                materials: &_materials.wrappedValue,
-                identityPalette: skinning.identityBuffer,
-                device: device.renderDevice,
-                transformChanges: candidates.transformChanges
-            )
-            let usesGPU = scratch.gpuCull.isAvailable(
+            if layers == nil {
+                registry.update(
+                    sources: candidates.meshes,
+                    materials: &_materials.wrappedValue,
+                    identityPalette: skinning.identityBuffer,
+                    device: device.renderDevice,
+                    transformChanges: candidates.transformChanges
+                )
+            }
+            let usesGPU = layers == nil && scratch.gpuCull.isAvailable(
                 camera: source.entityId,
                 registry: registry,
                 viewCount: entry.allocator.slots.count * 6,
@@ -252,6 +271,20 @@ public struct LocalShadow3DRenderNode: RenderNode {
                         culledFaceCount += 1
                         continue
                     }
+                    if let layers {
+                        cachedTiles.append(prepareCachedFace(
+                            layers,
+                            index: index,
+                            tile: tile,
+                            light: light.entity,
+                            projection: matrices[face],
+                            view: source.entityId,
+                            uniform: uniform,
+                            lod: environment.meshVisibility.lod,
+                            output: color
+                        ))
+                        continue
+                    }
                     if sceneUnchanged, let kept = entry.faceDigests[index], entry.faceMatrixDigests[index] == matrixDigest.value {
                         digests[index] = kept
                         faces.append(Face(index: index, tile: tile, isClean: true))
@@ -292,6 +325,22 @@ public struct LocalShadow3DRenderNode: RenderNode {
             entry.registryRevision = registryRevision
             entry.faceMatrixDigests = matrixDigests
             entry.faceDigests = digests
+            if layers != nil {
+                let update = encodeCachedFaces(
+                    cachedTiles,
+                    view: source.entityId,
+                    color: color,
+                    depth: depth,
+                    queue: renderContext.commandQueue
+                )
+                entry.reusedFaces = cachedTiles.count - update.composedTiles
+                entry.renderedFaces = update.composedTiles
+                entry.culledFaces = culledFaceCount
+                statistics.record(view: source.entityId, scene: _lighting.wrappedValue, entry: entry)
+                views.entries[source.entityId] = entry
+                submitted = update.command
+                return
+            }
             entry.reusedFaces = faces.filter(\.isClean).count
             entry.renderedFaces = faces.count - entry.reusedFaces
             entry.culledFaces = culledFaceCount
@@ -393,5 +442,95 @@ public struct LocalShadow3DRenderNode: RenderNode {
             if let metrics { await metrics.commit(submitted) } else { submitted.commit() }
         }
         return []
+    }
+
+    private func prepareCachedFace(
+        _ layers: ShadowCasterLayers3D,
+        index: Int,
+        tile: Rect,
+        light: Entity.ID,
+        projection: Transform3D,
+        view: Entity.ID,
+        uniform: GlobalViewUniform,
+        lod: Bool,
+        output: RenderTexture
+    ) -> ShadowMapCache3D.Tile {
+        let renderDevice = device.renderDevice
+        let firstList = 300 + 2 * index
+        let settings = MeshVisibilitySettings3D(frustumCulling: true, lod: lod, distanceCulling: false)
+        let key = layers.preparationKey(uniform: uniform, lightProjection: projection, settings: settings)
+        let prepared = scratch.shadowMapCache.preparedDigest(view: view, tile: index, key: key, output: output, light: light)
+        let pair = lists.prepareShadowCacheLayers(
+            layers,
+            view: view,
+            pass: firstList,
+            uniform: uniform,
+            lightProjection: projection,
+            settings: settings,
+            device: renderDevice,
+            materials: &_materials.wrappedValue,
+            preparedDigest: prepared
+        )
+        let constants = scratch.cache.write(
+            .init(
+                viewProjection: projection,
+                tileBounds: [tile.minX, tile.minY, tile.maxX, tile.maxY]
+            ),
+            view: view,
+            pass: index,
+            device: renderDevice
+        )
+        return .init(
+            index: index,
+            rect: tile,
+            projection: projection,
+            light: light,
+            staticDigest: pair.digest,
+            preparationKey: key,
+            hasMovingCasters: pair.hasMoving,
+            firstList: firstList,
+            constants: constants
+        )
+    }
+
+    private func encodeCachedFaces(
+        _ tiles: [ShadowMapCache3D.Tile],
+        view: Entity.ID,
+        color: RenderTexture,
+        depth: RenderTexture,
+        queue: CommandQueue
+    ) -> ShadowMapCache3D.Update {
+        var batches = ShadowBatchEncoder3D(requiresMaterialBuffer: true)
+        let preparedLists = lists
+        let materials = materials
+        let identity = skinning.identityBuffer
+        let renderDevice = device.renderDevice
+        let update = scratch.shadowMapCache.encode(
+            view: view,
+            output: color,
+            depth: depth,
+            tiles: tiles,
+            device: renderDevice,
+            queue: queue,
+            label: "Local Shadows 3D"
+        ) { tile, moving, encoder in
+            encodeCachedShadowTile(
+                tile,
+                isMoving: moving,
+                pass: encoder,
+                view: view,
+                lists: preparedLists,
+                batches: &batches,
+                pipelines: &_pipelines.wrappedValue,
+                materials: materials,
+                identity: identity,
+                device: renderDevice
+            )
+        }
+        if PerformanceStallProbe.isEnabled {
+            PerformanceStallProbe.mark("StudioShadowCache.local static=\(update.staticTiles) output=\(update.composedTiles)")
+        }
+        if let metrics { update.command?.addCompletedTimingHandler { metrics.record(pass: "local-shadows", seconds: $0) } }
+        return update
     }
 }

@@ -62,9 +62,14 @@ public struct UIComponentSystem: Sendable {
             )
         }
         for (id, view) in overlays.views where !overlays.active.contains(id) {
+            let windowID = view.window?.id
             view.removeFromParentView()
             overlays.views.removeValue(forKey: id)
-            redrawRequest.needsRedraw = true
+            if let windowID {
+                redrawRequest.request(windowID)
+            } else {
+                redrawRequest.needsRedraw = true
+            }
         }
     }
 }
@@ -116,7 +121,7 @@ extension UIComponentSystem {
                 if view.frame != newFrame {
                     view.frame = newFrame
                     view.layoutSubviews()
-                    redrawRequest.needsRedraw = true
+                    redrawRequest.request(window.id)
                 }
             }
         case .default:
@@ -162,7 +167,7 @@ extension UIComponentSystem {
         view.update(deltaTime)
 
         if view.consumeNeedsDisplay() {
-            redrawRequest.needsRedraw = true
+            redrawRequest.request(component.windowRef.getWindowId(from: primaryWindowId))
         }
     }
 }

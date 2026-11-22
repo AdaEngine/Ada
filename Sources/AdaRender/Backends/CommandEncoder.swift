@@ -147,7 +147,23 @@ public protocol CommandBuffer: AnyObject {
     func addCompletedHandler(_ handler: @escaping @Sendable () -> Void)
 }
 
+/// Retains ownership through GPU retirement without delaying acceptance of later commands.
+package protocol CommandBufferWithDeferredRetention: CommandBuffer {
+    func retainUntilRetired(_ resource: any Sendable)
+}
+
 extension CommandBuffer {
+    /// Receives the actual retirement outcome on SAGA without adding a fence to the ordered bridge.
+    package func observeSubmissionResult(_ observer: @escaping @Sendable (Bool) -> Void) {
+        #if SAGA_RENDER && canImport(SAGACompiler)
+            if let command = self as? SAGACommandBuffer {
+                command.observeSubmissionResult(observer)
+                return
+            }
+        #endif
+        observer(false)
+    }
+
     public func beginFoveatedRenderPass(_ desc: RenderPassDescriptor, rateMap: any RasterizationRateMap) throws -> FoveatedRenderPass {
         throw FoveatedRenderingError.unsupportedBackend
     }
@@ -570,4 +586,19 @@ extension RenderCommandEncoder {
 
 /// A protocol that defines a draw command buffer.
 public protocol DrawCommandBuffer: Sendable {
+}
+
+// A producer can declare eligible indexed draws. The backend still checks resources and attachments.
+package enum IndexedDrawGrouping {
+    case ui
+    case shadowDepth
+    case geometry
+}
+
+extension RenderCommandEncoder {
+    package func allowIndexedDrawGrouping(_ grouping: IndexedDrawGrouping?) {
+        #if SAGA_RENDER && canImport(SAGACompiler) && SAGA_METAL_NATIVE_PASS
+        (self as? SAGARenderCommandEncoder)?.indexedDrawGrouping = grouping
+        #endif
+    }
 }

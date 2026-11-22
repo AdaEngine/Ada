@@ -71,6 +71,14 @@ public final class RenderEngine: RenderBackend, Sendable {
 
     private let renderBackend: RenderBackend
 
+    var supportsDeferredWindowFrames: Bool {
+        #if os(macOS) && SAGA_METAL && canImport(SAGACompiler)
+        renderBackend is SAGAMetalRenderBackend
+        #else
+        false
+        #endif
+    }
+
     init(renderBackend: RenderBackend) {
         self.renderBackend = renderBackend
     }
