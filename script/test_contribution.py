@@ -80,6 +80,16 @@ class ProfileTests(unittest.TestCase):
             self.assertIn("--no-parallel", commands[prefix + "-tests"])
             self.assertIn("--skip-build", commands[prefix + "-tests"])
 
+    def test_windows_gives_swift_compilation_thirty_minutes(self):
+        for platform, build_timeout in (("win32", 1800), ("linux", 900)):
+            with self.subTest(platform=platform), patch.object(sys, "platform", platform):
+                checks = build_checks(REPO, ["Sources/AdaUI/View.swift"], CONFIG, REPO / "files.json", REPO)
+                timeouts = {check.name: check.timeout for check in checks}
+                for prefix in ("swift", "editor"):
+                    self.assertEqual(timeouts[prefix + "-build"], build_timeout)
+                    self.assertEqual(timeouts[prefix + "-analysis"], 900)
+                    self.assertEqual(timeouts[prefix + "-tests"], 900)
+
     def test_document_change_does_not_build_engine(self):
         checks = build_checks(REPO, ["Documentation/Designs/example.md"], CONFIG, REPO / "files.json", REPO)
         self.assertFalse(any("swift" in check.argv for check in checks))
