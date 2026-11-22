@@ -159,6 +159,11 @@ extension Path {
     /// Adds a rounded rectangle subpath with uniform corner radius.
     public mutating func addRoundedRect(_ rect: Rect, cornerRadius: Float) {
         let r = min(cornerRadius, min(rect.width, rect.height) * 0.5)
+        guard r > 0 else {
+            // Sampling collapsed Bézier corners can introduce tiny reversed edges.
+            addRect(rect)
+            return
+        }
         let kappa: Float = 0.5522847498
         let k = r * kappa
 

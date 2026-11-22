@@ -1,11 +1,31 @@
 @_spi(AdaEngine) import AdaEngine
 import Foundation
 
-struct EditorInterfaceModePicker: View {
+struct EditorInterfaceModeSwitcher: View {
     let state: EditorInterfaceState
     @Environment(\.theme) private var theme
 
     var body: some View {
+        Group {
+            if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+                let inEditor = state.mode == .editor
+                EditorSceneToolbarButton(
+                    title: inEditor ? "Switch to Agent" : "Switch to Editor",
+                    symbol: inEditor ? "\u{E86F}" : "\u{E65F}",
+                    identifier: "AdaEditor.InterfaceMode.Toggle",
+                    compact: true,
+                    tint: theme.editorColors.blue
+                ) {
+                    state.mode = inEditor ? .agent : .editor
+                }
+            } else {
+                segmentedPicker
+            }
+        }
+        .accessibilityIdentifier("AdaEditor.InterfaceMode")
+    }
+
+    private var segmentedPicker: some View {
         HStack(spacing: 2) {
             ForEach(EditorInterfaceMode.allCases, id: \.self) { mode in
                 Button(action: { state.mode = mode }) {
@@ -21,7 +41,6 @@ struct EditorInterfaceModePicker: View {
         }
         .padding(2)
         .background(RoundedRectangleShape(cornerRadius: 7).fill(theme.editorColors.surfaceElevated))
-        .accessibilityIdentifier("AdaEditor.InterfaceMode")
     }
 }
 
@@ -32,6 +51,7 @@ struct EditorAgentWorkspace: View {
 
     @State private var splitState = EditorWorkbenchResizeState()
     @State private var navigator: EditorAgentNavigatorTab?
+    private var compact: Bool { AdaEngineStyleLayoutSpec.usesCompactWorkspace }
 
     var body: some View {
         GeometryReader { geometry in
@@ -39,52 +59,55 @@ struct EditorAgentWorkspace: View {
             let showsSidebar = geometry.size.width >= 680 && (navigator == nil || geometry.size.width >= 1200)
             HStack(spacing: 0) {
                 if showsSidebar {
-                    sessions.frame(width: sidebarWidth).padding(.trailing, 8)
+                    sessions.frame(width: sidebarWidth).padding(.trailing, compact ? 0 : 8)
                 }
-                conversationAndArtifact
+                conversationAndArtifact(showsHistory: !showsSidebar)
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                 if let navigator {
                     EditorAgentNavigator(viewModel: viewModel, tab: navigator, onSelectTab: selectNavigator)
                         .frame(width: min(300, geometry.size.width * 0.3))
-                        .padding(.leading, 8)
+                        .padding(.leading, compact ? 0 : 8)
                 }
-                navigationStrip.padding(.leading, 8)
+                navigationStrip.padding(.leading, compact ? 0 : 8)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
         .accessibilityIdentifier("AdaEditor.AgentWorkspace")
     }
 
-    private var conversationAndArtifact: some View {
+    private func conversationAndArtifact(showsHistory: Bool) -> some View {
         GeometryReader { geometry in
             let inlineArtifact = geometry.size.width >= 640
             if viewModel.interface.showsArtifact && inlineArtifact {
-                EditorWorkbenchPanelsLayout(state: splitState) {
-                    conversation
+                let divider = compact ? AdaEngineStyleLayoutSpec.workspaceDividerSize : AdaEngineStyleLayoutSpec.dividerHitSize
+                EditorWorkbenchPanelsLayout(state: splitState, dividerWidth: divider) {
+                    conversation(showsHistory: showsHistory)
+                    artifact
                     EditorResizeHandle(
                         axis: .horizontal,
-                        onResize: { splitState.resize(translation: $0.width, availableWidth: geometry.size.width) },
+                        onResize: { splitState.resize(translation: $0.width, availableWidth: geometry.size.width, dividerWidth: divider) },
                         onResizeEnded: { splitState.endDrag() },
-                        showsGrip: true
+                        showsGrip: !compact,
+                        showsDivider: compact
                     )
                     .accessibilityIdentifier("AdaEditor.AgentWorkspace.ResizeArtifact")
-                    artifact
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
             } else if viewModel.interface.showsArtifact {
                 artifact
             } else {
-                conversation
+                conversation(showsHistory: showsHistory)
             }
         }
     }
 
-    private var conversation: some View {
+    private func conversation(showsHistory: Bool) -> some View {
         EditorAgentSidebar(
             viewModel: viewModel.agent,
             onOpenCatalog: { viewModel.presentSettings(.agent) },
             presentation: .workspace,
-            onOpenChangedFile: viewModel.openAgentChangedFile
+            onOpenChangedFile: viewModel.openAgentChangedFile,
+            showsSessionHistory: showsHistory
         )
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
     }
@@ -132,18 +155,31 @@ struct EditorAgentWorkspace: View {
             HStack {
                 Text(L10n.text("Agent Sessions")).font(.system(size: 13, weight: .semibold))
                 Spacer()
-                Text("\(viewModel.agent.sessions.count)").font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                if compact {
+                    EditorSceneToolbarButton(
+                        title: "New Session",
+                        symbol: "\u{E145}",
+                        identifier: "AdaEditor.AgentWorkspace.NewSession",
+                        compact: true,
+                        action: createSession
+                    )
+                } else {
+                    Text("\(viewModel.agent.sessions.count)").font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
+                }
             }
-            .padding(.horizontal, 14)
-            .frame(height: 36)
-            HStack(spacing: 6) {
-                outlinedButton("New Session", symbol: "\u{E145}") { createSession() }
-                    .accessibilityIdentifier("AdaEditor.AgentWorkspace.NewSession")
-                outlinedButton("Add Project", symbol: "\u{E2C7}", action: viewModel.openProjectFromMenu)
-                    .accessibilityIdentifier("AdaEditor.AgentWorkspace.AddProject")
+            .padding(.horizontal, compact ? 8 : 14)
+            .frame(height: compact ? AdaEngineStyleLayoutSpec.workspaceHeaderHeight : 36)
+            .modifier(EditorWorkspaceHeader())
+            if !compact {
+                HStack(spacing: 6) {
+                    outlinedButton("New Session", symbol: "\u{E145}") { createSession() }
+                        .accessibilityIdentifier("AdaEditor.AgentWorkspace.NewSession")
+                    outlinedButton("Add Project", symbol: "\u{E2C7}", action: viewModel.openProjectFromMenu)
+                        .accessibilityIdentifier("AdaEditor.AgentWorkspace.AddProject")
+                }
+                .padding(.horizontal, 10)
+                .padding(.bottom, 14)
             }
-            .padding(.horizontal, 10)
-            .padding(.bottom, 14)
             HStack(spacing: 8) {
                 Text("\u{E2C7}").font(AdaEditorMaterialSymbolFont.font(size: 17))
                 Text(viewModel.agent.projectName).font(.system(size: 12, weight: .semibold)).lineLimit(1)
@@ -160,49 +196,85 @@ struct EditorAgentWorkspace: View {
                         }
                     }
                 }
-                .padding(.horizontal, 8)
+                .padding(.horizontal, compact ? 0 : 8)
             }
             .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
             .accessibilityIdentifier("AdaEditor.AgentWorkspace.Sessions.ScrollView")
-            Button(action: { viewModel.presentSettings(.agent) }) {
-                HStack(spacing: 8) {
-                    Text("\u{E8B8}").font(AdaEditorMaterialSymbolFont.font(size: 17))
-                    Text(L10n.text("Agent Settings")).font(.system(size: 12))
-                    Spacer()
+            if compact {
+                HStack(spacing: 3) {
+                    EditorSceneToolbarButton(title: "Agent Settings", symbol: "\u{E8B8}", identifier: "AdaEditor.AgentWorkspace.Settings", compact: true) {
+                        viewModel.presentSettings(.agent)
+                    }
+                    EditorSceneToolbarButton(
+                        title: "Add Project",
+                        symbol: "\u{E2C7}",
+                        identifier: "AdaEditor.AgentWorkspace.AddProject",
+                        compact: true,
+                        action: viewModel.openProjectFromMenu
+                    )
+                    Spacer(minLength: 0)
                 }
-                .padding(12)
-                .foregroundColor(theme.editorColors.muted)
+                .padding(4)
+            } else {
+                settingsButton
             }
-            .buttonStyle(DefaultButtonStyle())
-            .accessibilityIdentifier("AdaEditor.AgentWorkspace.Settings")
         }
-        .background(RoundedRectangleShape(cornerRadius: 9).fill(theme.editorColors.surface))
-        .overlay { adaEditorPanelBorder(theme: theme, cornerRadius: 9) }
-        .mask(RoundedRectangleShape(cornerRadius: 9))
+        .background(RoundedRectangleShape(cornerRadius: compact ? 0 : 9).fill(theme.editorColors.surface))
+        .overlay { adaEditorPanelBorder(theme: theme, cornerRadius: compact ? 0 : 9) }
+        .modifier(EditorPanelClip(cornerRadius: compact ? 0 : 9))
+        .overlay(anchor: .trailing) {
+            if compact {
+                RectangleShape().fill(theme.editorColors.border).frame(width: 1).allowsHitTesting(false)
+            }
+        }
         .accessibilityIdentifier("AdaEditor.AgentWorkspace.Sessions")
+    }
+
+    private var settingsButton: some View {
+        Button(action: { viewModel.presentSettings(.agent) }) {
+            HStack(spacing: 8) {
+                Text("\u{E8B8}").font(AdaEditorMaterialSymbolFont.font(size: 17))
+                Text(L10n.text("Agent Settings")).font(.system(size: 12))
+                Spacer()
+            }
+            .padding(12)
+            .foregroundColor(theme.editorColors.muted)
+        }
+        .buttonStyle(DefaultButtonStyle())
+        .accessibilityIdentifier("AdaEditor.AgentWorkspace.Settings")
     }
 
     private func sessionRow(_ session: EditorAgentSessionSummary) -> some View {
         let active = session.id == viewModel.agent.activeSessionID
         return Button(action: { viewModel.agent.selectSession(session) }) {
             HStack(spacing: 7) {
-                Text(active ? "\u{E5CF}" : "\u{E5CC}").font(AdaEditorMaterialSymbolFont.font(size: 14))
+                if !compact {
+                    Text(active ? "\u{E5CF}" : "\u{E5CC}").font(AdaEditorMaterialSymbolFont.font(size: 14))
+                }
                 if viewModel.agent.runningSessionID == session.id {
                     EditorFlipLoadingIndicator(size: 12, color: theme.editorColors.blue)
-                } else {
+                } else if !compact {
                     Text("\u{E8F1}").font(AdaEditorMaterialSymbolFont.font(size: 15))
                 }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(session.title).font(.system(size: 12, weight: active ? .semibold : .regular)).lineLimit(1)
-                    Text(session.updatedAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.system(size: 10)).foregroundColor(theme.editorColors.muted).lineLimit(1)
+                    if !compact {
+                        Text(session.updatedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.system(size: 10)).foregroundColor(theme.editorColors.muted).lineLimit(1)
+                    }
                 }
                 Spacer()
             }
             .padding(.horizontal, 9)
-            .padding(.vertical, 8)
+            .padding(.vertical, compact ? 0 : 8)
+            .frame(minHeight: compact ? 27 : nil)
             .foregroundColor(theme.editorColors.text)
-            .background(RoundedRectangleShape(cornerRadius: 5).fill(active ? theme.editorColors.blue.opacity(0.14) : .clear))
+            .background(RoundedRectangleShape(cornerRadius: compact ? 0 : 5).fill(active ? theme.editorColors.blue.opacity(0.14) : .clear))
+            .overlay(anchor: .leading) {
+                if compact && active {
+                    RectangleShape().fill(theme.editorColors.blue).frame(width: 2).allowsHitTesting(false)
+                }
+            }
         }
         .buttonStyle(DefaultButtonStyle())
         .contextMenu { Button(L10n.text("Delete session")) { viewModel.agent.deleteSession(session) } }
@@ -214,7 +286,8 @@ struct EditorAgentWorkspace: View {
     }
 
     private var artifact: some View {
-        VStack(spacing: 0) {
+        let radius: Float = compact ? 0 : 9
+        return VStack(spacing: 0) {
             HStack {
                 Text(L10n.text("Workspace")).font(.system(size: 12, weight: .semibold))
                 Spacer()
@@ -230,9 +303,9 @@ struct EditorAgentWorkspace: View {
                 .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         }
         .foregroundColor(theme.editorColors.text)
-        .background(RoundedRectangleShape(cornerRadius: 9).fill(theme.editorColors.surface))
-        .mask(RoundedRectangleShape(cornerRadius: 9))
-        .overlay { adaEditorPanelBorder(theme: theme, cornerRadius: 9) }
+        .background(RoundedRectangleShape(cornerRadius: radius).fill(theme.editorColors.surface))
+        .modifier(EditorPanelClip(cornerRadius: radius))
+        .overlay { adaEditorPanelBorder(theme: theme, cornerRadius: radius) }
         .accessibilityIdentifier("AdaEditor.AgentWorkspace.Artifact")
     }
 

@@ -17,19 +17,20 @@ struct EditorBottomPanel: View {
     let viewModel: EditorViewModel
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
+    private var compact: Bool { AdaEngineStyleLayoutSpec.usesCompactWorkspace }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if viewModel.activeOutputTab != "Terminal" || EditorDistribution.current != .standalone {
                 ScrollView(.horizontal) {
-                    HStack(spacing: 8) {
+                    HStack(spacing: compact ? 0 : 8) {
                         ForEach(metrics.outputTabs, id: \.self) { tab in
                             outputTab(tab)
                         }
                     }
-                    .padding(.horizontal, 8)
+                    .padding(.horizontal, compact ? 0 : 8)
                 }
-                .frame(height: 34)
+                .frame(height: AdaEngineStyleLayoutSpec.workspaceHeaderHeight)
                 .background(theme.editorColors.surface)
             }
 
@@ -86,7 +87,7 @@ struct EditorBottomPanel: View {
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
                 .fill(theme.editorColors.surfaceElevated)
         }
-        .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .modifier(EditorPanelClip(cornerRadius: metrics.panelsRoundedCorner))
         .overlay {
             adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
         }
@@ -275,23 +276,34 @@ struct EditorBottomPanel: View {
         .buttonStyle(DefaultButtonStyle())
     }
 
+    @ViewBuilder
     private func outputTab(_ tab: String) -> some View {
         let active = tab == viewModel.activeOutputTab
-
-        return Button(action: { viewModel.selectOutputTab(tab) }) {
+        let button = Button(action: { viewModel.selectOutputTab(tab) }) {
             Text(L10n.tr(tab))
                 .font(.system(size: 12))
                 .foregroundColor(active ? theme.editorColors.text : theme.editorColors.muted)
                 .padding(.horizontal, metrics.outputTabHorizontalPadding)
-                .frame(width: outputTabWidth(tab), height: 24)
-                .background(RoundedRectangleShape(cornerRadius: 5).fill(active ? theme.editorColors.surfaceElevated : theme.editorColors.surface.opacity(0.55)))
+                .frame(width: outputTabWidth(tab), height: compact ? AdaEngineStyleLayoutSpec.workspaceHeaderHeight : 24)
+        }
+        if compact {
+            button
+                .buttonStyle(EditorChromeHoverButtonStyle(theme: theme, cornerRadius: 0))
+                .modifier(EditorWorkspaceTabChrome(isSelected: active))
+                .accessibilityIdentifier("AdaEditor.Output.Tab.\(tab)")
+        } else {
+            button
+                .buttonStyle(DefaultButtonStyle())
+                .background(
+                    RoundedRectangleShape(cornerRadius: 5)
+                        .fill(active ? theme.editorColors.surfaceElevated : theme.editorColors.surface.opacity(0.55))
+                )
                 .overlay {
                     RoundedRectangleShape(cornerRadius: 5)
                         .stroke(active ? theme.editorColors.blue.opacity(0.68) : theme.editorColors.border.opacity(0.36), lineWidth: 1)
                 }
+                .accessibilityIdentifier("AdaEditor.Output.Tab.\(tab)")
         }
-        .buttonStyle(DefaultButtonStyle())
-        .accessibilityIdentifier("AdaEditor.Output.Tab.\(tab)")
     }
 
     private func outputTabWidth(_ tab: String) -> Float {

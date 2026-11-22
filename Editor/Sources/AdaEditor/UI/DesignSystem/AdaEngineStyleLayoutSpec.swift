@@ -6,6 +6,18 @@
 //
 
 enum AdaEngineStyleLayoutSpec {
+    #if os(macOS) || os(Windows) || os(Linux)
+    static let usesCompactWorkspace = true
+    #else
+    static let usesCompactWorkspace = false
+    #endif
+
+    static let dividerHitSize: Float = 8
+    static let workspaceDividerSize: Float = usesCompactWorkspace ? 1 : dividerHitSize
+    static let workspaceHeaderHeight: Float = usesCompactWorkspace ? 30 : 34
+    static let workspaceControlRadius: Float = usesCompactWorkspace ? 3 : 5
+    static let workspaceIconSize: Double = 14
+
     static let windowWidth: Float = 1280
     static let windowHeight: Float = 820
     static let minimumWidth: Float = 640

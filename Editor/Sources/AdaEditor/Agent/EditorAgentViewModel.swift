@@ -205,7 +205,10 @@ final class EditorAgentViewModel {
         guard activeSession?.id == submission.sessionID, !isSending, !isSubmittingA2UI, settings.configuration.enabled,
               submission.agentIdentity == settings.configuration.target.sessionIdentity
         else {
-            a2ui.sessions[submission.sessionID]?.rejectSubmission("This interface belongs to another or unavailable agent session. Reconnect its agent before submitting.", surfaceID: submission.surfaceID)
+            a2ui.sessions[submission.sessionID]?.rejectSubmission(
+                "This interface belongs to another or unavailable agent session. Reconnect its agent before submitting.",
+                surfaceID: submission.surfaceID
+            )
             return
         }
         if let ui = a2ui.sessions[submission.sessionID], ui.performLocal(submission, apply: { request in
@@ -221,17 +224,27 @@ final class EditorAgentViewModel {
 
     private func a2uiRecordsChanged(sessionID: String, records: [EditorAgentA2UISurfaceRecord]) {
         if activeSession?.id == sessionID { activeSession?.a2uiSurfaces = records }
-        if runningSession?.id == sessionID { runningSession?.a2uiSurfaces = records; return }
+        if runningSession?.id == sessionID {
+            runningSession?.a2uiSurfaces = records
+            return
+        }
         a2uiSaveTasks[sessionID]?.cancel()
         a2uiSaveTasks[sessionID] = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
-            guard let self, let store = self.store, self.runningSession?.id != sessionID else { return }
+            guard let self, let store = self.store, self.runningSession?.id != sessionID else {
+                return
+            }
             do {
                 var session: EditorAgentSession
-                if let active = self.activeSession, active.id == sessionID { session = active }
-                else { session = try await store.loadSession(id: sessionID) }
+                if let active = self.activeSession, active.id == sessionID {
+                    session = active
+                } else {
+                    session = try await store.loadSession(id: sessionID)
+                }
                 session.a2uiSurfaces = self.a2ui.sessions[sessionID]?.persistedRecords ?? records
-                guard !Task.isCancelled, self.a2ui.sessions[sessionID] != nil else { return }
+                guard !Task.isCancelled, self.a2ui.sessions[sessionID] != nil else {
+                    return
+                }
                 try await store.saveSession(session, makeActive: self.activeSession?.id == sessionID)
             } catch { self.statusMessage = error.localizedDescription }
         }
@@ -353,7 +366,9 @@ final class EditorAgentViewModel {
             return
         }
         let task = Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             await self.loadSessionsImpl()
         }
         sessionLoadTask = task
@@ -575,7 +590,9 @@ final class EditorAgentViewModel {
             let target = installed?.target ?? local?.target
             if EditorSloppyLocalSetup.isSloppyTarget(target) {
                 do {
-                    guard try EditorSloppyLocalSetup.prepare() else { return }
+                    guard try EditorSloppyLocalSetup.prepare() else {
+                        return
+                    }
                 } catch {
                     settingsStatusMessage = "Unable to prepare Sloppy: \(error.localizedDescription)"
                     return
@@ -748,11 +765,12 @@ final class EditorAgentViewModel {
         attachFile(at: projectURL.appendingPathComponent(entry.path, isDirectory: false))
     }
 
-    func presentContextFilePicker() {
+    func presentContextFilePicker(onComplete: (() -> Void)? = nil) {
         ProjectOpenPicker.presentAgentContextPicker { [weak self] result in
             guard let self else {
                 return
             }
+            defer { onComplete?() }
             switch result {
             case let .selected(urls):
                 for url in urls {
@@ -792,8 +810,8 @@ final class EditorAgentViewModel {
         return true
     }
 
-    func submitPromptFromKeyboard() -> Bool {
-        if acceptCompletion() {
+    func submitPromptFromKeyboard(attachingFile: Bool = false) -> Bool {
+        if acceptCompletion(attachingFile: attachingFile) {
             return true
         }
         if canSend {
@@ -802,32 +820,37 @@ final class EditorAgentViewModel {
         return true
     }
 
-    func acceptCompletion() -> Bool {
+    func acceptCompletion(attachingFile: Bool = false) -> Bool {
         guard autocompleteSuggestions.indices.contains(selectedCompletionIndex) else {
             return false
         }
-        insertAutocomplete(autocompleteSuggestions[selectedCompletionIndex])
+        insertAutocomplete(autocompleteSuggestions[selectedCompletionIndex], attachingFile: attachingFile)
         return true
     }
 
-    func insertAutocomplete(_ entry: EditorAgentCompletion) {
+    func insertAutocomplete(_ entry: EditorAgentCompletion, attachingFile: Bool = false) {
         guard let token = EditorAgentCompletionToken.current(in: prompt, cursorOffset: promptCaretOffset) else {
             return
         }
-        let value: String
+        let replacement: String
         switch entry {
         case let .file(file):
-            value = "@" + EditorAgentPathTokens.escapedTokenValue(file.path)
+            if attachingFile, !file.isDirectory, projectURL != nil {
+                attachProjectFile(file)
+                replacement = ""
+            } else {
+                replacement = "@" + EditorAgentPathTokens.escapedTokenValue(file.path) + " "
+            }
         case let .skill(skill):
             let needsQualifier = token.marker == "@" || currentSessionConfiguration.commands.contains { $0.name == skill.id }
-            value = String(token.marker) + (needsQualifier ? "skill:" : "") + EditorAgentPathTokens.escapedTokenValue(skill.id)
+            replacement = String(token.marker) + (needsQualifier ? "skill:" : "") + EditorAgentPathTokens.escapedTokenValue(skill.id) + " "
         case let .command(command):
-            value = "/" + command.name
+            replacement = "/" + command.name + " "
         }
         let prefix = String(prompt[..<token.range.lowerBound])
-        prompt.replaceSubrange(token.range, with: value + " ")
-        promptCaretOffset = prefix.count + value.count + 1
-        let beforeCaret = prefix + value + " "
+        prompt.replaceSubrange(token.range, with: replacement)
+        promptCaretOffset = prefix.count + replacement.count
+        let beforeCaret = prefix + replacement
         let lines = beforeCaret.split(separator: "\n", omittingEmptySubsequences: false)
         let position = TextEditorSourcePosition(line: lines.count - 1, column: lines.last?.count ?? 0)
         promptCompletionFocus = TextEditorSourceRange(start: position, end: position)
@@ -874,7 +897,9 @@ final class EditorAgentViewModel {
         }
 
         if let submission = a2uiSubmission {
-            guard submission.sessionID == session.id, submission.agentIdentity == settings.configuration.target.sessionIdentity else { return }
+            guard submission.sessionID == session.id, submission.agentIdentity == settings.configuration.target.sessionIdentity else {
+                return
+            }
         }
         session.a2uiSurfaces = a2ui.restoreIfNeeded(session).persistedRecords
         connectionSettings = projectConfig.ai.agent
@@ -1042,7 +1067,9 @@ final class EditorAgentViewModel {
     }
 
     private func receiveRunEvent(_ event: EditorAgentEvent, sessionID: String, activityID: String) {
-        guard runningSession?.id == sessionID, runningActivityID == activityID else { return }
+        guard runningSession?.id == sessionID, runningActivityID == activityID else {
+            return
+        }
         runEventBatcher?.receive(event)
     }
 
@@ -1116,11 +1143,15 @@ final class EditorAgentViewModel {
                     }
                 }
             )
-            guard activeSession?.id == session.id, connectionSettings == settings.configuration else { return }
+            guard activeSession?.id == session.id, connectionSettings == settings.configuration else {
+                return
+            }
             sessionConfiguration = configuration
             connectionState = .ready(configuration.agentName)
         } catch {
-            guard activeSession?.id == session.id, connectionSettings == settings.configuration else { return }
+            guard activeSession?.id == session.id, connectionSettings == settings.configuration else {
+                return
+            }
             statusMessage = error.localizedDescription
             connectionState = .failed(error.localizedDescription)
             notifications.post(

@@ -21,6 +21,7 @@ struct EditorWorkspaceView<
     @ViewBuilder let bottomPanel: () -> BottomPanel
 
     @State private var resizeState = EditorWorkspaceResizeState()
+    @Environment(\.theme) private var theme
 
     var body: some View {
         GeometryReader { geometry in
@@ -28,7 +29,7 @@ struct EditorWorkspaceView<
             // swiftlint:disable:next redundant_discardable_let
             let _ = resizeState.topologyRevision
             let layout = resizeState.layout(in: geometry.size, viewModel: viewModel)
-            // Keep seven slots, including empty placeholders for collapsed panels.
+            // Keep the thin dividers independent of the wider hit targets.
             EditorWorkspacePanelsLayout(state: resizeState, viewModel: viewModel)(
                 invalidation: resizeState.geometryInvalidation
             ) {
@@ -36,24 +37,30 @@ struct EditorWorkspaceView<
                     leftPanel()
                         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                 }
-                if layout.showsLeftPanel {
-                    resizeHandle(.left, size: geometry.size)
-                }
                 mainPanel()
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                if layout.showsRightPanel {
-                    resizeHandle(.right, size: geometry.size)
-                }
                 if layout.showsRightPanel {
                     rightPanel()
                         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
                 }
                 if layout.showsBottomPanel {
-                    resizeHandle(.bottom, size: geometry.size)
-                }
-                if layout.showsBottomPanel {
                     bottomPanel()
                         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                }
+                if AdaEngineStyleLayoutSpec.usesCompactWorkspace && layout.showsLeftPanel {
+                    verticalDivider
+                }
+                if AdaEngineStyleLayoutSpec.usesCompactWorkspace && layout.showsRightPanel {
+                    verticalDivider
+                }
+                if layout.showsLeftPanel {
+                    resizeHandle(.left, size: geometry.size)
+                }
+                if layout.showsRightPanel {
+                    resizeHandle(.right, size: geometry.size)
+                }
+                if layout.showsBottomPanel {
+                    resizeHandle(.bottom, size: geometry.size)
                 }
             }
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
@@ -61,18 +68,26 @@ struct EditorWorkspaceView<
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    private var verticalDivider: some View {
+        RectangleShape()
+            .fill(theme.editorColors.border)
+            .frame(width: EditorWorkspaceLayout.dividerSize)
+            .allowsHitTesting(false)
+    }
+
     private func resizeHandle(_ panel: EditorWorkspaceResizeState.Panel, size: Size) -> some View {
         EditorResizeHandle(
             axis: panel == .bottom ? .vertical : .horizontal,
             onResize: { resizeState.resize(panel, translation: $0, in: size, viewModel: viewModel) },
-            onResizeEnded: { resizeState.endDrag() }
+            onResizeEnded: { resizeState.endDrag() },
+            showsDivider: AdaEngineStyleLayoutSpec.usesCompactWorkspace && panel == .bottom
         )
         .accessibilityIdentifier("AdaEditor.Workspace.Resize\(panel.rawValue)")
     }
 }
 
 struct EditorWorkspaceLayout: Equatable {
-    static let resizeHandleSize: Float = 8
+    static let dividerSize = AdaEngineStyleLayoutSpec.workspaceDividerSize
     static let minimumMainPanelHeight: Float = 140
     static let minimumLeftPanelWidth: Float = 180
     static let minimumRightPanelWidth: Float = 220
@@ -111,19 +126,19 @@ struct EditorWorkspaceLayout: Equatable {
 
         leftPanelWidth = panelWidths.left
         rightPanelWidth = panelWidths.right
-        let horizontalHandleWidth = Float((leftPanelWidth > 0 ? 1 : 0) + (rightPanelWidth > 0 ? 1 : 0)) * Self.resizeHandleSize
-        mainPanelWidth = max(0, size.width - horizontalHandleWidth - leftPanelWidth - rightPanelWidth)
+        let horizontalHandleWidth = Float((leftPanelWidth > 0 ? 1 : 0) + (rightPanelWidth > 0 ? 1 : 0)) * Self.dividerSize
+        mainPanelWidth = max(0, size.width - horizontalHandleWidth - (leftPanelWidth + rightPanelWidth))
 
         bottomPanelHeight =
             showsBottomPanel
             ? Self.clampedBottomPanelHeight(requestedBottomPanelHeight, in: size)
             : 0
-        let verticalHandleHeight = bottomPanelHeight > 0 ? Self.resizeHandleSize : 0
+        let verticalHandleHeight = bottomPanelHeight > 0 ? Self.dividerSize : 0
         mainPanelHeight = max(0, size.height - verticalHandleHeight - bottomPanelHeight)
     }
 
     static func clampedBottomPanelHeight(_ height: Float, in size: Size) -> Float {
-        let maximumHeight = min(520, size.height - resizeHandleSize - minimumMainPanelHeight)
+        let maximumHeight = min(520, size.height - dividerSize - minimumMainPanelHeight)
         guard maximumHeight >= minimumBottomPanelHeight, height >= minimumBottomPanelHeight else {
             return 0
         }
@@ -152,11 +167,11 @@ extension EditorWorkspaceLayout {
 
         // Reclaim both the content and divider of a collapsed panel before sizing its siblings.
         while left > 0 || right > 0 {
-            let handles = Float((left > 0 ? 1 : 0) + (right > 0 ? 1 : 0)) * resizeHandleSize
+            let handles = Float((left > 0 ? 1 : 0) + (right > 0 ? 1 : 0)) * dividerSize
             let budget = max(0, availableWidth - handles)
             let scale = min(1, budget / (left + right))
             let fittedLeft = left * scale
-            let fittedRight = right * scale
+            let fittedRight = scale < 1 && right > 0 ? budget - fittedLeft : right
             if left > 0 && fittedLeft < minimumLeftPanelWidth {
                 left = 0
             } else if right > 0 && fittedRight < minimumRightPanelWidth {

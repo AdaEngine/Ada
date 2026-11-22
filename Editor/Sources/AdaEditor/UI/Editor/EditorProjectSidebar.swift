@@ -69,32 +69,34 @@ struct EditorProjectSidebar: View {
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
+    private var compact: Bool { AdaEngineStyleLayoutSpec.usesCompactWorkspace }
 
     var body: some View {
         ZStack(anchor: .topLeading) {
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
+                HStack(spacing: compact ? 4 : 8) {
                     Button(action: {
                         viewModel.toggleDisplayModeMenu()
                     }) {
                         HStack(spacing: 4) {
                             Text(L10n.tr(viewModel.displayMode.title))
                                 .font(.system(size: 14, weight: .bold))
+                                .lineLimit(1)
                             Text(EditorProjectTreeIcon.expandMore)
-                                .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                                .font(AdaEditorMaterialSymbolFont.font(size: compact ? 12 : 16))
                         }
                         .foregroundColor(theme.editorColors.text)
                         .frame(height: 24)
                     }
-                    .buttonStyle(DefaultButtonStyle())
+                    .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
                     .accessibilityIdentifier("AdaEditor.ProjectTree.DisplayMode.Menu")
                     Spacer()
                     Button(action: { onRevealActiveFile?() }) {
                         EditorProjectTreeLocateIcon()
                             .stroke(theme.editorColors.blue, lineWidth: 1.5)
-                            .frame(width: 17, height: 17)
+                            .frame(width: compact ? 14 : 17, height: compact ? 14 : 17)
                             .frame(width: 26, height: 26)
-                            .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.14)))
+                            .background(RoundedRectangleShape(cornerRadius: compact ? 3 : 6).fill(compact ? .clear : theme.editorColors.blue.opacity(0.14)))
                     }
                     .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
                     .disabled(!isRevealActiveFileEnabled)
@@ -104,10 +106,10 @@ struct EditorProjectSidebar: View {
                     .accessibilityIdentifier("AdaEditor.ProjectTree.RevealActiveFile")
                     Button(action: { viewModel.toggleAllFolders() }) {
                         Text(viewModel.hasExpandedFolders ? EditorProjectTreeIcon.unfoldLess : EditorProjectTreeIcon.unfoldMore)
-                            .font(AdaEditorMaterialSymbolFont.font(size: 17))
+                            .font(AdaEditorMaterialSymbolFont.font(size: compact ? AdaEngineStyleLayoutSpec.workspaceIconSize : 17))
                             .foregroundColor(theme.editorColors.blue)
                             .frame(width: 26, height: 26)
-                            .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.14)))
+                            .background(RoundedRectangleShape(cornerRadius: compact ? 3 : 6).fill(compact ? .clear : theme.editorColors.blue.opacity(0.14)))
                     }
                     .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
                     .disabled(!viewModel.hasFolders)
@@ -117,16 +119,17 @@ struct EditorProjectSidebar: View {
                         onNewFile(nil)
                     }) {
                         Text("\u{E145}")
-                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                            .font(AdaEditorMaterialSymbolFont.font(size: compact ? AdaEngineStyleLayoutSpec.workspaceIconSize : 16))
                             .foregroundColor(theme.editorColors.blue)
                             .frame(width: 26, height: 26)
-                            .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.20)))
+                            .background(RoundedRectangleShape(cornerRadius: 6).fill(compact ? .clear : theme.editorColors.blue.opacity(0.20)))
                     }
                     .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
                     .accessibilityIdentifier("AdaEditor.ProjectTree.NewFile")
                 }
-                .padding(.horizontal, 12)
-                .frame(height: 34)
+                .padding(.horizontal, compact ? 8 : 12)
+                .frame(height: AdaEngineStyleLayoutSpec.workspaceHeaderHeight)
+                .modifier(EditorWorkspaceHeader())
 
                 ZStack(anchor: .topLeading) {
                     projectTreeBackground
@@ -151,7 +154,8 @@ struct EditorProjectSidebar: View {
                                 }
                                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(8)
+                            .padding(.vertical, compact ? 4 : 8)
+                            .padding(.horizontal, compact ? 0 : 8)
                         }
                         .accessibilityIdentifier("AdaEditor.ProjectTree.ScrollView")
                         .onChange(of: viewModel.revealRevision) { _, _ in
@@ -279,33 +283,39 @@ struct EditorProjectSidebar: View {
             HStack(spacing: 6) {
                 EditorProjectTreeChevron(expansion: item.isFolder && !viewModel.isCollapsed(item) ? 1 : 0)
                     .stroke(theme.editorColors.muted, lineWidth: 1.5)
-                    .frame(width: 16, height: 18)
+                    .frame(width: compact ? 14 : 16, height: compact ? 14 : 18)
                     .opacity(item.isFolder ? 1 : 0)
                     .animation(.easeInOut(duration: Float(EditorProjectTreePresentation.duration)), value: viewModel.isCollapsed(item))
                     .accessibilityIdentifier("AdaEditor.ProjectTree.Disclosure.\(item.navigationPath)")
                 if let language = textLanguage(for: item), let image = EditorLanguageLogo.image(for: language) {
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 18, height: 18)
+                        .scaledToFit()
+                        .frame(width: compact ? 14 : 18, height: compact ? 14 : 18)
                 } else {
                     Text(fileIcon(for: item))
-                        .font(AdaEditorMaterialSymbolFont.font(size: 17))
+                        .font(AdaEditorMaterialSymbolFont.font(size: compact ? AdaEngineStyleLayoutSpec.workspaceIconSize : 17))
                         .foregroundColor(iconColor(for: item))
-                        .frame(width: 18, height: 18)
+                        .frame(width: compact ? 14 : 18, height: compact ? 14 : 18)
                 }
                 Text(item.title)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(item.isActive ? theme.editorColors.text : theme.editorColors.muted)
+                    .lineLimit(1)
                 Spacer()
             }
-            .padding(.leading, 6 + Float(item.level) * 16)
+            .padding(.leading, 6 + Float(item.level) * (compact ? 13 : 16))
             .padding(.trailing, 6)
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 26, maxHeight: 26, alignment: .leading)
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: rowHeight, maxHeight: rowHeight, alignment: .leading)
             .background(
-                RoundedRectangleShape(cornerRadius: 5)
+                RoundedRectangleShape(cornerRadius: compact ? 0 : 5)
                     .fill(projectTreeRowBackground(for: item, isHovered: isHovered))
             )
+            .overlay(anchor: .leading) {
+                if compact && item.isActive {
+                    RectangleShape().fill(theme.editorColors.blue).frame(width: 2).allowsHitTesting(false)
+                }
+            }
         }
         .buttonStyle(DefaultButtonStyle())
         .contextMenu(onPresent: { if !isSwiftTargetFolder { viewModel.select(item) } }) {
@@ -362,6 +372,8 @@ struct EditorProjectSidebar: View {
         }
         .accessibilityIdentifier("AdaEditor.ProjectTree.\(item.title)")
     }
+
+    private var rowHeight: Float { compact ? EditorProjectTreePresentation.rowHeight : 26 }
 
     private func projectTreeRowBackground(for item: EditorProjectSidebarViewModel.Item, isHovered: Bool) -> Color {
         if item.isActive {

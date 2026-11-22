@@ -41,7 +41,7 @@ struct EditorAgentChatUITests {
         #expect(model.prompt.isEmpty)
     }
 
-    @Test("Header has one settings action and compact tabs have a deletion menu")
+    @Test("The chat header provides settings and conversation history")
     func tabsAndSettings() throws {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
         _ = makeContainer(model)
@@ -54,23 +54,36 @@ struct EditorAgentChatUITests {
         container.frame = Rect(x: 0, y: 0, width: 560, height: 820)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
-        let a = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Session.\(first.id)"))
-        let b = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Session.\(second.id)"))
         let header = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Header"))
-        #expect(a.absoluteFrame.maxX < b.absoluteFrame.minX)
-        #expect(a.absoluteFrame.height == 32)
-        #expect(a.absoluteFrame.minY - header.absoluteFrame.maxY <= 3)
         #expect(throws: (any Error).self) { try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Connect")) }
         #expect(throws: (any Error).self) { try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Delete session")) }
         var menu: ContextMenuPresentation?
         let previous = ContextMenuPresentationCenter.present
         ContextMenuPresentationCenter.present = { menu = $0 }
         defer { ContextMenuPresentationCenter.present = previous }
-        container.onMouseEvent(MouseEvent(
-            window: RID(), button: .right, mousePosition: Point(b.absoluteFrame.midX, b.absoluteFrame.midY),
-            phase: .began, modifierKeys: [], time: 0
-        ))
-        #expect(menu?.items.map(\.title) == ["Delete session"])
+        if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+            let history = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.SessionHistory"))
+            #expect(history.absoluteFrame.maxY <= header.absoluteFrame.maxY)
+            _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.SessionHistory"))
+            #expect(menu?.items.first { $0.title == first.title }?.isSelected == true)
+            #expect(menu?.items.contains { $0.title == second.title } == true)
+            #expect(menu?.items.first { $0.title == L10n.text("Delete session") }?.submenu.count == 2)
+        } else {
+            let a = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Session.\(first.id)"))
+            let b = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Session.\(second.id)"))
+            #expect(a.absoluteFrame.maxX < b.absoluteFrame.minX)
+            #expect(a.absoluteFrame.height == 32)
+            #expect(a.absoluteFrame.minY - header.absoluteFrame.maxY <= 3)
+            container.onMouseEvent(MouseEvent(
+                window: RID(),
+                button: .right,
+                mousePosition: Point(b.absoluteFrame.midX, b.absoluteFrame.midY),
+                phase: .began,
+                modifierKeys: [],
+                time: 0
+            ))
+            #expect(menu?.items.map(\.title) == [L10n.text("Delete session")])
+        }
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.OpenCatalog"))
         #expect(opened)
     }
@@ -136,7 +149,7 @@ struct EditorAgentChatUITests {
         #expect(await service.connectionCount() == 1)
     }
 
-    @Test("Tab context menu deletes the clicked session and keeps the active session")
+    @Test("Conversation deletion keeps the active session")
     func deleteClickedSession() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentDelete-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
@@ -148,16 +161,27 @@ struct EditorAgentChatUITests {
         try await model.createSession()
         let activeID = try #require(model.activeSession?.id)
         let container = makeContainer(model)
-        let tab = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Session.\(oldSession.id)"))
         var menu: ContextMenuPresentation?
         let previous = ContextMenuPresentationCenter.present
         ContextMenuPresentationCenter.present = { menu = $0 }
         defer { ContextMenuPresentationCenter.present = previous }
-        container.onMouseEvent(MouseEvent(
-            window: RID(), button: .right, mousePosition: Point(tab.absoluteFrame.midX, tab.absoluteFrame.midY),
-            phase: .began, modifierKeys: [], time: 0
-        ))
-        let delete = try #require(menu?.items.first?.action)
+        let delete: () -> Void
+        if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+            _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.SessionHistory"))
+            let actions = try #require(menu?.items.first { $0.title == L10n.text("Delete session") })
+            delete = try #require(actions.submenu.first { $0.title == oldSession.title }?.action)
+        } else {
+            let tab = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Session.\(oldSession.id)"))
+            container.onMouseEvent(MouseEvent(
+                window: RID(),
+                button: .right,
+                mousePosition: Point(tab.absoluteFrame.midX, tab.absoluteFrame.midY),
+                phase: .began,
+                modifierKeys: [],
+                time: 0
+            ))
+            delete = try #require(menu?.items.first?.action)
+        }
         delete()
         for _ in 0..<100 {
             if !model.sessions.contains(where: { $0.id == oldSession.id }) { break }
@@ -165,6 +189,48 @@ struct EditorAgentChatUITests {
         }
         #expect(!model.sessions.contains(where: { $0.id == oldSession.id }))
         #expect(model.activeSession?.id == activeID)
+    }
+
+    @Test("Selecting a session from history returns typing focus to the prompt")
+    func historySelectionRestoresFocus() async throws {
+        guard AdaEngineStyleLayoutSpec.usesCompactWorkspace else {
+            return
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentHistoryFocus-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try ProjectSystem.saveProject(ProjectSystem.defaultProject(projectName: "History"), at: root)
+        let model = EditorAgentViewModel(
+            project: .init(name: "History", path: root.path),
+            settings: EditorAgentSettingsStore(),
+            service: FakeEditorAgentService()
+        )
+        await model.loadSessions()
+        let first = try #require(model.activeSession)
+        try await model.createSession()
+        let container = makeContainer(model)
+        var menu: ContextMenuPresentation?
+        let previous = ContextMenuPresentationCenter.present
+        ContextMenuPresentationCenter.present = { menu = $0 }
+        defer { ContextMenuPresentationCenter.present = previous }
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.SessionHistory"))
+        let select = try #require(menu?.items.first { $0.title == first.title }?.action)
+        select()
+        for _ in 0..<40 {
+            await Task.yield()
+            container.update(0.016)
+            container.layoutIfNeeded()
+            let focused = try container.uiLayoutDiagnostics(matching: nil, subtreeDepth: nil).focusedNode
+            if model.activeSession?.id == first.id, focused?.nodeType.hasSuffix("TextEditorViewNode") == true {
+                break
+            }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(model.activeSession?.id == first.id)
+        let focused = try container.uiLayoutDiagnostics(matching: nil, subtreeDepth: nil).focusedNode
+        #expect(focused?.nodeType.hasSuffix("TextEditorViewNode") == true)
+        container.onTextInputEvent(TextInputEvent(window: .empty, text: "Next draft", action: .insert, time: 0))
+        #expect(model.prompt == "Next draft")
     }
 
     @Test("Provider JSON errors remain readable instead of disappearing in Markdown")
@@ -215,7 +281,8 @@ struct EditorAgentChatUITests {
     func sidebarHistoryScrolls() async throws {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
         model.activeSession = EditorAgentSession(title: "History")
-        model.activeSession?.events = (0..<30).map { index in
+        let first = EditorAgentEvent(id: "initial-user", kind: .message, message: .init(role: .user, segments: [.init(kind: .text, text: "Hello")]))
+        model.activeSession?.events = [first] + (0..<30).map { index in
             EditorAgentEvent(
                 id: "history-\(index)",
                 kind: .message,
@@ -273,9 +340,10 @@ struct EditorAgentChatUITests {
         let add = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.AddContext"))
         let send = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Send"))
         #expect(add.absoluteFrame.width >= 24)
-        #expect(send.absoluteFrame.width == 34)
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        #expect(send.absoluteFrame.width == (compact ? 26 : 34))
         #expect(send.absoluteFrame.maxX <= 300)
-        #expect(add.absoluteFrame.maxY == send.absoluteFrame.maxY - 2)
+        #expect(add.absoluteFrame.midY == send.absoluteFrame.midY)
         #expect(throws: (any Error).self) {
             try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Skills"))
         }
@@ -305,8 +373,14 @@ struct EditorAgentChatUITests {
         let row = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Completion.command:compact"))
         let completions = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Completions"))
         let composer = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Composer"))
-        #expect(row.absoluteFrame.height >= 48)
-        #expect(composer.absoluteFrame.minY - completions.absoluteFrame.maxY >= 8)
+        if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+            #expect(row.absoluteFrame.height == 32)
+            #expect(completions.absoluteFrame.minY >= prompt.minY)
+            #expect(completions.absoluteFrame.minY <= prompt.maxY + 4)
+        } else {
+            #expect(row.absoluteFrame.height >= 48)
+            #expect(composer.absoluteFrame.minY - completions.absoluteFrame.maxY >= 8)
+        }
         container.onKeyEvent(KeyEvent(window: .empty, keyCode: .arrowDown, modifiers: [], status: .down, time: 0, isRepeated: false))
         #expect(model.selectedCompletionIndex == 1)
         container.onKeyEvent(KeyEvent(window: .empty, keyCode: .enter, modifiers: [], status: .down, time: 0, isRepeated: false))
@@ -315,6 +389,65 @@ struct EditorAgentChatUITests {
         #expect(model.prompt == "/help ")
         #expect(model.autocompleteSuggestions.isEmpty)
         #expect(!model.isSending)
+    }
+
+    @Test("Selecting a file from context completion creates a removable draft chip", arguments: [false, true])
+    func fileCompletionAttachesContext(keyboard: Bool) async throws {
+        guard AdaEngineStyleLayoutSpec.usesCompactWorkspace else {
+            return
+        }
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("AgentContext-\(UUID())")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try ProjectSystem.saveProject(ProjectSystem.defaultProject(projectName: "Context"), at: root)
+        try "Local preview".write(to: root.appendingPathComponent("LayoutNote.md"), atomically: true, encoding: .utf8)
+        let model = EditorAgentViewModel(
+            project: .init(name: "Context", path: root.path),
+            settings: EditorAgentSettingsStore(),
+            service: FakeEditorAgentService()
+        )
+        await model.loadSessions()
+        let container = makeContainer(model)
+        let prompt = UINodeSelector.accessibilityIdentifier("AdaEditor.Agent.Prompt")
+        _ = try container.uiTapNode(matching: prompt)
+        container.onTextInputEvent(TextInputEvent(window: .empty, text: "Read @LayoutNote", action: .insert, time: 0))
+        for _ in 0..<8 {
+            await Task.yield()
+            container.update(0.016)
+            container.layoutIfNeeded()
+        }
+        let entry = try #require(model.autocompleteSuggestions.first)
+        if keyboard {
+            container.onKeyEvent(KeyEvent(window: .empty, keyCode: .enter, modifiers: [], status: .down, time: 0, isRepeated: false))
+        } else {
+            _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Completion.\(entry.id)"))
+        }
+        for _ in 0..<8 {
+            await Task.yield()
+            container.update(0.016)
+            container.layoutIfNeeded()
+        }
+        #expect(model.prompt == "Read ")
+        #expect(model.pendingAttachments.map(\.name) == ["LayoutNote.md"])
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.RemoveContext.LayoutNote.md"))
+        #expect(model.pendingAttachments.isEmpty)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.AddContext"))
+        for _ in 0..<8 {
+            await Task.yield()
+            container.update(0.016)
+            container.layoutIfNeeded()
+        }
+        let file = try #require(model.contextFiles(matching: "LayoutNote").first)
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.ContextFile.\(file.id)"))
+        for _ in 0..<8 {
+            await Task.yield()
+            container.update(0.016)
+            container.layoutIfNeeded()
+        }
+        #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Agent.ContextSearch")).isEmpty)
+        #expect(model.pendingAttachments.map(\.name) == ["LayoutNote.md"])
+        let focused = try container.uiLayoutDiagnostics(matching: nil, subtreeDepth: nil).focusedNode
+        #expect(focused?.nodeType.hasSuffix("TextEditorViewNode") == true)
     }
 
     @Test("streamed text relayouts the existing message before completion")
@@ -412,7 +545,7 @@ struct EditorAgentChatUITests {
         #expect(menu?.items.filter(\.isSelected).map(\.title) == ["Model A"])
     }
 
-    @Test("short user bubble sits on the right and assistant text sits on the left")
+    @Test("Desktop messages distinguish a full-width user block from the agent reply")
     func messageAlignment() throws {
         let model = EditorAgentViewModel(project: nil, settings: EditorAgentSettingsStore(), service: FakeEditorAgentService())
         model.activeSession = EditorAgentSession(events: [
@@ -420,10 +553,18 @@ struct EditorAgentChatUITests {
             EditorAgentEvent(id: "assistant", kind: .message, message: EditorAgentMessage(role: .assistant, segments: [.init(kind: .text, text: "Hello")])),
         ])
         let container = makeContainer(model)
-        let user = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.EventContent.user")).absoluteFrame
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        let userID = compact ? "AdaEditor.Agent.UserMessage.user" : "AdaEditor.Agent.EventContent.user"
+        let user = try container.uiNode(matching: .accessibilityIdentifier(userID)).absoluteFrame
         let assistant = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.EventContent.assistant")).absoluteFrame
-        #expect(user.minX > 280)
         #expect(assistant.minX < 30)
-        #expect(user.width < 140)
+        if compact {
+            #expect(abs(user.minX - assistant.minX) < 1)
+            #expect(user.width >= container.frame.width - 22)
+            #expect(user.maxY <= assistant.minY)
+        } else {
+            #expect(user.minX > 280)
+            #expect(user.width < 140)
+        }
     }
 }

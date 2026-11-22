@@ -16,6 +16,7 @@ struct EditorInspectorSidebar: View {
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) var theme
+    private var vectorFieldHeight: Float { AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 26 : 32 }
 
     var body: some View {
         ZStack(anchor: .topTrailing) {
@@ -304,35 +305,38 @@ struct EditorInspectorSidebar: View {
                 .accessibilityIdentifier("AdaEditor.Inspector.Axis.\(fieldID).\(axes[index])")
             }
         }
-        .frame(height: 32)
+        .frame(height: vectorFieldHeight)
         .frame(maxWidth: .infinity)
     }
 
     private func vectorAxisField(label: String, value: String, isEditable: Bool, text: Binding<String>, onSubmit: (() -> Void)?) -> some View {
-        HStack(spacing: 0) {
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        let radius = AdaEngineStyleLayoutSpec.workspaceControlRadius
+        return HStack(spacing: 0) {
             Text(L10n.tr(label))
                 .font(.system(size: 10, weight: .bold))
                 .foregroundColor(.white)
-                .frame(width: 24, height: 32)
-                .background(RoundedRectangleShape(cornerRadius: 5).fill(axisColor(for: label)))
+                .frame(width: compact ? 18 : 24, height: vectorFieldHeight)
+                .background(RoundedRectangleShape(cornerRadius: radius).fill(axisColor(for: label)))
             if isEditable {
                 TextField("", text: text, onSubmit: onSubmit)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(theme.editorColors.text)
                     .multilineTextAlignment(.leading)
                     .textFieldStyle(PlainTextFieldStyle())
-                    .padding(.horizontal, 7)
+                    .padding(.horizontal, compact ? 4 : 7)
             } else {
                 Text(value)
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(theme.editorColors.muted)
-                    .padding(.horizontal, 7)
+                    .lineLimit(1)
+                    .padding(.horizontal, compact ? 4 : 7)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .frame(minWidth: 72, maxWidth: .infinity, minHeight: 32, maxHeight: 32, alignment: .leading)
-        .background(RoundedRectangleShape(cornerRadius: 5).fill(isEditable ? theme.editorColors.surface : theme.editorColors.surfaceElevated))
-        .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
+        .frame(minWidth: compact ? 0 : 72, maxWidth: .infinity, minHeight: vectorFieldHeight, maxHeight: vectorFieldHeight, alignment: .leading)
+        .background(RoundedRectangleShape(cornerRadius: radius).fill(isEditable ? theme.editorColors.surface : theme.editorColors.surfaceElevated))
+        .overlay { RoundedRectangleShape(cornerRadius: radius).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1).allowsHitTesting(false) }
     }
 
     func editorTextField(text: Binding<String>, onSubmit: (() -> Void)? = nil, hasError: Bool = false) -> some View {
@@ -343,9 +347,11 @@ struct EditorInspectorSidebar: View {
             .padding(.horizontal, 8)
             .frame(height: 26)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surface))
+            .background(RoundedRectangleShape(cornerRadius: AdaEngineStyleLayoutSpec.workspaceControlRadius).fill(theme.editorColors.surface))
             .overlay {
-                RoundedRectangleShape(cornerRadius: 5).stroke(hasError ? .red : theme.editorColors.border.opacity(0.92), lineWidth: 1)
+                RoundedRectangleShape(cornerRadius: AdaEngineStyleLayoutSpec.workspaceControlRadius)
+                    .stroke(hasError ? .red : theme.editorColors.border.opacity(0.92), lineWidth: 1)
+                    .allowsHitTesting(false)
             }
     }
 

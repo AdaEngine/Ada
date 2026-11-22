@@ -34,7 +34,7 @@ struct EditorEnumField: View {
         #if IOS || VISIONOS || ANDROID
         44
         #else
-        30
+        AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 26 : 30
         #endif
     }
 }
@@ -43,6 +43,7 @@ struct EditorFieldButtonStyle: ButtonStyle {
     let theme: Theme
     @Environment(\.isEnabled) private var isEnabled
     func makeBody(configuration: Configuration) -> some View {
+        let radius: Float = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 3 : 6
         let enabled = isEnabled && configuration.state.isEnabled
         let focused = configuration.state.contains(.focused)
         let feedback: Color = !enabled ? .clear : configuration.isPressed ? theme.editorColors.text.opacity(0.16)
@@ -50,11 +51,13 @@ struct EditorFieldButtonStyle: ButtonStyle {
         return configuration.label
             .opacity(enabled ? 1 : 0.55)
             .background {
-                RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.surfaceElevated)
-                    .overlay { RoundedRectangleShape(cornerRadius: 6).fill(feedback) }
+                RoundedRectangleShape(cornerRadius: radius).fill(theme.editorColors.surfaceElevated)
+                    .overlay { RoundedRectangleShape(cornerRadius: radius).fill(feedback) }
             }
             .overlay {
-                RoundedRectangleShape(cornerRadius: 6).stroke(focused ? theme.editorColors.blue : theme.editorColors.border.opacity(0.6), lineWidth: 1)
+                RoundedRectangleShape(cornerRadius: radius)
+                    .stroke(focused ? theme.editorColors.blue : theme.editorColors.border.opacity(0.6), lineWidth: 1)
+                    .allowsHitTesting(false)
             }
     }
 }

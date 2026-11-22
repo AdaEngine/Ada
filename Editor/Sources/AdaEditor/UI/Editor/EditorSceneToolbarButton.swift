@@ -8,6 +8,7 @@ struct EditorSceneToolbarButton: View {
     var isSelected = false
     var isEnabled = true
     var compact = false
+    var tint: Color?
     let action: () -> Void
 
     @State private var isHovered = false
@@ -16,13 +17,14 @@ struct EditorSceneToolbarButton: View {
     var body: some View {
         Button(action: action) {
             Text(symbol)
-                .font(AdaEditorMaterialSymbolFont.font(size: 17))
-                .foregroundColor(isSelected ? theme.editorColors.blue : theme.editorColors.text)
-                .frame(width: compact ? 24 : 28, height: 26)
+                .font(AdaEditorMaterialSymbolFont.font(size: AdaEngineStyleLayoutSpec.usesCompactWorkspace ? AdaEngineStyleLayoutSpec.workspaceIconSize : 17))
+                .foregroundColor(tint ?? (isSelected ? theme.editorColors.blue : theme.editorColors.text))
+                .frame(width: compact ? (AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 26 : 24) : 28, height: 26)
         }
         .buttonStyle(EditorPickerRowButtonStyle(
             theme: theme,
-            selectionColor: isSelected ? theme.editorColors.blue.opacity(0.14) : .clear
+            selectionColor: isSelected ? theme.editorColors.blue.opacity(0.14) : .clear,
+            cornerRadius: AdaEngineStyleLayoutSpec.workspaceControlRadius
         ))
         .disabled(!isEnabled)
         .overlay(anchor: .topTrailing) {

@@ -7,8 +7,8 @@ final class EditorWorkbenchResizeState {
     private(set) var fraction: Float = 0.5
     @ObservationIgnored private var dragStart: Float?
 
-    func resize(translation: Float, availableWidth: Float) {
-        let width = max(0, availableWidth - EditorWorkbenchPanelsLayout.handleWidth)
+    func resize(translation: Float, availableWidth: Float, dividerWidth: Float = AdaEngineStyleLayoutSpec.dividerHitSize) {
+        let width = max(0, availableWidth - dividerWidth)
         guard width > 0 else {
             return
         }
@@ -22,8 +22,8 @@ final class EditorWorkbenchResizeState {
 }
 
 struct EditorWorkbenchPanelsLayout: Layout {
-    static let handleWidth: Float = 8
     let state: EditorWorkbenchResizeState
+    var dividerWidth = AdaEngineStyleLayoutSpec.dividerHitSize
 
     func sizeThatFits(_ proposal: ProposedViewSize, subviews _: Subviews, cache _: inout ()) -> Size {
         proposal.replacingUnspecifiedDimensions()
@@ -33,17 +33,17 @@ struct EditorWorkbenchPanelsLayout: Layout {
         guard subviews.count == 3 else {
             return
         }
-        let handle = min(max(0, bounds.width), Self.handleWidth)
-        let available = max(0, bounds.width - handle)
+        let divider = min(max(0, bounds.width), dividerWidth)
+        let available = max(0, bounds.width - divider)
         let minimum = min(240, available / 2)
         let left = min(max(available * state.fraction, minimum), available - minimum)
-        var x = bounds.minX
-        for (index, width) in [left, handle, available - left].enumerated() {
+        let hitSize = AdaEngineStyleLayoutSpec.dividerHitSize
+        let positions = [Float(0), left + divider, left - (hitSize - divider) / 2]
+        for (index, width) in [left, available - left, hitSize].enumerated() {
             var childProposal = proposal
             childProposal.width = width
             childProposal.height = bounds.height
-            subviews[index].place(at: Point(x, bounds.minY), anchor: .topLeading, proposal: childProposal)
-            x += width
+            subviews[index].place(at: Point(bounds.minX + positions[index], bounds.minY), anchor: .topLeading, proposal: childProposal)
         }
     }
 }

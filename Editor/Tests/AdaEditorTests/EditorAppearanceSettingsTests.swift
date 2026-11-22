@@ -21,6 +21,9 @@ struct EditorAppearanceSettingsTests {
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.AgentActivityGlow"))
+        if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+            _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.LargerSidebarIcons"))
+        }
         let displayModel = EditorSettingsWindowViewModel(editorViewModel: nil, selectedSection: .general, selectedPage: EditorSettingsPage.editorDisplay)
         #expect(displayModel.pages(in: .general).contains(EditorSettingsPage.editorDisplay))
         let display = UIContainerView(rootView: EditorSettingsWindowView(viewModel: displayModel).theme(.adaEditor))
@@ -28,6 +31,25 @@ struct EditorAppearanceSettingsTests {
         display.bounds.size = display.frame.size
         display.layoutIfNeeded()
         _ = try display.uiNode(matching: .accessibilityIdentifier("AdaEditor.Settings.SpaceMarkers"))
+    }
+
+    @Test("Sidebar icons can be enlarged through Appearance and the choice survives reloading")
+    func largerSidebarIconsPersistence() throws {
+        let suite = "AdaEditor.SidebarIconsTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = EditorAppearanceSettings(defaults: defaults)
+        let container = UIContainerView(rootView: EditorSidebarIconSettings(settings: settings).theme(.adaEditor))
+        container.frame = Rect(x: 0, y: 0, width: 500, height: 100)
+        container.bounds.size = container.frame.size
+        container.layoutIfNeeded()
+        let toggle = UINodeSelector.accessibilityIdentifier("AdaEditor.Settings.LargerSidebarIcons")
+        #expect(settings.sidebarIconSize == 14)
+        _ = try container.uiTapNode(matching: toggle)
+        #expect(settings.sidebarIconSize == 18)
+        #expect(EditorAppearanceSettings(defaults: defaults).sidebarIconSize == 18)
+        _ = try container.uiTapNode(matching: toggle)
+        #expect(EditorAppearanceSettings(defaults: defaults).sidebarIconSize == 14)
     }
 
     @Test("Space dots can be toggled independently and survive reloading")

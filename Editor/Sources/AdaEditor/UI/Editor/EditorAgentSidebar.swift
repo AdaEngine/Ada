@@ -10,41 +10,125 @@ struct EditorAgentSidebar: View {
     var onOpenCatalog: (() -> Void)?
     var presentation: EditorAgentChatPresentation = .sidebar
     var onOpenChangedFile: ((String) -> Void)?
+    var showsSessionHistory = true
 
     @State private var showsContextPicker = false
     @State private var contextSearchText = ""
+    @State private var completionCaret: Rect?
+    @State private var promptFocusRequest: UInt64 = 0
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            agentHeader
-            conversationToolbar
+            if compact {
+                EditorAgentConversationHeader(model: viewModel, showsHistory: showsSessionHistory, onOpenCatalog: onOpenCatalog)
+            } else {
+                agentHeader
+                conversationToolbar
+            }
             if presentation == .workspace {
-                chatContent
-                    .frame(maxWidth: Self.maximumContentWidth)
+                conversation
+                    .frame(maxWidth: compact ? .infinity : Self.maximumContentWidth)
                     .accessibilityIdentifier("AdaEditor.Agent.ContentColumn")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                chatContent
+                conversation
             }
         }
         .background(
             RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
                 .fill(theme.editorColors.surfaceElevated)
         )
-        .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+        .modifier(EditorPanelClip(cornerRadius: metrics.panelsRoundedCorner))
         .overlay {
             adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
         }
         .onAppear { viewModel.panelDidAppear() }
         .onDisappear { viewModel.panelDidDisappear() }
+        .onChange(of: viewModel.activeSessionID) { _, _ in
+            showsContextPicker = false
+            contextSearchText = ""
+        }
         .onChange(of: EditorLocalization.shared.language) { _, _ in
             viewModel.refreshPromptSuggestions()
         }
     }
 
     static let maximumContentWidth: Float = 800
+
+    private var compact: Bool { AdaEngineStyleLayoutSpec.usesCompactWorkspace }
+    private var isDocked: Bool { viewModel.transcript.userID != nil }
+
+    @ViewBuilder
+    private var conversation: some View {
+        if compact {
+            GeometryReader { geometry in
+                EditorAgentConversationLayout(isDocked: isDocked) {
+                    desktopTranscript
+                    desktopDraft(maximumEditorHeight: min(320, max(EditorAgentPromptEditor.minimumDesktopHeight, geometry.size.height - 176)))
+                    composerControls
+                        .background(theme.editorColors.surface)
+                        .overlay(anchor: .top) {
+                            RectangleShape().fill(theme.editorColors.border).frame(height: 1).allowsHitTesting(false)
+                        }
+                }
+                .overlay(anchor: .topLeading) {
+                    if !viewModel.autocompleteSuggestions.isEmpty, let completionCaret {
+                        let frame = EditorAgentCompletionLayout.frame(
+                            caret: completionCaret,
+                            panel: geometry.frame(in: .global),
+                            entryCount: viewModel.autocompleteSuggestions.count
+                        )
+                        if frame.height > 0 {
+                            EditorAgentCompletionList(model: viewModel, compact: true)
+                                .frame(width: frame.width, height: frame.height)
+                                .offset(x: frame.minX, y: frame.minY)
+                        }
+                    } else if showsContextPicker {
+                        let listHeight = min(150, max(24, geometry.size.height - EditorAgentConversationLayout.footerHeight - 84))
+                        let height = listHeight + 76
+                        contextPicker(listHeight: listHeight)
+                            .frame(width: min(320, max(0, geometry.size.width - 12)), height: height)
+                            .offset(x: 6, y: max(0, geometry.size.height - EditorAgentConversationLayout.footerHeight - height - 4))
+                    }
+                }
+            }
+        } else {
+            chatContent
+        }
+    }
+
+    private var desktopTranscript: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if viewModel.hasActiveSessionEvents {
+                EditorAgentTranscript(viewModel: viewModel, compactMessages: true)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            if let message = viewModel.statusMessage {
+                Text(message)
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.editorColors.muted)
+                    .lineLimit(2)
+                    .padding(8)
+                    .accessibilityIdentifier("AdaEditor.Agent.StatusMessage")
+            }
+            if presentation == .workspace, let onOpenChangedFile {
+                EditorAgentLiveChangesSummary(viewModel: viewModel, onOpenFile: onOpenChangedFile)
+            }
+        }
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func desktopDraft(maximumEditorHeight: Float) -> some View {
+        EditorAgentDesktopDraft(
+            viewModel: viewModel,
+            isDocked: isDocked,
+            onCaret: { caret in if completionCaret != caret { completionCaret = caret } },
+            maximumEditorHeight: maximumEditorHeight,
+            focusRequest: promptFocusRequest
+        )
+    }
 
     private var chatContent: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -69,7 +153,8 @@ struct EditorAgentSidebar: View {
     }
 
     private var agentHeader: some View {
-        HStack(spacing: 8) {
+        let connection = viewModel.settings.configuration.enabled ? viewModel.currentConnectionState.title : L10n.text("Choose an agent")
+        return HStack(spacing: 8) {
             Text(presentation == .workspace ? (viewModel.activeSessionTitle ?? L10n.text("New session")) : viewModel.projectName)
                 .font(.system(size: 13, weight: .bold))
                 .foregroundColor(theme.editorColors.text)
@@ -80,7 +165,7 @@ struct EditorAgentSidebar: View {
             }
             Text(viewModel.isSending
                 ? (viewModel.runningSessionID == viewModel.activeSessionID ? L10n.text("Working") : L10n.text("Another session is running"))
-                : viewModel.isConnectingCatalogAgent ? L10n.text("Connecting") : (viewModel.settings.configuration.enabled ? viewModel.currentConnectionState.title : L10n.text("Choose an agent")))
+                : viewModel.isConnectingCatalogAgent ? L10n.text("Connecting") : connection)
                 .font(.system(size: 10))
                 .foregroundColor(theme.editorColors.muted)
                 .lineLimit(1)
@@ -248,7 +333,7 @@ struct EditorAgentSidebar: View {
     }
 
     @ViewBuilder
-    private var contextPicker: some View {
+    private func contextPicker(listHeight: Float = 150) -> some View {
         if showsContextPicker {
             VStack(alignment: .leading, spacing: 6) {
                 TextField(L10n.text("Search project files"), text: Binding(get: { contextSearchText }, set: { contextSearchText = $0 }))
@@ -259,7 +344,12 @@ struct EditorAgentSidebar: View {
                     .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.background))
                     .textFieldStyle(PlainTextFieldStyle())
                     .accessibilityIdentifier("AdaEditor.Agent.ContextSearch")
-                Button(action: { viewModel.presentContextFilePicker() }) {
+                Button(action: {
+                    if compact { showsContextPicker = false }
+                    viewModel.presentContextFilePicker {
+                        if compact { promptFocusRequest &+= 1 }
+                    }
+                }) {
                     Text(L10n.text("Browse files and images…"))
                         .font(.system(size: 10))
                         .foregroundColor(theme.editorColors.blue)
@@ -270,7 +360,13 @@ struct EditorAgentSidebar: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 2) {
                         ForEach(viewModel.contextFiles(matching: contextSearchText), id: \.id) { entry in
-                            Button(action: { viewModel.attachProjectFile(entry) }) {
+                            Button(action: {
+                                viewModel.attachProjectFile(entry)
+                                if compact {
+                                    showsContextPicker = false
+                                    promptFocusRequest &+= 1
+                                }
+                            }) {
                                 HStack(spacing: 6) {
                                     Text(contextFileLabel(entry.path))
                                         .font(.system(size: 9))
@@ -286,10 +382,11 @@ struct EditorAgentSidebar: View {
                                 .frame(height: 24)
                             }
                             .buttonStyle(DefaultButtonStyle())
+                            .accessibilityIdentifier("AdaEditor.Agent.ContextFile.\(entry.id)")
                         }
                     }
                 }
-                .frame(height: 150)
+                .frame(height: listHeight)
             }
             .padding(6)
             .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.surfaceElevated))
@@ -320,7 +417,7 @@ struct EditorAgentSidebar: View {
         VStack(alignment: .leading, spacing: 0) {
             sceneContextIndicator
             codeSelectionIndicator
-            contextPicker
+            contextPicker()
             pendingAttachmentList
             EditorSceneAnnotationChips(agent: viewModel)
             autocompleteList
@@ -329,38 +426,7 @@ struct EditorAgentSidebar: View {
                 VStack(alignment: .leading, spacing: 4) {
                     EditorAgentPromptEditor(viewModel: viewModel)
 
-                    HStack(spacing: 4) {
-                        compactComposerButton("+", active: showsContextPicker) {
-                            showsContextPicker.toggle()
-                        }
-                        .accessibilityIdentifier("AdaEditor.Agent.AddContext")
-                        ScrollView(.horizontal) {
-                            configurationControls
-                                .fixedSize(horizontal: true, vertical: false)
-                        }
-                        .frame(height: 34)
-                        if viewModel.isSending {
-                            EditorFlipLoadingIndicator(size: 12, color: theme.editorColors.blue)
-                                .accessibilityIdentifier("AdaEditor.Agent.SendingFlip")
-                            Button(action: { viewModel.interrupt() }) {
-                                Text("\u{E047}")
-                                    .font(AdaEditorMaterialSymbolFont.font(size: 20))
-                                    .foregroundColor(theme.editorColors.muted)
-                                    .frame(width: 30, height: 30)
-                            }
-                            .buttonStyle(DefaultButtonStyle())
-                        }
-                        Button(action: { viewModel.sendPrompt() }) {
-                            Text("\u{E5D8}")
-                                .font(AdaEditorMaterialSymbolFont.font(size: 22))
-                                .foregroundColor(theme.editorColors.background)
-                                .frame(width: 34, height: 34)
-                                .background(CircleShape().fill(theme.editorColors.text.opacity(viewModel.canSend ? 1 : 0.28)))
-                        }
-                        .buttonStyle(DefaultButtonStyle())
-                        .disabled(!viewModel.canSend)
-                        .accessibilityIdentifier("AdaEditor.Agent.Send")
-                    }
+                    composerControls
                 }
             }
             .accessibilityIdentifier("AdaEditor.Agent.Composer")
@@ -369,15 +435,55 @@ struct EditorAgentSidebar: View {
         .background(theme.editorColors.surfaceElevated)
     }
 
-    private func compactComposerButton(_ title: String, active: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(L10n.tr(title))
-                .font(.system(size: title == "+" ? 20 : 11, weight: .semibold))
-                .foregroundColor(active ? theme.editorColors.blue : theme.editorColors.text)
-                .frame(width: 30, height: 30)
-                .fixedSize(horizontal: true, vertical: false)
+    private var composerControls: some View {
+        HStack(spacing: 4) {
+            Button(action: {
+                showsContextPicker.toggle()
+                if showsContextPicker { viewModel.dismissCompletions() }
+            }) {
+                Text("\u{E145}")
+                    .font(AdaEditorMaterialSymbolFont.font(size: compact ? 14 : 20))
+                    .foregroundColor(showsContextPicker ? theme.editorColors.blue : theme.editorColors.text)
+                    .frame(width: compact ? 26 : 30, height: compact ? 26 : 30)
+            }
+            .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
+            .accessibilityIdentifier("AdaEditor.Agent.AddContext")
+            ScrollView(.horizontal, showsIndicators: false) {
+                configurationControls.fixedSize(horizontal: true, vertical: false)
+            }
+            .frame(minWidth: 0, maxWidth: .infinity)
+            .frame(height: 34)
+            if viewModel.isSending {
+                EditorFlipLoadingIndicator(size: 12, color: theme.editorColors.blue)
+                    .accessibilityIdentifier("AdaEditor.Agent.SendingFlip")
+                EditorSceneToolbarButton(
+                    title: "Stop",
+                    symbol: "\u{E047}",
+                    identifier: "AdaEditor.Agent.Stop",
+                    compact: compact,
+                    action: { viewModel.interrupt() }
+                )
+            } else {
+                Button(action: { viewModel.sendPrompt() }) {
+                    Text(compact ? "\u{E163}" : "\u{E5D8}")
+                        .font(AdaEditorMaterialSymbolFont.font(size: compact ? 14 : 22))
+                        .foregroundColor(compact ? theme.editorColors.blue : theme.editorColors.background)
+                        .frame(width: compact ? 26 : 34, height: compact ? 26 : 34)
+                        .background {
+                            if compact {
+                                RoundedRectangleShape(cornerRadius: 3).fill(viewModel.canSend ? theme.editorColors.blue.opacity(0.18) : .clear)
+                            } else {
+                                CircleShape().fill(theme.editorColors.text.opacity(viewModel.canSend ? 1 : 0.28))
+                            }
+                        }
+                }
+                .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
+                .disabled(!viewModel.canSend)
+                .opacity(compact && !viewModel.canSend ? 0.48 : 1)
+                .accessibilityIdentifier("AdaEditor.Agent.Send")
+            }
         }
-        .buttonStyle(DefaultButtonStyle())
+        .padding(.horizontal, compact ? 6 : 0)
     }
 
     @ViewBuilder
@@ -479,59 +585,9 @@ struct EditorAgentSidebar: View {
     @ViewBuilder
     private var autocompleteList: some View {
         if !viewModel.autocompleteSuggestions.isEmpty {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 2) {
-                        ForEach(Array(viewModel.autocompleteSuggestions.enumerated()), id: \.element.id) { index, entry in
-                            Button(action: { viewModel.insertAutocomplete(entry) }) {
-                                HStack(spacing: 10) {
-                                    Text(completionIcon(for: entry))
-                                        .font(AdaEditorMaterialSymbolFont.font(size: 20))
-                                        .foregroundColor(theme.editorColors.blue)
-                                        .frame(width: 28)
-
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(entry.title).font(.system(size: 13)).lineLimit(1)
-                                        if let detail = entry.detail, !detail.isEmpty {
-                                            Text(L10n.tr(detail)).font(.system(size: 11)).foregroundColor(theme.editorColors.muted).lineLimit(1)
-                                        }
-                                    }
-                                    .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                                }
-                                .foregroundColor(theme.editorColors.text)
-                                .padding(.horizontal, 10)
-                                .frame(height: 50)
-                                .background(
-                                    RoundedRectangleShape(cornerRadius: 5)
-                                        .fill(index == viewModel.selectedCompletionIndex ? theme.editorColors.blue.opacity(0.14) : .clear)
-                                )
-                            }
-                            .buttonStyle(DefaultButtonStyle())
-                            .accessibilityIdentifier("AdaEditor.Agent.Completion.\(entry.id)")
-                            .id(entry.id)
-                        }
-                    }
-                }
-                .onChange(of: viewModel.selectedCompletionIndex) { _, index in
-                    if viewModel.autocompleteSuggestions.indices.contains(index) {
-                        proxy.scrollTo(viewModel.autocompleteSuggestions[index].id)
-                    }
-                }
-            }
-            .frame(height: min(258, Float(viewModel.autocompleteSuggestions.count) * 52 - 2))
-            .padding(6)
-            .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.background))
-            .drawingGroup()
-            .accessibilityIdentifier("AdaEditor.Agent.Completions")
-            .padding(.bottom, 8)
-        }
-    }
-
-    private func completionIcon(for entry: EditorAgentCompletion) -> String {
-        switch entry {
-        case let .file(file): file.isDirectory ? "\u{E2C7}" : "\u{E24D}"
-        case .skill: "\u{E65F}"
-        case .command: "\u{EB8E}"
+            EditorAgentCompletionList(model: viewModel, compact: false)
+                .frame(height: min(258, Float(viewModel.autocompleteSuggestions.count) * 52 + 10))
+                .padding(.bottom, 8)
         }
     }
 

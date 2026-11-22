@@ -15,22 +15,55 @@ struct EditorAgentChatSizingTests {
         }
     }
 
+    @Test("A short chat keeps the composer and context picker above reachable footer controls")
+    func shortChatKeepsFooterClear() async throws {
+        guard AdaEngineStyleLayoutSpec.usesCompactWorkspace else {
+            return
+        }
+        let model = makeModel()
+        model.pendingAttachments = [.init(name: "Note.txt", mimeType: "text/plain", absolutePath: "/tmp/Note.txt")]
+        let container = makeContainer(model, width: 320)
+        container.frame.size.height = 300
+        container.bounds.size = container.frame.size
+        await settle(container)
+        let resize = try frame("AdaEditor.Agent.ResizeComposer", in: container)
+        let point = Point(resize.midX, resize.midY)
+        for (phase, position) in [(MouseEvent.Phase.began, point), (.changed, point + Point(0, -200)), (.ended, point + Point(0, -200))] {
+            container.onMouseEvent(
+                MouseEvent(window: RID(), button: .left, mousePosition: position, phase: phase, modifierKeys: [], time: 0)
+            )
+            await settle(container)
+        }
+        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.AddContext"))
+        await settle(container)
+        let search = try frame("AdaEditor.Agent.ContextSearch", in: container)
+        let send = try frame("AdaEditor.Agent.Send", in: container)
+        let prompt = try frame("AdaEditor.Agent.Prompt", in: container)
+        let chip = try frame("AdaEditor.Agent.RemoveContext.Note.txt", in: container)
+        #expect(prompt.maxY <= send.minY)
+        #expect(chip.maxY <= prompt.minY)
+        #expect(search.maxY <= send.minY)
+        #expect(send.maxY <= 300)
+    }
+
     @Test("Retry and New Session remain at the toolbar's right edge", arguments: [Float(420), 800, 2000])
     func trailingActions(width: Float) async throws {
         let model = makeModel()
         let container = makeContainer(model, width: width)
         await settle(container)
-        let toolbar = try frame("AdaEditor.Agent.ConversationToolbar", in: container)
+        let toolbarID = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? "AdaEditor.Agent.Header" : "AdaEditor.Agent.ConversationToolbar"
+        let toolbar = try frame(toolbarID, in: container)
         let retry = try frame("AdaEditor.Agent.Retry", in: container)
         let add = try frame("AdaEditor.Agent.NewSession", in: container)
         #expect(abs(toolbar.width - width) < 1)
-        #expect(abs(toolbar.maxX - add.maxX - 8) < 1)
+        #expect((4...12).contains(toolbar.maxX - add.maxX))
         #expect(add.minX > retry.maxX)
-        #expect(abs(add.minX - retry.maxX - 6) < 1)
+        let gap: Float = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 4 : 6
+        #expect(abs(add.minX - retry.maxX - gap) < 1)
         #expect(retry.width > 20)
     }
 
-    @Test("Messages and composer share a centered column without narrowing the header", arguments: [Float(420), 800, 1024, 2000])
+    @Test("Desktop messages and composer fill the conversation pane", arguments: [Float(220), 320, 420, 800, 1024, 2000])
     func contentColumn(width: Float) async throws {
         let model = makeModel()
         let container = makeContainer(model, width: width)
@@ -39,15 +72,29 @@ struct EditorAgentChatSizingTests {
         let transcript = try frame("AdaEditor.Agent.Transcript", in: container)
         let composer = try frame("AdaEditor.Agent.Composer", in: container)
         let header = try frame("AdaEditor.Agent.Header", in: container)
-        #expect(abs(column.width - min(width, EditorAgentSidebar.maximumContentWidth)) < 1)
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        let expectedWidth = compact ? width : min(width, EditorAgentSidebar.maximumContentWidth)
+        #expect(abs(column.width - expectedWidth) < 1)
         #expect(abs(column.midX - width / 2) < 1)
         #expect(abs(transcript.minX - column.minX) < 1)
         #expect(abs(transcript.maxX - column.maxX) < 1)
         #expect(composer.minX >= column.minX && composer.maxX <= column.maxX)
         #expect(abs(composer.midX - column.midX) < 1)
         #expect(abs(header.width - width) < 1)
-        #expect(abs(column.height - (760 - 34 - 38)) < 1)
-        #expect(composer.maxY >= 760 - 24)
+        if compact {
+            let send = try frame("AdaEditor.Agent.Send", in: container)
+            let prompt = try frame("AdaEditor.Agent.Prompt", in: container)
+            let hint = try frame("AdaEditor.Agent.PromptHint", in: container)
+            #expect(header.maxX - send.maxX < 16)
+            #expect(hint.minX >= prompt.minX && hint.maxX <= prompt.maxX)
+            #expect(hint.minY >= prompt.minY && hint.maxY <= prompt.maxY)
+            if width <= 320 {
+                #expect(hint.height > 20)
+            }
+        }
+        let headerHeight: Float = compact ? AdaEngineStyleLayoutSpec.workspaceHeaderHeight : 72
+        #expect(abs(column.height - (760 - headerHeight)) < 1)
+        #expect(composer.maxY >= 760 - (compact ? EditorAgentConversationLayout.footerHeight + 1 : 24))
         #expect(composer.minY >= transcript.maxY - 1)
         _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.Agent.AddContext"))
         await settle(container)
@@ -76,6 +123,7 @@ struct EditorAgentChatSizingTests {
         #expect(node.caretRect().maxX <= scroll.frame.width + 1)
         #expect(node.caretViewportRect().maxY <= scroll.frame.height + 1)
         #expect(model.prompt == original)
+        #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Agent.PromptHint")).isEmpty)
     }
 
     @Test("Resizing reflows unbroken Unicode drafts and preserves selection")
@@ -105,9 +153,13 @@ struct EditorAgentChatSizingTests {
     }
 
     private func editorNode(in node: ViewNode) -> TextEditorViewNode? {
-        if let editor = node as? TextEditorViewNode { return editor }
+        if let editor = node as? TextEditorViewNode {
+            return editor
+        }
         for child in node.transientEnvironmentChildren {
-            if let editor = editorNode(in: child) { return editor }
+            if let editor = editorNode(in: child) {
+                return editor
+            }
         }
         return nil
     }
@@ -117,6 +169,7 @@ struct EditorAgentChatSizingTests {
         let sessions = (0..<4).map { EditorAgentSession(title: "Conversation \($0)") }
         model.activeSession = sessions[0]
         model.activeSession?.events = [
+            .init(id: "user", kind: .message, message: .init(role: .user, segments: [.init(kind: .text, text: "Hello")])),
             .init(
                 id: "reply",
                 kind: .message,

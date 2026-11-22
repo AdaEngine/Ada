@@ -10,7 +10,7 @@ struct EditorCenterWorkbench: View {
     let onPlayScene: (() -> Void)?
     let onStopScene: (() -> Void)?
     let onSceneEntitySelected: (() -> Void)?
-    var onTerrainToolSelected: (() -> Void)? = nil
+    var onTerrainToolSelected: (() -> Void)?
     let onSourceHover: ((EditorTextDocument, EditorSourceLocation?) -> Void)?
     let onGoToDefinition: ((EditorTextDocument, EditorSourceLocation) -> Void)?
     let onCompletionPosition: ((EditorTextDocument, EditorSourceLocation, String) -> Void)?
@@ -18,7 +18,7 @@ struct EditorCenterWorkbench: View {
     let onApplyCompletion: ((EditorCompletionItem, EditorTextDocument) -> Void)?
     let onMoveCompletionSelection: ((EditorTextDocument, Int) -> Bool)?
     let onAcceptCompletion: ((EditorTextDocument) -> Bool)?
-    var onAcceptSnippetPlaceholder: ((EditorTextDocument, EditorSourceRange?) -> Bool)? = nil
+    var onAcceptSnippetPlaceholder: ((EditorTextDocument, EditorSourceRange?) -> Bool)?
     let onTextSelection: ((EditorTextDocument, EditorSourceRange?, String?) -> Void)?
     let onChatSelection: ((EditorTextDocument, EditorSourceRange, String) -> Void)?
     let sourceContextMenuItems: ((EditorTextDocument, EditorSourceLocation) -> [TextEditorContextMenuItem])?
@@ -38,6 +38,9 @@ struct EditorCenterWorkbench: View {
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
+    private var compactChrome: Bool { AdaEngineStyleLayoutSpec.usesCompactWorkspace }
+    private var tabSpacing: Float { compactChrome ? 0 : 4 }
+    private var tabHeight: Float { compactChrome ? AdaEngineStyleLayoutSpec.workspaceHeaderHeight : 26 }
 
     @State private var previewResizeState = EditorPreviewResizeState()
     @State private var draggedTabID: String?
@@ -54,7 +57,7 @@ struct EditorCenterWorkbench: View {
                 RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner)
                     .fill(theme.editorColors.surfaceElevated)
             )
-            .mask(RoundedRectangleShape(cornerRadius: metrics.panelsRoundedCorner))
+            .modifier(EditorPanelClip(cornerRadius: metrics.panelsRoundedCorner))
             .overlay {
                 adaEditorPanelBorder(theme: theme, cornerRadius: metrics.panelsRoundedCorner)
             }
@@ -74,10 +77,10 @@ extension EditorCenterWorkbench {
     private var workbenchContent: some View {
         if viewModel.isSplit {
             GeometryReader { geometry in
-                EditorWorkbenchPanelsLayout(state: splitResizeState) {
+                EditorWorkbenchPanelsLayout(state: splitResizeState, dividerWidth: AdaEngineStyleLayoutSpec.workspaceDividerSize) {
                     documentPane(.primary)
-                    splitResizeHandle(availableWidth: geometry.size.width)
                     documentPane(.secondary)
+                    splitResizeHandle(availableWidth: geometry.size.width)
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height)
             }
@@ -90,7 +93,7 @@ extension EditorCenterWorkbench {
         VStack(spacing: 0) {
             if showsDocumentTabs {
                 editorTabs(in: pane)
-                    .frame(height: AdaEngineStyleLayoutSpec.editorTabHeight)
+                    .frame(height: AdaEngineStyleLayoutSpec.workspaceHeaderHeight)
                     .overlay(anchor: .bottomLeading) {
                         RectangleShape()
                             .fill(viewModel.focusedPane == pane ? theme.editorColors.blue : theme.editorColors.border)
@@ -117,23 +120,25 @@ extension EditorCenterWorkbench {
     }
 
     private func splitResizeHandle(availableWidth: Float) -> some View {
-        ZStack {
-            RectangleShape().fill(theme.editorColors.border).frame(width: 1)
-            EditorResizeHandle(
-                axis: .horizontal,
-                onResize: { splitResizeState.resize(translation: $0.width, availableWidth: availableWidth) },
-                onResizeEnded: { splitResizeState.endDrag() }
-            )
-        }
-        .frame(width: EditorWorkbenchPanelsLayout.handleWidth)
-        .frame(maxHeight: .infinity)
+        EditorResizeHandle(
+            axis: .horizontal,
+            onResize: {
+                splitResizeState.resize(
+                    translation: $0.width,
+                    availableWidth: availableWidth,
+                    dividerWidth: AdaEngineStyleLayoutSpec.workspaceDividerSize
+                )
+            },
+            onResizeEnded: { splitResizeState.endDrag() },
+            showsDivider: true
+        )
         .accessibilityIdentifier("AdaEditor.Workbench.Split.Resize")
     }
 
     private func editorTabs(in pane: EditorWorkbenchPane) -> some View {
         HStack(spacing: 0) {
             ScrollView(.horizontal) {
-                HStack(spacing: 4) {
+                HStack(spacing: tabSpacing) {
                     #if !os(macOS) && !os(Windows) && !os(Linux)
                         filesTab(in: pane)
                     #endif
@@ -141,8 +146,8 @@ extension EditorCenterWorkbench {
                         editorTab(document, active: !filesBrowserPanes.contains(pane) && document.id == viewModel.selectedDocument(in: pane)?.id)
                     }
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, compactChrome ? 0 : 8)
+                .padding(.vertical, compactChrome ? 0 : 4)
                 .fixedSize(horizontal: true, vertical: false)
             }
             .frame(minWidth: 0, maxWidth: .infinity)
@@ -156,8 +161,8 @@ extension EditorCenterWorkbench {
             } else if let document = viewModel.selectedDocument(in: pane) {
                 Button(action: { viewModel.splitDocument(id: document.id) }) {
                     Text("\u{E949}")
-                        .font(AdaEditorMaterialSymbolFont.font(size: 18))
-                        .frame(width: 30, height: 30)
+                        .font(AdaEditorMaterialSymbolFont.font(size: compactChrome ? AdaEngineStyleLayoutSpec.workspaceIconSize : 18))
+                        .frame(width: compactChrome ? 26 : 30, height: compactChrome ? 26 : 30)
                 }
                 .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
                 .foregroundColor(theme.editorColors.blue)
@@ -165,7 +170,7 @@ extension EditorCenterWorkbench {
                 .accessibilityIdentifier("AdaEditor.Workbench.Split")
             }
         }
-        .background(theme.editorColors.surfaceElevated)
+        .background(compactChrome ? theme.editorColors.surface : theme.editorColors.surfaceElevated)
     }
 
     private func filesTab(in pane: EditorWorkbenchPane) -> some View {
@@ -210,7 +215,7 @@ extension EditorCenterWorkbench {
                     if let language = textLanguage(for: document), let image = EditorLanguageLogo.image(for: language) {
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fit)
+                            .scaledToFit()
                             .frame(width: 14, height: 14)
                     } else {
                         Text(tabIcon(for: document))
@@ -223,11 +228,11 @@ extension EditorCenterWorkbench {
                         .lineLimit(1)
                 }
                 .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
-                .frame(height: 26)
+                .padding(.horizontal, compactChrome ? 6 : 10)
+                .frame(height: tabHeight)
             }
-            .buttonStyle(DefaultButtonStyle())
-            .frame(minWidth: 0, maxWidth: .infinity, minHeight: 26, maxHeight: 26)
+            .buttonStyle(EditorChromeHoverButtonStyle(theme: theme, cornerRadius: compactChrome ? 0 : 5))
+            .frame(minWidth: 0, maxWidth: .infinity, minHeight: tabHeight, maxHeight: tabHeight)
             .accessibilityIdentifier("AdaEditor.Tab.Select.\(document.id)")
             .gesture(
                 DragGesture(minimumDistance: 8)
@@ -259,22 +264,15 @@ extension EditorCenterWorkbench {
                 Text("\u{E5CD}")
                     .font(AdaEditorMaterialSymbolFont.font(size: 12))
                     .foregroundColor(active ? theme.editorColors.text.opacity(0.75) : theme.editorColors.muted.opacity(0.70))
-                    .frame(width: 18, height: 18)
-                    .background(RoundedRectangleShape(cornerRadius: 4).fill(active ? theme.editorColors.surface.opacity(0.62) : Color.clear))
+                    .frame(width: compactChrome ? 24 : 18, height: compactChrome ? 24 : 18)
+                    .background(RoundedRectangleShape(cornerRadius: 4).fill(active && !compactChrome ? theme.editorColors.surface.opacity(0.62) : Color.clear))
             }
-            .buttonStyle(DefaultButtonStyle())
+            .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
             .padding(.trailing, 6)
             .accessibilityIdentifier("AdaEditor.Tab.Close.\(document.id)")
         }
-        .frame(width: editorTabWidth(document), height: 26)
-        .background(RoundedRectangleShape(cornerRadius: 5).fill(active ? theme.editorColors.surface : theme.editorColors.surfaceElevated))
-        .overlay {
-            RoundedRectangleShape(cornerRadius: 5)
-                .stroke(
-                    dropTargetTabID == document.id ? theme.editorColors.blue : active ? theme.editorColors.blue.opacity(0.72) : theme.editorColors.border.opacity(0.52),
-                    lineWidth: dropTargetTabID == document.id ? 2 : 1
-                )
-        }
+        .frame(width: editorTabWidth(document), height: tabHeight)
+        .modifier(EditorWorkspaceTabChrome(isSelected: active, isDropTarget: dropTargetTabID == document.id))
         .opacity(draggedTabID == document.id ? 0.7 : 1)
         .onMiddleClick {
             viewModel.closeDocument(id: document.id)
@@ -306,8 +304,7 @@ extension EditorCenterWorkbench {
                 }
             }
             if let index = viewModel.documents(in: viewModel.pane(for: document.id)).firstIndex(where: { $0.id == document.id }),
-                index < viewModel.documents(in: viewModel.pane(for: document.id)).count - 1
-            {
+                index < viewModel.documents(in: viewModel.pane(for: document.id)).count - 1 {
                 Button(L10n.text("Close Right")) {
                     viewModel.closeDocumentsToRight(of: document.id)
                 }
@@ -351,7 +348,7 @@ extension EditorCenterWorkbench {
         for document in documents {
             let width = editorTabWidth(document)
             centers.append(x + width / 2)
-            x += width + 4
+            x += width + tabSpacing
         }
 
         let draggedCenter = centers[sourceIndex] + translationX
@@ -473,7 +470,9 @@ extension EditorCenterWorkbench {
         if !filesBrowserPanes.contains(pane), case let .scene(scene)? = viewModel.selectedDocument(in: pane) {
             return scene
         }
-        guard playModeState == .editing else { return nil }
+        guard playModeState == .editing else {
+            return nil
+        }
         return viewModel.retainedSceneDocument(in: pane)
     }
 
@@ -483,10 +482,16 @@ extension EditorCenterWorkbench {
         case .animationLibrary, .animationModifiers:
             EditorAnimationLibraryAssetEditor(document: document, workbench: viewModel).id(document.id)
         case .shaderGraph:
-            EditorShaderGraphEditor(model: viewModel.shaderGraphModel(for: document), modelDocuments: viewModel.openDocuments.compactMap {
-                if case .asset(let asset) = $0, asset.kind == .model3D { return asset }
-                return nil
-            }, workbench: viewModel).id(document.id)
+            EditorShaderGraphEditor(
+                model: viewModel.shaderGraphModel(for: document),
+                modelDocuments: viewModel.openDocuments.compactMap {
+                    if case .asset(let asset) = $0, asset.kind == .model3D {
+                        return asset
+                    }
+                    return nil
+                },
+                workbench: viewModel
+            ).id(document.id)
         case .particleEffect:
             EditorParticleEffectAssetEditor(document: document, model: viewModel.particleEffectModel(for: document), workbench: viewModel)
                 .id(document.id)
@@ -587,8 +592,6 @@ extension EditorCenterWorkbench {
                 EditorPreviewPanelsLayout(state: previewResizeState) {
                     codeFileView(document: document)
                         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                    previewResizeHandle(availableWidth: geometry.size.width)
-
                     EditorPreviewPanel(
                         status: viewModel.previewStatus,
                         selectedPreviewID: viewModel.selectedPreviewID,
@@ -607,6 +610,7 @@ extension EditorCenterWorkbench {
                         }
                     )
                     .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                    previewResizeHandle(availableWidth: geometry.size.width)
                 }
                 .frame(width: geometry.size.width, height: geometry.size.height, alignment: .leading)
             }
@@ -614,22 +618,12 @@ extension EditorCenterWorkbench {
     }
 
     private func previewResizeHandle(availableWidth: Float) -> some View {
-        ZStack {
-            RectangleShape()
-                .fill(theme.editorColors.border)
-                .frame(width: 1)
-            EditorResizeHandle(
-                axis: .horizontal,
-                onResize: { translation in
-                    previewResizeState.resize(translation: translation.width, availableWidth: availableWidth)
-                },
-                onResizeEnded: {
-                    previewResizeState.endDrag()
-                }
-            )
-        }
-        .frame(width: EditorPreviewSplitLayout.resizeHandleWidth)
-        .frame(maxHeight: .infinity)
+        EditorResizeHandle(
+            axis: .horizontal,
+            onResize: { previewResizeState.resize(translation: $0.width, availableWidth: availableWidth) },
+            onResizeEnded: { previewResizeState.endDrag() },
+            showsDivider: true
+        )
     }
 
     private func codeFileView(document: EditorTextDocument) -> some View {
@@ -992,7 +986,7 @@ private struct EditorPreviewPanel: View {
         case .available(let declarations):
             let selected = declarations.first { $0.id == selectedPreviewID } ?? declarations.first
             messageView(title: selected?.title ?? "Preview", message: "Build the preview to render it.")
-        case .building(let declaration, let message):
+        case let .building(declaration, message):
             if let retainedPreviewView {
                 retainedPreviewContent(retainedPreviewView) {
                     statusBanner(title: declaration.title, message: message, showsBuildOutputButton: false, isBuilding: true)
@@ -1003,7 +997,7 @@ private struct EditorPreviewPanel: View {
         case .loaded(_, let view):
             EditorPreviewViewport(previewView: view, settings: previewControls)
                 .padding(12)
-        case .failed(let declaration, let message, let hasBuildOutput):
+        case let .failed(declaration, message, hasBuildOutput):
             if let retainedPreviewView {
                 retainedPreviewContent(retainedPreviewView) {
                     statusBanner(
@@ -1141,10 +1135,10 @@ struct EditorPreviewSplitLayout {
     static let defaultPreviewWidth: Float = 360
     static let minimumPreviewWidth: Float = 260
     static let minimumEditorWidth: Float = 320
-    static let resizeHandleWidth: Float = 8
+    static let dividerWidth = AdaEngineStyleLayoutSpec.workspaceDividerSize
 
     static func previewWidth(requestedWidth: Float, availableWidth: Float) -> Float {
-        let maximumWidth = max(0, availableWidth - resizeHandleWidth - minimumEditorWidth)
+        let maximumWidth = max(0, availableWidth - dividerWidth - minimumEditorWidth)
         guard maximumWidth >= minimumPreviewWidth else {
             return maximumWidth
         }

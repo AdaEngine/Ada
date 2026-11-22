@@ -10,6 +10,7 @@ struct EditorAICreditsBadge: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
+        let usesQuietToolbarStyle = compact && AdaEngineStyleLayoutSpec.usesCompactWorkspace
         Button {
             if let onOpen { onOpen() } else { refresh(true) }
         } label: {
@@ -22,11 +23,15 @@ struct EditorAICreditsBadge: View {
                     .foregroundColor(theme.editorColors.text)
                     .lineLimit(1)
             }
-            .padding(.horizontal, 8)
-            .frame(height: compact ? 36 : 28)
-            .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated))
+            .padding(.horizontal, usesQuietToolbarStyle ? 4 : 8)
+            .frame(height: usesQuietToolbarStyle ? 26 : compact ? 36 : 28)
+            .background {
+                if !usesQuietToolbarStyle {
+                    RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated)
+                }
+            }
         }
-        .buttonStyle(DefaultButtonStyle())
+        .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
         .accessibilityIdentifier("AdaEditor.Cloud.AICredits.Counter")
         .onAppear { refresh(false) }
     }
@@ -66,7 +71,10 @@ struct EditorAICreditsDetails: View {
                     .font(.system(size: 20, weight: .bold))
                     .foregroundColor(theme.editorColors.blue)
                     .accessibilityIdentifier("AdaEditor.Cloud.AICredits.Available")
-                Text(L10n.text("\(EditorAICreditAmount.text(balance.spent)) used · \(EditorAICreditAmount.text(balance.reserved)) reserved · \(EditorAICreditAmount.text(balance.allowance)) per cycle"))
+                let spent = EditorAICreditAmount.text(balance.spent)
+                let reserved = EditorAICreditAmount.text(balance.reserved)
+                let allowance = EditorAICreditAmount.text(balance.allowance)
+                Text(L10n.text("\(spent) used · \(reserved) reserved · \(allowance) per cycle"))
                     .font(.system(size: 12))
                     .foregroundColor(theme.editorColors.muted)
                     .lineLimit(2)

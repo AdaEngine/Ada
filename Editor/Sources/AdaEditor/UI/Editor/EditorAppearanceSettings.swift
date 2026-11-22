@@ -7,6 +7,7 @@ import Observation
 final class EditorAppearanceSettings {
     static let shared = EditorAppearanceSettings()
     private static let glowKey = "AdaEditor.appearance.agentActivityGlowEnabled"
+    private static let largerSidebarIconsKey = "AdaEditor.appearance.largerSidebarIcons"
     private static let indentationMarkersKey = "AdaEditor.editor.showsIndentationMarkers"
     private static let indentationGuidesKey = "AdaEditor.editor.showsIndentationGuides"
     private static let tabMarkersKey = "AdaEditor.editor.showsTabMarkers"
@@ -23,6 +24,19 @@ final class EditorAppearanceSettings {
 
     var agentActivityGlowEnabled: Bool {
         didSet { defaults.set(agentActivityGlowEnabled, forKey: Self.glowKey) }
+    }
+
+    var largerSidebarIcons: Bool {
+        didSet {
+            defaults.set(largerSidebarIcons, forKey: Self.largerSidebarIconsKey)
+            #if os(Windows)
+            defaults.synchronize()
+            #endif
+        }
+    }
+
+    var sidebarIconSize: Double {
+        largerSidebarIcons ? 18 : AdaEngineStyleLayoutSpec.workspaceIconSize
     }
 
     var showsIndentationGuides: Bool {
@@ -50,6 +64,7 @@ final class EditorAppearanceSettings {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         agentActivityGlowEnabled = defaults.object(forKey: Self.glowKey) as? Bool ?? true
+        largerSidebarIcons = defaults.bool(forKey: Self.largerSidebarIconsKey)
         let legacyMarkers = defaults.object(forKey: Self.indentationMarkersKey) as? Bool ?? false
         showsIndentationGuides = defaults.object(forKey: Self.indentationGuidesKey) as? Bool ?? legacyMarkers
         showsTabMarkers = defaults.object(forKey: Self.tabMarkersKey) as? Bool ?? legacyMarkers
@@ -99,6 +114,20 @@ final class EditorAppearanceSettings {
 
     private static func clamp(_ value: Double, to range: ClosedRange<Double>, fallback: Double) -> Double {
         value.isFinite ? min(max(value, range.lowerBound), range.upperBound) : fallback
+    }
+}
+
+struct EditorSidebarIconSettings: View {
+    var settings: EditorAppearanceSettings = .shared
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Toggle(L10n.text("Larger sidebar icons"), isOn: Binding(
+            get: { settings.largerSidebarIcons },
+            set: { settings.largerSidebarIcons = $0 }
+        ))
+        .toggleStyle(.editorSettings(colors: theme.editorColors))
+        .accessibilityIdentifier("AdaEditor.Settings.LargerSidebarIcons")
     }
 }
 
