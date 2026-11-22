@@ -7,7 +7,7 @@ Approval: explicit approval in the Codex conversation on 2026-11-22.
 This design extends [Animation Authoring](animation-authoring.md#7-animation-graph-extensions)
 with a ready-to-use runtime preset for an upright 3D character. A game supplies movement intent
 to its existing character controller and maps the model's clips once. The engine then selects and
-crossfades clips from the character's resolved movement. GardenRobot is the reference character.
+crossfades clips from the character's resolved movement. The tests use GardenRobot as the reference character.
 
 ## Character setup
 
@@ -36,7 +36,7 @@ Use `length(velocity.xz)` from `CharacterController3DComponent` for gait selecti
 against a wall with zero displacement settles to `Idle`. Sliding along a wall uses the actual
 remaining direction. Vertical displacement on a slope leaves the grounded gait unchanged.
 
-| GardenRobot tuning | Starting value |
+| Tuning | Default value |
 | --- | --- |
 | Leave idle / return to idle | 0.16 / 0.07 m/s |
 | Enter run / leave run | 2.475 / 2.1 m/s |
@@ -132,15 +132,14 @@ binding can consume.
   during landing, stale physics samples, zero/multiple fixed ticks per frame, and render/LOD
   clock behavior. Run two independently controlled characters and verify save/reopen, rebind,
   invalid-configuration recovery, and compatibility with the manual clip and graph paths.
-- Run the focused tests through the contributor runner. Verify the visible GardenRobot run on
-  one native desktop and exercise the same production path in a WASM browser smoke, since the
-  feature ships through the common 3D runtime. Cover the existing platform build/test matrix;
-  record actual platform and backend evidence. No new renderer dependency is required.
+- Run the focused tests through the contributor runner. Use a disposable scene for native or
+  WASM visual verification. Keep GardenRobot in the test fixtures. Cover the existing platform
+  build/test matrix and record actual platform and backend evidence.
 - Ship `Sources/AdaEngine/AdaEngine.docc/Articles/Developers/CharacterLocomotion3D.md` for game
   authors and link it under Guides in `Sources/AdaEngine/AdaEngine.docc/AdaEngine.md`. Include
-  a minimal GardenRobot setup backed by the production-path example, the clip mapping, the two
-  facing modes, speed tuning, conflicts, and in-place clip requirements. Compile and execute the
-  documented setup in the integration suite, verify the DocC build and navigation, and link the
+  a minimal setup for the reader's own character, the clip mapping, the two facing modes, speed
+  tuning, conflicts, and in-place clip requirements. Exercise the same component setup in the
+  integration suite, verify the DocC build and navigation, and link the
   guide from [Animation Graphs](../AnimationGraphs.md) so users comparing playback options can find it.
 
 ## Studio inspector improvement
@@ -182,6 +181,6 @@ existing inspector and [Studio control design](../../Editor/Documentation/Design
 Use a real GardenRobot scene to verify the defaults, select a clip, commit a numeric edit, switch
 facing modes and verify the preserved mappings. Save, reopen, undo and redo through the normal
 editor path. Check a missing clip, a model swap and a playback conflict. Update the existing
-Character Locomotion guide under the AdaEngine Guides navigation with the inspector workflow and
-GardenRobot example. Verify the example in Studio and refresh and check the Studio offline guide
+Character Locomotion guide under the AdaEngine Guides navigation with the inspector workflow for
+the reader's own character. Verify the workflow in Studio and check the refreshed offline guide
 snapshot alongside the DocC navigation.

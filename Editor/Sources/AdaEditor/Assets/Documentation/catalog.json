@@ -4972,37 +4972,37 @@
       },
       {
         "kind": "heading",
-        "text": "Set up GardenRobot",
+        "text": "Set up your character in Swift",
         "level": 2,
         "links": []
       },
       {
         "kind": "text",
-        "text": "Enable the 3D model and physics plugins in your game. Add a static floor and put\n`GardenRobot.glb` in your project assets. The repository fixture is at\n`Tests/AdaEngineTests/Fixtures/SkeletalGardenAssets/GardenRobot.glb`.\nSpawn its owner in the scene world.",
+        "text": "Enable the 3D model and physics plugins in your game. Add a static floor and put your skinned\nmodel in the project assets. This example uses `Character.glb` and the default clip names.\nSpawn the character's root entity in the scene world.",
         "level": 0,
         "links": []
       },
       {
         "kind": "code",
-        "text": "let robot = world.spawn(\"GardenRobot\") {\n    Transform(position: [0, 0.005, 0])\n    CharacterController3DComponent()\n    Model3DSource(source: \"@res://GardenRobot.glb\", animation: \"Idle\", autoplay: true)\n    CharacterLocomotion3DComponent()\n}\n\n// Set these from your input system. Request a jump once on the press edge.\nrobot.components[CharacterController3DComponent.self]?.desiredVelocity = [0, 0, 1.65]\n// To run, increase horizontal speed to 3.3.\n// To jump, set jumpRequested to true.",
+        "text": "let character = world.spawn(\"Character\") {\n    Transform(position: [0, 0.005, 0])\n    CharacterController3DComponent()\n    Model3DSource(source: \"@res://Character.glb\", animation: \"Idle\", autoplay: true)\n    CharacterLocomotion3DComponent()\n}\n\n// Set these from your input system. Request a jump once on the press edge.\ncharacter.components[CharacterController3DComponent.self]?.desiredVelocity = [0, 0, 1.65]\n// To run, increase horizontal speed to 3.3.\n// To jump, set jumpRequested to true.",
         "language": "swift",
         "links": []
       },
       {
         "kind": "text",
-        "text": "The default component maps `Idle`, `Walk`, `Run`, `Jump`, `Fall`, and `Land`.\nAfter the robot accelerates it walks, then runs at the higher speed. Releasing movement\nreturns it to idle after braking. `Jump` plays on ascent, `Fall` holds its final pose during\ndescent, and `Land` plays briefly before the robot resumes the current grounded gait.\nStepping off a ledge goes straight to `Fall` after two consecutive ungrounded physics samples.",
+        "text": "The default component maps `Idle`, `Walk`, `Run`, `Jump`, `Fall`, and `Land`.\nAfter the character accelerates it walks, then runs at the higher speed. Releasing movement\nreturns it to idle after braking. `Jump` plays on ascent, `Fall` holds its final pose during\ndescent, and `Land` plays briefly before the character resumes the current grounded gait.\nStepping off a ledge goes straight to `Fall` after two consecutive ungrounded physics samples.",
         "level": 0,
         "links": []
       },
       {
         "kind": "heading",
-        "text": "Set up another character",
+        "text": "Set up your character in Ada Studio",
         "level": 2,
         "links": []
       },
       {
         "kind": "text",
-        "text": "In Ada Studio's desktop scene inspector, select the root entity that owns the model and\ncontroller. Choose **Add Component**, then **3D Locomotion**. The default clip assignments\nmatch GardenRobot, so you can start the scene with them.",
+        "text": "In Ada Studio's desktop scene inspector, select the root entity that owns the model and\ncontroller. Choose **Add Component**, then **3D Locomotion**. Assign the six clip slots to your\nmodel's animations before starting the scene.",
         "level": 0,
         "links": []
       },
@@ -5032,7 +5032,7 @@
       },
       {
         "kind": "text",
-        "text": "A model with a manual `ModelAnimationPlayback3DComponent` or an active animation graph\nretains that playback. Inspect `diagnostic` to find conflicts, missing clips, and invalid\ntuning. Scene serialization preserves the settings and each actor starts with independent\nlocomotion state. Scene data can omit settings that use the GardenRobot defaults.",
+        "text": "A model with a manual `ModelAnimationPlayback3DComponent` or an active animation graph\nretains that playback. Inspect `diagnostic` to find conflicts, missing clips, and invalid\ntuning. Scene serialization preserves the settings and each actor starts with independent\nlocomotion state. Scene data can omit settings that use the component defaults.",
         "level": 0,
         "links": []
       },

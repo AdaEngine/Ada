@@ -26,7 +26,7 @@ public struct CharacterLocomotion3DComponent: Codable, Sendable {
         case ambiguousClip(String)
     }
 
-    /// Names of the model's forward gaits and air clips. Defaults match GardenRobot.
+    /// Names of the model's idle, forward gait, and air clips.
     public struct Clips: Codable, Equatable, Sendable {
         public var idle: String
         public var walk: String

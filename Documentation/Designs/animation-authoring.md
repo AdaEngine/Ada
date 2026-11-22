@@ -264,8 +264,8 @@ Any change to legacy generic clock clamping requires separate explicit compatibi
 
 ## 7. Animation Graph Extensions
 
-The accepted [3D character locomotion preset](character-locomotion-3d.md) defines a GardenRobot
-example and a reusable controller-to-clip binding using the existing skeletal player.
+The accepted [3D character locomotion preset](character-locomotion-3d.md) defines a reusable
+controller-to-clip binding using the existing skeletal player, with coverage using the GardenRobot test fixture.
 
 Retain existing blend normalization, rest-pose fill, masks, additive rotation order and clip events.
 Both imported and authored clips enter the same graph. Temporal curve shape is evaluated before pose
