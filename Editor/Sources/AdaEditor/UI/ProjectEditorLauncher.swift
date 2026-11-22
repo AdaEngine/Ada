@@ -26,14 +26,20 @@ enum ProjectEditorLauncher {
     static let windowTitlePrefix = "AdaEditor"
     static let windowWidth: Float = 1280
     static let windowHeight: Float = 800
+    static let trafficLightOffsetY: Float = 4
 
     static func openEditor(
         for project: EditorProjectReference,
         closing pickerWindow: UIWindow? = UIWindowManager.shared?.activeWindow
             ?? AppWorldsSession.current?.main.getResource(PrimaryWindow.self)?.window
     ) {
-        if let nativeProjectOpener { nativeProjectOpener(project); return }
-        guard let manager = UIWindowManager.shared else { return }
+        if let nativeProjectOpener {
+            nativeProjectOpener(project)
+            return
+        }
+        guard let manager = UIWindowManager.shared else {
+            return
+        }
         let configuration = UIWindow.Configuration(
             title: L10n.text("Ada - \(project.name)"),
             frame: Rect(x: 0, y: 0, width: ProjectOpeningLayout.windowWidth, height: ProjectOpeningLayout.windowHeight),
@@ -43,7 +49,7 @@ enum ProjectEditorLauncher {
                 background: .transparent,
                 reservesSafeArea: EditorWindowSafeAreaPolicy.reservesSystemSafeArea,
                 dragRegionHeight: EditorWindowSafeAreaPolicy.dragRegionHeight,
-                trafficLightOffset: Point(x: 0, y: ProjectOpeningLayout.trafficLightOffsetY)
+                trafficLightOffset: Point(x: 0, y: Self.trafficLightOffsetY)
             ),
             showsImmediately: false,
             makeKey: true
@@ -60,8 +66,13 @@ enum ProjectEditorLauncher {
     }
 
     static func openWelcome(makeFocused: Bool = true, beginCreatingProject: Bool = false) {
-        if let nativeWelcomeOpener { nativeWelcomeOpener(beginCreatingProject); return }
-        guard let manager = UIWindowManager.shared else { return }
+        if let nativeWelcomeOpener {
+            nativeWelcomeOpener(beginCreatingProject)
+            return
+        }
+        guard let manager = UIWindowManager.shared else {
+            return
+        }
         let configuration = UIWindow.Configuration(
             title: windowTitlePrefix,
             frame: Rect(x: 0, y: 0, width: ProjectOpeningLayout.windowWidth, height: ProjectOpeningLayout.windowHeight),

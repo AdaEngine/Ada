@@ -38,23 +38,29 @@ private struct EditorAgentMessageRowLayout: Layout {
 struct EditorAgentEventCard: View {
     let event: EditorAgentEvent
     let viewModel: EditorAgentViewModel?
-    var a2uiPresentation: EditorAgentA2UIPresentation? = nil
+    var a2uiPresentation: EditorAgentA2UIPresentation?
+    var compactMessages = false
 
     @Environment(\.theme) private var theme
 
     @State private var isExpanded = false
 
     private var isUser: Bool { event.message?.role == .user }
+    private var isCompactUser: Bool { isUser && compactMessages }
     private var isCollapsible: Bool {
         event.kind == .runStatus || event.toolCall != nil
             || event.message?.segments.allSatisfy { $0.kind == .thinking } == true
     }
 
     var body: some View {
-        EditorAgentMessageRowLayout(isUser: isUser) {
-            cardContent
+        EditorAgentMessageRowLayout(isUser: isUser && !isCompactUser) {
+            if isCompactUser {
+                cardContent.accessibilityIdentifier("AdaEditor.Agent.UserMessage.\(event.id)")
+            } else {
+                cardContent
+            }
         }
-        .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+        .frame(maxWidth: .infinity, alignment: isUser && !isCompactUser ? .trailing : .leading)
         .accessibilityIdentifier("AdaEditor.Agent.Event.\(event.id)")
     }
 
@@ -80,8 +86,14 @@ struct EditorAgentEventCard: View {
                 eventContent
             }
         }
-        .padding(isUser || isCollapsible ? 8 : 0)
-        .background(RoundedRectangleShape(cornerRadius: 8).fill(eventBackground))
+        .padding(isCompactUser ? 11 : isUser || isCollapsible ? 8 : 0)
+        .frame(maxWidth: isCompactUser ? .infinity : nil, alignment: .leading)
+        .background(RoundedRectangleShape(cornerRadius: isCompactUser ? 4 : 8).fill(eventBackground))
+        .overlay {
+            if isCompactUser {
+                adaEditorPanelBorder(theme: theme, cornerRadius: 4)
+            }
+        }
         .accessibilityIdentifier("AdaEditor.Agent.EventContent.\(event.id)")
     }
 
@@ -124,8 +136,12 @@ struct EditorAgentEventCard: View {
         else { return message.segments }
         var insertedText = false
         return message.segments.compactMap { segment in
-            guard segment.kind == .text else { return segment }
-            guard !insertedText else { return nil }
+            guard segment.kind == .text else {
+                return segment
+            }
+            guard !insertedText else {
+                return nil
+            }
             insertedText = true
             return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : .init(kind: .text, text: text)
         }
@@ -294,7 +310,10 @@ struct EditorAgentEventCard: View {
     }
 
     private var eventBackground: Color {
-        isUser ? theme.editorColors.blue.opacity(0.14) : (isCollapsible ? theme.editorColors.surface : .clear)
+        if isCompactUser {
+            return theme.editorColors.background
+        }
+        return isUser ? theme.editorColors.blue.opacity(0.14) : (isCollapsible ? theme.editorColors.surface : .clear)
     }
 
     private func toolStatusTitle(_ status: EditorAgentToolStatus?) -> String {

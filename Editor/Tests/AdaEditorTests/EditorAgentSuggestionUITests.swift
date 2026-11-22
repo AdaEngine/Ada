@@ -182,7 +182,8 @@ struct EditorAgentSuggestionUITests {
         await refresh(workspace)
         let chip = try workspace.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.PromptSuggestion.0")).absoluteFrame
         let column = try workspace.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.ContentColumn")).absoluteFrame
-        #expect(column.width == EditorAgentSidebar.maximumContentWidth)
+        let expectedWidth = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 1_200 : EditorAgentSidebar.maximumContentWidth
+        #expect(column.width == expectedWidth)
         #expect(chip.minX >= column.minX && chip.maxX <= column.maxX)
     }
 
@@ -199,8 +200,12 @@ struct EditorAgentSuggestionUITests {
         func pointer(_ phase: MouseEvent.Phase, x: Float, time: Float) throws {
             let frame = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Prompt")).absoluteFrame
             container.onMouseEvent(MouseEvent(
-                window: .empty, button: .left, mousePosition: Point(frame.minX + x, frame.minY + 15),
-                phase: phase, modifierKeys: [], time: time
+                window: .empty,
+                button: .left,
+                mousePosition: Point(frame.minX + x, frame.minY + 15),
+                phase: phase,
+                modifierKeys: [],
+                time: time
             ))
         }
 
@@ -285,7 +290,9 @@ struct EditorAgentSuggestionUITests {
 
     private func waitForRequest(_ service: FakeEditorAgentService) async throws {
         for _ in 0..<100 {
-            if await service.recordedRequest() != nil { return }
+            if await service.recordedRequest() != nil {
+                return
+            }
             try await Task.sleep(for: .milliseconds(10))
         }
         Issue.record("Composer did not send a request")
@@ -313,7 +320,9 @@ private struct SuggestionUIService: EditorAgentSuggestionServing {
     static let russianFollowUp = "Покажи, как проверить изменения в этой сцене, и объясни, какие результаты помогут убедиться, что всё работает правильно."
 
     func suggestions(for request: EditorAgentSuggestionRequest) async -> [String] {
-        if request.purpose == .completion { return [request.draft + " how this project works."] }
+        if request.purpose == .completion {
+            return [request.draft + " how this project works."]
+        }
         return request.languageCode == "ru"
             ? [Self.russianFollowUp, "Объясни изменения.", "Предложи следующий шаг."]
             : ["Explain the changes.", "How can I verify this?", "Suggest the next step."]

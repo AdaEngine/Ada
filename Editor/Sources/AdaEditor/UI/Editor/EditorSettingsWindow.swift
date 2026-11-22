@@ -288,7 +288,7 @@ final class EditorSettingsWindowViewModel {
             let runtime = try runtimeDraft.applying(to: runtimeSettings)
             let resolved = try EditorAdaScriptRuntimePluginResolver.resolve(runtime.plugins)
             let data = try EditorAdaScriptResolvedRuntimeManifest(project: runtime, resolved: resolved).encoded()
-            return String(decoding: data, as: UTF8.self)
+            return String(bytes: data, encoding: .utf8) ?? ""
         } catch {
             return error.localizedDescription
         }
@@ -623,7 +623,7 @@ struct EditorSettingsWindowView: View {
             VStack(alignment: .leading, spacing: 0) {
                 settingsGroup(EditorSettingsPage.language) { EditorLanguageSettings() }
                 settingsGroup("ADA CLOUD") { EditorCloudSettingsView() }
-                settingsGroup("APPEARANCE") { EditorAgentGlowSettings() }
+                settingsGroup("APPEARANCE") { appearanceSettings }
                 settingsGroup(EditorSettingsPage.editorDisplay) { EditorCodeDisplaySettings() }
             }
         } else if let editorViewModel = viewModel.editorViewModel {
@@ -650,9 +650,7 @@ struct EditorSettingsWindowView: View {
         VStack(alignment: .leading, spacing: 0) {
             settingsGroup(EditorSettingsPage.language) { EditorLanguageSettings() }
             settingsGroup("ADA CLOUD") { EditorCloudSettingsView() }
-            settingsGroup("APPEARANCE") {
-                EditorAgentGlowSettings()
-            }
+            settingsGroup("APPEARANCE") { appearanceSettings }
             settingsGroup(EditorSettingsPage.editorDisplay) {
                 EditorCodeDisplaySettings()
             }
@@ -721,6 +719,15 @@ struct EditorSettingsWindowView: View {
                 }
                 codeAppearancePreview
             }
+        }
+    }
+
+    private var appearanceSettings: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+                EditorSidebarIconSettings()
+            }
+            EditorAgentGlowSettings()
         }
     }
 

@@ -105,8 +105,9 @@ struct EditorTopToolbarTests {
         let projectIcon = try container.uiNode(matching: .accessibilityIdentifier(EditorTopToolbar.projectSwitcherIconAccessibilityIdentifier))
 
         #expect(destination.absoluteFrame.width == metrics.toolbarRunDestinationWidth)
-        #expect(run.absoluteFrame.width == 30)
-        #expect(stop.absoluteFrame.width == 30)
+        let expectedButtonWidth: Float = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 26 : 30
+        #expect(run.absoluteFrame.width == expectedButtonWidth)
+        #expect(stop.absoluteFrame.width == expectedButtonWidth)
         #expect(projectIcon.absoluteFrame.minX - projectSwitcher.absoluteFrame.minX <= 12)
         #if os(Windows)
         #expect(projectSwitcher.absoluteFrame.minX == 0)
@@ -158,8 +159,14 @@ struct EditorTopToolbarTests {
         let avd = EditorAndroidTarget(id: "avd:Pixel", name: "Pixel", kind: .emulator, serial: nil, avd: "Pixel", state: "stopped")
         let phone = EditorAndroidTarget(id: "device:USB1", name: "Phone", kind: .device, serial: "USB1", avd: nil, state: "device")
         var selected: String?
-        let container = UIContainerView(rootView: EditorRunDestinationMenu(selectedDestination: .android, onSelect: { _ in },
-            androidTargets: [avd, phone], onSelectAndroid: { selected = $0.id }))
+        let container = UIContainerView(
+            rootView: EditorRunDestinationMenu(
+                selectedDestination: .android,
+                onSelect: { _ in },
+                androidTargets: [avd, phone],
+                onSelectAndroid: { selected = $0.id }
+            )
+        )
         container.frame = Rect(x: 0, y: 0, width: 308, height: 500)
         container.bounds.size = container.frame.size
         container.layoutIfNeeded()

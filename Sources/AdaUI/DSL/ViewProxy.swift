@@ -54,6 +54,23 @@ public struct ViewProxy: Hashable, @unchecked Sendable {
         target?.setNeedsDisplay()
     }
 
+    /// Focuses the first eligible control in the mounted view's subtree.
+    @_spi(AdaEngine)
+    @MainActor
+    public func focusFirstControl() {
+        guard let root = target as? ViewNode, let owner = root.owner else {
+            return
+        }
+        var pending = [root]
+        while let node = pending.popLast() {
+            if node.canBecomeFocused {
+                owner.requestFocus(for: node)
+                return
+            }
+            pending.append(contentsOf: node.transientEnvironmentChildren.reversed())
+        }
+    }
+
     public static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.targetID == rhs.targetID
     }

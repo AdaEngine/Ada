@@ -45,7 +45,7 @@ struct EditorProjectTreeStateTests {
         #expect(presentation.settledRevision == 1)
         #expect(!presentation.isAnimating)
         #expect(presentation.rows(at: now).map(\.id) == order)
-        #expect(presentation.rows(at: now).allSatisfy { $0.height == 28 })
+        #expect(presentation.rows(at: now).allSatisfy { $0.height == EditorProjectTreePresentation.rowHeight })
         presentation.update(to: [root], order: order, at: now)
         #expect(presentation.settledRevision == 2)
         #expect(presentation.rows(at: now).map(\.id) == [root.id])
@@ -101,25 +101,19 @@ struct EditorProjectTreeStateTests {
         await settle(container)
         let root = UINodeSelector.accessibilityIdentifier("AdaEditor.ProjectTree.Tree")
         let child = UINodeSelector.accessibilityIdentifier("AdaEditor.ProjectTree.Row.Sources/Base")
+        let rowHeight = EditorProjectTreePresentation.rowHeight
         _ = try container.uiTapNode(matching: root)
+        #expect(try await observesIntermediateHeight(of: child, in: container))
+        try await Task.sleep(for: .milliseconds(190))
         await settle(container)
-        try await Task.sleep(for: .milliseconds(65))
-        await settle(container)
-        let expanding = try container.uiNode(matching: child).absoluteFrame.height
-        #expect(expanding > 0 && expanding < 28)
-        try await Task.sleep(for: .milliseconds(170))
-        await settle(container)
-        #expect(try container.uiNode(matching: child).absoluteFrame.height == 28)
+        #expect(try container.uiNode(matching: child).absoluteFrame.height == rowHeight)
         let parentArrow = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.Disclosure.Sources"))
         let childArrow = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.Disclosure.Sources/Base"))
-        #expect(childArrow.absoluteFrame.minX - parentArrow.absoluteFrame.minX >= 15)
+        let minimumIndent: Float = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 13 : 15
+        #expect(childArrow.absoluteFrame.minX - parentArrow.absoluteFrame.minX >= minimumIndent)
         _ = try container.uiTapNode(matching: root)
-        await settle(container)
-        try await Task.sleep(for: .milliseconds(65))
-        await settle(container)
-        let collapsing = try container.uiNode(matching: child).absoluteFrame.height
-        #expect(collapsing > 0 && collapsing < 28)
-        try await Task.sleep(for: .milliseconds(170))
+        #expect(try await observesIntermediateHeight(of: child, in: container))
+        try await Task.sleep(for: .milliseconds(190))
         await settle(container)
         #expect(container.uiFindNodes(matching: child).isEmpty)
     }
@@ -156,8 +150,15 @@ struct EditorProjectTreeStateTests {
         prepareTreeRenderer()
         let items = (0..<80).map { index in
             EditorProjectSidebarViewModel.Item(
-                id: "File\(index).ada", disclosure: "", icon: "", title: "File\(index).ada",
-                relativePath: "File\(index).ada", level: 0, isActive: false, isFolder: false, kind: .text(.ada)
+                id: "File\(index).ada",
+                disclosure: "",
+                icon: "",
+                title: "File\(index).ada",
+                relativePath: "File\(index).ada",
+                level: 0,
+                isActive: false,
+                isFolder: false,
+                kind: .text(.ada)
             )
         }
         let model = EditorProjectSidebarViewModel(items: items, displayMode: .files)
@@ -170,8 +171,9 @@ struct EditorProjectTreeStateTests {
             let frame = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ProjectTree.\(items[index].title)")).absoluteFrame
             let started = ContinuousClock.now
             for phase in [MouseEvent.Phase.began, .ended] {
-                container.onMouseEvent(MouseEvent(window: .empty, button: .left,
-                    mousePosition: Point(frame.midX, frame.midY), phase: phase, modifierKeys: [], time: 0))
+                container.onMouseEvent(
+                    MouseEvent(window: .empty, button: .left, mousePosition: Point(frame.midX, frame.midY), phase: phase, modifierKeys: [], time: 0)
+                )
             }
             await settle(container)
             longest = max(longest, started.duration(to: .now))
@@ -190,15 +192,27 @@ struct EditorProjectTreeStateTests {
     }
 
     private func makeContainer(
-        model: EditorProjectSidebarViewModel, onReveal: @escaping () -> Void = {},
+        model: EditorProjectSidebarViewModel,
+        onReveal: @escaping () -> Void = {},
         onOpenItem: ((EditorProjectSidebarViewModel.Item) -> Void)? = nil
     ) -> UIContainerView<some View> {
         let container = UIContainerView(rootView: EditorProjectSidebar(
-            viewModel: model, projectRootItem: nil, onOpenItem: onOpenItem ?? { model.toggleFolder($0) },
-            onOpenRawItem: { _ in }, onNewFile: { _ in }, onImportAssets: {}, onDropFiles: { _ in true },
-            onRevealItem: { _ in }, onOpenInDefaultApplication: { _ in }, onOpenInTerminal: { _ in },
-            onFindInFolder: { _ in }, onFindInProjectRoot: {}, onCopyPath: { _, _ in }, onDeleteItem: { _ in },
-            onRevealActiveFile: onReveal, isRevealActiveFileEnabled: true
+            viewModel: model,
+            projectRootItem: nil,
+            onOpenItem: onOpenItem ?? { model.toggleFolder($0) },
+            onOpenRawItem: { _ in },
+            onNewFile: { _ in },
+            onImportAssets: {},
+            onDropFiles: { _ in true },
+            onRevealItem: { _ in },
+            onOpenInDefaultApplication: { _ in },
+            onOpenInTerminal: { _ in },
+            onFindInFolder: { _ in },
+            onFindInProjectRoot: {},
+            onCopyPath: { _, _ in },
+            onDeleteItem: { _ in },
+            onRevealActiveFile: onReveal,
+            isRevealActiveFileEnabled: true
         ).theme(.adaEditor))
         container.frame = Rect(x: 0, y: 0, width: 340, height: 480)
         container.bounds.size = container.frame.size
@@ -272,11 +286,20 @@ struct EditorProjectTreeStateTests {
         let model = fixture.model()
         var newFileCount = 0
         let container = UIContainerView(rootView: EditorProjectSidebar(
-            viewModel: model, projectRootItem: nil, onOpenItem: { model.toggleFolder($0) },
-            onOpenRawItem: { _ in }, onNewFile: { _ in newFileCount += 1 }, onImportAssets: {},
-            onDropFiles: { _ in true }, onRevealItem: { _ in }, onOpenInDefaultApplication: { _ in },
-            onOpenInTerminal: { _ in }, onFindInFolder: { _ in }, onFindInProjectRoot: {},
-            onCopyPath: { _, _ in }, onDeleteItem: { _ in }
+            viewModel: model,
+            projectRootItem: nil,
+            onOpenItem: { model.toggleFolder($0) },
+            onOpenRawItem: { _ in },
+            onNewFile: { _ in newFileCount += 1 },
+            onImportAssets: {},
+            onDropFiles: { _ in true },
+            onRevealItem: { _ in },
+            onOpenInDefaultApplication: { _ in },
+            onOpenInTerminal: { _ in },
+            onFindInFolder: { _ in },
+            onFindInProjectRoot: {},
+            onCopyPath: { _, _ in },
+            onDeleteItem: { _ in }
         ).theme(.adaEditor))
         container.frame = Rect(x: 0, y: 0, width: 300, height: 500)
         container.bounds.size = container.frame.size
@@ -303,6 +326,20 @@ struct EditorProjectTreeStateTests {
         #expect(try container.uiNode(matching: newFile).absoluteFrame.maxX <= 300)
         _ = try container.uiTapNode(matching: newFile)
         #expect(newFileCount == 1)
+    }
+
+    private func observesIntermediateHeight<Content: View>(of selector: UINodeSelector, in container: UIContainerView<Content>) async throws -> Bool {
+        let fullHeight = EditorProjectTreePresentation.rowHeight
+        for _ in 0..<8 {
+            await Task.yield()
+            container.update(1.0 / 60)
+            container.layoutIfNeeded()
+            if let height = container.uiFindNodes(matching: selector).first?.absoluteFrame.height, height > 0, height < fullHeight {
+                return true
+            }
+            try await Task.sleep(for: .milliseconds(12))
+        }
+        return false
     }
 
     private func settle<Content: View>(_ container: UIContainerView<Content>) async {
@@ -338,8 +375,10 @@ struct EditorProjectTreeStateTests {
 
         func model(projectPath: String? = nil) -> EditorProjectSidebarViewModel {
             EditorProjectSidebarViewModel(
-                items: items, sourceRootTarget: .init(relativePath: "Sources", title: "Tree"),
-                projectPath: projectPath ?? root.path, defaults: defaults
+                items: items,
+                sourceRootTarget: .init(relativePath: "Sources", title: "Tree"),
+                projectPath: projectPath ?? root.path,
+                defaults: defaults
             )
         }
 

@@ -24,10 +24,11 @@ struct EditorTopToolbar: View {
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
+    private var compact: Bool { AdaEngineStyleLayoutSpec.usesCompactWorkspace }
 
     var body: some View {
         EditorToolbarLayout(searchWidth: metrics.toolbarSearchWidth) {
-            HStack(spacing: 12) {
+            HStack(spacing: compact ? 6 : 12) {
                 #if os(macOS)
                 Color.clear
                     .frame(width: metrics.toolbarWindowControlClearance, height: 1)
@@ -35,7 +36,7 @@ struct EditorTopToolbar: View {
                 projectSwitcherButton
                 #if os(macOS) || os(Windows) || os(Linux) || os(visionOS)
                 if let interface {
-                    EditorInterfaceModePicker(state: interface)
+                    EditorInterfaceModeSwitcher(state: interface)
                 }
                 #endif
             }
@@ -44,7 +45,7 @@ struct EditorTopToolbar: View {
                 .searchBarStyle(EditorToolbarSearchBarStyle(theme: theme))
                 .accessibilityIdentifier(Self.searchAccessibilityIdentifier)
 
-            HStack(spacing: 12) {
+            HStack(spacing: compact ? 4 : 12) {
                 EditorAICreditsBadge(compact: true, onOpen: onOpenCloud)
                 EditorUpdateButton()
                 if let buildTargets {
@@ -53,7 +54,7 @@ struct EditorTopToolbar: View {
                 runDestinationControls
                 runStopControls
             }
-            .padding(.trailing, 16)
+            .padding(.trailing, compact ? 8 : 16)
         }
         .frame(maxWidth: .infinity)
     }
@@ -62,7 +63,7 @@ struct EditorTopToolbar: View {
         Button(action: onToggleProjectSwitcher) {
             HStack(spacing: 6) {
                 Text("\u{E2C7}")
-                    .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                    .font(AdaEditorMaterialSymbolFont.font(size: compact ? AdaEngineStyleLayoutSpec.workspaceIconSize : 16))
                     .accessibilityIdentifier(Self.projectSwitcherIconAccessibilityIdentifier)
                 if metrics.toolbarProjectSwitcherWidth > 32 {
                     Text(project?.name ?? L10n.text("Projects"))
@@ -70,13 +71,13 @@ struct EditorTopToolbar: View {
                         .lineLimit(1)
                 }
                 Text(isProjectSwitcherPresented ? "\u{E5CE}" : "\u{E5CF}")
-                    .font(AdaEditorMaterialSymbolFont.font(size: 15))
+                    .font(AdaEditorMaterialSymbolFont.font(size: compact ? 12 : 15))
             }
             .foregroundColor(theme.editorColors.text)
             .padding(.horizontal, metrics.toolbarProjectSwitcherWidth > 32 ? 8 : 0)
             .frame(width: metrics.toolbarProjectSwitcherWidth, height: 30, alignment: .leading)
         }
-        .buttonStyle(DefaultButtonStyle())
+        .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
         .accessibilityIdentifier(Self.projectSwitcherAccessibilityIdentifier)
     }
 
@@ -91,22 +92,29 @@ struct EditorTopToolbar: View {
                     .foregroundColor(theme.editorColors.muted)
             }
             .padding(.horizontal, 8)
-            .frame(width: metrics.toolbarRunDestinationWidth, height: 28)
+            .frame(width: metrics.toolbarRunDestinationWidth, height: compact ? 26 : 28)
         }
         .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
-        .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated))
+        .background {
+            if !compact {
+                RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated)
+            }
+        }
         .overlay {
-            RoundedRectangleShape(cornerRadius: 8)
-                .stroke(theme.editorColors.border.opacity(0.72), lineWidth: 1)
+            if !compact {
+                RoundedRectangleShape(cornerRadius: 8)
+                    .stroke(theme.editorColors.border.opacity(0.72), lineWidth: 1)
+            }
         }
         .accessibilityIdentifier("AdaEditor.RunDestination.Button")
     }
 
     private var runStopControls: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: compact ? 2 : 4) {
             if let onDebug {
                 toolbarActionButton(title: "Debug", symbol: "\u{E868}", color: Color(red: 110 / 255, green: 205 / 255, blue: 126 / 255), action: onDebug)
                     .disabled(!isRunEnabled)
+                    .opacity(isRunEnabled ? 1 : 0.45)
             }
             toolbarActionButton(title: "Run", symbol: "\u{E037}", color: Color(red: 110 / 255, green: 205 / 255, blue: 126 / 255), action: onRun)
                 .disabled(!isRunEnabled)
@@ -115,14 +123,14 @@ struct EditorTopToolbar: View {
                 .disabled(!isStopEnabled)
                 .opacity(isStopEnabled ? 1 : 0.45)
         }
-        .frame(width: metrics.toolbarRunControlsWidth)
+        .frame(width: compact ? nil : metrics.toolbarRunControlsWidth)
     }
 
     private func toolbarActionButton(title: String, symbol: String, color: Color, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(symbol)
-                .font(AdaEditorMaterialSymbolFont.font(size: 20))
-                .frame(width: 30, height: 30)
+                .font(AdaEditorMaterialSymbolFont.font(size: compact ? AdaEngineStyleLayoutSpec.workspaceIconSize : 20))
+                .frame(width: compact ? 26 : 30, height: compact ? 26 : 30)
         }
         .foregroundColor(color)
         .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
@@ -280,9 +288,29 @@ private struct EditorToolbarSearchBarStyle: SearchBarStyle {
     let theme: Theme
 
     func makeBody(configuration: Configuration) -> some View {
+        if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+            searchContent(configuration)
+                .frame(height: 26)
+                .background {
+                    RoundedRectangleShape(cornerRadius: AdaEngineStyleLayoutSpec.workspaceControlRadius)
+                        .fill(theme.editorColors.surfaceElevated)
+                }
+                .overlay {
+                    RoundedRectangleShape(cornerRadius: AdaEngineStyleLayoutSpec.workspaceControlRadius)
+                        .stroke(theme.editorColors.border, lineWidth: 1)
+                        .allowsHitTesting(false)
+                }
+        } else {
+            searchContent(configuration)
+                .frame(maxHeight: .infinity)
+                .glassEffect(.editorToolbarSearch(theme: theme), in: CapsuleShape())
+        }
+    }
+
+    private func searchContent(_ configuration: Configuration) -> some View {
         HStack(alignment: .center, spacing: 10) {
             Text("\u{E8B6}")
-                .font(AdaEditorMaterialSymbolFont.font(size: 17))
+                .font(AdaEditorMaterialSymbolFont.font(size: AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 14 : 17))
                 .foregroundColor(theme.editorColors.text.opacity(0.88))
                 .frame(width: 18, height: 18)
 
@@ -302,8 +330,7 @@ private struct EditorToolbarSearchBarStyle: SearchBarStyle {
         }
         .padding(.leading, 12)
         .padding(.trailing, 8)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .glassEffect(.editorToolbarSearch(theme: theme), in: CapsuleShape())
+        .frame(maxWidth: .infinity)
     }
 }
 

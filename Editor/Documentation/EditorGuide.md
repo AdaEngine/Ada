@@ -15,6 +15,10 @@ The Project Navigator shows project files. Select a source file to edit it, or a
 
 Use **File > Save** to save the active document, or **File > Save All** to save all documents. The Code menu includes tab actions and editor font size controls.
 
+On desktop, drag the divider beside the Project Navigator or Inspector to resize that panel. Drag the divider above the bottom dock to adjust its height. The pointer changes to a resize cursor near a divider. If you drag a panel closed, use its tool strip button to reopen it.
+
+The mode icon beside the project name switches between Editor and Agent. Turn on **Larger sidebar icons** under **Settings > General > Appearance** to increase the icon size in both sidebar tool strips. The choice applies immediately and is remembered across projects and launches. See the [Agent Interface guide](AgentInterface.md) for the conversation layout and its keyboard controls.
+
 ## Generate pixel art
 
 Ask the Studio agent for a pixel sprite or a short animation. The

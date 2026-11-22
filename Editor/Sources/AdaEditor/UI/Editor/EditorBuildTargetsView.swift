@@ -7,6 +7,7 @@ struct EditorBuildTargetButton: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
         Button(action: { model.isMenuPresented.toggle() }) {
             HStack(spacing: 5) {
                 Text("\u{E869}").font(AdaEditorMaterialSymbolFont.font(size: 15))
@@ -14,12 +15,22 @@ struct EditorBuildTargetButton: View {
                 Text("\u{E5CF}").font(AdaEditorMaterialSymbolFont.font(size: 15))
             }
             .foregroundColor(theme.editorColors.text)
-            .padding(.horizontal, 8).frame(width: 130, height: 28)
+            .padding(.horizontal, compact ? 4 : 8)
+            .frame(width: compact ? 104 : 130, height: compact ? 26 : 28)
         }
         .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
-        .background(RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated))
-        .overlay { RoundedRectangleShape(cornerRadius: 8).stroke(theme.editorColors.border.opacity(0.72), lineWidth: 1) }
+        .background {
+            if !compact {
+                RoundedRectangleShape(cornerRadius: 8).fill(theme.editorColors.surfaceElevated)
+            }
+        }
+        .overlay {
+            if !compact {
+                RoundedRectangleShape(cornerRadius: 8).stroke(theme.editorColors.border.opacity(0.72), lineWidth: 1)
+            }
+        }
         .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.45)
         .accessibilityIdentifier("AdaEditor.BuildTarget.Button")
     }
 }
@@ -108,8 +119,11 @@ struct EditorBuildTargetsDialog: View {
                             Text(target.name).lineLimit(2).padding(10).frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .buttonStyle(DefaultButtonStyle())
-                        .background(RoundedRectangleShape(cornerRadius: 6).fill(
-                            target.id == model.draft?.activeBuildTargetID ? theme.editorColors.blue.opacity(0.2) : theme.editorColors.surface))
+                        .background {
+                            RoundedRectangleShape(cornerRadius: 6).fill(
+                                target.id == model.draft?.activeBuildTargetID ? theme.editorColors.blue.opacity(0.2) : theme.editorColors.surface
+                            )
+                        }
                         .accessibilityIdentifier("AdaEditor.BuildTargets.Row.\(target.id)")
                     }
                 }
@@ -130,8 +144,11 @@ struct EditorBuildTargetsDialog: View {
             Text(L10n.text("Build Configuration")).font(.system(size: 12, weight: .semibold))
             HStack(spacing: 8) {
                 ForEach(["debug", "release"], id: \.self) { configuration in
-                    action(configuration == "debug" ? "Debug" : "Release", id: configuration,
-                           primary: (model.editedTarget?.build.configuration ?? "debug") == configuration) {
+                    action(
+                        configuration == "debug" ? "Debug" : "Release",
+                        id: configuration,
+                        primary: (model.editedTarget?.build.configuration ?? "debug") == configuration
+                    ) {
                         model.edit { $0.build.configuration = configuration }
                     }
                 }
@@ -139,8 +156,11 @@ struct EditorBuildTargetsDialog: View {
             Text(L10n.text("Run Destination")).font(.system(size: 12, weight: .semibold))
             HStack(spacing: 6) {
                 ForEach(EditorRunDestination.toolbarDestinations.filter { $0 != .player }, id: \.self) { destination in
-                    action(destination.rawValue, id: destination.rawValue,
-                           primary: model.editedTarget?.run.destination == destination.adaProjectDestination) {
+                    action(
+                        destination.rawValue,
+                        id: destination.rawValue,
+                        primary: model.editedTarget?.run.destination == destination.adaProjectDestination
+                    ) {
                         model.edit { $0.run.destination = destination.adaProjectDestination }
                     }
                 }
@@ -165,10 +185,14 @@ struct EditorBuildTargetsDialog: View {
                 }
             }
             Text(L10n.text("Run Arguments (one per line)")).font(.system(size: 12))
-            TextEditor(text: Binding(get: { model.argumentsText }, set: { value in
-                model.argumentsText = value
-                model.edit { $0.run.arguments = EditorViewModel.lineList(from: value) }
-            }), showsLineNumbers: false, showsScrollIndicators: true)
+            TextEditor(
+                text: Binding(get: { model.argumentsText }, set: { value in
+                    model.argumentsText = value
+                    model.edit { $0.run.arguments = EditorViewModel.lineList(from: value) }
+                }),
+                showsLineNumbers: false,
+                showsScrollIndicators: true
+            )
                 .font(.system(size: 12))
                 .foregroundColor(theme.editorColors.text)
                 .accentColor(theme.editorColors.blue)
@@ -195,7 +219,9 @@ struct EditorBuildTargetsDialog: View {
                 model.excludedFilesText = value
                 model.edit { $0.build.excludedFiles = EditorViewModel.pathList(from: value) }
             }))
-            Text(L10n.text("Use project-relative paths separated by commas. Empty Included Files uses the project's source folder. Runtime and plugin settings are saved per target in Project Settings."))
+            Text(L10n.text(
+                "Use project-relative paths separated by commas. Empty Included Files uses the project's source folder. Runtime and plugin settings are saved per target in Project Settings."
+            ))
                 .font(.system(size: 11)).foregroundColor(theme.editorColors.muted)
         }.frame(maxWidth: .infinity, alignment: .leading)
     }
