@@ -14,6 +14,8 @@ public struct MeshLOD3DComponent: Component, Sendable {
     public var screenThresholds: [Float] { didSet { extractionRevision = RID() } }
     public var hysteresis: Float { didSet { extractionRevision = RID() } }
     public var maximumDistance: Float? { didSet { extractionRevision = RID() } }
+    /// Camera-to-hit cutoff for hardware path tracing of small details. Nil permits distant hits.
+    public var pathTracingMaximumDistance: Float? { didSet { extractionRevision = RID() } }
     public var fadeDistance: Float { didSet { extractionRevision = RID() } }
 
     private(set) var extractionRevision = RID()

@@ -196,6 +196,7 @@ struct TerrainSourceRequest: Sendable {
             && source.maximumResidentRegions == current.maximumResidentRegions && source.maximumMeshBytes == current.maximumMeshBytes
             && source.maximumLOD == current.maximumLOD
             && source.generatesCollision == current.generatesCollision && source.streamingRadius == current.streamingRadius
+            && source.cameraRefreshDistance == current.cameraRefreshDistance
             && source.physicsPadding == current.physicsPadding
             && source.instanceCollision == current.instanceCollision && source.queries == current.queries
     }

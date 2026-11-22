@@ -30,7 +30,7 @@ struct Model3DExtractionCache: Resource {
         GlobalTransform.identifier, Mesh3DComponent.identifier, Mesh3DInstancesComponent.identifier,
         MeshLOD3DComponent.identifier, Visibility.identifier, NoFrustumCulling.identifier,
         RelationshipComponent.identifier, SkinnedMesh3DComponent.identifier, MorphWeights3DComponent.identifier,
-        MeshTerrain3DSourceMask.identifier, PathTracingGeometry3D.identifier
+        MeshTerrain3DSourceMask.identifier, PathTracingGeometry3D.identifier,
     ]
     private var cursor: UInt64?
     private struct MaterialSlot {
@@ -73,33 +73,14 @@ struct Model3DExtractionCache: Resource {
         sources.meshes = []
         sources.pathTracingProxies = []
         sources.transformChanges = nil
-        if worldID != sourceWorld?.id {
-            entries.removeAll(keepingCapacity: true)
-            storage.removeAll(keepingCapacity: true)
-            seen.removeAll(keepingCapacity: true)
-            materialOwners.removeAll(keepingCapacity: true)
-            uniqueMaterials.removeAll(keepingCapacity: true)
-            worldID = sourceWorld?.id
-            cursor = nil
-            canApplyTransformChanges = false
-        }
-        var changes: [ComponentChangeJournal.Change]?
-        if let sourceWorld {
-            if let cursor {
-                let batch = sourceWorld.componentChanges.read(after: cursor)
-                changes = batch.changes
-                self.cursor = batch.cursor
-            } else {
-                cursor = sourceWorld.componentChanges.observe(Self.observedComponents)
-            }
-        }
+        let changes = synchronizeSourceWorld(sourceWorld)
         animatedBounds.beginFrame()
         skinning.beginFrame(device: device)
         morphUniforms.beginFrame()
         materials.beginFrame()
         if let sourceWorld, let changes, canApplyTransformChanges,
-           usesMaterialSnapshots == snapshotsMaterials,
-           let update = applyTransformChanges(changes, from: sourceWorld) {
+            usesMaterialSnapshots == snapshotsMaterials,
+            let update = applyTransformChanges(changes, from: sourceWorld) {
             sources.meshes = storage
             if !update.changedMaterials { sources.transformChanges = update.indices }
             skinning.finishPackedWrites()
@@ -114,33 +95,14 @@ struct Model3DExtractionCache: Resource {
         terrainMasks.batched().forEach { entity, mask in masks[entity.id] = mask }
         var morphByEntity: [Entity.ID: [Float]] = [:]
         morphs.batched().forEach { entity, morph in morphByEntity[entity.id] = morph.weights }
-        var posedBounds: [Entity.ID: AABB] = [:]
-        var skinScale: [Entity.ID: Float] = [:]
-        var hasSkins = false
-        skins.batched().forEach { entity, skin in
-            hasSkins = true
-            let revision = SkinningPoseRevision(id: skin.paletteID, generation: skin.poseGeneration)
-            // Atmospheres keep the positive instance-Y channel for their own parameters.
-            let isAtmosphere = entity.components[Mesh3DComponent.self]?.materials.contains { $0 is AtmosphereMaterial } == true
-            if isAtmosphere {
-                _ = skinning.write(skin.matrices, for: entity.id, device: device, revision: revision)
-            } else {
-                _ = skinning.writePacked(skin.matrices, for: entity.id, device: device, revision: revision)
-            }
-            guard let mesh = entity.components[Mesh3DComponent.self]?.mesh else {
-                return
-            }
-            let lod = lodByEntity[entity.id]
-            let meshes = lod?.skeletonCompatible == true ? [mesh] + (lod?.alternatives ?? []) : [mesh]
-            posedBounds[entity.id] = animatedBounds.bounds(meshes: meshes, matrices: skin.matrices, revision: revision)
-            guard mesh.hasMorphTargets, morphByEntity[entity.id] != nil else {
-                return
-            }
-            var largest: Float = 1
-            for matrix in skin.matrices { largest = max(largest, matrix.x.xyz.length, matrix.y.xyz.length, matrix.z.xyz.length) }
-            skinScale[entity.id] = largest
-        }
-        skinning.finishPackedWrites()
+        let (posedBounds, skinScale, hasSkins) = prepareSkinning(
+            skins,
+            lodByEntity: lodByEntity,
+            morphByEntity: morphByEntity,
+            bounds: &animatedBounds,
+            skinning: &skinning,
+            device: device
+        )
 
         // Query component columns once instead of resolving Entity.parent and optional components
         // separately for every mesh and every ancestor. No ancestor walk is needed if none are hidden.
@@ -157,8 +119,12 @@ struct Model3DExtractionCache: Resource {
         }
         var resolvedRoles: [Entity.ID: PathTracingGeometry3D?] = [:]
         func role(_ id: Entity.ID) -> PathTracingGeometry3D? {
-            if roleComponents.isEmpty { return nil }
-            if let value = resolvedRoles[id] { return value }
+            if roleComponents.isEmpty {
+                return nil
+            }
+            if let value = resolvedRoles[id] {
+                return value
+            }
             // A provisional value also bounds malformed cyclic hierarchies.
             resolvedRoles[id] = .some(nil)
             let value = roleComponents[id] ?? parents[id].flatMap(role)
@@ -193,7 +159,9 @@ struct Model3DExtractionCache: Resource {
                 return
             }
             let mask = masks[entity.id]
-            if let mask, MeshTerrainDrawMasking.fullyMasked(component.mesh, by: mask) { return }
+            if let mask, MeshTerrainDrawMasking.fullyMasked(component.mesh, by: mask) {
+                return
+            }
             let lod = lodByEntity[entity.id]
             let palette = skinning.buffer(for: entity.id)
             let forceVisible = forced.contains(entity.id)
@@ -264,6 +232,7 @@ struct Model3DExtractionCache: Resource {
                 skinningOffset: skinning.packedOffset(for: entity.id)
             )
             source.pathTracing = pathTracing
+            source.pathTracingMaximumDistance = lod?.pathTracingMaximumDistance
             if index == storage.count {
                 storage.append(source)
                 seen.append(true)
@@ -348,7 +317,14 @@ struct Model3DExtractionCache: Resource {
             source.instances = component.instances
             source.previousInstances = previousInstances
             source.pathTracing = pathTracing
-            if index == storage.count { storage.append(source); seen.append(true) } else { storage[index] = source; seen[index] = true }
+            source.pathTracingMaximumDistance = lod?.pathTracingMaximumDistance
+            if index == storage.count {
+                storage.append(source)
+                seen.append(true)
+            } else {
+                storage[index] = source
+                seen[index] = true
+            }
             entries[key] = Entry(
                 index: index,
                 meshRevision: component.extractionRevision,
@@ -406,7 +382,8 @@ struct Model3DExtractionCache: Resource {
                 materialRevisions[id] = pbr.stateRevision
             }
         }
-        canApplyTransformChanges = masks.isEmpty && !hasSkins && morphByEntity.isEmpty
+        canApplyTransformChanges =
+            masks.isEmpty && !hasSkins && morphByEntity.isEmpty
             && hidden.isEmpty && !roles && materialRevisions.count == uniqueMaterials.count
             && !entries.values.contains(where: \.settlesInstances)
         if canApplyTransformChanges, snapshotsMaterials {
@@ -423,13 +400,80 @@ struct Model3DExtractionCache: Resource {
 
     /// Ordinary retained geometry uses the stream to read only changed transforms.
     /// The full extractor still owns structural changes and specialized geometry.
+    private mutating func synchronizeSourceWorld(_ sourceWorld: World?) -> [ComponentChangeJournal.Change]? {
+        if worldID != sourceWorld?.id {
+            entries.removeAll(keepingCapacity: true)
+            storage.removeAll(keepingCapacity: true)
+            seen.removeAll(keepingCapacity: true)
+            materialOwners.removeAll(keepingCapacity: true)
+            uniqueMaterials.removeAll(keepingCapacity: true)
+            worldID = sourceWorld?.id
+            cursor = nil
+            canApplyTransformChanges = false
+        }
+        var changes: [ComponentChangeJournal.Change]?
+        if let sourceWorld {
+            if let cursor {
+                let batch = sourceWorld.componentChanges.read(after: cursor)
+                changes = batch.changes
+                self.cursor = batch.cursor
+            } else {
+                cursor = sourceWorld.componentChanges.observe(Self.observedComponents)
+            }
+        }
+        return changes
+    }
+
+    private func prepareSkinning(
+        _ skins: Query<Entity, SkinnedMesh3DComponent>,
+        lodByEntity: [Entity.ID: MeshLOD3DComponent],
+        morphByEntity: [Entity.ID: [Float]],
+        bounds: inout AnimatedBounds3D,
+        skinning: inout Skinning3DUniforms,
+        device: RenderDevice
+    ) -> ([Entity.ID: AABB], [Entity.ID: Float], Bool) {
+        var posedBounds: [Entity.ID: AABB] = [:]
+        var skinScale: [Entity.ID: Float] = [:]
+        var hasSkins = false
+        skins.batched().forEach { entity, skin in
+            hasSkins = true
+            let revision = SkinningPoseRevision(id: skin.paletteID, generation: skin.poseGeneration)
+            // Atmospheres keep the positive instance-Y channel for their own parameters.
+            let isAtmosphere = entity.components[Mesh3DComponent.self]?.materials.contains { $0 is AtmosphereMaterial } == true
+            if isAtmosphere {
+                _ = skinning.write(skin.matrices, for: entity.id, device: device, revision: revision)
+            } else {
+                _ = skinning.writePacked(skin.matrices, for: entity.id, device: device, revision: revision)
+            }
+            guard let mesh = entity.components[Mesh3DComponent.self]?.mesh else {
+                return
+            }
+            let lod = lodByEntity[entity.id]
+            let meshes = lod?.skeletonCompatible == true ? [mesh] + (lod?.alternatives ?? []) : [mesh]
+            posedBounds[entity.id] = bounds.bounds(meshes: meshes, matrices: skin.matrices, revision: revision)
+            guard mesh.hasMorphTargets, morphByEntity[entity.id] != nil else {
+                return
+            }
+            var largest: Float = 1
+            for matrix in skin.matrices { largest = max(largest, matrix.x.xyz.length, matrix.y.xyz.length, matrix.z.xyz.length) }
+            skinScale[entity.id] = largest
+        }
+        skinning.finishPackedWrites()
+        return (posedBounds, skinScale, hasSkins)
+    }
+
     private mutating func applyTransformChanges(
-        _ changes: [ComponentChangeJournal.Change], from world: World
+        _ changes: [ComponentChangeJournal.Change],
+        from world: World
     ) -> (indices: [Int], changedMaterials: Bool)? {
-        guard changes.allSatisfy({ $0.component == GlobalTransform.identifier }) else { return nil }
+        guard changes.allSatisfy({ $0.component == GlobalTransform.identifier }) else {
+            return nil
+        }
         var editedMaterials: [(RID, PBRMaterial)] = []
         for (id, material) in uniqueMaterials {
-            guard let pbr = material as? PBRMaterial, pbr.graphMaterial == nil else { return nil }
+            guard let pbr = material as? PBRMaterial, pbr.graphMaterial == nil else {
+                return nil
+            }
             if materialRevisions[id] != pbr.stateRevision { editedMaterials.append((id, pbr)) }
         }
         let entities = settlingTransforms.union(changes.lazy.map(\.entity))
@@ -437,9 +481,13 @@ struct Model3DExtractionCache: Resource {
         updates.reserveCapacity(entities.count)
         for entity in entities {
             let key = Key(entity: entity, instanced: false)
-            if entries[Key(entity: entity, instanced: true)] != nil { return nil }
+            if entries[Key(entity: entity, instanced: true)] != nil {
+                return nil
+            }
             guard entries[key] != nil else { continue }
-            guard let global = world.get(GlobalTransform.self, from: entity) else { return nil }
+            guard let global = world.get(GlobalTransform.self, from: entity) else {
+                return nil
+            }
             updates.append((key, global.matrix))
         }
         sourceVisitCount &+= updates.count
@@ -514,5 +562,4 @@ struct Model3DExtractionCache: Resource {
             if let replacement { meshes[index].materials = replacement }
         }
     }
-
 }

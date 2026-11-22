@@ -5,6 +5,83 @@ import AdaEngine
 import Testing
 
 extension TerrainSourceRuntimeTests {
+    @Test("A raster camera leaves another camera's staged forest intact until its last trace owner is removed")
+    func rasterCameraDoesNotDiscardAnotherCamerasStagedGeometry() async throws {
+        _ = try await makeApp()
+        let device = unsafe RenderEngine.shared.renderDevice
+        let material = PBRMaterial()
+        let mesh = Mesh.generateCube(renderDevice: device)
+        let forest = Mesh3DRenderSource(entity: 6, drawPass: Model3DDrawPass(), mesh: mesh, materials: [material], transform: .identity, bounds: mesh.bounds)
+        var tile = forest
+        tile.entity = 7
+        tile.mesh = Mesh.generateCube(size: [2, 0.5, 2], renderDevice: device)
+        var views = PathTracing3DViews()
+        views.traceOwners.insert(21)
+        var finished = false
+        for frame in 0..<5 {
+            do {
+                try await views.scene.prepare([forest, tile], skinning: nil, device: device, hardwareOrder: true, hardwareTriangleStep: 12)
+                finished = true
+                break
+            } catch PathTracing3DError.preparingGeometry {
+                if frame == 0 {
+                    #expect(views.scene.preparedVertexCount == 36)
+                    var removedDuringPreparation = views
+                    removedDuringPreparation.stopTracing(21)
+                    #expect(removedDuringPreparation.scene.atlas == nil && removedDuringPreparation.traceOwners.isEmpty)
+                }
+                views.stopTracing(22)
+                #expect(views.scene.atlas != nil)
+            }
+        }
+        #expect(finished && views.scene.triangleCount == 24)
+        views.stopTracing(21)
+        #expect(views.scene.triangles == nil && views.scene.atlas == nil && views.traceOwners.isEmpty)
+    }
+
+    @Test("Replacing a terrain LOD preserves the forest triangle table and prepares only the changed mesh")
+    func hardwareTracingRetainsTreesAcrossTerrainLODChanges() async throws {
+        _ = try await makeApp()
+        let device = unsafe RenderEngine.shared.renderDevice
+        let material = PBRMaterial()
+        let tree = Mesh.generateCube(renderDevice: device)
+        var forest = Mesh3DRenderSource(entity: 45, drawPass: Model3DDrawPass(), mesh: tree, materials: [material], transform: .identity, bounds: tree.bounds)
+        forest.instances = (0..<32).map { Mesh3DInstance(id: UInt64($0)) }
+        var tile = forest
+        tile.entity = 46
+        tile.instances = nil
+        tile.mesh = Mesh.generateCube(size: [4, 0.2, 4], renderDevice: device)
+        var scene = PathTracing3DScene()
+        try await scene.prepare([forest, tile], skinning: nil, device: device, hardwareOrder: true)
+        let initialTable = try #require(scene.triangles)
+        #expect(scene.preparedVertexCount == 72)
+        var coarse = MeshDescriptor(name: "Coarse terrain tile")
+        coarse.positions = MeshBuffer([Vector3(-2, 0, -2), Vector3(2, 0, -2), Vector3(0, 0, 2)])
+        coarse.indicies = [0, 1, 2]
+        tile.mesh = Mesh.generate(from: [coarse], renderDevice: device)
+        try await scene.prepare([tile, forest], skinning: nil, device: device, hardwareOrder: true)
+        #expect(scene.preparedVertexCount == 3)
+        #expect(scene.triangles === initialTable)
+        #expect(scene.triangleCount == 385)
+    }
+
+    @Test("Vulkan tracing shares packed mesh triangles across forest placements")
+    func hardwareTracingSharesGeometryAcrossInstances() async throws {
+        _ = try await makeApp()
+        let device = unsafe RenderEngine.shared.renderDevice
+        let mesh = Mesh.generateCube(renderDevice: device)
+        var source = Mesh3DRenderSource(entity: 45, drawPass: Model3DDrawPass(), mesh: mesh, materials: [PBRMaterial()], transform: .identity, bounds: mesh.bounds)
+        source.instances = (0..<12_000).map {
+            Mesh3DInstance(id: UInt64($0), transform: Transform3D(translation: [Float($0), 0, 0]))
+        }
+        var scene = PathTracing3DScene()
+        try await scene.prepare([source], skinning: nil, device: device, hardwareOrder: true)
+        #expect(scene.placements.count == 12_000)
+        #expect(scene.preparedVertexCount == 36)
+        #expect(scene.triangleCount == 144_000)
+        #expect(scene.triangles?.height == 1)
+    }
+
     @Test("Portable tracing transforms referenced vertices only and does not allocate tints for empty parts")
     func terrainTracingBoundsVertexWorkAndEmptyTintAllocations() async throws {
         _ = try await makeApp()

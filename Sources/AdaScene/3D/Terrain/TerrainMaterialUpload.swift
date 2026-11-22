@@ -27,10 +27,21 @@ struct TerrainMaterialUpload: Sendable {
             remaining -= image.data.count
             level += 1
             if level == maps.families[family][slice].count {
-                level = 0; slice += 1
-                if slice == maps.families[family].count { slice = 0; family += 1 }
+                level = 0
+                slice += 1
+                if slice == maps.families[family].count {
+                    slice = 0
+                    family += 1
+                }
             }
         }
-        return TerrainMaterialTextureArrays(sourceID: maps.id, albedo: textures[0], normal: textures[1], orm: textures[2], blendHeightLayers: maps.blendHeightLayers)
+        return TerrainMaterialTextureArrays(
+            sourceID: maps.id,
+            albedo: textures[0],
+            normal: textures[1],
+            orm: textures[2],
+            blendHeightLayers: maps.blendHeightLayers,
+            tracingImages: maps.families.map { $0.compactMap(\.first) }
+        )
     }
 }

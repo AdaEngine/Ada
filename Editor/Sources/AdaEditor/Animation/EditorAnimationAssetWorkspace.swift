@@ -39,7 +39,9 @@ final class EditorAnimationAssetWorkspace {
         timeline.workspace = self
         preview.onModifierInput = { [weak self] event, camera in self?.handleModifierInput(event, camera: camera) ?? false }
         preview.onSelectBone = { [weak self] index, additive in
-            guard let self, timeline.nodes.indices.contains(index) else { return }
+            guard let self, timeline.nodes.indices.contains(index) else {
+                return
+            }
             timeline.selectNode(timeline.nodes[index].id, additive: additive)
         }
         graph.onInspect = { [weak self] in self?.timeline.inspectorMode = "graph" }
@@ -53,7 +55,9 @@ final class EditorAnimationAssetWorkspace {
     }
 
     func start() {
-        guard !started else { return }
+        guard !started else {
+            return
+        }
         started = true
         do {
             if document.kind == .animationModifiers {
@@ -91,9 +95,12 @@ final class EditorAnimationAssetWorkspace {
     }
 
     func configureLoadedAsset() {
-        guard let asset = preview.asset else { return }
+        guard let asset = preview.asset else {
+            return
+        }
         if let rig = asset.animationRig {
-            let source = modifiers?.stack.binding.sourceAsset
+            let source =
+                modifiers?.stack.binding.sourceAsset
                 ?? (document.kind == .animationLibrary ? library?.library.binding.sourceAsset ?? document.relativePath : document.relativePath)
             var imported = AnimationLibrary(id: "imported-preview", binding: .init(rig: rig, sourceAsset: source))
             do {
@@ -130,8 +137,13 @@ final class EditorAnimationAssetWorkspace {
         guard let service else { throw unavailable() }
         let modelPath = sourceLibrary?.binding.sourceAsset ?? (document.kind == .animationLibrary ? library?.library.binding.sourceAsset : document.relativePath)
         guard let modelPath else { throw unavailable() }
-        let result = try await service.extract(path: libraryPath, modelPath: modelPath,
-            clipName: fromRest ? nil : sourceClip, name: clipName.isEmpty ? nil : clipName, expectedRevision: library?.revision)
+        let result = try await service.extract(
+            path: libraryPath,
+            modelPath: modelPath,
+            clipName: fromRest ? nil : sourceClip,
+            name: clipName.isEmpty ? nil : clipName,
+            expectedRevision: library?.revision
+        )
         try Task.checkCancellation()
         library = result
         libraryPath = result.relativePath
@@ -140,11 +152,46 @@ final class EditorAnimationAssetWorkspace {
         refreshLibrary()
     }
 
+    #if os(Windows)
+        func saveGeneratedClip(_ clip: AnimationLibraryClip, binding: AnimationRigBinding) throws {
+            try requireNoUnkeyedPose()
+            guard let service, let rig = preview.asset?.animationRig, binding.isCompatible(with: rig) else {
+                throw EditorKimodoError.invalidResult
+            }
+            let destination = try service.resolve(libraryPath, extensions: ["animlib"])
+            let existing = service.documents[destination.path] != nil || FileManager.default.fileExists(atPath: destination.path)
+            let result: EditorAnimationLibraryDocument
+            if existing {
+                result = try service.open(libraryPath)
+                guard result.library.binding == binding, !result.library.clips.contains(where: { $0.id == clip.id }) else {
+                    throw EditorKimodoError.invalidResult
+                }
+                var updated = result.library
+                updated.clips.append(clip)
+                try result.commitAndSave(updated, expectedRevision: result.revision)
+            } else {
+                result = try service.create(libraryPath, library: .init(binding: binding, clips: [clip]), saveImmediately: true)
+            }
+            library = result
+            libraryPath = result.relativePath
+            result.selectedClipID = clip.id
+            mode = .keys
+            refreshLibrary()
+        }
+    #endif
+
     /// Recompile the shared draft without replacing the viewport, camera or playback clock.
     func refreshLibrary() {
-        guard !timeline.hasUnkeyedPose else { return }
-        if library?.isDiscarded == true { library = nil; mode = .clips }
-        guard let asset = preview.asset else { return }
+        guard !timeline.hasUnkeyedPose else {
+            return
+        }
+        if library?.isDiscarded == true {
+            library = nil
+            mode = .clips
+        }
+        guard let asset = preview.asset else {
+            return
+        }
         let clock = preview.playbackTime
         do {
             let libraries = library.map { [$0.library] } ?? []
@@ -168,13 +215,15 @@ final class EditorAnimationAssetWorkspace {
     }
 
     func applyModePreview() {
-        guard !timeline.hasUnkeyedPose else { return }
+        guard !timeline.hasUnkeyedPose else {
+            return
+        }
         let clock = preview.playbackTime
         if mode == .graph {
             if let graph = graph.validGraph { preview.animationGraph = graph }
         } else {
             preview.animationGraph = nil
-            if (mode == .keys || mode == .curves), let library,
+            if mode == .keys || mode == .curves, let library,
                 let clip = library.library.clips.first(where: { $0.id == library.selectedClipID }) ?? library.library.clips.first {
                 preview.animationRepeats = clip.repeats
                 preview.selectedAnimation = library.library.runtimeName(for: clip.id)
@@ -187,7 +236,9 @@ final class EditorAnimationAssetWorkspace {
     }
 
     func applyRequestedPreview() {
-        guard !timeline.hasUnkeyedPose else { return }
+        guard !timeline.hasUnkeyedPose else {
+            return
+        }
         refreshLibrary()
         if let library, library.previewSerial > 0 {
             preview.playsAnimation = false
@@ -196,13 +247,16 @@ final class EditorAnimationAssetWorkspace {
     }
 
     func run(_ operation: @escaping @MainActor () async throws -> Void) {
-        guard !isWorking else { return }
+        guard !isWorking else {
+            return
+        }
         isWorking = true
         workTask = Task { @MainActor in
             defer { isWorking = false }
-            do { try await operation(); error = "" }
-            catch is CancellationError { return }
-            catch { self.error = error.localizedDescription }
+            do {
+                try await operation()
+                error = ""
+            } catch is CancellationError { return } catch { self.error = error.localizedDescription }
         }
     }
 
@@ -219,13 +273,16 @@ final class EditorAnimationAssetWorkspace {
 
 extension EditorWorkbenchViewModel {
     var animationAssetDocument: EditorAssetDocument? {
-        guard case let .asset(document)? = activeDocument,
-            document.kind == .model3D || document.kind == .animationLibrary || document.kind == .animationModifiers else { return nil }
+        guard case .asset(let document)? = activeDocument,
+            document.kind == .model3D || document.kind == .animationLibrary || document.kind == .animationModifiers
+        else { return nil }
         return document
     }
 
     func animationWorkspace(for document: EditorAssetDocument) -> EditorAnimationAssetWorkspace {
-        if let existing = animationWorkspaces[document.id] { return existing }
+        if let existing = animationWorkspaces[document.id] {
+            return existing
+        }
         let workspace = EditorAnimationAssetWorkspace(document: document, service: animationService)
         workspace.workbench = self
         workspace.revealInspector = { [weak self] in self?.onRevealAnimationInspector?() }
@@ -237,7 +294,8 @@ extension EditorWorkbenchViewModel {
 extension EditorViewModel {
     func revealAssetAnimatorIfNeeded() {
         guard let asset = workbench.animationAssetDocument,
-            asset.kind == .animationLibrary || asset.kind == .animationModifiers || ["glb", "gltf"].contains(asset.fileExtension.lowercased()) else { return }
+            asset.kind == .animationLibrary || asset.kind == .animationModifiers || ["glb", "gltf"].contains(asset.fileExtension.lowercased())
+        else { return }
         toolStrip.selectLeftBottomTool(.init(identifier: "animator", title: "Animator", icon: "\u{E71C}"))
         showBottomPanel = true
     }

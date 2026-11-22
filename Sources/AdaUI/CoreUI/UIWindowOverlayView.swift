@@ -2,14 +2,14 @@ import AdaInput
 import AdaUtils
 import Math
 
-/// A passive window layer composited after the window's cameras.
+/// A window layer composited after the window's cameras.
 package final class UIWindowOverlayView: UIView {
     private let onClose: (@MainActor () -> Void)?
 
-    package init(content: UIView, onClose: (@MainActor () -> Void)? = nil) {
+    package init(content: UIView, interactive: Bool = false, onClose: (@MainActor () -> Void)? = nil) {
         self.onClose = onClose
         super.init()
-        isInteractionEnabled = false
+        isInteractionEnabled = interactive
         backgroundColor = .clear
         autoresizingRules = [.flexibleWidth, .flexibleHeight]
         content.autoresizingRules = [.flexibleWidth, .flexibleHeight]
@@ -23,7 +23,12 @@ package final class UIWindowOverlayView: UIView {
         backgroundColor = .clear
     }
 
-    override package func canRespondToAction(_: any InputEvent) -> Bool { false }
+    override package func canRespondToAction(_: any InputEvent) -> Bool { isInteractionEnabled }
+
+    override package func hitTest(_ point: Point, with event: any InputEvent) -> UIView? {
+        let hit = super.hitTest(point, with: event)
+        return hit === self ? nil : hit
+    }
 
     override package func layoutSubviews() {
         for subview in subviews {

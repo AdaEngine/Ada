@@ -27,10 +27,12 @@ final class EditorAnimationAuthoringService {
         guard !path.isEmpty, !path.contains(":"), !path.contains("\\"), !path.hasPrefix("/"),
             !path.contains("#"), !path.contains("?"), !path.contains("\0"),
             projectURL.resolvingSymlinksInPath().standardizedFileURL.path == projectURL.path,
-            assetsURL.resolvingSymlinksInPath().standardizedFileURL.path == assetsURL.path else { throw invalidPath(path) }
+            assetsURL.resolvingSymlinksInPath().standardizedFileURL.path == assetsURL.path
+        else { throw invalidPath(path) }
         let target = Self.canonicalDestination(projectURL.appendingPathComponent(path))
         guard assetsURL.path.hasPrefix(projectURL.path + "/"), target.path.hasPrefix(assetsURL.path + "/"),
-            extensions.contains(target.pathExtension.lowercased()) else { throw invalidPath(path) }
+            extensions.contains(target.pathExtension.lowercased())
+        else { throw invalidPath(path) }
         return target
     }
 
@@ -52,20 +54,29 @@ final class EditorAnimationAuthoringService {
 
     func open(_ path: String) throws -> EditorAnimationLibraryDocument {
         let url = try resolve(path, extensions: ["animlib"])
-        if let document = documents[url.path] { return document }
+        if let document = documents[url.path] {
+            return document
+        }
         let data = try Self.readBounded(url, resourceRoot: assetsURL)
-        let document = try EditorAnimationLibraryDocument(url: url, relativePath: relative(url), library: AnimationLibrary.decode(data), savedBytes: data, resourceRoot: assetsURL)
+        let document = try EditorAnimationLibraryDocument(
+            url: url,
+            relativePath: relative(url),
+            library: AnimationLibrary.decode(data),
+            savedBytes: data,
+            resourceRoot: assetsURL
+        )
         documents[url.path] = document
         onDocumentOpened?(document)
         return document
     }
 
-    func create(_ path: String, library: AnimationLibrary) throws -> EditorAnimationLibraryDocument {
+    func create(_ path: String, library: AnimationLibrary, saveImmediately: Bool = false) throws -> EditorAnimationLibraryDocument {
         let url = try resolve(path, extensions: ["animlib"])
         guard documents[url.path] == nil, !FileManager.default.fileExists(atPath: url.path) else {
             throw AnimationAuthoringError(.conflict, itemID: path, message: "Animation resource already exists; inspect and edit it instead.")
         }
         let document = try EditorAnimationLibraryDocument(url: url, relativePath: relative(url), library: library, savedBytes: nil, resourceRoot: assetsURL)
+        if saveImmediately { try document.save(expectedRevision: document.revision) }
         documents[url.path] = document
         onDocumentOpened?(document)
         return document
@@ -80,11 +91,14 @@ final class EditorAnimationAuthoringService {
         if FileManager.default.fileExists(atPath: destination.path) || documents[destination.path] != nil {
             existing = try open(path)
             try existing?.checkRevision(expectedRevision ?? "")
-        } else { existing = nil }
+        } else {
+            existing = nil
+        }
         let imported = try await Self.importLibrary(modelURL: modelURL, assetsURL: assetsURL, source: relative(modelURL), clipName: clipName, name: name)
         try Task.checkCancellation()
         guard generation == token, try resolve(path, extensions: ["animlib"]) == destination,
-            try resolve(modelPath, extensions: ["glb", "gltf"]) == modelURL else {
+            try resolve(modelPath, extensions: ["glb", "gltf"]) == modelURL
+        else {
             throw AnimationAuthoringError(.conflict, itemID: path, message: "Project resources changed during import; retry.")
         }
         if let existing {
@@ -157,7 +171,8 @@ final class EditorAnimationAuthoringService {
         var seen: Set<URL> = []
         return try references.map { reference in
             guard let url = EditorSceneFileLoader.resolveTileMapReference(reference, relativeTo: sceneURL, resourceRootURL: assetsURL, fileExtension: "animlib"),
-                seen.insert(url).inserted else {
+                seen.insert(url).inserted
+            else {
                 throw AnimationAuthoringError(.conflict, itemID: reference, message: "Use distinct animation resources inside project assets.")
             }
             let document = try open(relative(url))
@@ -166,7 +181,10 @@ final class EditorAnimationAuthoringService {
         }
     }
 
-    struct ModelAnimations: Sendable { let rig: SkeletalRig; let clips: [SkeletalAnimationClip] }
+    struct ModelAnimations: Sendable {
+        let rig: SkeletalRig
+        let clips: [SkeletalAnimationClip]
+    }
 
     func animationsForModel(_ path: String) async throws -> ModelAnimations {
         let token = generation
@@ -189,8 +207,10 @@ final class EditorAnimationAuthoringService {
         let imported = try NativeGLTFLoader(resourceRoot: assetsURL, maximumTotalBytes: maximumBytes)
             .load(data: readBounded(modelURL, resourceRoot: assetsURL), baseURL: modelURL.deletingLastPathComponent())
         try Task.checkCancellation()
-        return try .init(rig: GLTFAnimationAdapter.makeRig(nodes: imported.nodes, meshes: imported.meshes),
-                         clips: GLTFAnimationAdapter.makeClips(imported.animations, nodes: imported.nodes, meshes: imported.meshes))
+        return try .init(
+            rig: GLTFAnimationAdapter.makeRig(nodes: imported.nodes, meshes: imported.meshes),
+            clips: GLTFAnimationAdapter.makeClips(imported.animations, nodes: imported.nodes, meshes: imported.meshes)
+        )
     }
 
     @concurrent
@@ -215,10 +235,11 @@ final class EditorAnimationAuthoringService {
         return library
     }
 
-    private nonisolated static func readBounded(_ url: URL, resourceRoot: URL) throws -> Data {
+    nonisolated private static func readBounded(_ url: URL, resourceRoot: URL) throws -> Data {
         guard url.resolvingSymlinksInPath().standardizedFileURL.path == url.path,
             resourceRoot.resolvingSymlinksInPath().standardizedFileURL.path == resourceRoot.path,
-            url.path.hasPrefix(resourceRoot.path + "/") else {
+            url.path.hasPrefix(resourceRoot.path + "/")
+        else {
             throw AnimationAuthoringError(.conflict, itemID: url.lastPathComponent, message: "Resource location changed outside project assets.")
         }
         let size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0

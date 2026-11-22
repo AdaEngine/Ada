@@ -86,6 +86,16 @@ struct TerrainSourceFocus: Equatable, Sendable {
     let cameras: [Vector3]
     let allCameraRegions: Bool
     let physics: TerrainPhysicsInterests
+
+    static func cameraPositions(_ current: [Vector3], previous: [Vector3]?, refreshDistance: Float?) -> [Vector3] {
+        guard let distance = refreshDistance, distance > 0, let previous, previous.count == current.count else {
+            return current
+        }
+        for index in current.indices where (current[index] - previous[index]).squaredLength >= distance * distance {
+            return current
+        }
+        return previous
+    }
 }
 
 enum TerrainPhysicsBounds {

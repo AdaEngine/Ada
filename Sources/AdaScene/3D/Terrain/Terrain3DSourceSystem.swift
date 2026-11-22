@@ -29,7 +29,10 @@ public struct Terrain3DSourceSystem {
     public init(world _: World) {}
 
     public func update(context _: UpdateContext) async {
-        guard sources.first != nil || instances.first != nil || heightEdits.first != nil || meshEdits.first != nil || saves.first != nil || !ownedSources.isEmpty || !jobs.isEmpty || saveQueue.hasJobs else {
+        guard
+            sources.first != nil || instances.first != nil || heightEdits.first != nil || meshEdits.first != nil || saves.first != nil || !ownedSources.isEmpty
+                || !jobs.isEmpty || saveQueue.hasJobs
+        else {
             return
         }
         for id in jobs.keys.filter({ jobs[$0]?.isFinished == true }) { jobs.removeValue(forKey: id) }
@@ -42,22 +45,7 @@ public struct Terrain3DSourceSystem {
         var states: [Entity.ID: TerrainSourceState] = [:]
         instances.forEach { entity, state in states[entity.id] = state }
         let acknowledging = saveQueue.drain(states: states, busy: Set(jobs.keys), commands: commands.queue)
-        saveStatuses.forEach { entity, status in
-            guard status.phase == .pending, saveRequests[entity.id]?.id != status.id,
-                states[entity.id]?.saveJob?.request.id != status.id, !saveQueue.contains(status.id)
-            else {
-                return
-            }
-            let id = entity.id
-            commands.queue.push { world in
-                guard let owner = world.getEntityByID(id), owner.components[Terrain3DSaveStatus.self]?.id == status.id,
-                    owner.components[Terrain3DSave.self]?.id != status.id
-                else {
-                    return
-                }
-                owner.components[Terrain3DSaveStatus.self] = .init(id: status.id, phase: .cancelled, savedRevision: nil, error: nil)
-            }
-        }
+        cancelStaleSaveStatuses(requests: saveRequests, states: states)
         let cameraPositions = activeCameraPositions()
         let physicsBounds = TerrainPhysicsBounds.collect(bodies: bodies, characters: characters, physics: physicsWorld, deltaTime: fixedTime?.deltaTime ?? 0)
         var live: Set<Entity.ID> = []
@@ -77,11 +65,12 @@ public struct Terrain3DSourceSystem {
             let pinsChanged = (state?.residency?.transactionPins ?? []) != transactionPins
             let edited = state.map { value in value.storage.map { $0.revision != value.revision } ?? false } ?? false
             let attemptedMatrix = state?.attemptedMatrix ?? state?.matrix
-            let usesPlacementCollision = source.generatesCollision && source.instanceCollision.maximumCount > 0
+            let usesPlacementCollision =
+                source.generatesCollision && source.instanceCollision.maximumCount > 0
                 && (state?.instanceCells.values.contains { !$0.prepared.collisionPlacements.isEmpty } ?? false)
             let usesCameras = state?.meshAsset == nil && (source.maximumLOD > 0 || source.streamingRadius != nil || usesPlacementCollision)
             let focus = TerrainSourceFocus(
-                cameras: cameraPositions ?? [],
+                cameras: TerrainSourceFocus.cameraPositions(cameraPositions ?? [], previous: state?.focus?.cameras, refreshDistance: source.cameraRefreshDistance),
                 allCameraRegions: cameraPositions == nil,
                 physics: source.generatesCollision ? .project(physicsBounds, inverse: matrix.inverse) : .init()
             )
@@ -115,7 +104,9 @@ public struct Terrain3DSourceSystem {
                     owner.components[Terrain3DHeightEditStatus.self] = .init(id: editStatus.id, phase: .cancelled, error: nil, delta: nil)
                 }
             }
-            let changed = state?.attempted != source || attemptedMatrix != matrix || edited || focusChanged || pinsChanged || preparing || edits[entity.id] != nil || meshRequests[entity.id] != nil
+            let changed =
+                state?.attempted != source || attemptedMatrix != matrix || edited || focusChanged || pinsChanged || preparing || edits[entity.id] != nil
+                || meshRequests[entity.id] != nil
             if changed || jobs[entity.id] != nil {
                 pending.append(
                     .init(
@@ -156,11 +147,7 @@ public struct Terrain3DSourceSystem {
         waiting.removeAll { !live.contains($0) }
         waitingSet.formIntersection(live)
         for id in jobs.keys.filter({ !live.contains($0) }) { jobs.removeValue(forKey: id)?.cancel() }
-        if !removed.isEmpty {
-            commands.queue.push { world in
-                for id in removed { Self.setPhysicsPending(false, owner: id, world: world) }
-            }
-        }
+        clearPhysicsPending(for: removed)
         instances.forEach { entity, state in
             guard entity.components[Terrain3DSource.self] == nil else {
                 return
@@ -251,7 +238,10 @@ public struct Terrain3DSourceSystem {
                     }
                     edit = nil
                 }
-                guard needsWork else { stopWaiting(id); continue }
+                guard needsWork else {
+                    stopWaiting(id)
+                    continue
+                }
                 if source.source.isEmpty {
                     stopWaiting(id)
                     commands.queue.push { world in
@@ -341,7 +331,10 @@ public struct Terrain3DSourceSystem {
                         owner.components[Terrain3DHeightEditStatus.self] = .init(id: queuedEdit.id, phase: .pending, error: nil, delta: nil)
                     }
                     owner.components[Terrain3DSourceStatus.self] = .init(
-                        isReady: false, tileCount: state?.tiles.count ?? 0, isPreparing: true, instanceColliderCount: state?.instanceColliders.count ?? 0
+                        isReady: false,
+                        tileCount: state?.tiles.count ?? 0,
+                        isPreparing: true,
+                        instanceColliderCount: state?.instanceColliders.count ?? 0
                     )
                 }
             } catch {
@@ -365,6 +358,33 @@ public struct Terrain3DSourceSystem {
                         world: world
                     )
                 }
+            }
+        }
+    }
+
+    private func clearPhysicsPending(for removed: Set<Entity.ID>) {
+        if !removed.isEmpty {
+            commands.queue.push { world in
+                for id in removed { Self.setPhysicsPending(false, owner: id, world: world) }
+            }
+        }
+    }
+
+    private func cancelStaleSaveStatuses(requests saveRequests: [Entity.ID: Terrain3DSave], states: [Entity.ID: TerrainSourceState]) {
+        saveStatuses.forEach { entity, status in
+            guard status.phase == .pending, saveRequests[entity.id]?.id != status.id,
+                states[entity.id]?.saveJob?.request.id != status.id, !saveQueue.contains(status.id)
+            else {
+                return
+            }
+            let id = entity.id
+            commands.queue.push { world in
+                guard let owner = world.getEntityByID(id), owner.components[Terrain3DSaveStatus.self]?.id == status.id,
+                    owner.components[Terrain3DSave.self]?.id != status.id
+                else {
+                    return
+                }
+                owner.components[Terrain3DSaveStatus.self] = .init(id: status.id, phase: .cancelled, savedRevision: nil, error: nil)
             }
         }
     }
@@ -414,6 +434,7 @@ extension Terrain3DSourceSystem {
         guard source.maximumResidentHeightBytes >= 0, (1...16_384).contains(source.maximumResidentRegions), source.maximumMeshBytes >= 0,
             (0...6).contains(source.maximumLOD), source.lodDistance.isFinite, source.lodDistance > 0,
             source.streamingRadius.map({ $0.isFinite && $0 > 0 }) ?? true,
+            source.cameraRefreshDistance.map({ $0.isFinite && $0 >= 0 && ($0 * $0).isFinite }) ?? true,
             source.physicsPadding.isFinite, source.physicsPadding >= 0,
             (1...64).contains(source.maximumTileUpdatesPerFrame),
             source.color.x.isFinite, source.color.y.isFinite, source.color.z.isFinite, source.color.w.isFinite
@@ -465,7 +486,8 @@ extension Terrain3DSourceSystem {
         for coordinate in coordinates {
             try Task.checkCancellation()
             let cells = storage.tileCellCounts(at: coordinate)
-            let coverage = materialResolver != nil
+            let coverage =
+                materialResolver != nil
                 ? surface.surfaceOverrideCoverage(in: coordinate, cellCountX: cells?.x ?? 64, cellCountZ: cells?.z ?? 64)
                 : (painted: false, rowVisits: 0)
             surfaceCoverageRowVisitCount += coverage.rowVisits
@@ -522,7 +544,9 @@ extension Terrain3DSourceSystem {
                         let field = try TerrainSourceMaterials.prepareVolume(volume.descriptor, storage: storage, resolver: materialResolver)
                         canonical = field.descriptor
                         materialSampleEvaluationCount += field.evaluations
-                    } else { canonical = volume.descriptor }
+                    } else {
+                        canonical = volume.descriptor
+                    }
                 } else if !dataChanged, let previous = previousCanonical[coordinate],
                     materialResolver == nil || (previous[TerrainSourceMaterials.layerIDs] != nil && previous[TerrainSourceMaterials.weights] != nil) {
                     canonical = previous
@@ -537,7 +561,8 @@ extension Terrain3DSourceSystem {
                 // while direct height writes and LOD/stitch changes must still rebuild geometry.
                 let previous = previousCanonical[coordinate]
                 let sameCollision = previous.map { canonical.positions.elements == $0.positions.elements && canonical.indicies == $0.indicies } ?? false
-                let sameMesh = sameCollision && previousSelections[coordinate] == selection
+                let sameMesh =
+                    sameCollision && previousSelections[coordinate] == selection
                     && canonical.normals?.elements == previous?.normals?.elements
                     && canonical.textureCoordinates?.elements == previous?.textureCoordinates?.elements
                 let display: MeshDescriptor
@@ -560,7 +585,9 @@ extension Terrain3DSourceSystem {
         if let palette = residency?.cache.manifest.materials, let cache = residency?.cache {
             let available = source.maximumMeshBytes - tileBytes
             let maps: TerrainPreparedMaterialMaps
-            if let existing = residency?.materialMaps { maps = existing } else {
+            if let existing = residency?.materialMaps {
+                maps = existing
+            } else {
                 maps = try await TerrainPreparedMaterialMaps.prepare(palette: palette, cache: cache, maximumBytes: available)
             }
             guard maps.chargedBytes <= available else { throw TerrainSourceError.meshBudgetExceeded }
@@ -699,25 +726,40 @@ extension Terrain3DSourceSystem {
             )
         }
         let instanceColliders = applyInstanceColliders(
-            selectedInstanceColliders, previous: previous?.instanceColliders ?? [:], shapes: instanceShapes, owner: owner, world: world
+            selectedInstanceColliders,
+            previous: previous?.instanceColliders ?? [:],
+            shapes: instanceShapes,
+            owner: owner,
+            world: world
         )
         owner.components[Terrain3DSourceSurface.self] = .init(
             storage: publishedStorage,
             queries: source.queries == nil ? nil : TerrainSurfaceQueries(revision: build.revision, queries: tiles.compactMapValues(\.query)),
-            manifest: build.residency?.cache.manifest
+            manifest: build.residency?.cache.manifest,
+            residentRegionCount: build.residency?.visible.count ?? 0
         )
         if let asset = build.meshAsset, let manifest = build.meshManifest {
             owner.components.remove(Terrain3DSourceSurface.self)
-            let sections = Dictionary(uniqueKeysWithValues: (asset.compiled?.patches ?? []).enumerated().map { ($0.element.id, TerrainTileCoordinate(x: $0.offset, z: 0)) })
-            owner.components[MeshTerrain3DSourceSurface.self] = .init(asset: asset,
-                queries: source.queries == nil ? nil : TerrainSurfaceQueries(revision: build.meshQueryRevision ?? build.revision, queries: tiles.compactMapValues(\.query)), sections: sections)
+            let sections = Dictionary(
+                uniqueKeysWithValues: (asset.compiled?.patches ?? []).enumerated().map { ($0.element.id, TerrainTileCoordinate(x: $0.offset, z: 0)) }
+            )
+            owner.components[MeshTerrain3DSourceSurface.self] = .init(
+                asset: asset,
+                queries: source.queries == nil
+                    ? nil : TerrainSurfaceQueries(revision: build.meshQueryRevision ?? build.revision, queries: tiles.compactMapValues(\.query)),
+                sections: sections
+            )
             owner.components[MeshTerrain3DSourceResources.self] = .init(manifest: manifest)
         } else {
             owner.components.remove(MeshTerrain3DSourceSurface.self)
             owner.components.remove(MeshTerrain3DSourceResources.self)
         }
         owner.components[Terrain3DSourceStatus.self] = .init(
-            isReady: sourceError == nil, tileCount: tiles.count, error: sourceError, warnings: build.preparedMaterialMaps?.warnings ?? [], instanceColliderCount: instanceColliders.count
+            isReady: sourceError == nil,
+            tileCount: tiles.count,
+            error: sourceError,
+            warnings: build.preparedMaterialMaps?.warnings ?? [],
+            instanceColliderCount: instanceColliders.count
         )
         owner.components[TerrainSourceState.self] = .init(
             attempted: source,
@@ -771,7 +813,9 @@ extension Terrain3DSourceSystem {
             )
         var diagnostic = message
         if state.storage != nil {
-            do { try refreshResident(&state, source: source, matrix: matrix, world: world) } catch { diagnostic += "; resident surface update failed: \(error.localizedDescription)" }
+            do { try refreshResident(&state, source: source, matrix: matrix, world: world) } catch {
+                diagnostic += "; resident surface update failed: \(error.localizedDescription)"
+            }
         }
         state.attempted = source
         state.diagnostic = diagnostic
@@ -779,7 +823,12 @@ extension Terrain3DSourceSystem {
         if let failedLoad { state.failedLoad = failedLoad }
         state.focus = focus
         owner.components[TerrainSourceState.self] = state
-        owner.components[Terrain3DSourceStatus.self] = .init(isReady: false, tileCount: state.tiles.count, error: diagnostic, instanceColliderCount: state.instanceColliders.count)
+        owner.components[Terrain3DSourceStatus.self] = .init(
+            isReady: false,
+            tileCount: state.tiles.count,
+            error: diagnostic,
+            instanceColliderCount: state.instanceColliders.count
+        )
         setPhysicsPending(source.generatesCollision && !focus.physics.isEmpty, owner: owner.id, world: world)
     }
 

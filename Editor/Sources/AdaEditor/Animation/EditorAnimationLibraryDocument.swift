@@ -64,7 +64,9 @@ final class EditorAnimationLibraryDocument {
     func commit(_ draft: AnimationLibrary, expectedRevision: String) throws {
         try checkEditableRevision(expectedRevision)
         try draft.validate()
-        guard draft != library else { return }
+        guard draft != library else {
+            return
+        }
         undoStack.append(library)
         if undoStack.count > 100 { undoStack.removeFirst() }
         redoStack.removeAll()
@@ -73,32 +75,54 @@ final class EditorAnimationLibraryDocument {
 
     func undo(expectedRevision: String) throws {
         try checkEditableRevision(expectedRevision)
-        guard let previous = undoStack.popLast() else { return }
+        guard let previous = undoStack.popLast() else {
+            return
+        }
         redoStack.append(library)
         adopt(previous)
     }
 
     func redo(expectedRevision: String) throws {
         try checkEditableRevision(expectedRevision)
-        guard let next = redoStack.popLast() else { return }
+        guard let next = redoStack.popLast() else {
+            return
+        }
         undoStack.append(library)
         adopt(next)
     }
 
     func save(expectedRevision: String) throws {
         try checkEditableRevision(expectedRevision)
-        if let savedBytes {
-            guard try matchesDisk(savedBytes) else { throw diskConflict() }
-        } else if FileManager.default.fileExists(atPath: url.path) { throw diskConflict() }
-        let data = try library.encodedData()
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try checkLocation()
-        try data.write(to: url, options: .atomic)
-        savedBytes = data
+        savedBytes = try write(library)
         savedLibrary = library
         isDirty = false
         error = nil
         onChange?()
+    }
+
+    /// Persists a candidate before publishing the edit to the shared authoring draft.
+    func commitAndSave(_ candidate: AnimationLibrary, expectedRevision: String) throws {
+        try checkEditableRevision(expectedRevision)
+        let bytes = try write(candidate)
+        undoStack.append(library)
+        if undoStack.count > 100 { undoStack.removeFirst() }
+        redoStack.removeAll()
+        savedBytes = bytes
+        savedLibrary = candidate
+        adopt(candidate)
+    }
+
+    private func write(_ candidate: AnimationLibrary) throws -> Data {
+        if let savedBytes {
+            guard try matchesDisk(savedBytes) else { throw diskConflict() }
+        } else if FileManager.default.fileExists(atPath: url.path) {
+            throw diskConflict()
+        }
+        let data = try candidate.encodedData()
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try checkLocation()
+        try data.write(to: url, options: .atomic)
+        return data
     }
 
     func requireSavedSnapshot() throws {
@@ -107,15 +131,24 @@ final class EditorAnimationLibraryDocument {
     }
 
     private func checkLocation() throws {
-        guard let resourceRoot else { return }
+        guard let resourceRoot else {
+            return
+        }
         guard resourceRoot.resolvingSymlinksInPath().standardizedFileURL.path == resourceRoot.path,
-            EditorAnimationAuthoringService.canonicalDestination(url).path == url.path, url.path.hasPrefix(resourceRoot.path + "/") else {
-            throw AnimationAuthoringError(.conflict, itemID: relativePath, message: "Animation resource location changed; discard the draft and reopen a project-owned path.")
+            EditorAnimationAuthoringService.canonicalDestination(url).path == url.path, url.path.hasPrefix(resourceRoot.path + "/")
+        else {
+            throw AnimationAuthoringError(
+                .conflict,
+                itemID: relativePath,
+                message: "Animation resource location changed; discard the draft and reopen a project-owned path."
+            )
         }
     }
 
     private func matchesDisk(_ saved: Data) throws -> Bool {
-        guard try url.resourceValues(forKeys: [.fileSizeKey]).fileSize == saved.count else { return false }
+        guard try url.resourceValues(forKeys: [.fileSizeKey]).fileSize == saved.count else {
+            return false
+        }
         let handle = try FileHandle(forReadingFrom: url)
         defer { try? handle.close() }
         return try handle.read(upToCount: saved.count + 1) == saved
@@ -127,19 +160,32 @@ final class EditorAnimationLibraryDocument {
             throw AnimationAuthoringError(.conflict, itemID: relativePath, message: "Reload would discard local edits. Request discardChanges explicitly.")
         }
         let fresh = try AnimationLibrary.decode(data)
-        guard isDirty || data != savedBytes else { return }
-        savedBytes = data; savedLibrary = fresh
-        undoStack = []; redoStack = []
+        guard isDirty || data != savedBytes else {
+            return
+        }
+        savedBytes = data
+        savedLibrary = fresh
+        undoStack = []
+        redoStack = []
         if !fresh.clips.contains(where: { $0.id == selectedClipID }) { selectedClipID = fresh.clips.first?.id }
         adopt(fresh)
     }
 
-    func discard() { isDiscarded = true; onChange = nil }
+    func discard() {
+        isDiscarded = true
+        onChange = nil
+    }
 
     @discardableResult
     func save() -> Bool {
-        do { try save(expectedRevision: revision); return true }
-        catch { self.error = error.localizedDescription; onChange?(); return false }
+        do {
+            try save(expectedRevision: revision)
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            onChange?()
+            return false
+        }
     }
 
     private func adopt(_ value: AnimationLibrary) {

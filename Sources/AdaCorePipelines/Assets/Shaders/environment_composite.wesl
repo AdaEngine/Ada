@@ -1,5 +1,6 @@
 import package::tonemapping::{outputTransform, ditherDisplay};
 import package::color_grading::{applyLut, gradeLinear};
+import package::height_fog_3d::heightFogOpacity;
 
 struct EnvironmentUniform {
     projection: mat4x4f,
@@ -110,18 +111,8 @@ fn applyFog(linearColor: vec3f, viewPosition: vec3f, skyAmount: f32, isSky: bool
     if environment.fogColor.w <= 0.0 && environment.fogRange.z < 0.5 {
         return linearColor;
     }
-    let travel = max(length(viewPosition) - environment.fogShape.z, 0.0);
     let worldDirection = normalize((environment.inverseView * vec4f(viewPosition, 0.0)).xyz);
-    let falloff = environment.fogShape.x;
-    let cameraHeight = environment.inverseView[3].y;
-    let rise = falloff * worldDirection.y;
-    let exponent = clamp(rise * travel, -60.0, 60.0);
-    var pathFactor = travel;
-    if abs(rise * travel) > 0.0001 {
-        pathFactor = (1.0 - exp(-exponent)) / rise;
-    }
-    let baseDensity = environment.fogColor.w * exp(clamp(-falloff * (cameraHeight - environment.fogShape.y), -60.0, 60.0));
-    let opacity = min(1.0 - exp(-baseDensity * pathFactor), environment.fogShape.w) * skyAmount;
+    let opacity = heightFogOpacity(environment.fogColor.w, environment.fogShape, environment.inverseView[3].y, worldDirection.y, length(viewPosition)) * skyAmount;
     let sunAlignment = pow(max(dot(worldDirection, environment.fogSun.xyz), 0.0), environment.fogRange.y);
     let scattered = srgbToLinear(environment.fogColor.rgb) + environment.fogSunColor.rgb * (environment.fogSun.w * sunAlignment);
     let volume = volumetricScatter(uv, select(viewPosition.z, 10000.0, isSky));

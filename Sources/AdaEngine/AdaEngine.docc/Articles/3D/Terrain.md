@@ -278,11 +278,11 @@ Tile meshes, canonical material fields and collision preparation use the separat
 `maximumTileUpdatesPerFrame` allowance. Completed arrays are shared across tiles
 and retained across idle frames and visual LOD changes.
 
-Terrain layer shading uses the raster PBR pipeline. When a view requests the
-experimental portable path tracer, layered terrain selects the existing raster
-fallback for that view and records the reason in `Render3DPathTracingStatistics`.
-Its layer colors, maps and manual fields remain visible. Ordinary PBR meshes and
-terrain without a layer palette keep their existing tracing behavior.
+Vulkan hardware path tracing samples the terrain layer IDs, weights, paint and
+palette textures at the hit location. Set `environment.pathTracing.rasterFirstHit = false`
+to trace the primary ray as well as shadow and bounce rays. The portable shader
+BVH uses a raster fallback for layered terrain and records the reason in
+`Render3DPathTracingStatistics`.
 
 For a region-file round trip, enumerate `resourceCoordinates` and call
 `regionAsset(at:)` for each address, then encode its returned asset. This list
@@ -715,7 +715,9 @@ and saves preserve records in hidden dirty regions, including placement-only res
 removal. Decoded placement rows have an independent 16 MiB default storage/cache
 budget; expanded draw records and renderer buffers have separate costs. A manifest's `meshPrototypes` table assigns stable `UInt16` IDs to static model
 paths relative to the manifest directory. It also selects an optional imported
-scene and world-space draw distance. Nonempty palettes use manifest version two;
+scene and world-space draw distance. Set `pathTracingMaximumDistance` on grass
+to limit camera-to-hit distance for Vulkan ray queries. Omit it on trees to
+keep distant and offscreen shadows. Nonempty palettes use manifest version two;
 empty palettes keep version one. Both save modes preserve model references.
 
 Source loading creates one shared batch per imported mesh node, prototype and

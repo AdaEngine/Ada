@@ -19,9 +19,15 @@ struct TerrainInstanceCellKey: Hashable, Sendable, Comparable {
     }
 
     static func < (lhs: Self, rhs: Self) -> Bool {
-        if lhs.coordinate != rhs.coordinate { return lhs.coordinate < rhs.coordinate }
-        if lhs.verticalBand != rhs.verticalBand { return lhs.verticalBand < rhs.verticalBand }
-        if lhs.cellScaleBits != rhs.cellScaleBits { return lhs.cellScaleBits < rhs.cellScaleBits }
+        if lhs.coordinate != rhs.coordinate {
+            return lhs.coordinate < rhs.coordinate
+        }
+        if lhs.verticalBand != rhs.verticalBand {
+            return lhs.verticalBand < rhs.verticalBand
+        }
+        if lhs.cellScaleBits != rhs.cellScaleBits {
+            return lhs.cellScaleBits < rhs.cellScaleBits
+        }
         return lhs.prototype < rhs.prototype
     }
 }
@@ -32,13 +38,26 @@ struct TerrainPreparedInstanceCell: Sendable {
     let instanceCount: Int
     let batches: [Mesh3DInstancesComponent]
     let maximumDistance: Float?
+    let pathTracingMaximumDistance: Float?
     let collisionPlacements: [TerrainCollisionPlacement]
     let meshInput: MeshTerrainInstanceCellInput?
 
-    init(inputID: UUID, instanceCount: Int, batches: [Mesh3DInstancesComponent], maximumDistance: Float?,
-         collisionPlacements: [TerrainCollisionPlacement] = [], meshInput: MeshTerrainInstanceCellInput? = nil) {
-        self.inputID = inputID; self.instanceCount = instanceCount; self.batches = batches; self.maximumDistance = maximumDistance; self.collisionPlacements = collisionPlacements
+    init(
+        inputID: UUID,
+        instanceCount: Int,
+        batches: [Mesh3DInstancesComponent],
+        maximumDistance: Float?,
+        pathTracingMaximumDistance: Float? = nil,
+        collisionPlacements: [TerrainCollisionPlacement] = [],
+        meshInput: MeshTerrainInstanceCellInput? = nil
+    ) {
+        self.inputID = inputID
+        self.instanceCount = instanceCount
+        self.batches = batches
+        self.maximumDistance = maximumDistance
+        self.collisionPlacements = collisionPlacements
         self.meshInput = meshInput
+        self.pathTracingMaximumDistance = pathTracingMaximumDistance
     }
 }
 
@@ -121,7 +140,14 @@ enum TerrainSourceInstances {
                 let collisions = zip(records, placements).compactMap { record, placement -> TerrainCollisionPlacement? in
                     record.flags.contains(.collision) ? .init(record: record, transform: placement.transform) : nil
                 }
-                cells[key] = .init(inputID: rows.id, instanceCount: records.count, batches: batches, maximumDistance: reference.maximumDistance, collisionPlacements: collisions)
+                cells[key] = .init(
+                    inputID: rows.id,
+                    instanceCount: records.count,
+                    batches: batches,
+                    maximumDistance: reference.maximumDistance,
+                    pathTracingMaximumDistance: reference.pathTracingMaximumDistance,
+                    collisionPlacements: collisions
+                )
             }
         }
         // Only currently visible draw cells own imported prototypes. Old published resources remain
@@ -130,7 +156,12 @@ enum TerrainSourceInstances {
         return (cells, residency, groupedRecordCount)
     }
 
-    static func apply(_ cells: [TerrainInstanceCellKey: TerrainPreparedInstanceCell], previous: [TerrainInstanceCellKey: TerrainSourceInstanceCell], owner: Entity, world: World)
+    static func apply(
+        _ cells: [TerrainInstanceCellKey: TerrainPreparedInstanceCell],
+        previous: [TerrainInstanceCellKey: TerrainSourceInstanceCell],
+        owner: Entity,
+        world: World
+    )
         -> [TerrainInstanceCellKey: TerrainSourceInstanceCell] {
         var result: [TerrainInstanceCellKey: TerrainSourceInstanceCell] = [:]
         for key in previous.keys where cells[key] == nil {
@@ -148,7 +179,9 @@ enum TerrainSourceInstances {
                 let existing = old.flatMap { $0.entities.indices.contains(index) ? world.getEntityByID($0.entities[index]) : nil }
                 let child = existing ?? world.spawn("Terrain Instances \(key.coordinate.x),\(key.coordinate.z)/\(key.prototype)/\(index)")
                 child.components[Mesh3DInstancesComponent.self] = prepared.batches[index]
-                child.components[MeshLOD3DComponent.self] = .init(maximumDistance: prepared.maximumDistance)
+                var lod = MeshLOD3DComponent(maximumDistance: prepared.maximumDistance)
+                lod.pathTracingMaximumDistance = prepared.pathTracingMaximumDistance
+                child.components[MeshLOD3DComponent.self] = lod
                 if existing == nil {
                     child.components[Transform.self] = Transform()
                     child.components[TransientEntity.self] = .init()

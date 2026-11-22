@@ -48,15 +48,18 @@ failure turned hardware off (it then stays off for the rest of the session). Ask
   placement of that part. Parts that disappear release theirs.
 - The top-level structure lists every placed part with its transform. It is rebuilt when the scene changes and keeps
   its capacity otherwise.
-- Shading, lights, the sky, the denoisers and DLSS Ray Reconstruction read the same triangle and material tables as the
-  shader BVH, so the picture matches it. Alpha-tested and stochastically transparent materials, single-sided surfaces and
-  shadow-caster filtering follow the same rules.
+- Instances share local-space shading tables and carry their own transforms, material, and shadow flags.
+  Alpha-tested and stochastically transparent materials, single-sided surfaces and shadow-caster filtering
+  use the same rules as the shader BVH.
+- Layered terrain reads its authored layer IDs, weights, palette textures and paint on hardware ray hits.
+  The portable shader BVH falls back to raster for views with layered terrain.
 
 ## Limits
 
 - Meshes with skinning make the view use the shader BVH. Morph targets already reject tracing, as before.
-- The scene budget is unchanged: 131072 triangles.
-- The CPU still prepares the shading tables when the scene changes, so hardware saves the BVH work, not that preparation.
+- The shader BVH budget is 131072 placed triangles. Vulkan ray queries have a separate budget of 1,398,101
+  triangles in the shared shading table and up to 1,048,576 placed parts. Repeated placements can share triangles.
+- Large scene changes can prepare geometry over several frames. The view uses raster rendering while preparation runs.
 - Performance depends on the scene. On the author's RTX 4070, in a synthetic scene of about 85 thousand triangles at
   640 by 480 (unoptimized build, wall-clock time per frame including CPU work), hardware was clearly faster when the
   trace was the bottleneck (8 samples per pixel: about 30 to 45 percent less frame time). At 2 samples per pixel it was

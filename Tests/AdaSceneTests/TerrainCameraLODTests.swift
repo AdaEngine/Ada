@@ -4,6 +4,17 @@ import Testing
 
 @Suite("Terrain camera LOD policy")
 struct TerrainCameraLODTests {
+    @Test("Visual residency can reuse the last published camera positions until a view crosses the configured distance")
+    func cameraRefreshUsesTheLastPublishedPosition() {
+        let old: [Vector3] = [[0, 0, 0], [100, 0, 0]]
+        let near: [Vector3] = [[8, 0, 0], [105, 0, 0]]
+        let crossed: [Vector3] = [[8, 0, 0], [112, 0, 0]]
+        #expect(TerrainSourceFocus.cameraPositions(near, previous: old, refreshDistance: 12) == old)
+        #expect(TerrainSourceFocus.cameraPositions(crossed, previous: old, refreshDistance: 12) == crossed)
+        #expect(TerrainSourceFocus.cameraPositions(near, previous: old, refreshDistance: nil) == near)
+        #expect(TerrainSourceFocus.cameraPositions([], previous: old, refreshDistance: 12).isEmpty)
+    }
+
     @Test("Distance bands retain detail across jitter, nearest views win, and inverse transforms preserve the policy")
     func bandsAndMultipleViews() throws {
         let storage = try TerrainHeightStorage()

@@ -8,12 +8,22 @@ public final class TerrainMaterialTextureArrays: Sendable {
     public let normal: Texture2D
     public let orm: Texture2D
     public let blendHeightLayers: Set<UInt16>
+    /// Both renderers use these normalized raster upload images in albedo, normal, then ORM/height order.
+    public let tracingImages: [[Image]]
 
-    public init(sourceID: UUID, albedo: Texture2D, normal: Texture2D, orm: Texture2D, blendHeightLayers: Set<UInt16> = []) {
+    public init(
+        sourceID: UUID,
+        albedo: Texture2D,
+        normal: Texture2D,
+        orm: Texture2D,
+        blendHeightLayers: Set<UInt16> = [],
+        tracingImages: [[Image]] = []
+    ) {
         self.sourceID = sourceID
         self.albedo = albedo
         self.normal = normal
         self.orm = orm
         self.blendHeightLayers = blendHeightLayers
+        self.tracingImages = tracingImages
     }
 }

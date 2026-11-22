@@ -4,8 +4,9 @@
 //
 
 import AdaEngine
+
 #if os(Windows)
-@_spi(Internal) import AdaPlatform
+    @_spi(Internal) import AdaPlatform
 #endif
 
 #if canImport(AppKit)
@@ -20,6 +21,9 @@ enum EditorMenuCommand: CaseIterable {
     case showMovieMaker
     case debugOverlayOff, debugOverlayRedraw, debugOverlayLayoutBounds, debugOverlayHitTestTarget, debugOverlayFocusedNode
     case newFile, newProject, openProject, importAssets, save, saveAll, closeEditor
+    #if os(Windows)
+        case installKimodoExtension
+    #endif
     case undo, redo, cut, copy, paste, selectAll, findInFile, findInProject
     case navigateBack, navigateForward, showProjectNavigator, showInspector, showBuildOutput, showProblems, enterFullScreen
     case refreshProjectFiles, revealProject, openProjectInTerminal, showProjectSettings, showProjectDependencies, showPackageTasks
@@ -53,10 +57,10 @@ final class EditorMenuCommandRouter {
     @discardableResult
     func perform(_ command: EditorMenuCommand) -> Bool {
         #if os(macOS) || os(Windows) || os(Linux)
-        if command == .installCLI, EditorDistribution.current == .standalone {
-            EditorCLIInstallationPresentation.install()
-            return true
-        }
+            if command == .installCLI, EditorDistribution.current == .standalone {
+                EditorCLIInstallationPresentation.install()
+                return true
+            }
         #endif
         if command == .checkForUpdates {
             EditorUpdateCenter.shared.checkForUpdates()
@@ -109,8 +113,8 @@ final class EditorMenuCommandRouter {
         #else
             switch command {
             #if os(Windows)
-            case .minimizeWindow:
-                return WindowsNativeDialogs.minimizeActiveWindow()
+                case .minimizeWindow:
+                    return WindowsNativeDialogs.minimizeActiveWindow()
             #endif
             case .closeEditor:
                 UIWindowManager.shared?.activeWindow?.close()
@@ -123,7 +127,9 @@ final class EditorMenuCommandRouter {
             case .bringAllToFront:
                 UIWindowManager.shared?.activeWindow?.showWindow(makeFocused: true)
             case .showSourceRepository:
-                guard let url = URL(string: "https://github.com/AdaEngine/Ada") else { return false }
+                guard let url = URL(string: "https://github.com/AdaEngine/Ada") else {
+                    return false
+                }
                 return Application.shared.openURL(url)
             default:
                 return false
@@ -155,15 +161,15 @@ enum EditorMenuBar {
 
     private static func systemMenu() -> UIMenu {
         #if os(Windows) || os(Linux)
-        let menu = UIMenu(title: L10n.text("Studio"), image: applicationMenuLogo, placement: .application)
+            let menu = UIMenu(title: L10n.text("Studio"), image: applicationMenuLogo, placement: .application)
         #else
-        let menu = UIMenu(title: L10n.text("System"), placement: .application)
+            let menu = UIMenu(title: L10n.text("System"), placement: .application)
         #endif
         menu.add(item("Settings...", command: .showSettings, key: .comma))
         if EditorDistribution.current == .standalone {
             menu.add(item("Check for Updates…", command: .checkForUpdates))
             #if os(macOS) || os(Windows) || os(Linux)
-            menu.add(item("Install adastudio Command in PATH…", command: .installCLI))
+                menu.add(item("Install adastudio Command in PATH…", command: .installCLI))
             #endif
         }
         menu.add(item("Movie Maker", command: .showMovieMaker))
@@ -177,11 +183,11 @@ enum EditorMenuBar {
     }
 
     #if os(Windows) || os(Linux)
-    private static let applicationMenuLogo = ProjectOpeningAssets.loadAdaEngineLogo()
+        private static let applicationMenuLogo = ProjectOpeningAssets.loadAdaEngineLogo()
     #endif
 
     private static func fileMenu() -> UIMenu {
-        menu(
+        var file = menu(
             "File",
             items: [
                 item("New File", command: .newFile, key: .n),
@@ -197,6 +203,10 @@ enum EditorMenuBar {
                 item("Close Window", command: .closeEditor, key: .w, modifiers: [.main, .shift]),
             ]
         )
+        #if os(Windows)
+            file.add(item("Install Extension from File…", command: .installKimodoExtension))
+        #endif
+        return file
     }
 
     private static func editMenu() -> UIMenu {
@@ -321,11 +331,11 @@ enum EditorMenuBar {
         var key = key
         var modifiers = modifiers
         #if os(Windows) || os(Linux)
-        if key == .plus { key = .equals }
-        if modifiers?.contains(.main) == true {
-            modifiers?.remove(.main)
-            modifiers?.insert(.control)
-        }
+            if key == .plus { key = .equals }
+            if modifiers?.contains(.main) == true {
+                modifiers?.remove(.main)
+                modifiers?.insert(.control)
+            }
         #endif
         return MenuItem(
             title: L10n.tr(title),

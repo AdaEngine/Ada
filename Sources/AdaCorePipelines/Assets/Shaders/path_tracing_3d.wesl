@@ -1,6 +1,9 @@
 // WESL port of path_tracing_3d.glsl. One fullscreen pass selected by `pu.u_Frame.y`:
 // 0 trace, 1 temporal, 2 guide, 3 wavelet denoise, 4 reconstruct, 5 Ray Reconstruction guides.
 
+@if(ADA_PATH_TRACING_RAY_QUERY) import package::path_tracing_terrain::traceTerrainMaterial;
+import package::height_fog_3d::heightFogOpacity;
+
 @if(ADA_PATH_TRACING_RAY_QUERY) enable wgpu_ray_query;
 
 struct PathVertex {
@@ -28,6 +31,11 @@ struct PathUniform {
     u_PreviousViewProjection: mat4x4f, // unjittered, previous frame of this view
     u_PreviousView: mat4x4f,
     u_Denoise: vec4f, // x: wavelet step, y: minimum history weight, z: trace writes demodulated light, w: final remodulates
+    u_FogColor: vec4f, // sRGB color, extinction at the base height
+    u_FogShape: vec4f, // height falloff, base height, start distance, opacity limit
+    u_FogSun: vec4f, // direction, sun inscattering strength
+    u_FogRadiance: vec4f, // sun radiance, sun exponent
+    u_FogSky: vec4f, // x: influence on the sky
 }
 
 @group(0) @binding(0) var u_Nodes: texture_2d<f32>;
@@ -62,7 +70,23 @@ fn randomValue() -> f32 {
 fn texelCoordinate(index: i32) -> vec2i {
     return vec2i(index % 2048, index / 2048);
 }
-fn tri(index: i32) -> vec4f { return textureLoad(u_Triangles, texelCoordinate(index), 0); }
+fn localTri(index: i32) -> vec4f { return textureLoad(u_Triangles, texelCoordinate(index), 0); }
+@if(!ADA_PATH_TRACING_RAY_QUERY)
+fn tri(index: i32) -> vec4f { return localTri(index); }
+@if(ADA_PATH_TRACING_RAY_QUERY) var<private> hitObjectToWorld: mat4x3f;
+@if(ADA_PATH_TRACING_RAY_QUERY) var<private> hitNormalToWorld: mat3x3f;
+@if(ADA_PATH_TRACING_RAY_QUERY) var<private> hitMetadata: vec4f;
+@if(ADA_PATH_TRACING_RAY_QUERY)
+fn tri(index: i32) -> vec4f {
+    let word = index % 12;
+    let value = localTri(index);
+    if word < 3 {
+        let tag = select(select(0.0, hitMetadata.z, word == 1), hitMetadata.y, word == 0);
+        return vec4f(hitObjectToWorld * vec4f(value.xyz, 1.0), tag);
+    }
+    if word < 6 { return vec4f(hitNormalToWorld * value.xyz, 0.0); }
+    return value;
+}
 fn node(index: i32) -> vec4f { return textureLoad(u_Nodes, texelCoordinate(index), 0); }
 fn material(index: i32) -> vec4f { return textureLoad(u_Materials, texelCoordinate(index), 0); }
 fn light(index: i32) -> vec4f { return textureLoad(u_Lights, texelCoordinate(index), 0); }
@@ -127,8 +151,7 @@ fn boxHit(origin: vec3f, direction: vec3f, lo: vec3f, hi: vec3f, distance: f32) 
     return true;
 }
 
-// Hardware variant of intersectScene: a ray query against the top-level structure. A hit's triangle is the instance's
-// first triangle (its custom data) plus the primitive index, which indexes the same triangle table the BVH variant reads.
+// Each Vulkan instance addresses a compact record. Its geometry offset is shared by all copies of the mesh.
 // Candidates are accepted with the same rules as the BVH variant: single-sided materials reject back faces, alpha-test and
 // stochastic coverage reject by alpha. Shadow rays see only shadow-casting instances (mask bit 0) and stop at the first hit.
 @if(ADA_PATH_TRACING_RAY_QUERY)
@@ -139,9 +162,13 @@ fn intersectScene(origin: vec3f, direction: vec3f, distance: ptr<function, f32>,
     rayQueryInitialize(&query, u_Scene, RayDesc(select(0u, 4u, shadowRay), select(255u, 1u, shadowRay), pu.u_Trace.y, *distance, origin, direction));
     while rayQueryProceed(&query) {
         let candidate = rayQueryGetCandidateIntersection(&query);
-        let index = (i32(candidate.instance_custom_data) + i32(candidate.primitive_index)) * 12;
-        let a = tri(index);
-        let m = i32(a.w) * 5;
+        let metadata = node(i32(candidate.instance_custom_data));
+        if metadata.w > 0.0 {
+            let fromCamera = origin + direction * candidate.t - pu.u_InverseView[3].xyz;
+            if dot(fromCamera, fromCamera) > metadata.w * metadata.w { continue; }
+        }
+        let index = (i32(metadata.x) + i32(candidate.primitive_index)) * 12;
+        let m = i32(metadata.y) * 5;
         let mode = i32(material(m + 4).x);
         let doubleSided = material(m + 2).w >= 0.5;
         // Opaque double-sided surfaces, the common case, need no further checks.
@@ -149,15 +176,14 @@ fn intersectScene(origin: vec3f, direction: vec3f, distance: ptr<function, f32>,
             rayQueryConfirmIntersection(&query);
             continue;
         }
-        // Facing comes from the world-space triangle, exactly as in the BVH variant.
-        let b = tri(index + 1);
-        let c = tri(index + 2);
-        let determinant = dot(b.xyz - a.xyz, cross(direction, c.xyz - a.xyz));
-        if !doubleSided && determinant < 0.0 {
-            continue;
+        if !doubleSided {
+            let a = localTri(index).xyz;
+            let edge1 = candidate.object_to_world * vec4f(localTri(index + 1).xyz - a, 0.0);
+            let edge2 = candidate.object_to_world * vec4f(localTri(index + 2).xyz - a, 0.0);
+            if dot(edge1, cross(direction, edge2)) < 0.0 { continue; }
         }
         let weights = vec3f(1.0 - candidate.barycentrics.x - candidate.barycentrics.y, candidate.barycentrics.x, candidate.barycentrics.y);
-        let uv = tri(index + 6).xy * weights.x + tri(index + 7).xy * weights.y + tri(index + 8).xy * weights.z;
+        let uv = localTri(index + 6).xy * weights.x + localTri(index + 7).xy * weights.y + localTri(index + 8).xy * weights.z;
         let alpha = material(m).w * atlas(material(m + 3).x, uv).a;
         if mode == 1 && alpha < material(m + 2).z {
             continue;
@@ -169,7 +195,11 @@ fn intersectScene(origin: vec3f, direction: vec3f, distance: ptr<function, f32>,
     }
     let committed = rayQueryGetCommittedIntersection(&query);
     if committed.kind != 0u {
-        hit = (i32(committed.instance_custom_data) + i32(committed.primitive_index)) * 12;
+        hitMetadata = node(i32(committed.instance_custom_data));
+        hitObjectToWorld = committed.object_to_world;
+        let inverse = committed.world_to_object;
+        hitNormalToWorld = transpose(mat3x3f(inverse[0], inverse[1], inverse[2]));
+        hit = (i32(hitMetadata.x) + i32(committed.primitive_index)) * 12;
         *bary = vec3f(1.0 - committed.barycentrics.x - committed.barycentrics.y, committed.barycentrics.x, committed.barycentrics.y);
         *distance = committed.t;
     }
@@ -272,6 +302,36 @@ fn surfaceAt(hit: i32, bary: vec3f, origin: vec3f, direction: vec3f, distance: f
     if dot(s.normal, direction) > 0.0 {
         s.normal = -s.normal;
     }
+    s.receives = (i32(tri(hit + 1).w) & 2) != 0;
+    @if(ADA_PATH_TRACING_RAY_QUERY) {
+        let header = i32(material(m + 4).z);
+        if header > 0 {
+            let a = localTri(hit).xyz;
+            let b = localTri(hit + 1).xyz;
+            let c = localTri(hit + 2).xyz;
+            let plane = normalize(cross(b - a, c - a));
+            let localN = localTri(hit + 3).xyz * bary.x + localTri(hit + 4).xyz * bary.y + localTri(hit + 5).xyz * bary.z;
+            let localNormal = select(plane, normalize(localN), dot(localN, localN) > 0.00001);
+            let edge1 = b - a;
+            let edge2 = c - a;
+            let d2 = cross(edge2, localNormal);
+            let d1 = cross(localNormal, edge1);
+            let tangent = d2 * edge1.x + d1 * edge2.x;
+            let bitangent = d2 * edge1.z + d1 * edge2.z;
+            let frameScale = sign(dot(plane, localNormal)) * inverseSqrt(max(max(dot(tangent, tangent), dot(bitangent, bitangent)), 0.000001));
+            let frame = mat3x3f(tangent * frameScale, bitangent * frameScale, localNormal);
+            let fieldUV = localTri(hit + 6).zw * bary.x + localTri(hit + 7).zw * bary.y + localTri(hit + 8).zw * bary.z;
+            let sampled = traceTerrainMaterial(u_Materials, u_Atlas, u_Linear, header, a * bary.x + b * bary.y + c * bary.z, fieldUV, localNormal, frame);
+            let mapped = normalize(hitNormalToWorld * sampled.normal);
+            let faced = select(mapped, -mapped, dot(mapped, s.normal) < 0.0);
+            if dot(faced, s.geometric) > 0.0 { s.normal = faced; }
+            s.color = clamp(factor.rgb * sampled.color, vec3f(0.0), vec3f(1.0));
+            s.roughness = sampled.roughness;
+            s.metal = sampled.metal;
+            s.emission = vec3f(0.0);
+            return s;
+        }
+    }
     if tiles.w >= 0.0 {
         let du = tri(hit + 10).zw - tri(hit + 9).zw;
         let dv = tri(hit + 11).zw - tri(hit + 9).zw;
@@ -295,7 +355,6 @@ fn surfaceAt(hit: i32, bary: vec3f, origin: vec3f, direction: vec3f, distance: f
     s.metal = clamp(parameters.x * mr.b, 0.0, 1.0);
     s.roughness = clamp(parameters.y * mr.g, 0.04, 1.0);
     s.emission = max(material(m + 1).rgb, vec3f(0.0)) * select(vec3f(1.0), srgb(atlas(tiles.z, other.xy).rgb), tiles.z >= 0.0);
-    s.receives = (i32(tri(hit + 1).w) & 2) != 0;
     return s;
 }
 
@@ -417,6 +476,18 @@ fn path(originIn: vec3f, directionIn: vec3f, firstBounce: i32) -> vec3f {
         var distance = pu.u_Trace.x;
         var bary: vec3f;
         let hit = intersectScene(origin, direction, &distance, &bary, false);
+        if bounce == 0 && pu.u_FogColor.w > 0.0 {
+            let camera = pu.u_InverseView[3].xyz;
+            let ray = origin + direction * distance - camera;
+            let skyRay = hit < 0;
+            let fogDirection = select(normalize(ray), direction, skyRay);
+            let fogDistance = select(length(ray), 1000.0, skyRay);
+            let opacity = heightFogOpacity(pu.u_FogColor.w, pu.u_FogShape, camera.y, fogDirection.y, fogDistance)
+                * select(1.0, pu.u_FogSky.x, skyRay);
+            let sun = pow(max(dot(fogDirection, pu.u_FogSun.xyz), 0.0), pu.u_FogRadiance.w);
+            radiance += opacity * (srgb(pu.u_FogColor.rgb) + pu.u_FogRadiance.rgb * (pu.u_FogSun.w * sun));
+            throughput *= 1.0 - opacity;
+        }
         if hit < 0 {
             radiance += throughput * sky(direction);
             break;

@@ -208,7 +208,9 @@ extension EditorViewModel {
     }
 
     func buildAll() {
-        guard saveDocumentsForNativeRun() else { return }
+        guard saveDocumentsForNativeRun() else {
+            return
+        }
         if let projectURL,
             let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
             settings.build.system == .adaScript {
@@ -219,7 +221,9 @@ extension EditorViewModel {
     }
 
     func buildTarget(_ target: String) {
-        guard saveDocumentsForNativeRun() else { return }
+        guard saveDocumentsForNativeRun() else {
+            return
+        }
         if let projectURL,
             let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
             settings.build.system == .adaScript {
@@ -230,7 +234,9 @@ extension EditorViewModel {
     }
 
     func saveDocumentsForNativeRun() -> Bool {
-        guard nativeAdaScriptLauncher != nil else { return true }
+        guard nativeAdaScriptLauncher != nil else {
+            return true
+        }
         guard workbench.saveAllDocuments() else {
             let message = "Build/Run blocked: unable to save project documents."
             workspaceStatus = .failed(message)
@@ -242,8 +248,12 @@ extension EditorViewModel {
     }
 
     func runSelectedTarget() {
-        guard !movieMaker.isBusy else { return }
-        guard saveDocumentsForNativeRun() else { return }
+        guard !movieMaker.isBusy else {
+            return
+        }
+        guard saveDocumentsForNativeRun() else {
+            return
+        }
         guard !debugger.isActive else {
             return
         }
@@ -263,14 +273,15 @@ extension EditorViewModel {
         let projectSettings = projectURL.flatMap {
             try? ProjectSystem.loadProject(at: $0, fileManager: fileManager)
         }
-        let product = projectSettings?.build.system == .swiftpm
+        let product =
+            projectSettings?.build.system == .swiftpm
             ? resolvedRunProduct
             : (selectedRunProduct ?? runProducts.first)
         let destination = selectedRunDestination.adaProjectDestination
         if let projectURL,
             let settings = projectSettings,
             settings.build.system == .adaScript,
-            (selectedRunDestination == .macOS || selectedRunDestination == .windows || selectedRunDestination == .linux || selectedRunDestination == .visionOS) {
+            selectedRunDestination == .macOS || selectedRunDestination == .windows || selectedRunDestination == .linux || selectedRunDestination == .visionOS {
             let projectName = settings.project.displayName ?? settings.project.name ?? project?.name ?? "AdaScript Project"
             buildAdaScriptProject(
                 settings,
@@ -310,7 +321,8 @@ extension EditorViewModel {
             runOnAdaPlayer()
         case .macOS, .windows, .linux:
             if projectSettings?.build.system == .swiftpm, product == nil {
-                let message = runProducts.isEmpty
+                let message =
+                    runProducts.isEmpty
                     ? L10n.tr("Load a SwiftPM package with an executable product before running.")
                     : L10n.tr("Select an executable product in Edit Build Targets before running.")
                 workspaceStatus = .failed(message)
@@ -389,14 +401,14 @@ extension EditorViewModel {
             }
             self.workspaceTask = nil
             switch outcome {
-            case let .success(artifact):
+            case .success(let artifact):
                 self.finishWorkspaceActivity(notificationRunID, succeeded: true)
                 self.finishAdaScriptProjectBuild(artifact)
                 onSuccess(artifact)
-            case let .projectFailure(error):
+            case .projectFailure(let error):
                 self.finishAdaScriptProjectBuildFailure(message: error.message)
                 self.finishWorkspaceActivity(notificationRunID, succeeded: false, detail: error.message)
-            case let .adaScriptFailure(error):
+            case .adaScriptFailure(let error):
                 let message = error.errorDescription ?? error.localizedDescription
                 self.finishAdaScriptProjectBuildFailure(message: message)
                 self.finishWorkspaceActivity(
@@ -405,7 +417,7 @@ extension EditorViewModel {
                     detail: message,
                     action: Self.notificationAction(for: error, projectID: self.project?.id)
                 )
-            case let .failure(message):
+            case .failure(let message):
                 self.finishAdaScriptProjectBuildFailure(message: message)
                 self.finishWorkspaceActivity(notificationRunID, succeeded: false, detail: message)
             }
@@ -559,7 +571,9 @@ extension EditorViewModel {
     }
 
     var isProjectRunning: Bool {
-        if movieMaker.isBusy { return true }
+        if movieMaker.isBusy {
+            return true
+        }
         if androidRunningSession != nil || isAdaPlayerActive {
             return true
         }
@@ -593,7 +607,9 @@ extension EditorViewModel {
     }
 
     func runActiveSceneInEditor() {
-        guard !movieMaker.isBusy else { return }
+        guard !movieMaker.isBusy else {
+            return
+        }
         guard !debugger.isActive else {
             return
         }
@@ -623,7 +639,10 @@ extension EditorViewModel {
     }
 
     func stopFromToolbar() {
-        if movieMaker.isBusy { movieMaker.stop(); return }
+        if movieMaker.isBusy {
+            movieMaker.stop()
+            return
+        }
         if selectedRunDestination == .player, isAdaPlayerActive {
             stopAdaPlayer()
             return
@@ -651,13 +670,18 @@ extension EditorViewModel {
     }
 
     func runTests(filter: String? = nil) {
-        guard workspaceTask == nil, projectURL != nil else { return }
+        guard workspaceTask == nil, projectURL != nil else {
+            return
+        }
         let filter = filter ?? (selectedTestFilter.isEmpty ? nil : selectedTestFilter)
         tests.begin(filter: filter?.isEmpty == true ? nil : filter)
         if let projectURL,
             let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
             settings.build.system.isAdaScript {
-            guard saveDocumentsForNativeRun() else { tests.finish(); return }
+            guard saveDocumentsForNativeRun() else {
+                tests.finish()
+                return
+            }
             runAdaScriptTests(settings, at: projectURL, filter: filter)
             return
         }
@@ -665,11 +689,15 @@ extension EditorViewModel {
     }
 
     func runTest(_ item: EditorTestItem) {
-        guard workspaceTask == nil, projectURL != nil else { return }
+        guard workspaceTask == nil, projectURL != nil else {
+            return
+        }
         if let projectURL,
-           let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
-           settings.build.system.isAdaScript {
-            guard saveDocumentsForNativeRun() else { return }
+            let settings = try? ProjectSystem.loadProject(at: projectURL, fileManager: fileManager),
+            settings.build.system.isAdaScript {
+            guard saveDocumentsForNativeRun() else {
+                return
+            }
             tests.begin(filter: item.filter, exactID: item.id)
             runAdaScriptTests(settings, at: projectURL, filter: item.filter, exactName: item.filter)
         } else {
@@ -691,15 +719,18 @@ extension EditorViewModel {
     }
 
     func cancelWorkspaceCommand() {
-        if androidRunningSession != nil { stopAndroidRun(); return }
-        #if os(macOS)
-        if adaScriptWebServer != nil {
-            stopAdaScriptWebServer()
-            workspaceStatus = .ready
-            footer.setWorkspaceFooterTitle(workspaceStatus.title)
-            appendOutput("Stopped AdaScript Web run.")
+        if androidRunningSession != nil {
+            stopAndroidRun()
             return
         }
+        #if os(macOS)
+            if adaScriptWebServer != nil {
+                stopAdaScriptWebServer()
+                workspaceStatus = .ready
+                footer.setWorkspaceFooterTitle(workspaceStatus.title)
+                appendOutput("Stopped AdaScript Web run.")
+                return
+            }
         #endif
         if isAdaPlayerActive {
             stopAdaPlayer()
@@ -726,7 +757,7 @@ extension EditorViewModel {
             return
         }
         #if os(macOS) || os(Windows) || os(Linux)
-        let cancellingAndroidRunner = androidRunner
+            let cancellingAndroidRunner = androidRunner
         #endif
         workspaceTask?.cancel()
         if isChangingProjectBuildSystem {
@@ -735,12 +766,14 @@ extension EditorViewModel {
         }
         workspaceStatus = .cancelled
         workspaceTask = Task { [weak self] in
-            guard let self else { return }
+            guard let self else {
+                return
+            }
             await workspaceService.cancel()
             tests.finish()
             #if os(macOS) || os(Windows) || os(Linux)
-            await adaScriptWebExportRunner?.cancelAll()
-            await cancellingAndroidRunner?.cancelAll()
+                await adaScriptWebExportRunner?.cancelAll()
+                await cancellingAndroidRunner?.cancelAll()
             #endif
             if !Task.isCancelled { workspaceTask = nil }
         }
@@ -752,11 +785,13 @@ extension EditorViewModel {
         case .checkForUpdates:
             EditorUpdateCenter.shared.checkForUpdates()
         case .installCLI:
-            return false // The application router handles installation without a project owner.
+            return false  // The application router handles installation without a project owner.
         case .showSettings:
             presentSettings(.general)
         case .showMovieMaker:
-            guard projectURL != nil else { return false }
+            guard projectURL != nil else {
+                return false
+            }
             movieMaker.isPresented = true
         case .debugOverlayOff:
             showsDebugOverlay = nil
@@ -768,35 +803,12 @@ extension EditorViewModel {
             toggleDebugOverlay(.hitTestTarget)
         case .debugOverlayFocusedNode:
             toggleDebugOverlay(.focusedNode)
-        case .newFile:
-            presentNewFileDialog()
-        case .newProject:
-            ProjectEditorLauncher.openWelcome(beginCreatingProject: true)
-        case .openProject:
-            openProjectFromMenu()
-        case .importAssets:
-            importAssets()
-        case .save:
-            saveActiveDocument()
-        case .saveAll:
-            if workbench.saveAllDocuments(includeAnimationDrafts: true) {
-                refreshSourceControl()
-                reloadScriptableObjectSupport()
-            }
-        case .findInFile:
-            guard workbench.presentFileSearch() else {
-                return false
-            }
-            Task { @MainActor in
-                await Task.yield()
-                _ = EditorSearchShortcutMonitor.shared.focusSearchField(identifier: EditorCodeFileView.fileSearchFieldIdentifier)
-            }
-        case .findInProject:
-            presentTextSearch()
-        case .navigateBack:
-            navigateBack()
-        case .navigateForward:
-            navigateForward()
+        case .newFile, .newProject, .openProject, .importAssets, .save, .saveAll, .findInFile, .findInProject, .navigateBack, .navigateForward:
+            return handleFileMenuCommand(command)
+        #if os(Windows)
+        case .installKimodoExtension:
+            kimodoInstaller.choosePackage()
+        #endif
         case .showProjectNavigator:
             toolStrip.activeLeftTopTool = "fileTree"
             showLeftPanel = true
@@ -879,6 +891,43 @@ extension EditorViewModel {
             .bringAllToFront,
             .showDocumentation,
             .showSourceRepository:
+            return false
+        }
+        return true
+    }
+
+    private func handleFileMenuCommand(_ command: EditorMenuCommand) -> Bool {
+        switch command {
+        case .newFile:
+            presentNewFileDialog()
+        case .newProject:
+            ProjectEditorLauncher.openWelcome(beginCreatingProject: true)
+        case .openProject:
+            openProjectFromMenu()
+        case .importAssets:
+            importAssets()
+        case .save:
+            saveActiveDocument()
+        case .saveAll:
+            if workbench.saveAllDocuments(includeAnimationDrafts: true) {
+                refreshSourceControl()
+                reloadScriptableObjectSupport()
+            }
+        case .findInFile:
+            guard workbench.presentFileSearch() else {
+                return false
+            }
+            Task { @MainActor in
+                await Task.yield()
+                _ = EditorSearchShortcutMonitor.shared.focusSearchField(identifier: EditorCodeFileView.fileSearchFieldIdentifier)
+            }
+        case .findInProject:
+            presentTextSearch()
+        case .navigateBack:
+            navigateBack()
+        case .navigateForward:
+            navigateForward()
+        default:
             return false
         }
         return true

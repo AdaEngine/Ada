@@ -186,13 +186,17 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                 } ?? false
                 uniform.diffuseGI.z = target.irradianceGridActive || lightmapped ? 1 : 0
             }
-            if context.world.getResource(PathTracing3DViews.self)?.entries[source.entityId]?.active == true {
+            if let trace = context.world.getResource(PathTracing3DViews.self)?.entries[source.entityId], trace.active {
                 // The traced HDR already owns every surface lighting term. Keep only presentation/fog here.
                 uniform.reflection.x = 0
                 uniform.quality.x = 0
                 // The response target holds the tracer's emission guide, not a specular response.
                 uniform.quality.w = 0
                 uniform.diffuseGI = [0,0,1,0]
+                if trace.status.implementation == PathTracingTraversalSelection.Traversal.hardwareRayQuery.rawValue && !trace.status.hybridFirstHit {
+                    // Hardware primary-ray depth already determined height fog; add raster volume shafts only.
+                    uniform.fogColor.w = 0
+                }
             }
             let constants = scratch.cache.write(uniform, view: source.entityId, device: renderDevice.renderDevice)
 

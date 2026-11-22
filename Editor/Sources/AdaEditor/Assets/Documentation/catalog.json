@@ -102,6 +102,12 @@
       },
       {
         "kind": "text",
+        "text": "On Windows, see [Generate an animation with Kimodo](AnimationAuthoring.md#generate-an-animation-with-kimodo-on-windows)\nto install the extension and save generated motion as an editable clip.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
         "text": "Select a Model 3D entity and open **Animator → Bone Keyframes**. Extract an editable\ncopy of an imported clip or create a clip from the rig's rest pose. Select bones,\ntracks and timeline keys to edit translation, rotation, scale or morph weights.\nPreview the model, use Undo/Redo, then explicitly **Save** the `.animlib` resource.\nAutosave and tab switches retain animation drafts without writing them.\n**Save and Bind** attaches a saved compatible library through the scene's own history;\nthe Skeletal Graph can then select its qualified clips. See\n[Editing bone animation](AnimationAuthoring.md) for key commands, conflict recovery\nand the shared agent/Studio Tools API. The offline **Authoring skeletal animation**\nguide also covers Swift library construction and runtime graph references.",
         "level": 0,
         "links": []
@@ -3822,7 +3828,7 @@
       },
       {
         "kind": "text",
-        "text": "• Each mesh part gets one bottom-level acceleration structure, built once from its geometry and shared by every\n  placement of that part. Parts that disappear release theirs.\n• The top-level structure lists every placed part with its transform. It is rebuilt when the scene changes and keeps\n  its capacity otherwise.\n• Shading, lights, the sky, the denoisers and DLSS Ray Reconstruction read the same triangle and material tables as the\n  shader BVH, so the picture matches it. Alpha-tested and stochastically transparent materials, single-sided surfaces and\n  shadow-caster filtering follow the same rules.",
+        "text": "• Each mesh part gets one bottom-level acceleration structure, built once from its geometry and shared by every\n  placement of that part. Parts that disappear release theirs.\n• The top-level structure lists every placed part with its transform. It is rebuilt when the scene changes and keeps\n  its capacity otherwise.\n• Instances share local-space shading tables and carry their own transforms, material, and shadow flags.\n  Alpha-tested and stochastically transparent materials, single-sided surfaces and shadow-caster filtering\n  use the same rules as the shader BVH.\n• Layered terrain reads its authored layer IDs, weights, palette textures and paint on hardware ray hits.\n  The portable shader BVH falls back to raster for views with layered terrain.",
         "level": 0,
         "links": []
       },
@@ -3834,7 +3840,7 @@
       },
       {
         "kind": "text",
-        "text": "• Meshes with skinning make the view use the shader BVH. Morph targets already reject tracing, as before.\n• The scene budget is unchanged: 131072 triangles.\n• The CPU still prepares the shading tables when the scene changes, so hardware saves the BVH work, not that preparation.\n• Performance depends on the scene. On the author's RTX 4070, in a synthetic scene of about 85 thousand triangles at\n  640 by 480 (unoptimized build, wall-clock time per frame including CPU work), hardware was clearly faster when the\n  trace was the bottleneck (8 samples per pixel: about 30 to 45 percent less frame time). At 2 samples per pixel it was\n  about 5 percent slower with double-sided materials and up to about 18 percent slower with single-sided materials. When\n  one object moved every frame it was 11 to 14 percent faster. Measure your own scene, and set `.software` if hardware\n  is slower for you.\n• Hardware ray queries are used on the Vulkan renderer only.",
+        "text": "• Meshes with skinning make the view use the shader BVH. Morph targets already reject tracing, as before.\n• The shader BVH budget is 131072 placed triangles. Vulkan ray queries have a separate budget of 1,398,101\n  triangles in the shared shading table and up to 1,048,576 placed parts. Repeated placements can share triangles.\n• Large scene changes can prepare geometry over several frames. The view uses raster rendering while preparation runs.\n• Performance depends on the scene. On the author's RTX 4070, in a synthetic scene of about 85 thousand triangles at\n  640 by 480 (unoptimized build, wall-clock time per frame including CPU work), hardware was clearly faster when the\n  trace was the bottleneck (8 samples per pixel: about 30 to 45 percent less frame time). At 2 samples per pixel it was\n  about 5 percent slower with double-sided materials and up to about 18 percent slower with single-sided materials. When\n  one object moved every frame it was 11 to 14 percent faster. Measure your own scene, and set `.software` if hardware\n  is slower for you.\n• Hardware ray queries are used on the Vulkan renderer only.",
         "level": 0,
         "links": []
       }
@@ -4058,7 +4064,7 @@
       },
       {
         "kind": "text",
-        "text": "Terrain layer shading uses the raster PBR pipeline. When a view requests the\nexperimental portable path tracer, layered terrain selects the existing raster\nfallback for that view and records the reason in `Render3DPathTracingStatistics`.\nIts layer colors, maps and manual fields remain visible. Ordinary PBR meshes and\nterrain without a layer palette keep their existing tracing behavior.",
+        "text": "Vulkan hardware path tracing samples the terrain layer IDs, weights, paint and\npalette textures at the hit location. Set `environment.pathTracing.rasterFirstHit = false`\nto trace the primary ray as well as shadow and bounce rays. The portable shader\nBVH uses a raster fallback for layered terrain and records the reason in\n`Render3DPathTracingStatistics`.",
         "level": 0,
         "links": []
       },
@@ -4370,7 +4376,7 @@
       },
       {
         "kind": "text",
-        "text": "The forward/shadow lists consume placement transforms. Portable tracing has a\n131072-placement/input-triangle work budget and a 262144-material-packet cap;\nline, point, empty and cosmetic-only parts do not expand. It transforms referenced\nvertices only. These limits do not establish the decorative-instance benchmark.\nRegion assets now preserve stable placement records in a versioned binary section.\nRecords retain compact rotation, tint and attachment-normal channels without repeated\nquantization on save. Height-only files retain their original encoding. Residency\nand saves preserve records in hidden dirty regions, including placement-only resource\nremoval. Decoded placement rows have an independent 16 MiB default storage/cache\nbudget; expanded draw records and renderer buffers have separate costs. A manifest's `meshPrototypes` table assigns stable `UInt16` IDs to static model\npaths relative to the manifest directory. It also selects an optional imported\nscene and world-space draw distance. Nonempty palettes use manifest version two;\nempty palettes keep version one. Both save modes preserve model references.",
+        "text": "The forward/shadow lists consume placement transforms. Portable tracing has a\n131072-placement/input-triangle work budget and a 262144-material-packet cap;\nline, point, empty and cosmetic-only parts do not expand. It transforms referenced\nvertices only. These limits do not establish the decorative-instance benchmark.\nRegion assets now preserve stable placement records in a versioned binary section.\nRecords retain compact rotation, tint and attachment-normal channels without repeated\nquantization on save. Height-only files retain their original encoding. Residency\nand saves preserve records in hidden dirty regions, including placement-only resource\nremoval. Decoded placement rows have an independent 16 MiB default storage/cache\nbudget; expanded draw records and renderer buffers have separate costs. A manifest's `meshPrototypes` table assigns stable `UInt16` IDs to static model\npaths relative to the manifest directory. It also selects an optional imported\nscene and world-space draw distance. Set `pathTracingMaximumDistance` on grass\nto limit camera-to-hit distance for Vulkan ray queries. Omit it on trees to\nkeep distant and offscreen shadows. Nonempty palettes use manifest version two;\nempty palettes keep version one. Both save modes preserve model references.",
         "level": 0,
         "links": []
       },

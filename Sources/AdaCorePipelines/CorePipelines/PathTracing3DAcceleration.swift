@@ -8,12 +8,22 @@ struct PathTracing3DPartKey: Hashable, Sendable {
     let indexCount: Int
 }
 
-/// One placed mesh part: a part of a source, at the transform the CPU flattening uses for it.
+extension PathTracing3DPartKey {
+    init(_ part: Mesh.Part) {
+        self.init(
+            vertexBuffer: ObjectIdentifier(part.vertexBuffer),
+            indexBuffer: ObjectIdentifier(part.indexBuffer),
+            indexCount: min(part.indexCount, part.meshDescriptor.indicies.count)
+        )
+    }
+}
+
+/// One placed mesh part at its world transform.
 struct PathTracing3DPlacement: Sendable {
     var key: PathTracing3DPartKey
     var transform: Transform3D
     var castsShadows: Bool
-    /// Triangles the part contributes to the flattened table, in index-buffer order, degenerate ones included.
+    /// Number of primitives in the shared part's index buffer.
     var triangleCount: Int
 }
 
@@ -23,8 +33,8 @@ struct PathTracing3DInstancePlan: Sendable {
         var key: PathTracing3DPartKey
         var transform: Transform3D
         var mask: UInt8
-        /// Index of the instance's first triangle in the flattened table; a hit's triangle is this plus the primitive index.
-        var firstTriangle: UInt32
+        /// Row containing this placement's shared geometry offset, material, shadow flags and distance limit.
+        var metadataIndex: UInt32
     }
 
     /// Every ray sees every instance; shadow rays use this bit to see only shadow casters.
@@ -33,15 +43,19 @@ struct PathTracing3DInstancePlan: Sendable {
     var instances: [Instance] = []
     var triangleTotal = 0
 
-    /// Lists an instance for every placement that has triangles, in order, each starting where the previous one's triangles end.
-    static func make(_ placements: [PathTracing3DPlacement]) -> PathTracing3DInstancePlan {
-        var plan = PathTracing3DInstancePlan()
+    /// Preserves the placement order of the shader's per-instance metadata.
+    static func make(_ placements: [PathTracing3DPlacement]) -> Self {
+        var plan = Self()
         for placement in placements where placement.triangleCount > 0 {
-            plan.instances.append(Instance(
-                key: placement.key, transform: placement.transform,
-                // Bit 1 is set on every instance so primary rays (mask 0xff) hit all of them; bit 0 marks shadow casters.
-                mask: placement.castsShadows ? 0b11 : 0b10, firstTriangle: UInt32(plan.triangleTotal)
-            ))
+            plan.instances.append(
+                Instance(
+                    key: placement.key,
+                    transform: placement.transform,
+                    // Bit 1 is set on every instance so primary rays (mask 0xff) hit all of them; bit 0 marks shadow casters.
+                    mask: placement.castsShadows ? 0b11 : 0b10,
+                    metadataIndex: UInt32(plan.instances.count)
+                )
+            )
             plan.triangleTotal += placement.triangleCount
         }
         return plan
@@ -67,12 +81,17 @@ final class PathTracing3DAccelerationStructures: @unchecked Sendable {
     /// `retained` objects (the part's buffers) stay alive with the entry, so a key made from their identities cannot be
     /// reused by different geometry while the entry exists.
     func resolveBottom(
-        _ key: PathTracing3DPartKey, triangleCount: Int, retaining retained: [AnyObject] = [], create: (Int) -> (any AccelerationStructure)?
+        _ key: PathTracing3DPartKey,
+        triangleCount: Int,
+        retaining retained: [AnyObject] = [],
+        create: (Int) -> (any AccelerationStructure)?
     ) -> Resolved? {
         if let existing = bottoms[key], existing.triangles == triangleCount {
             return Resolved(structure: existing.structure, isNew: false)
         }
-        guard let structure = create(triangleCount) else { return nil }
+        guard let structure = create(triangleCount) else {
+            return nil
+        }
         bottoms[key] = (structure, triangleCount, retained)
         return Resolved(structure: structure, isNew: true)
     }
@@ -80,10 +99,14 @@ final class PathTracing3DAccelerationStructures: @unchecked Sendable {
     /// The view's top-level structure. Its capacity grows (to the next power of two) only when `instanceCount` exceeds it,
     /// so ordinary frames rebuild the same structure in place.
     func resolveTop(instanceCount: Int, create: (Int) -> (any AccelerationStructure)?) -> Resolved? {
-        if let top, instanceCount <= top.capacity { return Resolved(structure: top.structure, isNew: false) }
+        if let top, instanceCount <= top.capacity {
+            return Resolved(structure: top.structure, isNew: false)
+        }
         var capacity = 16
         while capacity < instanceCount { capacity *= 2 }
-        guard let structure = create(capacity) else { return nil }
+        guard let structure = create(capacity) else {
+            return nil
+        }
         top = (structure, capacity)
         return Resolved(structure: structure, isNew: true)
     }

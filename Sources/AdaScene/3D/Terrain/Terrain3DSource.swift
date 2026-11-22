@@ -17,6 +17,9 @@ public struct Terrain3DSource: Codable, Equatable, Sendable {
     public var lodDistance: Float
     /// Optional terrain-local camera residency radius. Nil loads the complete declared set within limits.
     public var streamingRadius: Float?
+    /// Minimum world-space camera movement before refreshing visual residency and terrain LOD.
+    /// Nil tracks every movement. Physics residency always uses the current swept bounds.
+    public var cameraRefreshDistance: Float?
     /// Terrain-local margin around swept physical bounds; extends residency beyond camera coverage.
     public var physicsPadding: Float
     /// Maximum changed tiles whose GPU meshes and collision resources are prepared per update.
@@ -39,6 +42,7 @@ public struct Terrain3DSource: Codable, Equatable, Sendable {
         maximumLOD: Int = 6,
         lodDistance: Float = 128,
         streamingRadius: Float? = 384,
+        cameraRefreshDistance: Float? = nil,
         physicsPadding: Float = 64,
         maximumTileUpdatesPerFrame: Int = 4,
         instanceCollision: TerrainInstanceCollisionSettings = .init(),
@@ -53,6 +57,7 @@ public struct Terrain3DSource: Codable, Equatable, Sendable {
         self.maximumLOD = maximumLOD
         self.lodDistance = lodDistance
         self.streamingRadius = streamingRadius
+        self.cameraRefreshDistance = cameraRefreshDistance
         self.physicsPadding = physicsPadding
         self.maximumTileUpdatesPerFrame = maximumTileUpdatesPerFrame
         self.instanceCollision = instanceCollision
@@ -99,8 +104,11 @@ public struct Terrain3DSourceSurface: Component, Sendable {
     public let queries: TerrainSurfaceQueries?
     /// Immutable loaded/saved resource generation, for optimistic editor authoring checkpoints.
     public let manifest: TerrainManifestAsset?
+    /// Count of manifest regions currently published for rendering, including instance-only regions.
+    public let residentRegionCount: Int
 
-    init(storage: TerrainHeightStorage, queries: TerrainSurfaceQueries? = nil, manifest: TerrainManifestAsset? = nil) {
+    init(storage: TerrainHeightStorage, queries: TerrainSurfaceQueries? = nil, manifest: TerrainManifestAsset? = nil, residentRegionCount: Int = 0) {
         self.storage = storage; self.queries = queries; self.manifest = manifest
+        self.residentRegionCount = residentRegionCount
     }
 }
