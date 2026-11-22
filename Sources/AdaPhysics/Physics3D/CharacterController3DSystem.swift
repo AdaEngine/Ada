@@ -22,6 +22,7 @@ public struct CharacterController3DSystem {
         }
         characters.forEach { controller, transform in
             if controller.resetMotion {
+                controller.wrappedValue.recordMotionReset()
                 controller.wrappedValue.horizontalVelocity = .zero
                 controller.wrappedValue.verticalVelocity = 0
                 controller.wrappedValue.velocity = .zero
@@ -30,7 +31,11 @@ public struct CharacterController3DSystem {
                 controller.resetMotion = false
             }
             var position = transform.position
-            physics.world.moveCharacter(&controller.wrappedValue, position: &position, deltaTime: time.deltaTime)
+            if physics.world.moveCharacter(&controller.wrappedValue, position: &position, deltaTime: time.deltaTime) {
+                controller.wrappedValue.publishResolvedStep(deltaTime: time.deltaTime)
+            } else if controller.wrappedValue.resolvedStep != nil {
+                controller.wrappedValue.discardResolvedStep()
+            }
             if position != transform.position { transform.position = position }
         }
     }

@@ -64,8 +64,11 @@ struct EditorInspectorSidebar: View {
                                 ForEach(selectedEntity.components, id: \.typeName) { component in
                                     if component.typeName == String(reflecting: MeshTerrain3DBinding.self) {
                                         if let state = viewModel.terrainEditing {
-                                            EditorMeshTerrainDetachButton(state: state, accessibilityID: "AdaEditor.Inspector.DetachTerrain",
-                                                action: viewModel.detachTerrainRequested)
+                                            EditorMeshTerrainDetachButton(
+                                                state: state,
+                                                accessibilityID: "AdaEditor.Inspector.DetachTerrain",
+                                                action: viewModel.detachTerrainRequested
+                                            )
                                         }
                                     } else if component.typeName != String(reflecting: MeshTerrain3DIdentity.self) {
                                         componentEditor(component)
@@ -155,7 +158,9 @@ struct EditorInspectorSidebar: View {
                 }
             }
 
-            if !isCollapsed {
+            if !isCollapsed && component.typeName == EditorBuiltInComponentType.locomotion3D {
+                locomotionFields(component)
+            } else if !isCollapsed {
                 if viewModel.requiresTerrainTransformSubmission(component.typeName) {
                     Text(L10n.tr(viewModel.terrainEditing?.sourceFailure ?? "Press Enter to apply the transform."))
                         .font(.system(size: 11))
@@ -330,8 +335,8 @@ struct EditorInspectorSidebar: View {
         .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
     }
 
-    func editorTextField(text: Binding<String>) -> some View {
-        TextField("", text: text)
+    func editorTextField(text: Binding<String>, onSubmit: (() -> Void)? = nil, hasError: Bool = false) -> some View {
+        TextField("", text: text, onSubmit: onSubmit)
             .font(.system(size: 11, weight: .bold))
             .foregroundColor(theme.editorColors.text)
             .textFieldStyle(PlainTextFieldStyle())
@@ -339,7 +344,9 @@ struct EditorInspectorSidebar: View {
             .frame(height: 26)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surface))
-            .overlay { RoundedRectangleShape(cornerRadius: 5).stroke(theme.editorColors.border.opacity(0.92), lineWidth: 1) }
+            .overlay {
+                RoundedRectangleShape(cornerRadius: 5).stroke(hasError ? .red : theme.editorColors.border.opacity(0.92), lineWidth: 1)
+            }
     }
 
     func axisColor(for label: String) -> Color {
@@ -352,7 +359,7 @@ struct EditorInspectorSidebar: View {
         }
     }
 
-    private func boolField(text: Binding<String>) -> some View {
+    func boolField(text: Binding<String>) -> some View {
         let isOn = text.wrappedValue == "true"
         return Button(action: {
             text.wrappedValue = text.wrappedValue == "true" ? "false" : "true"

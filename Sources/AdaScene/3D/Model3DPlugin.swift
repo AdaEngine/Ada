@@ -30,7 +30,14 @@ public struct Model3DPlugin: Plugin {
         AssetsManager.registerAssetType(AnimationModifierResource.self)
         Model3DSourceState.registerComponent()
         ModelAnimationPlayback3DComponent.registerComponent()
+        RuntimeTypeRegistry.registerComponent(
+            CharacterLocomotion3DComponent.self,
+            names: ["CharacterLocomotion3DComponent"],
+            makeDefault: { CharacterLocomotion3DComponent() }
+        )
         app.addSystem(ModelAnimationPlayback3DSystem.self, on: .postUpdate)
+        app.addSystem(CharacterLocomotion3DFixedSystem.self, on: .fixedPostUpdate)
+        app.addSystem(CharacterLocomotion3DPlaybackSystem.self, on: .postUpdate)
         app.addSystem(Model3DSourceSystem.self, on: .preUpdate)
         Mesh3DComponent.registerComponent()
         Mesh3DInstancesComponent.registerComponent()
@@ -163,7 +170,9 @@ func ExtractModel3D(
 public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable {
     /// The path-tracing surface variant writes both optional outputs, so it needs both targets attached.
     static func writesPathTracingSurface(_ target: RenderViewTarget?) -> Bool {
-        guard let target else { return false }
+        guard let target else {
+            return false
+        }
         return writesPathTracingSurface(
             active: target.pathTracingSurfaceActive,
             albedo: target.diffuseSurface3DTexture != nil,
@@ -354,12 +363,17 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
             let source = clusters?.indices ?? part.indexBuffer
             let triangles = clusters?.sourceIndices ?? Array(part.meshDescriptor.indicies.prefix(part.indexCount))
             let resources = world.getRefResource(Wireframe3DResources.self)
-            guard let buffer = resources.wrappedValue.indices(source: source, triangles: triangles, device: renderDevice) else { return }
+            guard let buffer = resources.wrappedValue.indices(source: source, triangles: triangles, device: renderDevice) else {
+                return
+            }
             renderEncoder.setIndexBuffer(buffer, offset: 0)
             let ranges = clusters?.ranges ?? [0..<triangles.count]
             for range in ranges where range.lowerBound >= 0 && range.upperBound <= triangles.count {
-                renderEncoder.drawIndexed(indexCount: range.count * 2, indexBufferOffset: range.lowerBound * 2 * MemoryLayout<UInt32>.stride,
-                                          instanceCount: clusters == nil ? Int(batchRange.count) : 1)
+                renderEncoder.drawIndexed(
+                    indexCount: range.count * 2,
+                    indexBufferOffset: range.lowerBound * 2 * MemoryLayout<UInt32>.stride,
+                    instanceCount: clusters == nil ? Int(batchRange.count) : 1
+                )
             }
             return
         }

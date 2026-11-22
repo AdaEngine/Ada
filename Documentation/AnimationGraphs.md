@@ -1,5 +1,8 @@
 # Skeletal animation graphs
 
+For automatic ground and air clip selection from a 3D character controller, see
+[3D Character Locomotion](../Sources/AdaEngine/AdaEngine.docc/Articles/Developers/CharacterLocomotion3D.md).
+
 For editable project-owned clips, see [Animation authoring](../Editor/Documentation/AnimationAuthoring.md).
 Bound `.animlib` clips use `library.runtimeName(for: clipID)` in existing graph clip nodes.
 

@@ -284,6 +284,10 @@ Golden-frame check: pack `Tests/WebGolden/SAGASmoke` into an exported `AdaWebPla
 `node script/web_golden_saga.mjs <bundle>` (needs `playwright-core` and a WebGPU Chromium; `--record` replaces the
 reference). Pass `--actual=<path.png>` to save the captured frame. See [the smoke scene README](../Tests/WebGolden/SAGASmoke/README.md).
 
+To exercise skeletal locomotion and an embedded 3D scene in Chrome, export the standalone
+[GardenRobot smoke app](../Tests/WebGolden/SAGAGardenRobot/README.md). Its screenshot test
+checks that the robot and changing poses reach the canvas throughout a locomotion cycle.
+
 ## SAGA Metal development
 
 AdaEngine selects SAGAMetal on macOS, iOS, tvOS, and visionOS. The following tests exercise SAGAMetal:

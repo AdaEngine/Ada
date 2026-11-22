@@ -35,6 +35,7 @@ final class EditorInspectorSidebarViewModel {
         var gizmo: EditorGizmo?
         var hasExplicitGizmo: Bool
         var hasJoinedDescendant = false
+        var locomotion: EditorLocomotionInspectorState?
     }
 
     struct ComponentSection: Equatable {
@@ -119,7 +120,7 @@ final class EditorInspectorSidebarViewModel {
     @ObservationIgnored
     var updateScriptableObjectField: ((String, EditorComponentField, String) -> Void)?
     @ObservationIgnored
-    private var sceneViewportActionOwner: ObjectIdentifier?
+    private(set) var sceneViewportActionOwner: ObjectIdentifier?
     @ObservationIgnored
     private var vectorAxisDrafts: [VectorAxisDraftKey: String] = [:]
     // Read by the existing TextField bindings each frame, without rebuilding the Inspector tree.
@@ -210,7 +211,9 @@ final class EditorInspectorSidebarViewModel {
         detach: ((String) -> Void)? = nil,
         settingsChanged: @escaping () -> Void
     ) {
-        guard sceneViewportActionOwner == ObjectIdentifier(owner) else { return }
+        guard sceneViewportActionOwner == ObjectIdentifier(owner) else {
+            return
+        }
         if terrainEditing !== state { terrainEditing = state }
         createTerrainAction = create
         detachTerrainAction = detach
@@ -243,6 +246,17 @@ final class EditorInspectorSidebarViewModel {
         addScriptableObject = nil
         removeScriptableObject = nil
         updateScriptableObjectField = nil
+    }
+
+    func updateLocomotionInspector(owner: AnyObject, editorID: String, state: EditorLocomotionInspectorState) {
+        guard sceneViewportActionOwner == ObjectIdentifier(owner),
+              selectedEntity?.editorID == editorID,
+              let current = selectedEntity?.locomotion,
+              current != state
+        else {
+            return
+        }
+        selectedEntity?.locomotion = state
     }
 
     func addGizmo() {
@@ -314,7 +328,9 @@ final class EditorInspectorSidebarViewModel {
 
     func tileMapAssets(matching query: String) -> [TextureAsset] {
         let normalizedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !normalizedQuery.isEmpty else { return tileMapAssets }
+        guard !normalizedQuery.isEmpty else {
+            return tileMapAssets
+        }
         return tileMapAssets.filter {
             $0.name.lowercased().contains(normalizedQuery) || $0.reference.lowercased().contains(normalizedQuery)
         }
@@ -406,7 +422,9 @@ final class EditorInspectorSidebarViewModel {
     }
 
     func requiresTerrainTransformSubmission(_ typeName: String) -> Bool {
-        guard typeName == EditorBuiltInComponentType.transform, let selectedEntity else { return false }
+        guard typeName == EditorBuiltInComponentType.transform, let selectedEntity else {
+            return false
+        }
         return selectedEntity.hasJoinedDescendant || selectedEntity.components.contains {
             $0.typeName == String(reflecting: MeshTerrain3DBinding.self)
         }
@@ -414,10 +432,14 @@ final class EditorInspectorSidebarViewModel {
 
     func submitTerrainTransform(_ field: EditorComponentField) {
         let typeName = EditorBuiltInComponentType.transform
-        guard requiresTerrainTransformSubmission(typeName), terrainEditing?.isSourceBusy != true else { return }
+        guard requiresTerrainTransformSubmission(typeName), terrainEditing?.isSourceBusy != true else {
+            return
+        }
         var values = vectorComponents(from: componentFieldValue(typeName: typeName, field: field), count: field.kind.vectorComponentCount)
         let drafts = values.indices.map { VectorAxisDraftKey(typeName: typeName, fieldKey: field.key, axisIndex: $0) }
-        guard drafts.contains(where: { vectorAxisDrafts[$0] != nil }) else { return }
+        guard drafts.contains(where: { vectorAxisDrafts[$0] != nil }) else {
+            return
+        }
         for (index, key) in drafts.enumerated() {
             guard let draft = vectorAxisDrafts[key] else { continue }
             let value = draft.trimmingCharacters(in: .whitespacesAndNewlines)

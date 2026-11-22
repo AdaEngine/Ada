@@ -89,7 +89,9 @@
         }
 
         public func setData(_ bytes: UnsafeMutableRawPointer, byteCount: Int, offset: Int) {
-            guard byteCount > 0, offset >= 0, offset + byteCount <= length else { return }
+            guard byteCount > 0, offset >= 0, offset + byteCount <= length else {
+                return
+            }
             unsafe (shadow + offset).copyMemory(from: bytes, byteCount: byteCount)
             upload(offset: offset, byteCount: byteCount)
         }
@@ -122,7 +124,9 @@
             markShadowInputChanged()
             let bytes = unsafe [UInt8](UnsafeRawBufferPointer(start: shadow + offset, count: byteCount))
             let slot = self.slot
-            if context.shaderOutput == .msl {
+            // The browser waits for the GPU after each transport submission.
+            // Submit adjacent writes together so those waits don't delay the next draw or presentation.
+            if context.shaderOutput == .msl || context.shaderOutput == .wgsl {
                 context.queue.enqueueAdjacent(Upload(slot: slot, offset: UInt64(offset), bytes: bytes)) { device, uploads in
                     do {
                         let commands = try uploads.map {

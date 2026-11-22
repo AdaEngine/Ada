@@ -50,7 +50,11 @@ def wasm(ctx, args):
 
 class PreviewHandler(SimpleHTTPRequestHandler):
     """Serve a built SPA; APIs require the separate Cloud development services."""
-    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".wasm": "application/wasm"}
+    extensions_map = {
+        **SimpleHTTPRequestHandler.extensions_map,
+        ".mjs": "text/javascript",
+        ".wasm": "application/wasm",
+    }
 
     def translate_path(self, path):
         # The frontend's canonical <base> is /studio/, including in a flat dist.

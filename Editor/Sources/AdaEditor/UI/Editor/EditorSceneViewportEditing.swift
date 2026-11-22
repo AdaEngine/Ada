@@ -28,7 +28,9 @@ extension EditorSceneViewportView {
                 }
             },
             onDocumentContentChanged: { [weak viewportModel] content in
-                guard let model = viewportModel?.sceneModel else { return }
+                guard let model = viewportModel?.sceneModel else {
+                    return
+                }
                 var updatedDocument = document
                 updatedDocument.content = content
                 updatedDocument.sceneModel = model
@@ -40,6 +42,12 @@ extension EditorSceneViewportView {
             },
             onTransformChanged: { [weak inspectorViewModel] editorID, payload in
                 inspectorViewModel?.updateLiveTransform(editorID: editorID, payload: payload)
+            },
+            onLocomotionInspectorChanged: { [weak inspectorViewModel, weak viewportModel] editorID, state in
+                guard let viewportModel else {
+                    return
+                }
+                inspectorViewModel?.updateLocomotionInspector(owner: viewportModel, editorID: editorID, state: state)
             }
         )
         if let loadResult, runtimeWarnings != loadResult.warnings {
@@ -55,7 +63,9 @@ extension EditorSceneViewportView {
                 viewportModel.annotationEntityIDs.append(draft.context.selectedEntityID)
             }
             viewportModel.onAnnotateEntity = { id in
-                guard let context = EditorAgentSceneContext(document: document, entityID: id) else { return }
+                guard let context = EditorAgentSceneContext(document: document, entityID: id) else {
+                    return
+                }
                 annotations.select(context)
                 viewProxy.redraw()
             }
@@ -132,17 +142,23 @@ extension EditorSceneViewportView {
                 owner: viewportModel,
                 state: viewportModel.terrainEditing,
                 create: { [weak viewportModel] in
-                    guard let viewportModel else { return }
+                    guard let viewportModel else {
+                        return
+                    }
                     viewportModel.createTerrain()
                     viewportPresentation.refresh(viewportModel: viewportModel)
                     viewProxy.setNeedsDisplay()
                 },
                 detach: { [weak viewportModel] id in
-                    guard let viewportModel, viewportModel.selectedEditorID == id else { return }
+                    guard let viewportModel, viewportModel.selectedEditorID == id else {
+                        return
+                    }
                     viewportModel.detachSelectedMeshTerrain()
                 },
                 settingsChanged: { [weak viewportModel] in
-                    guard let viewportModel else { return }
+                    guard let viewportModel else {
+                        return
+                    }
                     viewportPresentation.refresh(viewportModel: viewportModel)
                     viewProxy.setNeedsDisplay()
                 }

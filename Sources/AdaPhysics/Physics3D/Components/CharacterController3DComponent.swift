@@ -1,6 +1,14 @@
 import AdaECS
 import Math
 
+package struct CharacterController3DResolvedStep: Sendable {
+    package let sequence: UInt64
+    package let resetGeneration: UInt64
+    package let deltaTime: Float
+    package let velocity: Vector3
+    package let isGrounded: Bool
+}
+
 /// An upright capsule mover. Its entity's position is the bottom of the capsule in world units.
 /// Use on a root entity without `PhysicsBody3DComponent`; visual scale does not resize the capsule.
 /// The controller collides with physics bodies, ignores sensors, and does not push dynamic bodies
@@ -52,6 +60,26 @@ public struct CharacterController3DComponent: Codable, Sendable {
     public internal(set) var velocity: Vector3 = .zero
     internal var horizontalVelocity: Vector3 = .zero
     internal var verticalVelocity: Float = 0
+    package private(set) var resolvedStep: CharacterController3DResolvedStep?
+    private var resolvedStepSequence: UInt64 = 0
+    private var motionResetGeneration: UInt64 = 0
+
+    mutating func recordMotionReset() {
+        motionResetGeneration &+= 1
+    }
+
+    mutating func publishResolvedStep(deltaTime: Float) {
+        resolvedStepSequence &+= 1
+        resolvedStep = .init(
+            sequence: resolvedStepSequence,
+            resetGeneration: motionResetGeneration,
+            deltaTime: deltaTime,
+            velocity: velocity,
+            isGrounded: isGrounded
+        )
+    }
+
+    mutating func discardResolvedStep() { resolvedStep = nil }
 
     /// Invalid dimensions fall back to a 0.4 meter radius and a height of at least two radii.
     public init(radius: Float = 0.4, height: Float = 1.8) {
@@ -66,8 +94,10 @@ public struct CharacterController3DComponent: Codable, Sendable {
 
     public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(radius: try values.decodeIfPresent(Float.self, forKey: .radius) ?? 0.4,
-                  height: try values.decodeIfPresent(Float.self, forKey: .height) ?? 1.8)
+        self.init(
+            radius: try values.decodeIfPresent(Float.self, forKey: .radius) ?? 0.4,
+            height: try values.decodeIfPresent(Float.self, forKey: .height) ?? 1.8
+        )
         requestedHeight = try values.decodeIfPresent(Float.self, forKey: .requestedHeight) ?? height
         acceleration = try values.decodeIfPresent(Float.self, forKey: .acceleration) ?? 14
         deceleration = try values.decodeIfPresent(Float.self, forKey: .deceleration) ?? 20

@@ -25,6 +25,7 @@ enum EditorBuiltInComponentType {
     static let mesh2D = String(reflecting: Mesh2D.self)
     static let mesh3D = String(reflecting: Mesh3DComponent.self)
     static let model3DSource = String(reflecting: Model3DSource.self)
+    static let locomotion3D = String(reflecting: CharacterLocomotion3DComponent.self)
     static let terrain3DSource = String(reflecting: Terrain3DSource.self)
     static let audioSource = String(reflecting: AudioSource.self)
     static let physicsBody3D = String(reflecting: PhysicsBody3DComponent.self)
@@ -91,6 +92,7 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
     var coding: EditorComponentFieldCoding = .standard
     var defaultValue: EditorSceneValue?
     var minimumValue: Double?
+    var numberRule: EditorInspectorNumberRule?
     var groupPath: [String] = []
 
     init(key: String, label: String, kind: EditorComponentFieldKind, isEditable: Bool = true, groupPath: [String] = []) {
@@ -160,6 +162,9 @@ struct EditorComponentField: Equatable, Identifiable, Sendable {
             guard let number = Double(rawValue), Float(number).isFinite, number >= minimumValue else {
                 return
             }
+        }
+        if let numberRule, numberRule.value(rawValue) == nil {
+            return
         }
         var temporary: EditorComponentPayload = [:]
         writePlainValue(rawValue, to: &temporary)
@@ -288,6 +293,7 @@ enum EditorComponentRegistry {
         terrainDescriptor,
         terrainSourceDescriptor,
         model3DSourceDescriptor,
+        locomotion3DDescriptor,
         spineSourceDescriptor,
         audioSourceDescriptor,
         physicsBody3DDescriptor,
@@ -351,6 +357,7 @@ enum EditorComponentRegistry {
         RuntimeTypeRegistry.registerComponent(NavigationTarget3DComponent.self, names: ["NavigationTarget3DComponent"], makeDefault: { NavigationTarget3DComponent() })
         RuntimeTypeRegistry.registerComponent(NavigationAgent3DComponent.self, names: ["NavigationAgent3DComponent"], makeDefault: { NavigationAgent3DComponent() })
         ModelAnimationPlayback3DComponent.registerComponent()
+        CharacterLocomotion3DComponent.registerComponent()
         MorphWeights3DComponent.registerComponent()
         CharacterController3DComponent.registerComponent()
         CameraCollision3DComponent.registerComponent()

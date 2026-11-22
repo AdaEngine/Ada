@@ -56,7 +56,9 @@ private func collectCharacterPlanes(
 }
 
 private func noteCharacterHeightOverlap(shape: b3ShapeId, context: UnsafeMutableRawPointer?) -> Bool {
-    guard !b3Shape_IsSensor(shape), let context = unsafe context else { return true }
+    guard !b3Shape_IsSensor(shape), let context = unsafe context else {
+        return true
+    }
     unsafe context.assumingMemoryBound(to: Bool.self).pointee = true
     return false
 }
@@ -68,11 +70,19 @@ private struct CharacterLanding {
 }
 
 private func noteCharacterLanding(
-    shape: b3ShapeId, point: b3Vec3, normal: b3Vec3, fraction: Float,
-    material _: UInt64, triangle _: Int32, child _: Int32, context: UnsafeMutableRawPointer?
+    shape: b3ShapeId,
+    point: b3Vec3,
+    normal: b3Vec3,
+    fraction: Float,
+    material _: UInt64,
+    triangle _: Int32,
+    child _: Int32,
+    context: UnsafeMutableRawPointer?
 ) -> Float {
     // A tangent wall or a ceiling we are moving away from cannot block a downward sweep.
-    guard !b3Shape_IsSensor(shape), normal.y > 0.0001, let context = unsafe context else { return -1 }
+    guard !b3Shape_IsSensor(shape), normal.y > 0.0001, let context = unsafe context else {
+        return -1
+    }
     let result = unsafe context.assumingMemoryBound(to: CharacterLanding.self)
     if fraction < (unsafe result.pointee.fraction) {
         unsafe result.pointee = CharacterLanding(fraction: fraction, point: point.asVector3, normal: normal.asVector3)
@@ -82,18 +92,19 @@ private func noteCharacterLanding(
 
 extension PhysicsWorld3D {
     @MainActor
-    func moveCharacter(_ controller: inout CharacterController3DComponent, position: inout Vector3, deltaTime: Float) {
+    @discardableResult
+    func moveCharacter(_ controller: inout CharacterController3DComponent, position: inout Vector3, deltaTime: Float) -> Bool {
         guard deltaTime.isFinite, deltaTime > 0, position.x.isFinite, position.y.isFinite, position.z.isFinite else {
-            return
+            return false
         }
         resolveCharacterHeight(&controller, position: position)
         let desired = controller.desiredVelocity
         guard desired.x.isFinite, desired.z.isFinite else {
-            return
+            return false
         }
         let target = Vector3(desired.x, 0, desired.z)
         guard target.length.isFinite else {
-            return
+            return false
         }
         let jumped = controller.jumpRequested && controller.isGrounded && controller.jumpSpeed.isFinite && controller.jumpSpeed > 0
         let control = controller.airControl.isFinite ? min(max(controller.airControl, 0), 1) : 0
@@ -116,11 +127,24 @@ extension PhysicsWorld3D {
         let groundThreshold = controller.minimumGroundNormalY.isFinite ? min(max(controller.minimumGroundNormalY, 0.01), 1) : 0.707107
         let horizontalDelta = controller.horizontalVelocity * deltaTime
         let canStep = controller.isGrounded && !jumped && controller.verticalVelocity <= 0 && horizontalDelta.length > 0.00001
-        var result = moveCapsule(position: start, radius: controller.radius, height: controller.height,
-            delta: velocity * deltaTime, groundThreshold: groundThreshold, blockCorners: canStep)
+        var result = moveCapsule(
+            position: start,
+            radius: controller.radius,
+            height: controller.height,
+            delta: velocity * deltaTime,
+            groundThreshold: groundThreshold,
+            blockCorners: canStep
+        )
         let snapDistance = controller.groundSnapDistance.isFinite ? min(max(controller.groundSnapDistance, 0), controller.radius) : 0
-        if canStep, let stepped = stepCharacter(position: start, radius: controller.radius, height: controller.height,
-            delta: horizontalDelta, slide: result.position, snapDistance: snapDistance, groundThreshold: groundThreshold) {
+        if canStep, let stepped = stepCharacter(
+            position: start,
+            radius: controller.radius,
+            height: controller.height,
+            delta: horizontalDelta,
+            slide: result.position,
+            snapDistance: snapDistance,
+            groundThreshold: groundThreshold
+        ) {
             result = (stepped, true, false)
         }
         if controller.isGrounded, !jumped, controller.verticalVelocity <= 0, snapDistance > 0,
@@ -142,6 +166,7 @@ extension PhysicsWorld3D {
         let horizontal = Vector3(controller.velocity.x, 0, controller.velocity.z)
         let maximumSpeed = controller.horizontalVelocity.length
         controller.horizontalVelocity = horizontal.length > maximumSpeed ? horizontal.normalized * maximumSpeed : horizontal
+        return true
     }
 
     @MainActor
@@ -151,7 +176,9 @@ extension PhysicsWorld3D {
             controller.heightChangeBlocked = true
             return
         }
-        if requested == controller.height { return }
+        if requested == controller.height {
+            return
+        }
         if requested < controller.height {
             controller.height = requested
             controller.heightChangeBlocked = false
@@ -201,7 +228,9 @@ extension PhysicsWorld3D {
     ) -> Vector3? {
         let direction = delta.normalized
         let progress = (slide - position).dot(direction)
-        guard progress < delta.length - 0.00001, characterCapsuleIsClear(position: position, radius: radius, height: height, stepping: true) else { return nil }
+        guard progress < delta.length - 0.00001, characterCapsuleIsClear(position: position, radius: radius, height: height, stepping: true) else {
+            return nil
+        }
         let limit = height * 0.05
         var support = position.y
         if let floor = raycast(from: position + Vector3(0, radius, 0), to: position - Vector3(0, snapDistance + 0.006, 0)), floor.normal.y >= groundThreshold {
@@ -213,13 +242,17 @@ extension PhysicsWorld3D {
         let upFraction = unsafe b3World_CastMover(worldId, position.b3Vec, &capsule, up.b3Vec, filter, { shape, _ in !b3Shape_IsSensor(shape) }, nil)
         let lift = max(0, limit * upFraction - (upFraction < 1 ? 0.01 : 0))
         let raised = position + Vector3(0, lift, 0)
-        guard lift > 0.00001, characterCapsuleIsClear(position: raised, radius: radius, height: height, stepping: true) else { return nil }
+        guard lift > 0.00001, characterCapsuleIsClear(position: raised, radius: radius, height: height, stepping: true) else {
+            return nil
+        }
         let forward = unsafe b3World_CastMover(worldId, raised.b3Vec, &capsule, delta.b3Vec, filter, { shape, _ in !b3Shape_IsSensor(shape) }, nil)
         // CastMover permits support slop. Stop outside a forward obstacle so a tangent
         // wall is clear for the following full-radius overlap/downward queries.
         let travel = max(0, delta.length * forward - (forward < 1 ? 0.006 : 0))
         let advanced = raised + direction * travel
-        guard (advanced - position).dot(direction) > progress + 0.00001 else { return nil }
+        guard (advanced - position).dot(direction) > progress + 0.00001 else {
+            return nil
+        }
         var landing = CharacterLanding()
         let down = Vector3(0, -lift - snapDistance, 0)
         unsafe withUnsafeTemporaryAllocation(of: b3Vec3.self, capacity: 2) { points in
