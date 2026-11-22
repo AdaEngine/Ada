@@ -7,7 +7,21 @@ import Testing
 extension TerrainSourceRuntimeTests {
     @Test("A raster camera leaves another camera's staged forest intact until its last trace owner is removed")
     func rasterCameraDoesNotDiscardAnotherCamerasStagedGeometry() async throws {
-        _ = try await makeApp()
+        let app = try await makeApp()
+        let world = try #require(app.getSubworldBuilder(by: .renderWorld)?.main)
+        world.insertResource(ExtractedEnvironment3D())
+        world.insertResource(Render3DPathTracingStatistics())
+        let node = PathTracing3DRenderNode()
+
+        func update(_ views: PathTracing3DViews, active: Set<Entity.ID>) throws -> PathTracing3DViews {
+            var cameras = ExtractedCameraRenderViewTargets()
+            cameras.activeCameraIDs = active
+            world.insertResource(cameras)
+            world.insertResource(views)
+            node.update(from: world)
+            return try #require(world.getResource(PathTracing3DViews.self))
+        }
+
         let device = unsafe RenderEngine.shared.renderDevice
         let material = PBRMaterial()
         let mesh = Mesh.generateCube(renderDevice: device)
@@ -16,6 +30,7 @@ extension TerrainSourceRuntimeTests {
         tile.entity = 7
         tile.mesh = Mesh.generateCube(size: [2, 0.5, 2], renderDevice: device)
         var views = PathTracing3DViews()
+        views.activeCameras = [21, 22]
         views.traceOwners.insert(21)
         var finished = false
         for frame in 0..<5 {
@@ -26,16 +41,15 @@ extension TerrainSourceRuntimeTests {
             } catch PathTracing3DError.preparingGeometry {
                 if frame == 0 {
                     #expect(views.scene.preparedVertexCount == 36)
-                    var removedDuringPreparation = views
-                    removedDuringPreparation.stopTracing(21)
+                    let removedDuringPreparation = try update(views, active: [22])
                     #expect(removedDuringPreparation.scene.atlas == nil && removedDuringPreparation.traceOwners.isEmpty)
+                    views = try update(views, active: [21])
+                    try #require(views.scene.atlas != nil)
                 }
-                views.stopTracing(22)
-                #expect(views.scene.atlas != nil)
             }
         }
         #expect(finished && views.scene.triangleCount == 24)
-        views.stopTracing(21)
+        views = try update(views, active: [])
         #expect(views.scene.triangles == nil && views.scene.atlas == nil && views.traceOwners.isEmpty)
     }
 
