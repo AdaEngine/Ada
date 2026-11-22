@@ -114,8 +114,7 @@ Current limits:
   and 1,048,576 placed parts with Vulkan ray queries. Each view supports up to 256 texture atlas tiles.
   When the scene exceeds a budget, the status reports the reason.
 - Vulkan ray queries can sample authored terrain layer weights and paint. Layered terrain uses the raster
-  fallback on the portable BVH. Run [Green Valley](../Editor/Samples/GreenValley/README.md) and press **P**
-  to try the Vulkan path on terrain with instanced vegetation.
+  fallback on the portable BVH.
 - Moving geometry currently prepares CPU triangles and uploads them. The shader BVH refits; the hardware path
   instead rebuilds a top-level acceleration structure over per-part bottom-level structures. There is no GPU
   skinning or refit: skinned meshes make a view use the shader BVH.

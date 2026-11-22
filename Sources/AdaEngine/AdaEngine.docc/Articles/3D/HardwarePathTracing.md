@@ -67,10 +67,3 @@ failure turned hardware off (it then stays off for the rest of the session). Ask
   one object moved every frame it was 11 to 14 percent faster. Measure your own scene, and set `.software` if hardware
   is slower for you.
 - Hardware ray queries are used on the Vulkan renderer only.
-
-## Try it in Green Valley
-
-Run the [Green Valley standalone sample](https://github.com/AdaEngine/AdaEngine/tree/main/Editor/Samples/GreenValley)
-and press **P**. The sample keeps the camera in place and loads terrain and forest regions for traversal. Check
-the status for **Path Tracing (Vulkan)** or the fallback reason. Press **P** again to return to raster rendering.
-See <doc:Terrain> for the camera controls and measurement routes.

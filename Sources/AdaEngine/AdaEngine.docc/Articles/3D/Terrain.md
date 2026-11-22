@@ -4,20 +4,6 @@ Create editable ground with `Terrain3D`. Its heights describe one square surface
 in the entity's local X/Z plane. `Model3DPlugin` generates the visible geometry;
 `Physics3DPlugin` adds matching static triangle collision.
 
-## Walk through Green Valley
-
-Open `Editor/Samples/GreenValley` in Ada Studio and press Play to explore a 4 × 4 km heightfield. The trail starts in a meadow surrounded by mixed woodland. Use W/A/S/D to move. F switches between walking and free flight. In flight, Space climbs, Ctrl descends, and Shift increases speed. R starts the guided walk and G starts the guided flyover. Each view reads the same saved region files. To repeat a scene from a fixed seed, run `python Editor/Samples/GreenValley/generate.py` from the repository root.
-
-Green Valley keeps all playable ground resident and reduces mesh detail with distance. A separate grass source streams 500 m regions across the map. Grass patches reach 150 m and the most distant tree model reaches 950 m. The outer hills match the terrain samples along the edge of the map. Height fog softens the distant tree line. In the standalone raster player, gusts bend the grass near the camera while its roots stay anchored.
-
-The standalone raster player fills in the distant forest with canopy meshes baked from a 2.5 m voxel grid. The generator uses the original tree placements, limits each baked crown to 12 triangles, and shares a single crown among far trees in each occupied 20 m patch. Climb in free flight to see the distant tree line from above. Path tracing continues to use the original tree meshes.
-
-The trail is a painted soil layer in the canonical terrain material field. Its texture follows the visible surface at every mesh LOD, and the same field supplies the traced view. Short blade meshes fill the shoulders where the soil blends into grass.
-
-In standalone, click **Switch to Path Tracing** or press **P**. The player loads all terrain and forest regions. The status changes to **Path Tracing (Vulkan)** after the renderer reports an encoded frame on the ray-query backend. A second press restores raster rendering and nearby-region streaming at the same viewpoint. Check the status when comparing captures. See <doc:HardwarePathTracing> for GPU requirements.
-
-For Windows performance captures, run the sample's standalone Release player. Set `GREEN_VALLEY_ROUTE` to `walk` or `fly` and use the same native resolution for every run. Inspect the slowest frames while crossing region boundaries. The sample README lists the launch command, camera controls and capture procedure. [Green Valley sample](https://github.com/AdaEngine/AdaEngine/tree/main/Editor/Samples/GreenValley)
-
 ## Load Mesh Terrain
 
 Mesh Terrain uses a `Terrain3DSource` whose `.aterrain` manifest references an
