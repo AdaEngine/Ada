@@ -1,0 +1,15 @@
+{
+  "name": "resurrect-64",
+  "description": "Resurrect 64-color palette by Kerrie Lake. Full-spectrum palette with excellent hue ramps for detailed pixel art.",
+  "max_colors": 64,
+  "colors": [
+    "#2E222F", "#3E3546", "#625565", "#966C6C", "#AB947A", "#694F62", "#7F708A", "#9BABB2",
+    "#C7DCD0", "#FFFFFF", "#6E2727", "#B33831", "#EA4F36", "#F57D4A", "#AE2334", "#E83B3B",
+    "#FB6B1D", "#F79617", "#F9C22B", "#7A3045", "#9E4539", "#CD683D", "#E6904E", "#FBB954",
+    "#4C3E24", "#676633", "#A2A947", "#D5E04B", "#FBFF86", "#165A4C", "#239063", "#1EBC73",
+    "#91DB69", "#CDDF6C", "#313638", "#374E4A", "#547E64", "#92A984", "#B2BA90", "#0B5E65",
+    "#0B8A8F", "#0EAF9B", "#30E1B9", "#8FF8E2", "#323353", "#484A77", "#4D65B4", "#4D9BE6",
+    "#8FD3FF", "#45293F", "#6B3E75", "#905EA9", "#A884F3", "#EAADED", "#753C54", "#A24B6F",
+    "#CF657F", "#ED8099", "#831C5D", "#C32454", "#F04F78", "#F68181", "#FCA790", "#FDCBB0"
+  ]
+}

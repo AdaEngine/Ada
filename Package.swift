@@ -646,7 +646,7 @@ var targets: [Target] = [
     .testTarget(name: "AdaUIDescriptionTests", dependencies: ["AdaUIDescription"]),
     .target(
         name: "AdaA2UI",
-        dependencies: ["AdaUI", "AdaUIDescription"],
+        dependencies: ["AdaAssets", "AdaRender", "AdaUI", "AdaUIDescription"],
         resources: [.process("Resources")],
         swiftSettings: swiftSettings
     ),

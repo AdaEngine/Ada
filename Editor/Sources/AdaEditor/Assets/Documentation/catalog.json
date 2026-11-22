@@ -49,6 +49,23 @@
       },
       {
         "kind": "heading",
+        "text": "Generate pixel art",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Ask the Studio agent for a pixel sprite or a short animation. The\npixel art guide covers palettes, saved AdaScript recipes,\nanimation sheets and GIF previews in the chat.",
+        "level": 0,
+        "links": [
+          {
+            "title": "pixel art guide",
+            "destination": "AgentPixelArt"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
         "text": "Import and place a 3D model",
         "level": 2,
         "links": []
@@ -2373,6 +2390,80 @@
       {
         "kind": "text",
         "text": "After validation and build, inspect a completed frame from visible Play. A 3D scene needs a camera, a light and an `Environment3D` (or a camera `backgroundColor`/clear flags) so the frame is not a flat clear color; `editor.play.run_scenario` can capture before/after frames around input. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Native desktop agents can create/extract and edit skeletal/morph clips using the revision-checked `editor.animation.*` API; read [Animation authoring](AnimationAuthoring.md) for explicit Save, scene binding, shared Tool API 2, budgets and verification. Query `animationAuthoring` in desktop project context before use; mobile hosts do not advertise these desktop authoring commands. Blender execution, visual rig-structure editing and automatic rig inference remain unavailable. To create a new low-poly model use editor.model.generate (an AdaScript program that writes a GLB) or editor.voxel.generate (a .vox).",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "AgentPixelArt",
+    "title": "AI-assisted pixel art in Ada Studio",
+    "section": "Editor",
+    "source": "Editor/Documentation/AgentPixelArt.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Studio's agent draws pixel art as real PNG files: you describe the picture, the\nagent writes a small AdaScript program, and Studio renders it in an isolated VM.\nThe bundled `ada-pixel-art` skill teaches agents this workflow; it is advertised\nin every desktop and mobile session and loads on demand through\n`editor.skills.read` with `id: \"ada-pixel-art\"`. Painted or photographic art is\nout of scope — that needs the image generation provider (`editor.image.generate`)\nwhen one is configured.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Recipes instead of one-shot scripts",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Agents keep every drawing program as a recipe file under\n`.ada/workspace/pixel-art/<name>.adas` (written with `editor.file.write`) and\npass its text to `editor.sprite.generate` together with the recipe path. The\nrecipe is recorded in the sheet metadata, and revisions patch the saved recipe\n(`editor.file.patch`) instead of rewriting from scratch, so iterations stay\nsmall and reviewable. The VM is isolated: no file, network, scene or engine\naccess, a 64 KiB source limit and a small time/step budget, with errors returned\nas text.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Palettes and consistent style",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A palette is chosen before drawing and stays fixed for the whole game. Ten\nbundled presets cover the classic machines and community standards: `pico-8`,\n`gameboy`, `nes`, `snes`, `cga`, `commodore-64`, `db32`, `endesga-32`,\n`resurrect-64` and `sweetie-16`. `sprite.palettePreset(\"pico-8\")` fills palette\nindices in the listed order and also works before `sprite.size`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "When you provide reference art, the agent calls `editor.palette.extract` with\nthe image path, a short name and an optional `maxColors` (default 16). The\nextracted palette is saved to `.ada/workspace/pixel-art/palettes/<name>.json`\nand loaded in scripts as `sprite.palettePreset(\"user:<name>\")`. Saved palettes\nare never overwritten; each revision gets a new name.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Layers, frames and the sheet sidecar",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Wrap drawing calls in `sprite.beginLayer(\"shading\")` and `sprite.endLayer()`\nto keep outlines, base colors and shading editable independently. Layers flatten\ninto the final image in creation order. `sprite.size(w, h, frames)` creates a\nhorizontal strip of equal frames. `sprite.frame(i)` selects the frame to draw,\n`sprite.frameDuration(i, ms)` sets pacing and `sprite.tag(\"walk\", 0, 3)` names\nframe ranges. Next to every strip PNG, Studio writes an Aseprite-compatible\n`<name>.sheet.json` with frames, durations and tags. Open **Sprite Animation**\nand import the sheet using its Aseprite import. Use `editor.tileset.create` for\ntile sheets.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Chat previews and verification",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.sprite.gif` renders a looping GIF from the sidecar or from explicit frame\ndimensions. Set `firstFrame` and `lastFrame` to select an inclusive, zero-based\nrange. Save the preview beside the sheet or in `.ada/workspace/pixel-art/`. Use a\nnew filename for each export.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In native Studio chat, the A2UI `Image` component uses a project-relative path.\nShow the GIF to check the loop or show the PNG strip to inspect all frames side\nby side. The component uses nearest-neighbor filtering and integer zoom from 1\nto 16. Omit `zoom` for automatic sizing. If the chat host does not support\n`Image`, open the PNG in the asset panel. Hosts that advertise\n`editor.image.read` can also inspect the PNG before adding it to the game.",
         "level": 0,
         "links": []
       }

@@ -73,6 +73,7 @@ enum EditorAgentA2UIProtocol {
         Client capability metadata: {"a2uiClientCapabilities":{"supportedCatalogIds":["\(A2UIClient.catalogID)"]}}
         Catalog ID: \(A2UIClient.catalogID). Do not use the Basic Catalog.
         Components: Column/Row {children:[IDs],spacing?:number}; Text {text:stringOrPath};
+        Native Studio Image {path:string,zoom?:number}: show a project-relative PNG or animated GIF with nearest-neighbor zoom 1...16 (omit for automatic).
         TextField {text:{path:"/absolute/path"},placeholder?:string};
         Toggle {label:stringOrPath,value:{path:"/absolute/path"}};
         ChoicePicker {label?:stringOrPath,value:{path:"/absolute/path"},options:[{label:string,value:string}]};

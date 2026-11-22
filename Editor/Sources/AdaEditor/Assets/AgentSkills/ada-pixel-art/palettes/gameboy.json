@@ -1,0 +1,8 @@
+{
+  "name": "gameboy",
+  "description": "Original Nintendo Game Boy DMG-01 4-shade green palette.",
+  "max_colors": 4,
+  "colors": [
+    "#0F380F", "#306230", "#8BAC0F", "#9BBC0F"
+  ]
+}

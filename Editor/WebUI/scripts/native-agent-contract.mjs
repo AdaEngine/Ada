@@ -43,9 +43,11 @@ export async function nativeAgentContract(root) {
       !/^[a-f0-9]{64}$/.test(expected)
     )
       throw new Error("Invalid native contract source fingerprint");
-    const actual = createHash("sha256")
-      .update(await readFile(path.join(root, relative)))
-      .digest("hex");
+    const bytes = await readFile(path.join(root, relative));
+    const source = /\.(ada|md|swift|txt|ui)$/.test(relative)
+      ? bytes.toString("utf8").replaceAll("\r\n", "\n")
+      : bytes;
+    const actual = createHash("sha256").update(source).digest("hex");
     if (actual !== expected)
       throw new Error(
         `Native agent contract is stale: ${relative}. ${regenerate}`,

@@ -98,6 +98,114 @@ struct ProceduralMediaTests {
         #expect(canvas.rgba() == [0, 0, 0, 0, 10, 20, 30, 128])
     }
 
+    // MARK: - GIF
+
+    @Test("GIF output loops, scales by integers and round-trips frames and delays")
+    func gifRoundTrip() throws {
+        var palette = [PixelColor](repeating: PixelColor(red: 0, green: 0, blue: 0), count: 256)
+        palette[1] = PixelColor(red: 200, green: 10, blue: 20)
+        palette[2] = PixelColor(red: 10, green: 20, blue: 220)
+        let first = [UInt8](repeating: 1, count: 16)
+        var second = [UInt8](repeating: 0, count: 16)
+        second[5] = 2
+        let gif = try GIFWriter().encode(
+            width: 4,
+            height: 4,
+            frames: [
+                GIFAnimationFrame(indices: first, delayMilliseconds: 100),
+                GIFAnimationFrame(indices: second, delayMilliseconds: 80),
+            ],
+            palette: palette,
+            scale: 2
+        )
+        #expect(gif.starts(with: [0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))
+        #expect(gif.last == 0x3B)
+
+        let decoded = try GIFReader().decode(gif)
+        #expect(decoded.width == 8 && decoded.height == 8)
+        #expect(decoded.frames.count == 2)
+        #expect(decoded.frames[0].delayMilliseconds == 100)
+        #expect(decoded.frames[1].delayMilliseconds == 80)
+        #expect(decoded.loops)
+        #expect(decoded.palette[1] == PixelColor(red: 200, green: 10, blue: 20))
+        #expect(decoded.palette[2] == PixelColor(red: 10, green: 20, blue: 220))
+        #expect(decoded.palette[0].alpha == 0, "index 0 stays transparent")
+        #expect(decoded.frames[0].indices.allSatisfy { $0 == 1 }, "scaled solid frame")
+        #expect(decoded.frames[1].indices[18] == 2 && decoded.frames[1].indices[19] == 2, "2x scale replicates pixels")
+        #expect(decoded.frames[1].indices[0] == 0)
+    }
+
+    @Test("GIF writer rejects bad sizes, scales, frame counts and mismatched pixels")
+    func gifInvalid() {
+        let frame = GIFAnimationFrame(indices: [1], delayMilliseconds: 100)
+        #expect(throws: GIFWritingError.invalidSize(width: 0, height: 1)) {
+            try GIFWriter().encode(width: 0, height: 1, frames: [frame], palette: [])
+        }
+        #expect(throws: GIFWritingError.invalidScale(0)) {
+            try GIFWriter().encode(width: 1, height: 1, frames: [frame], palette: [], scale: 0)
+        }
+        #expect(throws: GIFWritingError.emptyAnimation) {
+            try GIFWriter().encode(width: 1, height: 1, frames: [], palette: [])
+        }
+        #expect(throws: GIFWritingError.tooManyFrames(257)) {
+            try GIFWriter().encode(width: 1, height: 1, frames: [GIFAnimationFrame](repeating: frame, count: 257), palette: [])
+        }
+        #expect(throws: GIFWritingError.mismatchedFrame(0, expected: 4)) {
+            try GIFWriter().encode(width: 2, height: 2, frames: [frame], palette: [])
+        }
+    }
+
+    @Test("GIF reader rejects junk and features the writer never emits")
+    func gifReaderRejects() {
+        #expect(throws: GIFReadingError.notGIF) { try GIFReader().decode(Data([1, 2, 3, 4, 5, 6])) }
+        #expect(throws: GIFReadingError.truncated) { try GIFReader().decode(Data([0x47, 0x49, 0x46, 0x38])) }
+    }
+
+    @Test("GIF decoding follows LZW code-width changes and preserves every color index")
+    func gifReadsLargeDictionary() throws {
+        let size = 128
+        var state: UInt32 = 1
+        let indices = (0..<(size * size)).map { _ in
+            state = state &* 1_664_525 &+ 1_013_904_223
+            return UInt8(truncatingIfNeeded: state >> 16)
+        }
+        let frame = GIFAnimationFrame(indices: indices, delayMilliseconds: 85)
+        let gif = try GIFWriter().encode(width: size, height: size, frames: [frame], palette: [])
+        let decoded = try GIFReader().decode(gif)
+        #expect(decoded.frames.first?.indices == indices)
+        #expect(decoded.frames.first?.delayMilliseconds == 90)
+    }
+
+    // MARK: - Palette extraction
+
+    @Test("Palette extraction keeps exact colors when few, ignoring transparent pixels")
+    func paletteExtractExact() {
+        // 2x2: red, red, blue, transparent.
+        let rgba: [UInt8] = [200, 0, 0, 255, 200, 0, 0, 255, 0, 0, 200, 255, 9, 9, 9, 40]
+        let colors = PixelPaletteExtractor.extract(rgba: rgba, maximumColors: 8)
+        #expect(colors == [PixelColor(red: 200, green: 0, blue: 0), PixelColor(red: 0, green: 0, blue: 200)])
+        #expect(PixelPaletteExtractor.extract(rgba: [1, 2, 3, 0], maximumColors: 8).isEmpty)
+    }
+
+    @Test("Palette extraction quantizes busy images down to the cap")
+    func paletteExtractQuantized() {
+        var rgba: [UInt8] = []
+        for index in 0..<256 {
+            let value = UInt8(index)
+            rgba.append(contentsOf: [value, value, value, 255])
+        }
+        let colors = PixelPaletteExtractor.extract(rgba: rgba, maximumColors: 4)
+        #expect(colors.count == 4)
+        #expect(colors.allSatisfy { abs(Int($0.red) - Int($0.green)) <= 1 && abs(Int($0.green) - Int($0.blue)) <= 1 }, "grayscale stays gray")
+    }
+
+    @Test("Palette buckets keep distinct red bands and break frequency ties consistently")
+    func paletteExtractQuantizesEveryChannel() {
+        let rgba: [UInt8] = [0, 0, 0, 255, 128, 0, 0, 255, 255, 0, 0, 255]
+        let colors = PixelPaletteExtractor.extract(rgba: rgba, maximumColors: 2)
+        #expect(colors == [PixelColor(red: 255, green: 0, blue: 0), PixelColor(red: 128, green: 0, blue: 0)])
+    }
+
     // MARK: - WAV
 
     @Test("WAV encoding round-trips through the reader and clips out-of-range samples")

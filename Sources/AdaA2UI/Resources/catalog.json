@@ -32,6 +32,33 @@
       ],
       "additionalProperties": false
     },
+    "Image": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "common_types.json#/$defs/ComponentId"
+        },
+        "component": {
+          "const": "Image"
+        },
+        "path": {
+          "type": "string",
+          "description": "Project-relative PNG or GIF file shown in the chat card."
+        },
+        "zoom": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16,
+          "description": "Integer nearest-neighbor scale; omit for automatic."
+        }
+      },
+      "required": [
+        "id",
+        "component",
+        "path"
+      ],
+      "additionalProperties": false
+    },
     "Column": {
       "type": "object",
       "properties": {

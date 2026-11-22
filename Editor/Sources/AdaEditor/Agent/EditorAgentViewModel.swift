@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+import AdaUI
 import Foundation
 import Observation
 
@@ -321,6 +322,7 @@ final class EditorAgentViewModel {
         }
 
         store = EditorAgentSessionStore(projectURL: projectURL)
+        a2ui.resources = UISceneResources(rootURL: projectURL)
         do {
             baseProjectConfig = try ProjectSystem.loadProject(at: projectURL, fileManager: fileManager)
         } catch {

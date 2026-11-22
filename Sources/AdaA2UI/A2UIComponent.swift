@@ -20,6 +20,7 @@ struct A2UIComponent {
         case "Toggle": allowed = ["label", "value", "checks"]
         case "ChoicePicker": allowed = ["label", "value", "options", "checks"]
         case "Slider": allowed = ["value", "min", "max", "step", "checks"]
+        case "Image": allowed = ["path", "zoom"]
         default: throw A2UIValidationError(path: "/component", message: "Unknown Ada catalog component '\(type)'.")
         }
         try fields.checkKeys(allowed.union(["id", "component"]))
@@ -76,6 +77,21 @@ struct A2UIComponent {
             if let step = fields["step"] {
                 guard let number = step.number, number.isFinite, number > 0 else {
                     throw A2UIValidationError(path: "/step", message: "Slider step must be a positive finite number.")
+                }
+            }
+        }
+        if type == "Image" {
+            // The path stays a literal project-relative reference; bindings could smuggle host paths in.
+            let path = try fields.requiredString("path")
+            guard !path.isEmpty, !path.hasPrefix("/"), !path.hasPrefix("~"), !path.contains("..") else {
+                throw A2UIValidationError(path: "/path", message: "Image path must be a relative path inside the project.")
+            }
+            guard path.lowercased().hasSuffix(".png") || path.lowercased().hasSuffix(".gif") else {
+                throw A2UIValidationError(path: "/path", message: "Image previews support PNG and GIF files.")
+            }
+            if let zoom = fields["zoom"] {
+                guard let number = zoom.number, number.isFinite, number.rounded() == number, (1...16).contains(number) else {
+                    throw A2UIValidationError(path: "/zoom", message: "Image zoom must be an integer between 1 and 16.")
                 }
             }
         }

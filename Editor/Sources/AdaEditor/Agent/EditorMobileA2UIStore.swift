@@ -1,3 +1,4 @@
+import AdaUI
 import Foundation
 import Observation
 
@@ -43,7 +44,7 @@ final class EditorMobileA2UIStore {
                 session.a2uiSurfaces = try JSONDecoder().decode([EditorAgentA2UISurfaceRecord].self, from: Data(contentsOf: url))
             }
         } catch { persistenceError = "Unable to restore chat interface: \(error.localizedDescription)" }
-        let ui = controller.restoreIfNeeded(session)
+        let ui = controller.restoreIfNeeded(session, resources: UISceneResources(rootURL: projectURL))
         ui.reconcileEvents(events)
         return ui
     }
