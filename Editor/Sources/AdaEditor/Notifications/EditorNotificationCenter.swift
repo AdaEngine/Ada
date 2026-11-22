@@ -37,10 +37,6 @@ final class EditorNotificationCenter {
     @ObservationIgnored
     private var loaded = false
     @ObservationIgnored
-    private var pendingReadIDs: Set<String> = []
-    @ObservationIgnored
-    private var clearedBeforeLoad = false
-    @ObservationIgnored
     private var isLoading = false
     @ObservationIgnored
     private var deadlines: [String: Date] = [:]
@@ -68,15 +64,6 @@ final class EditorNotificationCenter {
         defer { isLoading = false }
         do {
             let snapshot = try await store?.load() ?? .init()
-            let existingIDs = Set(notifications.map(\.id))
-            notifications = Array(
-                (notifications + (clearedBeforeLoad ? [] : snapshot.notifications.filter { !existingIDs.contains($0.id) }))
-                    .sorted { $0.createdAt > $1.createdAt }.prefix(500)
-            )
-            for index in notifications.indices where pendingReadIDs.contains(notifications[index].id) {
-                notifications[index].isRead = true
-            }
-            pendingReadIDs.removeAll()
             preferences = snapshot.preferences
             activities.restore(snapshot.activities)
             for activity in snapshot.activities where !activity.state.isTerminal && !activities.active.contains(where: { $0.id == activity.id }) {
@@ -125,7 +112,6 @@ final class EditorNotificationCenter {
         let ids = Set(notifications.map(\.id))
         toastIDs.removeAll { !ids.contains($0) }
         expireToasts()
-        persist()
     }
 
     func expireToasts(now: Date = Date()) {
@@ -173,32 +159,23 @@ final class EditorNotificationCenter {
     }
 
     func markRead(_ id: String) {
-        if !loaded {
-            pendingReadIDs.insert(id)
-        }
         if let index = notifications.firstIndex(where: { $0.id == id }) {
             notifications[index].isRead = true
         }
         removeDelivered?([id])
-        persist()
     }
 
     func markAllRead() {
         for index in notifications.indices { notifications[index].isRead = true }
         removeDelivered?(notifications.map(\.id))
-        persist()
     }
 
     func clear() {
-        if !loaded {
-            clearedBeforeLoad = true
-        }
         removeDelivered?(notifications.map(\.id))
         notifications.removeAll()
         toastIDs.removeAll()
         deadlines.removeAll()
         paused.removeAll()
-        persist()
     }
 
     func perform(_ action: EditorNotificationAction, notificationID: String? = nil) {
@@ -226,7 +203,7 @@ final class EditorNotificationCenter {
         }
         revision += 1
         let revision = revision
-        let snapshot = EditorNotificationSnapshot(notifications: notifications, activities: activities.all, preferences: preferences)
+        let snapshot = EditorNotificationSnapshot(activities: activities.all, preferences: preferences)
         Task {
             do { try await store.save(snapshot, revision: revision) } catch { storageError = "Unable to save notifications: \(error.localizedDescription)" }
         }

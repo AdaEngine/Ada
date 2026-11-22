@@ -50,7 +50,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/AdaEngine/SAGA.git",
       "state" : {
-        "revision" : "b4778ced1da4b26e850b020d0f4cfe223d95d5c7"
+        "revision" : "bcc6896875ee80f6c6f033ce5cdd6d272d21134c"
       }
     },
     {

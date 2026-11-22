@@ -566,16 +566,18 @@ extension EditorWorkbenchViewModel {
             isUI = false
         }
 
-        let previousContent = document.content
-        let wasDirty = document.isDirty
+        let previous = document
         update(&document)
-        if document.content != previousContent {
+        if document.content != previous.content {
             document.semanticTokens = []
+        }
+        guard document != previous else {
+            return
         }
         textSelections[documentID] = EditorTextSelection(range: document.selectionRange, text: document.selectedText)
         openDocuments[index] = isUI ? .ui(document) : .text(document)
         notifyActiveDocumentChangedIfNeeded(documentID: documentID)
-        if document.isDirty, document.content != previousContent || !wasDirty {
+        if document.isDirty, document.content != previous.content || !previous.isDirty {
             onDocumentEdited?(documentID)
         }
     }

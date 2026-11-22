@@ -28,6 +28,7 @@ final class EditorProjectTreePresentation {
     typealias Item = EditorProjectSidebarViewModel.Item
     nonisolated static let duration: Double = 0.18
     nonisolated static let rowHeight: Float = 28
+    private static let maxAnimatedVisibilityChanges = 64
 
     struct Row: Identifiable {
         let item: Item
@@ -44,15 +45,23 @@ final class EditorProjectTreePresentation {
     }
 
     private var entries: [Entry]
+    @ObservationIgnored private var settledRows: [Row] = []
     private var startedAt: Date?
+    private(set) var settledRevision: UInt64 = 0
     var isAnimating: Bool { startedAt != nil }
 
     init(items: [Item]) {
         entries = items.map { Entry(item: $0, start: 1, visible: true) }
+        settledRows = items.map { Row(item: $0, fraction: 1, isVisible: true) }
     }
 
     func rows(at date: Date) -> [Row] {
-        let elapsed = startedAt.map { max(0, date.timeIntervalSince($0)) } ?? Self.duration
+        // Observe entry changes even when a settled snapshot already exists.
+        let entries = self.entries
+        guard let startedAt else {
+            return settledRows
+        }
+        let elapsed = max(0, date.timeIntervalSince(startedAt))
         let progress = Float(min(1, elapsed / Self.duration))
         let eased = progress * progress * (3 - 2 * progress)
         return entries.map { entry in
@@ -63,6 +72,7 @@ final class EditorProjectTreePresentation {
 
     func reset(to items: [Item]) {
         entries = items.map { Entry(item: $0, start: 1, visible: true) }
+        settledRows = items.map { Row(item: $0, fraction: 1, isVisible: true) }
         startedAt = nil
     }
 
@@ -70,6 +80,10 @@ final class EditorProjectTreePresentation {
         let targets = Dictionary(items.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
         let previousTargets = entries.filter(\.visible).map { $0.item.id }
         if previousTargets == items.map(\.id) {
+            if !isAnimating {
+                reset(to: items)
+                return
+            }
             entries = entries.map { entry in
                 var updated = entry
                 updated.item = targets[entry.item.id] ?? entry.item
@@ -77,6 +91,14 @@ final class EditorProjectTreePresentation {
             }
             return
         }
+
+        // A large folder animated from zero height packs all of its children into
+        // the viewport at once and defeats the lazy stack's normal row budget.
+        if Set(previousTargets).symmetricDifference(targets.keys).count > Self.maxAnimatedVisibilityChanges {
+            settle(to: items)
+            return
+        }
+
         let current = Dictionary(rows(at: date).map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
         entries = order.compactMap { id in
             guard let item = targets[id] ?? current[id]?.item else { return nil }
@@ -86,8 +108,15 @@ final class EditorProjectTreePresentation {
     }
 
     func finishIfNeeded(at date: Date) {
-        guard let startedAt, date.timeIntervalSince(startedAt) >= Self.duration else { return }
-        reset(to: entries.filter(\.visible).map(\.item))
+        guard let startedAt, date.timeIntervalSince(startedAt) >= Self.duration else {
+            return
+        }
+        settle(to: entries.filter(\.visible).map(\.item))
+    }
+
+    private func settle(to items: [Item]) {
+        reset(to: items)
+        settledRevision &+= 1
     }
 }
 
@@ -116,15 +145,16 @@ struct EditorProjectTreeRows<RowContent: View>: View {
                 row(entry.item)
                     .opacity(entry.fraction)
                     .frame(height: entry.height, alignment: .topLeading)
-                    .mask(RectangleShape())
+                    .mask(RectangleShape(), isEnabled: entry.fraction != 1)
                     .allowsHitTesting(entry.isVisible)
                     .accessibilityIdentifier("AdaEditor.ProjectTree.Row.\(entry.item.relativePath)")
             }
+            // Reveal after the new row IDs have reached the mounted lazy stack.
+            .onChange(of: presentation.settledRevision) { _, _ in onSettled() }
             .onChange(of: context.date) { _, date in presentation.finishIfNeeded(at: date) }
         }
         .onChange(of: items) { _, items in
             presentation.update(to: items, order: order, at: Date())
         }
-        .onChange(of: presentation.isAnimating) { _, animating in if !animating { onSettled() } }
     }
 }

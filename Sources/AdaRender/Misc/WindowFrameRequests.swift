@@ -19,6 +19,10 @@ public struct WindowFrameRequests: Resource {
 
     package mutating func beginFrame() {
         requestedWindowIDs.removeAll(keepingCapacity: true)
+        clearCameraModes()
+    }
+
+    mutating func clearCameraModes() {
         onDemandWindowIDs.removeAll(keepingCapacity: true)
         continuousWindowIDs.removeAll(keepingCapacity: true)
     }
@@ -27,7 +31,9 @@ public struct WindowFrameRequests: Resource {
         let id: WindowID
         switch window {
         case .primary:
-            guard let primary else { return }
+            guard let primary else {
+                return
+            }
             id = primary
         case .windowId(let windowID): id = windowID
         }
@@ -39,6 +45,8 @@ public struct WindowFrameRequests: Resource {
     }
 
     // Preserve ordinary display pacing when no on-demand cameras participate.
+    var hasOnDemandWindows: Bool { !onDemandWindowIDs.isEmpty }
+
     package var expectsPresentation: Bool {
         onDemandWindowIDs.isEmpty || !continuousWindowIDs.isEmpty || !requestedWindowIDs.isEmpty
     }
@@ -48,6 +56,8 @@ public struct WindowFrameRequests: Resource {
 /// prevents acquisition. Owned by the render world's surface system.
 package struct PendingWindowFrameRequests {
     private var windowIDs: Set<WindowID> = []
+
+    var isEmpty: Bool { windowIDs.isEmpty }
 
     package mutating func include(_ requests: WindowFrameRequests?) {
         if let requests { windowIDs.formUnion(requests.requestedWindowIDs) }

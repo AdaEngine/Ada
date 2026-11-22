@@ -115,7 +115,13 @@ struct SceneViewFrameCaptureTests {
 
     @Test
     func resizeKeepsPresentingTheLastFrameInsteadOfBlanking() async throws {
-        let coordinator = SceneViewCoordinator(make: { _ in }, updateContent: { _, _ in }, frameCaptureLabel: "game")
+        var now = ContinuousClock.now
+        let coordinator = SceneViewCoordinator(
+            make: { _ in },
+            updateContent: { _, _ in },
+            frameCaptureLabel: "game",
+            resizeClock: { now }
+        )
         defer { coordinator.shutdown() }
         try await boot(coordinator)
         try await completeFrame(of: coordinator)
@@ -125,18 +131,30 @@ struct SceneViewFrameCaptureTests {
         coordinator.tick(0.2)
         for _ in 0..<5000 where coordinator.standaloneTickInFlight { await Task.yield() }
 
+        // A large delta measured before the resize request must not trigger reallocation.
+        let app = try #require(coordinator.appWorlds)
+        #expect(renderTarget(in: app.main)?.width == 16)
+        now = now.advanced(by: .milliseconds(70))
+        coordinator.updateSize(SizeInt(width: 36, height: 26), scaleFactor: 1)
+        now = now.advanced(by: .milliseconds(79))
+        coordinator.tick(0.2)
+        for _ in 0..<5000 where coordinator.standaloneTickInFlight { await Task.yield() }
+        #expect(renderTarget(in: app.main)?.width == 16)
+        now = now.advanced(by: .milliseconds(1))
+        coordinator.tick(0.016)
+        for _ in 0..<5000 where coordinator.standaloneTickInFlight { await Task.yield() }
+
         // The viewport must never expose what is behind it (a white flash) while the new targets render.
         #expect(coordinator.renderTexture === displayed)
         #expect(coordinator.completedFrameTexture == nil)
-        let app = try #require(coordinator.appWorlds)
         let target = try #require(renderTarget(in: app.main))
-        #expect(target.width == 32)
+        #expect(target.width == 36)
         target.notifyRenderCompleted()
         for _ in 0..<50 { await Task.yield() }
         coordinator.tick(0.016)
         for _ in 0..<5000 where coordinator.standaloneTickInFlight { await Task.yield() }
         #expect(coordinator.renderTexture === displayed)
-        #expect(displayed.width == 32)
+        #expect(displayed.width == 36)
     }
 
     @Test

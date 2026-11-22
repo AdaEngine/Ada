@@ -13,7 +13,7 @@ import AdaUtils
 import Math
 
 /// Plugin for RenderWorld added 2D render capatibilites.
-public struct Core2DPlugin: Plugin {
+public struct Core2DPlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
     /// Input slots of render graph.
@@ -37,6 +37,7 @@ public struct Core2DPlugin: Plugin {
             .insertResource(RenderPipelines(configurator: LinePipeline()))
 
         var graph = RenderGraph(label: .main2D)
+        graph.supportsOnDemandWindowFrames = true
         let entryNode = graph.addEntryNode(inputs: [
             RenderSlot(name: InputNode.view, kind: .entity)
         ])

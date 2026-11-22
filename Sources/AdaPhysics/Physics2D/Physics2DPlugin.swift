@@ -13,7 +13,7 @@ import AdaUtils
 import Math
 
 /// Setup 2D physics to the scene.
-public struct Physics2DPlugin: Plugin {
+public struct Physics2DPlugin: Plugin, DeferredRenderSnapshotPlugin {
     public let gravity: Vector2
 
     public init(gravity: Vector2 = [0, -9.81]) {

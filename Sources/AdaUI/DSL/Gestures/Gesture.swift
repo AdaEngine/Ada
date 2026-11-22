@@ -290,6 +290,15 @@ public struct DragGesture: Gesture {
     public var minimumDistance: Float
     /// Touches must remain pressed for this duration before dragging. Quick swipes can scroll an enclosing ScrollView.
     public var minimumPressDuration: TimeInterval
+    private var coalescesMouseMoves = false
+
+    /// Use for controls whose drag state depends only on the most recent position.
+    @_spi(AdaEngine)
+    public func coalescingMouseMoves() -> Self {
+        var gesture = self
+        gesture.coalescesMouseMoves = true
+        return gesture
+    }
 
     public init(minimumDistance: Float = 10, minimumPressDuration: TimeInterval = 0) {
         self.minimumDistance = minimumDistance
@@ -302,7 +311,13 @@ extension DragGesture: _RecognizableGesture {
         onChanged: ((DragGesture.Value) -> Void)?,
         onEnded: ((DragGesture.Value) -> Void)?
     ) -> GestureRecognizer {
-        DragGestureRecognizer(minimumDistance: minimumDistance, minimumPressDuration: minimumPressDuration, onChanged: onChanged, onEnded: onEnded)
+        DragGestureRecognizer(
+            minimumDistance: minimumDistance,
+            minimumPressDuration: minimumPressDuration,
+            coalescesMouseMoves: coalescesMouseMoves,
+            onChanged: onChanged,
+            onEnded: onEnded
+        )
     }
 }
 

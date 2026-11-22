@@ -169,10 +169,30 @@ public struct RenderGraph: Resource {
     let label: Label?
     private let logger: Logger
 
-    internal private(set) var nodes: [RenderNodeLabel: Node] = [:]
-    internal private(set) var subGraphs: [Label: Self] = [:]
+    private(set) var allowsDeferredSnapshots = DeferredSnapshotRegistration.isCompatible
+    package var supportsOnDemandWindowFrames = false
 
-    internal private(set) var entryNode: Node?
+    internal private(set) var nodes: [RenderNodeLabel: Node] = [:] {
+        didSet { recordConfigurationChange() }
+    }
+    internal private(set) var subGraphs: [Label: Self] = [:] {
+        didSet {
+            recordConfigurationChange()
+            if subGraphs.values.contains(where: { !$0.allowsDeferredSnapshots }) {
+                allowsDeferredSnapshots = false
+            }
+        }
+    }
+
+    internal private(set) var entryNode: Node? {
+        didSet { recordConfigurationChange() }
+    }
+
+    private mutating func recordConfigurationChange() {
+        if !DeferredSnapshotRegistration.isCompatible {
+            allowsDeferredSnapshots = false
+        }
+    }
 
     nonisolated public init(label: Label? = nil) {
         self.label = label

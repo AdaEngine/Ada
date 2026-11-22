@@ -52,8 +52,34 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
         try? FileHandle.standardError.write(contentsOf: Data("[SAGA queue] \(message)\n".utf8))
     }
 
+    private final class AdjacentBatch<Item: Sendable>: Sendable {
+        private let items: Mutex<[Item]?>
+
+        init(_ first: Item) {
+            items = Mutex([first])
+        }
+
+        func append(_ item: Item) -> Bool {
+            items.withLock { items in
+                guard let count = items?.count, count < 64 else {
+                    return false
+                }
+                items?.append(item)
+                return true
+            }
+        }
+
+        func take() -> [Item] {
+            items.withLock { items in
+                defer { items = nil }
+                return items ?? []
+            }
+        }
+    }
+
     private struct State {
         var continuation: AsyncStream<(Job, String)>.Continuation?
+        var adjacentBatch: (any Sendable)?
         var pending = 0
         var idleWaiters: [CheckedContinuation<Void, Never>] = []
     }
@@ -118,12 +144,32 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
         enqueue(.cleanup(cleanup), origin: "\(file):\(line)")
     }
 
-    private func enqueue(_ job: Job, origin: String) {
-        let continuation = state.withLock { state -> AsyncStream<(Job, String)>.Continuation? in
+    /// Coalesces neighboring items of one type until ordinary work or a size limit seals the batch.
+    func enqueueAdjacent<Item: Sendable>(
+        _ item: Item,
+        submit: @escaping @Sendable (Context, [Item]) async throws -> Void,
+        file: String = #fileID,
+        line: Int = #line
+    ) {
+        state.withLock { state in
+            if let existing = state.adjacentBatch as? AdjacentBatch<Item>, existing.append(item) {
+                return
+            }
+            let batch = AdjacentBatch(item)
+            state.adjacentBatch = batch
             state.pending += 1
-            return state.continuation
+            state.continuation?.yield((.device({ context in
+                try await submit(context, batch.take())
+            }, onUnavailable: { _ = batch.take() }), "\(file):\(line)"))
         }
-        continuation?.yield((job, origin))
+    }
+
+    private func enqueue(_ job: Job, origin: String) {
+        state.withLock { state in
+            state.adjacentBatch = nil
+            state.pending += 1
+            state.continuation?.yield((job, origin))
+        }
     }
 
     /// Suspends until all work enqueued before the call has finished.

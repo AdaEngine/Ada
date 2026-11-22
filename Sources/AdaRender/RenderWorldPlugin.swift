@@ -13,7 +13,7 @@ import Logging
 import Math
 
 /// The plugin that sets up the render world.
-public struct RenderWorldPlugin: Plugin {
+public struct RenderWorldPlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
     /// Setup the render world.
@@ -173,18 +173,30 @@ public struct RenderSystem {
 }
 
 /// The extractor that extracts the main world to the render world.
-struct RenderWorldExctractor: WorldExctractor {
+struct RenderWorldExctractor: FrameDeferringWorldExtractor {
+    @MainActor
+    func needsUpdate(from main: World, to subworld: AppWorlds) -> Bool {
+        #if os(macOS) && SAGA_METAL && canImport(SAGACompiler)
+        OnDemandRenderWorld.needsUpdate(from: main, to: subworld)
+        #else
+        true
+        #endif
+    }
+
     func exctract(from mainWorld: World, to renderWorld: World) async {
         renderWorld.clear()
         renderWorld.insertResource(MainWorld(world: mainWorld))
-        var graphClock = renderWorld.getResource(ShaderGraphClock.self) ?? ShaderGraphClock()
-        graphClock.advance(delta: mainWorld.getResource(DeltaTime.self)?.deltaTime ?? 0)
-        renderWorld.insertResource(graphClock)
+        Self.advanceClock(from: mainWorld, to: renderWorld)
         if let primaryWindow = mainWorld.getResource(PrimaryWindowId.self) {
             renderWorld.insertResource(primaryWindow)
+        } else {
+            renderWorld.removeResource(PrimaryWindowId.self)
         }
-        // Copied, not read through `Extract`, because surfaces are created after extraction (`.prepare`).
-        if let frameRequests = mainWorld.getResource(WindowFrameRequests.self) {
+        // The automatic path snapshots camera demand after simulation. Explicit updates use the usual main-world requests.
+        let surfaces = renderWorld.getResource(WindowSurfaces.self)
+        let frameRequests = surfaces?.automaticFrameRequests ?? mainWorld.getResource(WindowFrameRequests.self)
+        surfaces?.automaticFrameRequests = nil
+        if let frameRequests {
             renderWorld.insertResource(frameRequests)
         } else {
             renderWorld.removeResource(WindowFrameRequests.self)
@@ -195,6 +207,12 @@ struct RenderWorldExctractor: WorldExctractor {
         if RenderPipelining.isActive(in: renderWorld) {
             renderWorld.removeResource(MainWorld.self)
         }
+    }
+
+    static func advanceClock(from main: World, to render: World) {
+        var clock = render.getResource(ShaderGraphClock.self) ?? ShaderGraphClock()
+        clock.advance(delta: main.getResource(DeltaTime.self)?.deltaTime ?? 0)
+        render.insertResource(clock)
     }
 }
 
@@ -215,6 +233,10 @@ public struct WindowSurface: Sendable {
 public final class WindowSurfaces: Resource, @unchecked Sendable {
     public var windows: SparseSet<WindowRef, WindowSurface>
     var pendingFrameRequests = PendingWindowFrameRequests()
+    var automaticFrameRequests: WindowFrameRequests?
+    #if os(macOS) && SAGA_METAL && canImport(SAGACompiler)
+    let onDemand = OnDemandRenderWorld()
+    #endif
     let allowsWindowRendering: Bool
     let allowedWindowIDs: Set<WindowID>?
 

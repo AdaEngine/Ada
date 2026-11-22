@@ -6,8 +6,10 @@
 //
 
 import AdaRender
+import AdaTextShaper
 import AtlasFontGenerator
 import Foundation
+import Synchronization
 
 /// Hold information about font data and atlas.
 @safe
@@ -15,7 +17,8 @@ final class FontHandle: Hashable, @unchecked Sendable {
     let atlasTexture: Texture2D
     let fontData: OpaquePointer!
     let fontPath: URL?
-    let variationAxes: [FontVariationAxis]
+    private let variationAxes: [FontVariationAxis]
+    private let shapingFont = Mutex<ShapingFont?>(nil)
 
     let metrics: FontMetrics
     let fontName: String
@@ -42,6 +45,21 @@ final class FontHandle: Hashable, @unchecked Sendable {
 
     deinit {
         unsafe font_handle_destroy(self.fontData)
+    }
+
+    // Fallback atlases can provide glyph geometry without ever opening a shaper.
+    func preparedShapingFont() -> ShapingFont? {
+        guard let fontPath else {
+            return nil
+        }
+        return shapingFont.withLock { cached in
+            if let cached {
+                return cached
+            }
+            let font = ShapingFont(fontPath, variationAxes: variationAxes)
+            cached = font
+            return font
+        }
     }
 
     func getGlyph(for scalar: UInt32) -> Glyph? {
@@ -95,6 +113,29 @@ final class FontHandle: Hashable, @unchecked Sendable {
 }
 
 extension FontHandle {
+    /// Owns one immutable HarfBuzz font. Each caller shapes with its own HarfBuzz buffer.
+    @safe
+    final class ShapingFont: @unchecked Sendable {
+        @unsafe let ref: OpaquePointer
+
+        init?(_ fontPath: URL, variationAxes: [FontVariationAxis]) {
+            let axes = variationAxes.map { ada_font_variation_axis_t(tag: $0.tag, value: $0.value) }
+            let nativeFont = unsafe fontPath.path.withCString { path in
+                unsafe axes.withUnsafeBufferPointer { axes in
+                    unsafe ada_shaping_font_create(path, axes.baseAddress, Int32(axes.count))
+                }
+            }
+            guard let nativeFont = unsafe nativeFont else {
+                return nil
+            }
+            unsafe self.ref = nativeFont
+        }
+
+        deinit {
+            unsafe ada_shaping_font_destroy(ref)
+        }
+    }
+
     @safe
     final class Glyph {
         let ref: OpaquePointer

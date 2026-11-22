@@ -25,6 +25,13 @@ enum ShadowSceneDigest3D {
             for model in sources[index].mesh.models {
                 for part in model.parts {
                     digest.combine(UInt64(UInt(bitPattern: ObjectIdentifier(part.vertexBuffer))))
+                    digest.combine(UInt64(UInt(bitPattern: ObjectIdentifier(part.indexBuffer))))
+                    if let vertexRevision = part.vertexBuffer.shadowRasterRevision, let indexRevision = part.indexBuffer.shadowRasterRevision {
+                        digest.combine(vertexRevision)
+                        digest.combine(indexRevision)
+                    } else if part.vertexBuffer.hasUntrackedShadowWrites || part.indexBuffer.hasUntrackedShadowWrites {
+                        return nil
+                    }
                     digest.combine(UInt64(part.indexCount))
                     digest.combine(UInt64(part.materialIndex))
                 }

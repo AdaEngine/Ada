@@ -6,6 +6,7 @@
 //
 
 @_spi(AdaEngine) import AdaEngine
+@_spi(AdaEngine) import AdaUI
 
 struct EditorWorkspaceView<
     LeftPanel: View,
@@ -23,12 +24,14 @@ struct EditorWorkspaceView<
 
     var body: some View {
         GeometryReader { geometry in
-            // Width changes are observed by the layout, not the panel builders.
+            // The layout handles width changes without rerunning panel builders.
             // swiftlint:disable:next redundant_discardable_let
             let _ = resizeState.topologyRevision
             let layout = resizeState.layout(in: geometry.size, viewModel: viewModel)
             // Keep seven slots, including empty placeholders for collapsed panels.
-            EditorWorkspacePanelsLayout(state: resizeState, viewModel: viewModel) {
+            EditorWorkspacePanelsLayout(state: resizeState, viewModel: viewModel)(
+                invalidation: resizeState.geometryInvalidation
+            ) {
                 if layout.showsLeftPanel {
                     leftPanel()
                         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)

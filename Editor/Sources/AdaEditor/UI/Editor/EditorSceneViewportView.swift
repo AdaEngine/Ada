@@ -339,7 +339,9 @@ struct EditorSceneViewportView: View {
         Self.configureSimulation(in: app, isPlaying: isPlayingThisDocument)
         app.addPlugin(TileMapPlugin())
         app.addPlugin(Core2DPlugin())
-        app.addPlugin(Core3DPlugin(includes2D: true))
+        let core3D = Core3DPlugin(includes2D: true)
+        let cacheEditShadows = !isPlayingThisDocument && !isAssetPreview
+        app.addPlugin(cacheEditShadows ? core3D.cachingStudioEditShadows() : core3D)
         app.addPlugin(Light2DPlugin())
         app.addPlugin(UpscalePlugin())
         return true

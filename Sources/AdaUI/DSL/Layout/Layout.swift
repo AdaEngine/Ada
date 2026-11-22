@@ -82,7 +82,30 @@ extension Layout {
     /// - Parameter content: The content of the layout.
     /// - Returns: The layout.
     public func callAsFunction<Content: View>(@ViewBuilder _ content: @escaping () -> Content) -> some View {
-        CustomLayoutContainer(layout: self, content: content)
+        CustomLayoutContainer(layout: self, invalidation: nil, content: content)
+    }
+
+    /// Mounts a layout that accepts explicit geometry invalidations in addition to observable changes.
+    @_spi(AdaEngine)
+    public func callAsFunction<Content: View>(
+        invalidation: LayoutInvalidation,
+        @ViewBuilder _ content: @escaping () -> Content
+    ) -> some View {
+        CustomLayoutContainer(layout: self, invalidation: invalidation, content: content)
+    }
+}
+
+/// A geometry update handle for one mounted custom layout.
+@_spi(AdaEngine)
+@MainActor
+public final class LayoutInvalidation {
+    weak var node: ObservedLayoutViewContainerNode?
+
+    public init() {}
+
+    /// Schedules placement after an external geometry change, preserving any pending animation transaction.
+    public func invalidateGeometry() {
+        node?.invalidateGeometry()
     }
 }
 
@@ -92,6 +115,7 @@ struct CustomLayoutContainer<T: Layout, Content: View>: View {
     typealias Body = Never
 
     let layout: T
+    let invalidation: LayoutInvalidation?
     let content: () -> Content
 
     public static func _makeView(_ view: _ViewGraphNode<Self>, inputs: _ViewInputs) -> _ViewOutputs {
@@ -101,6 +125,7 @@ struct CustomLayoutContainer<T: Layout, Content: View>: View {
         var inputs = inputs
         inputs.layout = layout
         let node = ObservedLayoutViewContainerNode(layout: layout, content: content.value)
+        node.geometryInvalidation = view[\.invalidation].value
         node.updateEnvironment(inputs.environment)
         node.invalidateContent()
         return _ViewOutputs(node: node)

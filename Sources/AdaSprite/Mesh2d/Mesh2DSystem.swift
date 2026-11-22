@@ -16,7 +16,7 @@ import Math
 // MARK: - Mesh 2D Plugin -
 
 /// Plugin to exctract meshes to RenderWorld.
-public struct Mesh2DPlugin: Plugin {
+public struct Mesh2DPlugin: Plugin, DeferredRenderSnapshotPlugin {
     /// Initialize a new mesh 2D plugin.
     public init() {}
 

@@ -9,6 +9,48 @@ import Testing
 @MainActor
 @Suite("Project tree expansion", .serialized)
 struct EditorProjectTreeStateTests {
+    @Test("Large project folders skip compressed intermediate rows")
+    func largeFolderSettlesImmediately() {
+        typealias Item = EditorProjectSidebarViewModel.Item
+        let root = Item(
+            id: "Assets",
+            disclosure: "",
+            icon: "",
+            title: "Assets",
+            relativePath: "Assets",
+            level: 0,
+            isActive: false,
+            isFolder: true,
+            kind: .folder
+        )
+        let files = (0..<180).map { index in
+            let name = "Asset\(index).ada"
+            return Item(
+                id: name,
+                disclosure: "",
+                icon: "",
+                title: name,
+                relativePath: "Assets/\(name)",
+                level: 1,
+                isActive: false,
+                isFolder: false,
+                kind: .text(.ada)
+            )
+        }
+        let items = [root] + files
+        let order = items.map(\.id)
+        let presentation = EditorProjectTreePresentation(items: [root])
+        let now = Date()
+        presentation.update(to: items, order: order, at: now)
+        #expect(presentation.settledRevision == 1)
+        #expect(!presentation.isAnimating)
+        #expect(presentation.rows(at: now).map(\.id) == order)
+        #expect(presentation.rows(at: now).allSatisfy { $0.height == 28 })
+        presentation.update(to: [root], order: order, at: now)
+        #expect(presentation.settledRevision == 2)
+        #expect(presentation.rows(at: now).map(\.id) == [root.id])
+    }
+
     @Test("Source subfolders remain unique descendants of the configured source target")
     func sourceHierarchy() throws {
         let fixture = try Fixture()

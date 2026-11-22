@@ -38,6 +38,7 @@ for relative in [
     "Tests/AdaRenderTests/SAGAVulkanDeviceTests.swift",
     "Tests/AdaRenderTests/SAGAIndexedIndirectTests.swift",
     "Tests/AdaRenderTests/SAGAVisibilityProcessorTests.swift",
+    "Tests/AdaRenderTests/SAGACommandCompletionTests.swift",
     "Tests/AdaRenderTests/SAGAMetalNativeSubmissionTests.swift",
     "Tests/AdaRenderTests/MetalResourceDeviceTests.swift",
     "Tests/AdaRenderTests/MetalFoveationTests.swift",

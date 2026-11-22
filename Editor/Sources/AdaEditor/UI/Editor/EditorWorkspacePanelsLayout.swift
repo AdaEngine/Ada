@@ -1,4 +1,5 @@
 @_spi(AdaEngine) import AdaEngine
+@_spi(AdaEngine) import AdaUI
 import Observation
 
 @Observable
@@ -10,8 +11,8 @@ final class EditorWorkspaceResizeState {
         case bottom = "Bottom"
     }
 
-    // Only the layout subscribes to per-movement updates. Content subscribes to topology.
-    private(set) var layoutRevision: UInt64 = 0
+    // Pointer movement requests layout directly. Content only observes topology changes.
+    let geometryInvalidation = LayoutInvalidation()
     private(set) var topologyRevision: UInt64 = 0
     @ObservationIgnored private var leftWidth: Float = AdaEngineStyleLayoutSpec.projectSidebarWidth
     @ObservationIgnored private var rightWidth: Float = AdaEngineStyleLayoutSpec.inspectorWidth
@@ -67,13 +68,19 @@ final class EditorWorkspaceResizeState {
             let height = start - translation.height
             if height < EditorWorkspaceLayout.minimumBottomPanelHeight {
                 viewModel.showBottomPanel = false
-                if viewModel.toolStrip.activeLeftBottomTool == "animator" { animatorHeight = start }
-                else { bottomHeight = start }
+                if viewModel.toolStrip.activeLeftBottomTool == "animator" {
+                    animatorHeight = start
+                } else {
+                    bottomHeight = start
+                }
                 dragStart = nil
             } else {
                 let adjusted = EditorWorkspaceLayout.clampedBottomPanelHeight(height, in: size)
-                if viewModel.toolStrip.activeLeftBottomTool == "animator" { animatorHeight = adjusted }
-                else { bottomHeight = adjusted }
+                if viewModel.toolStrip.activeLeftBottomTool == "animator" {
+                    animatorHeight = adjusted
+                } else {
+                    bottomHeight = adjusted
+                }
             }
         }
         let after = layout(in: size, viewModel: viewModel)
@@ -85,7 +92,7 @@ final class EditorWorkspaceResizeState {
             || before.showsBottomPanel != after.showsBottomPanel {
             topologyRevision &+= 1
         }
-        layoutRevision &+= 1
+        geometryInvalidation.invalidateGeometry()
     }
 
     func endDrag() {
@@ -103,7 +110,6 @@ struct EditorWorkspacePanelsLayout: Layout {
     }
 
     func placeSubviews(in bounds: Rect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
-        _ = state.layoutRevision
         let layout = state.layout(in: bounds.size, viewModel: viewModel)
         var index = 0
         var x: Float = 0

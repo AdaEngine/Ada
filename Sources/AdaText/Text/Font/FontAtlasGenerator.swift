@@ -221,10 +221,10 @@ final class FontAtlasGenerator: Sendable {
 
     private static func halfPrecisionPixels(from data: Data) -> Data {
         let stride = MemoryLayout<Float>.stride
-        let components = unsafe data.withUnsafeBytes { bytes in
-            (0..<(bytes.count / stride)).map { index in
-                let component = unsafe bytes.loadUnaligned(fromByteOffset: index * stride, as: Float.self)
-                return Float16(component).bitPattern
+        let components: [UInt16] = unsafe data.withUnsafeBytes { bytes in
+            return (0..<(bytes.count / stride)).map { (index: Int) in
+                let component: Float = unsafe bytes.loadUnaligned(fromByteOffset: index * stride, as: Float.self)
+                return component.toFloat16BitPattern
             }
         }
         return unsafe components.withUnsafeBufferPointer { unsafe Data(buffer: $0) }
@@ -791,5 +791,11 @@ private struct FontCacheBinaryReader {
         }
         offset += size
         return T(littleEndian: value)
+    }
+}
+
+extension Float {
+    var toFloat16BitPattern: UInt16 {
+        Float16(self).bitPattern
     }
 }

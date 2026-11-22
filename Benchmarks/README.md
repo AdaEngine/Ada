@@ -119,3 +119,7 @@ frame): typed query 14 ms, native cursor 30 ms, Gravity iteration only 0.40 s, G
 typed Swift query is therefore about 115 times faster than the equivalent script, and about
 three quarters of the script's time is bridge and VM work per field access rather than iteration. Treat these as
 a baseline for comparing changes on the same machine, not as a portable figure.
+
+## AdaUI interaction benchmarks
+
+- [Split editor resize](SplitEditor/README.md) measures visible divider motion while resizing an editable code pane and a file panel.

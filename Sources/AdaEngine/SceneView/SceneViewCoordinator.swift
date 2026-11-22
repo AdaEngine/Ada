@@ -49,9 +49,8 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     private let pipelinedRendering: Bool
     private var currentSize: SizeInt = .zero
     private var scaleFactor: Float = 1
-    private var pendingSize: SizeInt?
-    private var pendingScaleFactor: Float = 1
-    private var pendingSizeElapsed: AdaUtils.TimeInterval = 0
+    private var pendingResize: (size: SizeInt, scaleFactor: Float, readyAt: ContinuousClock.Instant)?
+    private let resizeClock: () -> ContinuousClock.Instant
     private var contentDeltaTime: AdaUtils.TimeInterval = 0
 
     private let makeClosure: @MainActor (inout AppWorlds) -> Void
@@ -62,7 +61,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     /// `false` keeps the scene on its own update loop even when a host session exists, so it
     /// advances without the host's display link (for automation that must not depend on a visible window).
     private let joinsHostSession: Bool
-    private let resizeApplyDelay: AdaUtils.TimeInterval = 0.08
+    private let resizeApplyDelay = Duration.milliseconds(80)
     /// Common guaranteed 2D texture limit across the supported Metal and WebGPU device families.
     private let maximumRenderTextureDimension = 8_192
 
@@ -87,10 +86,12 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         prepareFramePresentation: (@MainActor () -> (@MainActor () -> Void))? = nil,
         frameCaptureLabel: String? = nil,
         pipelinedRendering: Bool = false,
-        joinsHostSession: Bool = true
+        joinsHostSession: Bool = true,
+        resizeClock: @escaping () -> ContinuousClock.Instant = { .now }
     ) {
         self.pipelinedRendering = pipelinedRendering
         self.joinsHostSession = joinsHostSession
+        self.resizeClock = resizeClock
         self.frameCaptureLabel = frameCaptureLabel
         self.useSceneCameras = useSceneCameras
         self.makeClosure = make
@@ -196,9 +197,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         standaloneTickInFlight = false
         currentSize = .zero
         scaleFactor = 1
-        pendingSize = nil
-        pendingScaleFactor = 1
-        pendingSizeElapsed = 0
+        pendingResize = nil
     }
 
     func updateSize(_ size: SizeInt, scaleFactor: Float) {
@@ -214,9 +213,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             return
         }
         guard size != currentSize || scaleFactor != self.scaleFactor else {
-            pendingSize = nil
-            pendingScaleFactor = 1
-            pendingSizeElapsed = 0
+            pendingResize = nil
             return
         }
 
@@ -225,16 +222,15 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             return
         }
 
-        if pendingSize != size || pendingScaleFactor != scaleFactor {
-            pendingSize = size
-            pendingScaleFactor = scaleFactor
-            pendingSizeElapsed = 0
+        if pendingResize?.size != size || pendingResize?.scaleFactor != scaleFactor {
+            // Frame delta can include a render stall that occurred before this request.
+            pendingResize = (size, scaleFactor, resizeClock().advanced(by: resizeApplyDelay))
         }
     }
 
     func tick(_ deltaTime: AdaUtils.TimeInterval) {
         guard isRenderingEnabled else { return }
-        applyPendingSizeIfReady(deltaTime: deltaTime)
+        applyPendingSizeIfReady()
         // GPU completion may arrive between UI extraction and submission. Only
         // swap the displayed texture and its companion UI at the next UI tick.
         publishRenderTextureIfReady()
@@ -351,20 +347,13 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         hasCalledSetup = true
     }
 
-    private func applyPendingSizeIfReady(deltaTime: AdaUtils.TimeInterval) {
-        guard let pendingSize else {
+    private func applyPendingSizeIfReady() {
+        guard let resize = pendingResize, resizeClock() >= resize.readyAt else {
             return
         }
 
-        pendingSizeElapsed += deltaTime
-        guard pendingSizeElapsed >= resizeApplyDelay else {
-            return
-        }
-
-        applySize(pendingSize, scaleFactor: pendingScaleFactor)
-        self.pendingSize = nil
-        pendingScaleFactor = 1
-        pendingSizeElapsed = 0
+        pendingResize = nil
+        applySize(resize.size, scaleFactor: resize.scaleFactor)
     }
 
     private func applySize(_ size: SizeInt, scaleFactor: Float) {

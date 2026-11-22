@@ -15,8 +15,9 @@ protocol FocusedInputContainer: AnyObject {
 }
 
 @MainActor
-protocol TextSelectionInputContainer: AnyObject {
+protocol CapturedMouseInputContainer: AnyObject {
     var isSelectingTextWithMouse: Bool { get }
+    var isDraggingWithCoalescedMouseMoves: Bool { get }
 }
 
 @MainActor
@@ -175,6 +176,14 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
     var isSelectingTextWithMouse: Bool {
         (activeMouseEventNode as? TextEditorViewNode)?.isSelectingWithMouse == true
     }
+    var isDraggingWithCoalescedMouseMoves: Bool {
+        guard let node = activeMouseEventNode as? GestureAreaViewNode, node.gestures.count == 1,
+              let drag = node.gestures.first as? DragGestureRecognizer else {
+            return false
+        }
+        return drag.coalescesMouseMoves && drag.state == .changed
+    }
+
     /// Touch-began capture target. Subsequent moved/ended/cancelled events are routed here.
     private var activeTouchEventNodes: [RID: WeakBox<ViewNode>] = [:]
     /// Pinch-began capture target, retained through the end of the gesture.
@@ -605,7 +614,7 @@ extension UIContainerView: UIInspectionOverlayStateProviding {
     }
 }
 
-extension UIContainerView: TextSelectionInputContainer {}
+extension UIContainerView: CapturedMouseInputContainer {}
 
 extension UIContainerView: UIMousePassthroughEventReceiving {
     @_spi(Internal)

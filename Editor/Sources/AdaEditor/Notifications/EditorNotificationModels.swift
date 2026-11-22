@@ -87,9 +87,20 @@ struct EditorOperationActivity: Codable, Equatable, Identifiable, Sendable {
 }
 
 struct EditorNotificationSnapshot: Codable, Sendable {
-    var notifications: [EditorNotification] = []
     var activities: [EditorOperationActivity] = []
     var preferences = EditorNotificationPreferences()
+
+    private enum PersistenceKey: String, CodingKey {
+        case notifications, activities, preferences
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: PersistenceKey.self)
+        // Older Studio builds expect this key when reopening the file.
+        try values.encode([EditorNotification](), forKey: .notifications)
+        try values.encode(activities, forKey: .activities)
+        try values.encode(preferences, forKey: .preferences)
+    }
 }
 
 actor EditorNotificationStore {

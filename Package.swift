@@ -1479,8 +1479,8 @@ if !isWebExportEnabled && !isAndroidBuildEnabled {
 if let sagaPath = sagaCheckoutPath {
     package.dependencies.append(.package(name: "SAGA", path: sagaPath))
 } else {
-    // SAGA Metal compositor submission and native Vulkan surface presentation.
-    let sagaRevision = "b4778ced1da4b26e850b020d0f4cfe223d95d5c7"
+    // Metal indexed draw grouping and validated shared upload batches.
+    let sagaRevision = "bcc6896875ee80f6c6f033ce5cdd6d272d21134c"
     package.dependencies.append(.package(
         url: "https://github.com/AdaEngine/SAGA.git",
         revision: sagaRevision

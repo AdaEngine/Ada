@@ -14,7 +14,7 @@
     import Synchronization
 
     @_spi(Internal)
-    public final class SAGARenderDevice: RenderDevice, @unchecked Sendable {
+    public final class SAGARenderDevice: RenderDevice, RenderDeviceWithCommandCompletion, @unchecked Sendable {
         let context: SAGAContext
         weak var windows: (any SAGAWindowProvider)?
 

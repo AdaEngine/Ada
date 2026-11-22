@@ -644,6 +644,7 @@ struct EditorResizeHandle: View {
             .drawingGroup()
             .gesture(
                 DragGesture(minimumDistance: 1)
+                    .coalescingMouseMoves()
                     .onChanged { value in
                         if !isDragging {
                             isDragging = true
@@ -651,6 +652,10 @@ struct EditorResizeHandle: View {
                         onResize(value.translation)
                     }
                     .onEnded { _ in
+                        isDragging = false
+                        onResizeEnded()
+                    }
+                    .onCancelled {
                         isDragging = false
                         onResizeEnded()
                     }

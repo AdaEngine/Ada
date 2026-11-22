@@ -13,7 +13,7 @@ import AdaRender
 import AdaText
 
 /// Plugin for extracting sprites from scene to RenderWorld.
-public struct SpritePlugin: Plugin {
+public struct SpritePlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
     public func setup(in app: AppWorlds) {

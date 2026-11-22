@@ -23,6 +23,14 @@ public protocol WorldExctractor {
     func exctract(from mainWorld: World, to world: World) async
 }
 
+/// An extractor that can decide whether an automatic subworld update is needed.
+package protocol FrameDeferringWorldExtractor: WorldExctractor {
+    @MainActor func needsUpdate(from main: World, to subworld: AppWorlds) -> Bool
+}
+
+/// Built-in render setup whose snapshots can be deferred between requested frames.
+package protocol DeferredRenderSnapshotPlugin: Plugin {}
+
 /// A class that represents a collection of worlds.
 @MainActor
 public final class AppWorlds {
@@ -242,8 +250,12 @@ extension AppWorlds {
 
         for world in self.subWorlds.values where !world.isHostedUpdateSuspended && world.hostedUpdateSuspensionCount == 0 {
             // A pipelined subworld may still render the previous frame; extraction is the only meeting point.
-            let pipelined = world.isUpdatePipelined
             try await world.waitForPipelinedUpdates()
+            let pipelined = world.isUpdatePipelined
+            if let extractor = unsafe world.worldExctractor as? any FrameDeferringWorldExtractor,
+               !extractor.needsUpdate(from: main, to: world) {
+                continue
+            }
             let stall = PerformanceStallProbe.begin()
             unsafe await world.worldExctractor?.exctract(from: main, to: world.main)
             if stall != nil { PerformanceStallProbe.end("App.Extract.\(world.main.name ?? "subworld")", since: stall) }
@@ -409,7 +421,9 @@ extension AppWorlds {
                 assertionFailure("Plugin \(pluginName) already setuped")
             }
 
-            plugin.setup(in: self)
+            DeferredSnapshotRegistration.$isCompatible.withValue(plugin is any DeferredRenderSnapshotPlugin) {
+                plugin.setup(in: self)
+            }
 
             while !plugin.isLoaded(in: self) {
                 try await waitForPluginLoad()

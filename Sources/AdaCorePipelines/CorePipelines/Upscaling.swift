@@ -12,7 +12,7 @@ import AdaRender
 import AdaUtils
 import Math
 
-public struct UpscalePlugin: Plugin {
+public struct UpscalePlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
     public func setup(in app: borrowing AdaApp.AppWorlds) {

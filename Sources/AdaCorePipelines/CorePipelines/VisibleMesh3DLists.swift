@@ -336,7 +336,13 @@ public struct VisibleMesh3DLists: Resource {
             if sources[sourceIndex].skinningOffset > 0 { shadowFlags.y = -Float(sources[sourceIndex].skinningOffset) }
             if isShadowPass {
                 // A skinned pose changes without any CPU-visible identity change, so such a face is never reusable.
-                if sources[sourceIndex].skinningBuffer != nil || !sources[sourceIndex].morphBuffers.isEmpty { entry.isDynamic = true }
+                let part = selectedMesh.models[Int(record.model)].parts[Int(record.part)]
+                if sources[sourceIndex].skinningBuffer != nil || !sources[sourceIndex].morphBuffers.isEmpty
+                    || part.vertexBuffer.hasUntrackedShadowWrites || part.indexBuffer.hasUntrackedShadowWrites {
+                    entry.isDynamic = true
+                }
+                if let revision = part.vertexBuffer.shadowRasterRevision { entry.digest.combine(revision) }
+                if let revision = part.indexBuffer.shadowRasterRevision { entry.digest.combine(revision) }
                 entry.digest.combine(template.batchHash)
                 entry.digest.combine(transform)
                 entry.digest.combine(tint)
@@ -404,7 +410,7 @@ public struct VisibleMesh3DLists: Resource {
 
     /// Fingerprint of everything a shadow pass would draw (batches, transforms, alpha inputs), or `nil` when the pass
     /// contains skinned meshes whose pose changes without any visible change here. Equal fingerprints mean an
-    /// identical face. Meshes edited in place keep their buffer identity and are not noticed.
+    /// identical face. Meshes edited in place on Metal also contribute their geometry storage version.
     func shadowDigest(view: Entity.ID, pass: Int) -> UInt64? {
         guard let entry = entries[Key(view: view, pass: pass)], !entry.isDynamic else {
             return nil

@@ -49,6 +49,24 @@ struct EditorTextInteractionPerformanceTests {
         #expect(model.textDocument(id: "text")?.selectedText == "value")
     }
 
+    @Test("Text edits keep the project tree's active path observation local")
+    func textEditsDoNotPublishActivePath() {
+        let model = makeModel()
+        let changes = Mutex(0)
+        withObservationTracking {
+            _ = model.activeDocumentRelativePath
+        } onChange: {
+            changes.withLock { $0 += 1 }
+        }
+        let text = model.textDocumentBinding(documentID: "text")
+        text.wrappedValue += " inserted"
+        #expect(changes.withLock { $0 } == 0)
+        #expect(model.activeDocumentRelativePath == model.activeDocument?.relativePath)
+        model.closeDocument(id: "text")
+        #expect(changes.withLock { $0 } == 1)
+        #expect(model.activeDocumentRelativePath == nil)
+    }
+
     @Test("Dragging in the mounted code view does not rebuild the workspace")
     func selectionAvoidsRebuilds() throws {
         prepareRenderer()

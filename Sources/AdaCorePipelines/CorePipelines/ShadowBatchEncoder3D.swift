@@ -81,6 +81,7 @@ struct ShadowBatchEncoder3D {
         if let defaults { pass.setVertexBuffer(defaults, offset: 0, slot: 4) }
         var current: Int32 = -1
         var encoded = 0
+        defer { pass.allowIndexedDrawGrouping(nil) }
         for draw in draws {
             guard let state = states[Int(draw.state)] else { continue }
             if draw.state != current || state.material != nil {
@@ -98,6 +99,7 @@ struct ShadowBatchEncoder3D {
                 pass.setIndexBuffer(state.indexBuffer, offset: 0)
                 current = draw.state
             }
+            pass.allowIndexedDrawGrouping(state.material == nil ? .shadowDepth : nil)
             pass.drawIndexed(
                 indexCount: state.indexCount,
                 indexBufferOffset: 0,

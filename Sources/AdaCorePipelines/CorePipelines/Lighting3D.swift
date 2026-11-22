@@ -128,6 +128,7 @@ public struct DirectionalShadowViewUniform: Sendable {
 
 /// Reusable GPU storage for the directional shadow pass.
 public struct DirectionalShadow3DScratch: Resource, Sendable {
+    var shadowMapCache = ShadowMapCache3D()
     struct PreparedCascade: Equatable, Sendable {
         let sourceRevision: RID
         let cameraView: Transform3D

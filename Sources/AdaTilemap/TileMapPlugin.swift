@@ -13,7 +13,7 @@ import AdaTransform
 import Math
 import OrderedCollections
 
-public struct TileMapPlugin: Plugin {
+public struct TileMapPlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
     public func setup(in app: AppWorlds) {

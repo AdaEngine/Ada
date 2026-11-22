@@ -163,6 +163,9 @@ public protocol Drawable: AnyObject, Sendable {
     func present() throws
 }
 
+/// Devices whose command buffers signal safe reuse after retirement or terminal device loss.
+package protocol RenderDeviceWithCommandCompletion {}
+
 extension RenderDevice {
     public var supportsFloat32TextureFiltering: Bool { true }
     public var supportsInstancedVertexInputs: Bool { false }

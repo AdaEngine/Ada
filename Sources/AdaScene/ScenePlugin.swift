@@ -1,7 +1,7 @@
 import AdaApp
 import AdaECS
 
-public struct ScenePlugin: Plugin {
+public struct ScenePlugin: Plugin, DeferredRenderSnapshotPlugin {
     private let includesModel3D: Bool
 
     /// Creates scene support with optional installation of the built-in 3D model pipeline.

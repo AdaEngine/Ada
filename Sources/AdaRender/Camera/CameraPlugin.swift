@@ -12,7 +12,7 @@ import AdaTransform
 import AdaUtils
 import Math
 
-public struct CameraPlugin: Plugin {
+public struct CameraPlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
     public func setup(in app: AppWorlds) {

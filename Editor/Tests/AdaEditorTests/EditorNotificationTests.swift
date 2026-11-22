@@ -107,23 +107,48 @@ struct EditorNotificationTests {
         #expect(!preferences.shouldDeliver(notification, applicationIsActive: false))
     }
 
-    @Test("History round trips through an actual file and stale writes are ignored")
+    @Test("Notification preferences round trip through an actual file and stale writes are ignored")
     func persistence() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("EditorNotifications-\(UUID())")
         defer { try? FileManager.default.removeItem(at: root) }
-        let store = EditorNotificationStore(url: root.appendingPathComponent("history.json"))
-        let item = EditorNotification(
-            id: "persisted",
-            source: .agent,
-            importance: .error,
-            title: "Failed",
-            actions: [.init(title: "Chat", destination: .chat, projectID: "project", sessionID: "session")]
-        )
-        try await store.save(.init(notifications: [item]), revision: 2)
+        let url = root.appendingPathComponent("history.json")
+        let store = EditorNotificationStore(url: url)
+        let preferences = EditorNotificationPreferences(soundEnabled: false, enabledSources: [.build])
+        try await store.save(.init(preferences: preferences), revision: 2)
         try await store.save(.init(), revision: 1)
         let restored = try await store.load()
-        #expect(restored.notifications == [item])
-        #expect(restored.notifications.first?.actions.first?.sessionID == "session")
+        #expect(restored.preferences == preferences)
+        let legacy = try JSONDecoder().decode(LegacyNotificationSnapshot.self, from: Data(contentsOf: url))
+        #expect(legacy.notifications.isEmpty)
+        #expect(legacy.preferences == preferences)
+    }
+
+    @Test("Notification history ends with the Studio session")
+    func historyIsSessionScoped() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("EditorNotifications-\(UUID())")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("history.json")
+        let saved = EditorNotification(id: "previous", source: .build, importance: .success, title: "Built")
+        let activity = EditorOperationActivity(source: .build, title: "Build", state: .completed)
+        let preferences = EditorNotificationPreferences(soundEnabled: false)
+        let legacy = LegacyNotificationSnapshot(notifications: [saved], activities: [activity], preferences: preferences)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try JSONEncoder().encode(legacy).write(to: url)
+
+        let center = EditorNotificationCenter(store: EditorNotificationStore(url: url))
+        let current = EditorNotification(id: "current", source: .project, importance: .information, title: "Ready")
+        center.post(current)
+        await center.start()
+
+        #expect(center.notifications == [current])
+        #expect(center.activities.all == [activity])
+        #expect(center.preferences == preferences)
+    }
+
+    private struct LegacyNotificationSnapshot: Codable {
+        let notifications: [EditorNotification]
+        let activities: [EditorOperationActivity]
+        let preferences: EditorNotificationPreferences
     }
 
     @Test("History is bounded and clearing removes delivered system notifications")

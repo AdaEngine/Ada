@@ -1,4 +1,6 @@
 #if os(macOS) && SAGA_METAL
+    import AdaApp
+    import AdaECS
     @testable import AdaRender
     import AdaUtils
     import AppKit
@@ -11,6 +13,69 @@
 
     @MainActor
     struct SAGAMetalWindowTests {
+        @Test(.enabled(if: sagaMetalWindowSmokeEnabled))
+        func idleOnDemandWindowSkipsRenderWorldWhileSimulationContinues() async throws {
+            _ = NSApplication.shared
+            let view = MTKView(frame: NSRect(x: 0, y: 0, width: 64, height: 64), device: nil)
+            view.isPaused = true
+            let window = NSWindow(contentRect: view.frame, styleMask: [.titled], backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = view
+            window.orderFrontRegardless()
+            defer { window.close() }
+
+            let backend = try SAGAMetalRenderBackend()
+            let engine = RenderEngine(renderBackend: backend)
+            let id = WindowID()
+            try backend.createWindow(id, for: view, size: SizeInt(width: 64, height: 64))
+            defer { try? backend.destroyWindow(id) }
+
+            let app = AppWorlds(main: World(name: "On-demand frame test"))
+            MainSchedulerPlugin().setup(in: app)
+            app.addPlugin(RenderWorldPlugin())
+            app.insertResource(PrimaryWindowId(windowId: id))
+            var requests = WindowFrameRequests()
+            requests.include(.primary, primary: id, onDemand: true)
+            requests.requestedWindowIDs.insert(id)
+            app.insertResource(requests)
+            app.spawn {
+                Camera(window: .primary)
+                WindowRenderOnDemand()
+            }
+            try await app.build()
+            let render = try #require(app.getSubworldBuilder(by: .renderWorld))
+            render.insertResource(RenderEngineHandler(renderEngine: engine))
+            render.insertResource(RenderDeviceHandler(renderDevice: engine.renderDevice))
+            var simulationTicks = 0
+            var renderTicks = 0
+            app.gameDiagnosticsTick = { _ in simulationTicks += 1 }
+            render.gameDiagnosticsTick = { _ in renderTicks += 1 }
+
+            try await app.update()
+            let surfaces = try #require(render.getResource(WindowSurfaces.self))
+            for _ in 0..<4 where surfaces.windows[.primary]?.currentDrawable == nil {
+                try await Task.sleep(for: .milliseconds(20))
+                try await app.update()
+            }
+            try #require(surfaces.windows[.primary]?.currentDrawable != nil)
+            requests.requestedWindowIDs.removeAll()
+            app.insertResource(requests)
+            let idleSimulationStart = simulationTicks
+            let idleRenderStart = renderTicks
+            try await app.update()
+            try await app.update()
+            #expect(simulationTicks == idleSimulationStart + 2)
+            #expect(renderTicks == idleRenderStart)
+            #expect(surfaces.windows.isEmpty)
+
+            requests.requestedWindowIDs.insert(id)
+            app.insertResource(requests)
+            try await app.update()
+            #expect(renderTicks == idleRenderStart + 1)
+            #expect(surfaces.windows[.primary]?.currentDrawable != nil)
+            await backend.context.queue.drain()
+        }
+
         @Test(.enabled(if: sagaMetalWindowSmokeEnabled))
         func presentsAndResizesAnEngineDrawable() async throws {
             _ = NSApplication.shared

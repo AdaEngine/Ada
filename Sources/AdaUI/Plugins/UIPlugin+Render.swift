@@ -183,6 +183,9 @@ public struct UIRenderTesselationSystem {
     @ResMut<UILayerDrawCache>
     private var layerDrawCache
 
+    @Res<UIGeometryBufferPool?>
+    private var geometryBufferPool
+
     @Res<UIDrawPass>
     private var uiDrawPass
 
@@ -201,6 +204,9 @@ public struct UIRenderTesselationSystem {
         removeStaleRenderItems()
 
         let tessellator = UITessellator()
+        let transientBuffers = renderDevice.renderDevice is RenderDeviceWithCommandCompletion
+            ? geometryBufferPool
+            : nil
         var sortKey: Float = 0
         var activeLayerIDs = Set<UInt64>()
         var rebuiltWindowIds = Set<WindowID?>()
@@ -208,14 +214,13 @@ public struct UIRenderTesselationSystem {
         contexts.graphicContexts.forEach { graphicsContext in
             let windowId = graphicsContext.windowId
             rebuiltWindowIds.insert(windowId)
-            var rootState = DrawBuildState()
+            var rootState = DrawBuildState(transientBuffers: transientBuffers)
             var layerStack: [ActiveLayer] = []
 
             for command in graphicsContext.getDrawCommands() {
                 switch command {
                 case let .beginLayer(id, version, cacheable):
                     activeLayerIDs.insert(id)
-                    var inheritedState = layerStack.last?.state ?? rootState
                     if let parentIndex = layerStack.indices.last {
                         // A parent's slices are emitted around its children. Caching
                         // only its final slice would lose/reorder earlier geometry.
@@ -227,7 +232,6 @@ public struct UIRenderTesselationSystem {
                         flushStateIfNeeded(&rootState, renderDevice: renderDevice.renderDevice).map { rootState.drawDataItems.append($0) }
                         appendRenderItems(rootState.drawDataItems, sortKey: &sortKey, context: graphicsContext)
                         rootState.drawDataItems.removeAll(keepingCapacity: true)
-                        inheritedState = rootState
                     } else if layerStack[layerStack.count - 1].mode == .building {
                         flushStateIfNeeded(&layerStack[layerStack.count - 1].state, renderDevice: renderDevice.renderDevice)
                             .map {
@@ -235,9 +239,9 @@ public struct UIRenderTesselationSystem {
                             }
                         appendRenderItems(layerStack[layerStack.count - 1].state.drawDataItems, sortKey: &sortKey, context: graphicsContext)
                         layerStack[layerStack.count - 1].state.drawDataItems.removeAll(keepingCapacity: true)
-                        inheritedState = layerStack[layerStack.count - 1].state
                     }
 
+                    var inheritedState = layerStack.last?.state ?? rootState
                     let canUseLayerCache = cacheable
                     if canUseLayerCache,
                         let cached = layerDrawCache.entries[id],
@@ -248,6 +252,7 @@ public struct UIRenderTesselationSystem {
                         appendRenderItems(cached.drawDataItems, sortKey: &sortKey, context: graphicsContext)
                         layerStack.append(ActiveLayer(id: id, version: version, mode: .skipping, cacheable: cacheable, state: inheritedState))
                     } else {
+                        inheritedState.transientBuffers = canUseLayerCache ? nil : transientBuffers
                         layerStack.append(ActiveLayer(id: id, version: version, mode: .building, cacheable: canUseLayerCache, state: inheritedState))
                     }
 
@@ -358,18 +363,21 @@ public struct UIRenderTesselationSystem {
         }
         var preparedGlyphClip: UITessellator.PreparedGlyphClip?
         var clipPolygonStack: [[[Vector2]]?] = []
+        var transientBuffers: UIGeometryBufferPool?
 
         init(
             currentClipRect: Rect? = nil,
             clipStack: [Rect?] = [],
             currentClipPolygons: [[Vector2]]? = nil,
-            clipPolygonStack: [[[Vector2]]?] = []
+            clipPolygonStack: [[[Vector2]]?] = [],
+            transientBuffers: UIGeometryBufferPool? = nil
         ) {
             self.currentClipRect = currentClipRect
             self.clipStack = clipStack
             self.currentClipPolygons = currentClipPolygons
             self.preparedGlyphClip = currentClipPolygons.flatMap { UITessellator().prepareGlyphClip($0) }
             self.clipPolygonStack = clipPolygonStack
+            self.transientBuffers = transientBuffers
             renderData.textures = [.whiteTexture]
             renderData.fontAtlases = []
             renderData.clipRect = currentClipRect
@@ -430,16 +438,19 @@ public struct UIRenderTesselationSystem {
             return nil
         }
 
-        let accumulatedDrawDataItems = state.drawDataItems
-        state.renderData.write(to: renderDevice)
-        let flushed = state.renderData
-        state = DrawBuildState(
-            currentClipRect: state.currentClipRect,
-            clipStack: state.clipStack,
-            currentClipPolygons: state.currentClipPolygons,
-            clipPolygonStack: state.clipPolygonStack
-        )
-        state.drawDataItems = accumulatedDrawDataItems
+        let transientBuffers = state.transientBuffers
+        var flushed = state.renderData
+        // The next slice uses the same clip and already prepared glyph bounds.
+        state.renderData = UIDrawData()
+        state.renderData.textures = [.whiteTexture]
+        state.renderData.clipRect = state.currentClipRect
+        state.currentLineWidth = 1.0
+
+        // The draw pass cannot rasterize any of this slice through an empty scissor.
+        if let clip = flushed.clipRect, clip.width <= 0 || clip.height <= 0 {
+            return nil
+        }
+        flushed.write(to: renderDevice, using: transientBuffers)
         return flushed
     }
 

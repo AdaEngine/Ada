@@ -2,6 +2,11 @@ import AdaUtils
 import Logging
 import Tracing
 
+/// The installation scope of a built-in plugin with a deferred snapshot contract.
+package enum DeferredSnapshotRegistration {
+    @TaskLocal package static var isCompatible = false
+}
+
 /// Represents a scheduler stage in the ECS update loop.
 public struct SchedulerName: Hashable, Equatable, RawRepresentable, CustomStringConvertible, Sendable {
     /// The raw value of the scheduler name.
@@ -52,6 +57,7 @@ public final class Schedulers: @unchecked Sendable {
     private(set) var schedulerLabels: [SchedulerName]
     private var schedulers: [SchedulerName: Scheduler]
     private let logger: Logger = Logger(label: "org.adaengine.ecs.schedulers")
+    package private(set) var hasUnclassifiedWork = false
 
     /// Initialize a new schedulers.
     /// - Parameter schedulers: The schedulers to initialize.
@@ -65,6 +71,7 @@ public final class Schedulers: @unchecked Sendable {
     /// Set the schedulers.
     /// - Parameter schedulers: The schedulers to set.
     public func setSchedulers(_ schedulers: [SchedulerName]) {
+        recordConfigurationChange()
         self.schedulerLabels = schedulers
         self.schedulers = Dictionary(
             uniqueKeysWithValues: schedulerLabels.map { ($0, Scheduler(name: $0)) }
@@ -74,6 +81,7 @@ public final class Schedulers: @unchecked Sendable {
     /// Append a scheduler.
     /// - Parameter scheduler: The scheduler to append.
     public func append(_ scheduler: Scheduler) {
+        recordConfigurationChange()
         schedulerLabels.append(scheduler.name)
         schedulers[scheduler.name] = scheduler
     }
@@ -87,6 +95,7 @@ public final class Schedulers: @unchecked Sendable {
             return
         }
 
+        recordConfigurationChange()
         if let idx = schedulerLabels.firstIndex(of: after) {
             schedulerLabels.insert(scheduler.name, at: idx + 1)
         } else {
@@ -111,6 +120,7 @@ public final class Schedulers: @unchecked Sendable {
             return
         }
 
+        recordConfigurationChange()
         if let idx = schedulerLabels.firstIndex(of: before) {
             schedulerLabels.insert(scheduler.name, at: idx)
         } else {
@@ -130,8 +140,19 @@ public final class Schedulers: @unchecked Sendable {
         for schedulerName: SchedulerName,
         scopeBlock: (inout Scheduler) async -> Void
     ) async {
+        recordConfigurationChange()
+        await withScheduler(schedulerName, scopeBlock)
+    }
+
+    func run(_ schedulerName: SchedulerName, world: World, deltaTime: AdaUtils.TimeInterval?) async {
+        await withScheduler(schedulerName) {
+            await $0.run(world: world, deltaTime: deltaTime)
+        }
+    }
+
+    private func withScheduler(_ schedulerName: SchedulerName, _ body: (inout Scheduler) async -> Void) async {
         if var scheduler = self.schedulers[schedulerName] {
-            await scopeBlock(&scheduler)
+            await body(&scheduler)
             self.schedulers[schedulerName] = scheduler
         } else {
             logger.error("Scheduler \(schedulerName) not found")
@@ -140,6 +161,7 @@ public final class Schedulers: @unchecked Sendable {
 
     /// Add system to scheduler. If scheduler not exists, than we create it.
     public func addSystem<T: System>(_ system: T, for schedulerName: SchedulerName) {
+        recordConfigurationChange()
         if schedulers[schedulerName] == nil {
             schedulerLabels.append(schedulerName)
         }
@@ -152,8 +174,15 @@ public final class Schedulers: @unchecked Sendable {
         guard var scheduler = schedulers[schedulerName] else {
             return
         }
+        recordConfigurationChange()
         scheduler.systemGraph.removeSystem(system)
         self.schedulers[schedulerName] = scheduler
+    }
+
+    private func recordConfigurationChange() {
+        if !DeferredSnapshotRegistration.isCompatible {
+            hasUnclassifiedWork = true
+        }
     }
 }
 

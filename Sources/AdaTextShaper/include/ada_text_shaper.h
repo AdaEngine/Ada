@@ -32,6 +32,22 @@ typedef enum ada_text_direction_e {
     ADA_TEXT_DIRECTION_RIGHT_TO_LEFT = 1
 } ada_text_direction_t;
 
+typedef struct hb_font_t ada_shaping_font_t;
+
+/* A prepared font owns its data and can shape independently on multiple threads. */
+ada_shaping_font_t *ada_shaping_font_create(
+    const char *fontPath,
+    const ada_font_variation_axis_t *variationAxes,
+    int variationAxesCount
+);
+void ada_shaping_font_destroy(ada_shaping_font_t *font);
+ada_shaped_text_t *ada_shaping_font_shape_utf8(
+    ada_shaping_font_t *font,
+    const char *text,
+    int textLength,
+    ada_text_direction_t direction
+);
+
 ada_shaped_text_t *ada_text_shape_utf8(const char *fontPath, const char *text, int textLength);
 ada_shaped_text_t *ada_text_shape_utf8_with_variations(
     const char *fontPath,

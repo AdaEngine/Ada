@@ -1385,7 +1385,7 @@
   "Restart connection": "Подключиться заново",
   "Restore Locked Libraries": "Восстановить закреплённые библиотеки",
   "Restore purchases": "Восстановить покупки",
-  "Results and requests for attention appear in the system while AdaEditor is inactive. Notification history is always available in the editor.": "Когда Ada Studio неактивна, результаты и просьбы о помощи появляются в системе. История уведомлений всегда доступна в редакторе.",
+  "Results and requests for attention appear in the system while AdaEditor is inactive. The editor keeps notification history for the current session.": "Когда Ada Studio неактивна, результаты и просьбы о помощи появляются в системе. Редактор хранит историю уведомлений до закрытия Studio.",
   "Retry": "Повторить",
   "Reveal File": "Показать файл в папке",
   "Reveal Project in File Manager": "Показать папку проекта",

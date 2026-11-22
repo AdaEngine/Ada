@@ -2,9 +2,11 @@
 
 The bell at the bottom right opens the application-wide notification history and
 Activity panel. Closing a toast marks it read and preserves its history entry.
-Informational toasts hide after eight visible seconds; warnings, errors, and
+Informational toasts hide after four visible seconds; warnings, errors, and
 requests for attention stay until dismissed or resolved. At most three cards are
-shown at once. History retains the latest 500 records in Application Support.
+shown at once. The Notifications tab keeps up to 500 records for the current
+Studio session. The next launch starts with a fresh notification history.
+Notification settings and Activity history persist across launches.
 
 Notification Settings controls system delivery, sound, and source categories.
 System permission is requested only when the user enables delivery. Agent/build/

@@ -14,6 +14,27 @@ struct ClippedLayerCacheTests {
     }
 
     @Test
+    func emptyClipDiscardsGeometryAndRestoresParentClip() async throws {
+        let world = makeWorld()
+        let viewport = Rect(x: 0, y: 0, width: 100, height: 100)
+        let outside = Rect(x: 150, y: 20, width: 30, height: 30)
+        var context = UIGraphicsContext()
+        context.clip(to: viewport) { clipped in
+            clipped.clip(to: outside) { hidden in
+                hidden.drawRect(outside, color: .red)
+            }
+            clipped.drawRect(Rect(x: 10, y: 10, width: 20, height: 20), color: .green)
+        }
+
+        let items = try await build(context, in: world)
+        #expect(items.count == 1)
+        let visible = try #require(items.last?.drawData)
+        #expect(visible.clipRect == viewport)
+        #expect(visible.quadIndexBuffer.count == 6)
+        #expect(visible.quadVertexBuffer.elements.allSatisfy { $0.color == .green })
+    }
+
+    @Test
     func unchangedMaskReusesBuffersAndChangedMaskRetessellates() async throws {
         let world = makeWorld()
         let layer = UILayer(frame: Rect(x: 0, y: 0, width: 100, height: 100)) { context, size in

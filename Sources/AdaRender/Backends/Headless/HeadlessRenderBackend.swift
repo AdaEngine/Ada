@@ -58,7 +58,7 @@ final class HeadlessRenderBackend: RenderBackend, @unchecked Sendable {
     }
 }
 
-private final class HeadlessRenderDevice: RenderDevice, @unchecked Sendable {
+private final class HeadlessRenderDevice: RenderDevice, RenderDeviceWithCommandCompletion, @unchecked Sendable {
     func createBuffer(label: String?, length: Int, options _: ResourceOptions) -> Buffer {
         HeadlessBuffer(label: label, length: length)
     }

@@ -61,6 +61,32 @@ struct OrderedGPUWorkQueueTests {
     }
 
     @Test
+    func adjacentUploadsStopAtOrdinaryWork() async {
+        let gate = AsyncStream<Void>.makeStream()
+        let results = Mutex<[[Int]]>([])
+        let queue = OrderedGPUWorkQueue<Int>(context: { 0 }, onError: { error in
+            Issue.record("Unexpected queue error: \(error)")
+        })
+        queue.enqueue { _ in
+            var iterator = gate.stream.makeAsyncIterator()
+            _ = await iterator.next()
+        }
+        let submit: @Sendable (Int, [Int]) async throws -> Void = { _, items in
+            results.withLock { $0.append(items) }
+        }
+        queue.enqueueAdjacent(1, submit: submit)
+        queue.enqueueAdjacent(2, submit: submit)
+        queue.enqueueCleanup { results.withLock { $0.append([0]) } }
+        queue.enqueueAdjacent(3, submit: submit)
+        queue.enqueueAdjacent(4, submit: submit)
+        gate.continuation.yield()
+        gate.continuation.finish()
+
+        await queue.drain()
+        #expect(results.withLock { $0 } == [[1, 2], [0], [3, 4]])
+    }
+
+    @Test
     func unfulfilledSlotThrows() {
         let slot = ResourceSlot<Int>()
         #expect(throws: ResourceSlot<Int>.SlotError.self) { try slot.get() }

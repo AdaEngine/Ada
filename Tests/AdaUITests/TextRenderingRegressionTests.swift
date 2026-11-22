@@ -22,6 +22,38 @@ struct TextRenderingRegressionTests {
     }
 
     @Test
+    func drawingARunPreservesGlyphOrderAndContext() throws {
+        let layout = TextLayoutManager()
+        layout.setTextContainer(TextContainer(text: AttributedText("HEALTH 100")))
+        layout.fitToSize(Size(width: 300, height: 64))
+        let run = try #require(layout.textLines.first?.first)
+        try #require(run.count > 1)
+        var context = UIGraphicsContext()
+        context.translateBy(x: 20, y: 30)
+        context.opacity = 0.5
+        context.drawRect(.zero, color: .red)
+        context.draw(run)
+        context.drawRect(.zero, color: .green)
+
+        let commands = context.getDrawCommands()
+        try #require(commands.count == run.count + 2)
+        guard case .drawQuad = commands.first, case .drawQuad = commands.last else {
+            Issue.record("Expected the glyph run between the two quads")
+            return
+        }
+        for (command, expected) in zip(commands.dropFirst().dropLast(), run) {
+            guard case let .drawGlyph(glyph, transform, opacity) = command else {
+                Issue.record("Expected a glyph draw")
+                return
+            }
+            #expect(glyph == expected)
+            #expect(glyph.textureAtlas === expected.textureAtlas)
+            #expect(transform == context.transform)
+            #expect(opacity == context.opacity)
+        }
+    }
+
+    @Test
     func textNodeDefersGlyphLayoutUntilMeasurement() {
         var environment = EnvironmentValues()
         environment.font = .system(size: 13)
