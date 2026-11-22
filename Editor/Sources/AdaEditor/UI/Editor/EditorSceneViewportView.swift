@@ -102,7 +102,7 @@ struct EditorSceneViewportView: View {
 
     private var editViewport: some View {
         VStack(spacing: 0) {
-            Color.clear.frame(height: 34)
+            Color.clear.frame(height: AdaEngineStyleLayoutSpec.workspaceHeaderHeight)
             GeometryReader { geometry in
                 ZStack(anchor: .bottomLeading) {
                     SceneView(
@@ -157,11 +157,13 @@ struct EditorSceneViewportView: View {
                     // Retained scenes stay prepared behind asset tabs. Their custom drawing
                     // layers must be removed while inactive; inherited opacity does not hide them.
                     if isDocumentActive {
-                        viewportSceneOverlay
+                        viewportSceneOverlay(width: geometry.size.width)
                             .frame(width: geometry.size.width, height: geometry.size.height)
                     }
 
-                    sceneControls(size: geometry.size)
+                    if !usesInlineSceneControls(width: geometry.size.width) {
+                        sceneControls(size: geometry.size)
+                    }
                     statusBar
                     if let agent = annotationAgent,
                        (agent.sceneAnnotations.draft?.context.sceneRelativePath == document.relativePath && agent.sceneAnnotations.draft?.editingID == nil)
@@ -196,7 +198,7 @@ struct EditorSceneViewportView: View {
             GeometryReader { geometry in
                 toolbar(width: geometry.size.width)
             }
-            .frame(height: 34)
+            .frame(height: AdaEngineStyleLayoutSpec.workspaceHeaderHeight)
         }
     }
 
@@ -358,8 +360,9 @@ struct EditorSceneViewportView: View {
         app.addPlugin(Physics3DPlugin())
     }
 
-    private var viewportSceneOverlay: some View {
-        ZStack(anchor: .topLeading) {
+    private func viewportSceneOverlay(width: Float) -> some View {
+        let usesFloatingTools = AdaEngineStyleLayoutSpec.usesCompactWorkspace && !isAssetPreview && !usesInlineSceneControls(width: width)
+        return ZStack(anchor: .topLeading) {
             viewportGridLayer
             EditorSceneUIPreviewSurface(viewportModel: viewportModel)
             viewportGizmoLayer
@@ -368,24 +371,44 @@ struct EditorSceneViewportView: View {
                 EditorSceneViewportOrientationCompass(viewportModel: viewportModel, presentation: viewportPresentation)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
                     .padding(12)
+                    .padding(.top, usesFloatingTools ? 34 : 0)
             }
         }
         .allowsHitTesting(false)
     }
 
+    @ViewBuilder
     private func toolbar(width: Float) -> some View {
+        let minimumToolbarWidth: Float = 248
+        if AdaEngineStyleLayoutSpec.usesCompactWorkspace && width < minimumToolbarWidth {
+            ScrollView(.horizontal, showsIndicators: true) {
+                toolbarContents(width: minimumToolbarWidth)
+                    .frame(width: minimumToolbarWidth)
+            }
+            .frame(width: width, height: AdaEngineStyleLayoutSpec.workspaceHeaderHeight)
+        } else {
+            toolbarContents(width: width)
+        }
+    }
+
+    private func toolbarContents(width: Float) -> some View {
         let compact = width < 540
+        let inline = usesInlineSceneControls(width: width)
         let iconCount = isAssetPreview ? 1 : (annotationAgent == nil ? 4 : 5)
-        let modeWidth = compact ? min(174, max(92, width - Float(26 * iconCount + 12))) : 174
+        let iconWidth = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 28 : 26
+        let modeWidth = compact ? min(174, max(92, width - Float(iconWidth * iconCount + 10))) : 174
         let compactModeLabels = modeWidth < 158 ? [EditorSceneViewportRenderingMode.shadedWireframe.rawValue: "Wireframe overlay"] : [:]
         return HStack(spacing: compact ? 2 : 8) {
-            if !compact || displayMode != .threeD {
+            if inline {
+                sceneControls(size: Size(width: width, height: AdaEngineStyleLayoutSpec.workspaceHeaderHeight), inline: true)
+                    .fixedSize(horizontal: true, vertical: false)
+            } else if !compact || displayMode != .threeD {
                 Text(document.title)
                     .font(.system(size: 12))
                     .foregroundColor(theme.editorColors.text)
                     .lineLimit(1)
             }
-            if !compact {
+            if !compact && !inline {
                 #if !os(iOS)
                 Text(document.relativePath)
                     .font(.system(size: 11))
@@ -447,7 +470,9 @@ struct EditorSceneViewportView: View {
                         selection: Binding(
                             get: { viewportModel.renderingMode.rawValue },
                             set: { value in
-                                guard let mode = EditorSceneViewportRenderingMode(rawValue: value) else { return }
+                                guard let mode = EditorSceneViewportRenderingMode(rawValue: value) else {
+                                    return
+                                }
                                 viewportModel.renderingMode = mode
                                 viewportModel.applyCamera()
                                 redrawViewport()
@@ -471,7 +496,7 @@ struct EditorSceneViewportView: View {
                     skeletonVisibilityButton
                 }
             }
-            if !compact {
+            if !compact && !inline {
                 Text(isPlayingThisDocument ? L10n.text("PLAY MODE") : isAssetPreview ? L10n.text("MODEL PREVIEW") : L10n.text("SCENE"))
                     .font(.system(size: 10))
                     .foregroundColor(isPlayingThisDocument ? theme.editorColors.purple : theme.editorColors.muted)
@@ -479,7 +504,7 @@ struct EditorSceneViewportView: View {
         }
         .padding(.horizontal, compact ? 4 : 12)
         .frame(maxWidth: .infinity)
-        .frame(height: 34)
+        .frame(height: AdaEngineStyleLayoutSpec.workspaceHeaderHeight)
         .background(theme.editorColors.surface)
     }
 
@@ -521,7 +546,11 @@ struct EditorSceneViewportView: View {
         .background(theme.editorColors.surface)
     }
 
-    private func sceneControls(size: Size) -> some View {
+    private func usesInlineSceneControls(width: Float) -> Bool {
+        AdaEngineStyleLayoutSpec.usesCompactWorkspace && !isAssetPreview && width >= 680
+    }
+
+    private func sceneControls(size: Size, inline: Bool = false) -> some View {
         EditorSceneViewportControls(
             activeTool: activeTool,
             displayMode: displayMode,
@@ -532,7 +561,8 @@ struct EditorSceneViewportView: View {
             onSelectTool: selectTool,
             onStop: { onStop?() },
             showsEditingTools: !isAssetPreview,
-            showsPlayback: !isAssetPreview
+            showsPlayback: !isAssetPreview,
+            inline: inline
         )
     }
 

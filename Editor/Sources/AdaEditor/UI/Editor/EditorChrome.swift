@@ -1,9 +1,81 @@
 @_spi(AdaEngine) import AdaEngine
 
 @MainActor
+@ViewBuilder
 func adaEditorPanelBorder(theme: Theme, cornerRadius: Float) -> some View {
-    RoundedRectangleShape(cornerRadius: cornerRadius)
-        .stroke(theme.editorColors.border, lineWidth: 1)
+    if cornerRadius > 0 {
+        RoundedRectangleShape(cornerRadius: cornerRadius)
+            .stroke(theme.editorColors.border, lineWidth: 1)
+            .allowsHitTesting(false)
+    }
+}
+
+@MainActor
+struct EditorPanelClip: ViewModifier {
+    let cornerRadius: Float
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if cornerRadius > 0 {
+            content.mask(RoundedRectangleShape(cornerRadius: cornerRadius))
+        } else {
+            content.mask(RectangleShape())
+        }
+    }
+}
+
+@MainActor
+struct EditorWorkspaceHeader: ViewModifier {
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        content
+            .background(AdaEngineStyleLayoutSpec.usesCompactWorkspace ? theme.editorColors.surface : .clear)
+            .overlay(anchor: .bottom) {
+                if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+                    RectangleShape().fill(theme.editorColors.border).frame(height: 1).allowsHitTesting(false)
+                }
+            }
+    }
+}
+
+@MainActor
+struct EditorWorkspaceTabChrome: ViewModifier {
+    let isSelected: Bool
+    var isDropTarget = false
+    @Environment(\.theme) private var theme
+
+    func body(content: Content) -> some View {
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        let colors = theme.editorColors
+        let selectedBackground = compact ? colors.surfaceElevated : colors.surface
+        let tabBackground = compact ? colors.surface : colors.surfaceElevated
+        return content
+            .background(
+                RoundedRectangleShape(cornerRadius: compact ? 0 : 5)
+                    .fill(isSelected ? selectedBackground : tabBackground)
+            )
+            .overlay {
+                if !compact || isDropTarget {
+                    RoundedRectangleShape(cornerRadius: compact ? 0 : 5)
+                        .stroke(
+                            isDropTarget ? colors.blue : isSelected ? colors.blue.opacity(0.72) : colors.border.opacity(0.52),
+                            lineWidth: isDropTarget ? 2 : 1
+                        )
+                        .allowsHitTesting(false)
+                }
+            }
+            .overlay(anchor: .trailing) {
+                if compact {
+                    RectangleShape().fill(colors.border).frame(width: 1).allowsHitTesting(false)
+                }
+            }
+            .overlay(anchor: .bottom) {
+                if compact && isSelected {
+                    RectangleShape().fill(colors.blue).frame(height: 2).allowsHitTesting(false)
+                }
+            }
+    }
 }
 
 enum AdaEditorTitleFont {
@@ -61,7 +133,8 @@ func adaEditorInspectorTitle(theme: Theme) -> some View {
         Spacer()
     }
     .padding(.horizontal, 12)
-    .frame(height: 34)
+    .frame(height: AdaEngineStyleLayoutSpec.workspaceHeaderHeight)
+    .modifier(EditorWorkspaceHeader())
 }
 
 @MainActor
@@ -111,10 +184,12 @@ private struct EditorToolStripButton: View {
     @State private var isHovered = false
 
     var body: some View {
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        let size: Float = compact ? 26 : 34
         Button(action: action) {
             Text(item.icon)
-                .font(AdaEditorMaterialSymbolFont.font(size: 21))
-                .frame(width: 34, height: 34)
+                .font(AdaEditorMaterialSymbolFont.font(size: compact ? EditorAppearanceSettings.shared.sidebarIconSize : 21))
+                .frame(width: size, height: size)
         }
         .buttonStyle(
             AdaEditorStripButtonStyle(
@@ -245,6 +320,7 @@ enum AdaEditorMaterialSymbolFont {
         0xE88E,
         0xE897,
         0xE89F,
+        0xE8B5,
         0xE8B6,
         0xE8B8,
         0xE8E2,
@@ -297,14 +373,23 @@ enum AdaEditorMaterialSymbolFont {
 
 struct EditorChromeHoverButtonStyle: ButtonStyle {
     let theme: Theme
+    var cornerRadius: Float = AdaEngineStyleLayoutSpec.workspaceControlRadius
 
     func makeBody(configuration: Configuration) -> some View {
-        let highlighted = configuration.state.isEnabled && (configuration.isHighlighted || configuration.isPressed || configuration.state.contains(.focused))
+        let focused = configuration.state.isEnabled && configuration.state.contains(.focused)
+        let highlighted = configuration.state.isEnabled && (configuration.isHighlighted || configuration.isPressed)
         return configuration.label
             .background(
-                RoundedRectangleShape(cornerRadius: 5)
-                    .fill(highlighted ? theme.editorColors.text.opacity(0.10) : Color.clear)
+                RoundedRectangleShape(cornerRadius: cornerRadius)
+                    .fill(highlighted ? theme.editorColors.text.opacity(configuration.isPressed ? 0.16 : 0.10) : Color.clear)
             )
+            .overlay {
+                if focused {
+                    RoundedRectangleShape(cornerRadius: cornerRadius)
+                        .stroke(theme.editorColors.blue, lineWidth: 1)
+                        .allowsHitTesting(false)
+                }
+            }
     }
 }
 
@@ -317,12 +402,27 @@ private struct AdaEditorStripButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         let colors = theme.editorColors
         let accentColor = accent ?? colors.blue
-        let isHighlighted = configuration.state.isHighlighted || configuration.state.isSelected
-        let backgroundColor = hovered || isHighlighted ? colors.surfaceElevated : (active ? accentColor.opacity(0.20) : Color.clear)
+        let isHighlighted = hovered || configuration.state.isHighlighted || configuration.state.isSelected
+        let focused = configuration.state.contains(.focused)
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        let radius: Float = compact ? AdaEngineStyleLayoutSpec.workspaceControlRadius : 7
+        let background = active
+            ? accentColor.opacity(isHighlighted ? 0.30 : 0.20)
+            : isHighlighted ? colors.surfaceElevated : .clear
 
         return configuration.label
-            .foregroundColor(active ? accentColor : (hovered || isHighlighted ? colors.text : colors.muted))
-            .frame(width: 34, height: 34)
-            .background(RoundedRectangleShape(cornerRadius: 7).fill(backgroundColor))
+            .foregroundColor(active ? accentColor : (isHighlighted ? colors.text : colors.muted))
+            .background(
+                RoundedRectangleShape(cornerRadius: radius)
+                    .fill(background)
+            )
+            .overlay {
+                if configuration.isPressed {
+                    RoundedRectangleShape(cornerRadius: radius).fill(colors.text.opacity(0.12)).allowsHitTesting(false)
+                }
+                if focused {
+                    RoundedRectangleShape(cornerRadius: radius).stroke(accentColor, lineWidth: 1).allowsHitTesting(false)
+                }
+            }
     }
 }

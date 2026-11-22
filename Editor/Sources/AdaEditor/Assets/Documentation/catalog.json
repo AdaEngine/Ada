@@ -48,6 +48,23 @@
         "links": []
       },
       {
+        "kind": "text",
+        "text": "On desktop, drag the divider beside the Project Navigator or Inspector to resize that panel. Drag the divider above the bottom dock to adjust its height. The pointer changes to a resize cursor near a divider. If you drag a panel closed, use its tool strip button to reopen it.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The mode icon beside the project name switches between Editor and Agent. Turn on **Larger sidebar icons** under **Settings > General > Appearance** to increase the icon size in both sidebar tool strips. The choice applies immediately and is remembered across projects and launches. See the Agent Interface guide for the conversation layout and its keyboard controls.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Agent Interface guide",
+            "destination": "AgentInterface"
+          }
+        ]
+      },
+      {
         "kind": "heading",
         "text": "Generate pixel art",
         "level": 2,
@@ -2286,6 +2303,116 @@
       {
         "kind": "text",
         "text": "Benchmark scripting changes with multiple archetypes and chunks and compare\nthem with a typed Swift query. Validate semantics before drawing performance\nconclusions.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "AgentInterface",
+    "title": "Agent Interface",
+    "section": "Editor",
+    "source": "Editor/Documentation/AgentInterface.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "On desktop, use the mode icon in the top toolbar to switch between Editor and Agent.\nThe choice is remembered for each project on this computer. The editor can also\nshow Agent Chat as a sidebar. Both desktop chat surfaces use the same conversation layout.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In a new conversation, the prompt is ready for input at the top. The first sent message\nappears in its own outlined block and the agent replies below it. From that point,\nthe composer stays at the bottom, including when you reopen the conversation.\nUse `/` for available commands and skills or `@` for project context. The suggestion\nmenu opens near the caret. Use arrow keys and Enter to choose a result, or Escape\nto dismiss the menu. Attached files, images, code selections and scene annotations\nappear beside the draft. The bottom toolbar contains context, provider settings,\nand Send or Stop.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The chat header shows the current conversation and offers **New Session**. In the\neditor sidebar, **Session history** opens conversations and their deletion actions.\nAgent has a project session list on the left. The history button appears in its\nchat header when the list cannot fit. **Add Project** opens Studio's project picker,\nand **Agent Settings** opens the provider catalog and configuration. The messages,\ncomposer, and toolbar span the available conversation pane, including when the\nworkbench is open beside it.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Documents and results",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Completed tool events containing diff payloads list changed files under the\nselected session and above the composer. Reads, failed tools and unfinished edits\ndo not count as changes. This list describes reported agent changes across the\nsession; it is not a Git working-tree diff or a rollback snapshot.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Clicking a changed file opens its current project document through the same loader\nused by Editor. The right activity strip opens **Files**, **Workspaces** or **Source Control**. Files reuses\nthe project navigator; selecting a file opens its editor or asset preview. Workspaces lists\nopen editors and previews, including unsaved-change markers, and selects their existing\ndocument models. Source Control uses the same Git/Lore changes and history panel as Editor;\nopening a diff reveals it in the document area. These navigation choices do not change\nthe standard Editor mode's panel preferences.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The activity strip's **Show Workspace** action opens the existing document workbench beside\nthe conversation in wide windows. In smaller windows it occupies the central\narea; **Back to Chat** returns to the conversation. The result panel fills its\nallocated area with square outer corners on desktop, with a visible divider and a wider drag target in the side-by-side layout. Dragging\nchanges the conversation/document proportions while keeping both panes usable;\nclosing it restores the conversation to the full available width. Code, scenes, asset previews\nand scene Play use their existing implementations. **Editor** restores the full\neditor with its Inspector and tool panels. Existing selection-to-chat actions\nremain available in the document workspace and return to the conversation with\nan unsent selection-backed draft. Project-file search opens its selected result\nin the document area while keeping Agent Interface active.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Neither mode switching nor closing the result area closes document models,\nsaves/discards dirty buffers, or cancels the agent. The editor's panel preferences\nare independent of Agent Interface. The document models survive switching;\ntransient view state such as scroll positions is not guaranteed to be retained.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Sessions and execution",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Assistant Markdown uses native block layout: headings and inline styles, lists,\nselectable code blocks with horizontal scrolling, quotes, tables with wrapped\ncells, separators and clickable HTTP(S)/mail links. User prompts remain literal.\nParsing is cached per mounted message and reuses unchanged document blocks while\nthe reply grows. Text deltas and full-text snapshots coalesce for up to 33 ms; control events flush pending\ntext before permissions, tool updates, errors or completion. Individual transcript\nrows and A2UI display text own their observation state, so a growing reply does not\ninvalidate older messages or the composer. Bottom following preserves the reading\nposition when the user scrolls into history.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "After a successfully saved reply, **What next?** shows up to three concrete next\nmessages authored by the connected agent using that turn's task, project context\nand tool results. The agent returns them in a hidden `ada-next` JSON fence during\nthe ordinary reply; this requires no second model request. Missing or invalid\nsuggestions leave the area empty. Clicking a suggestion only fills the editable\ndraft. Suggestions remain attached to the latest completed turn after reopening\nthe chat; a new user turn clears them.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Both modes use the same project-scoped session store and agent service. Switching\nchats keeps each session's unsent text, attachments, scene annotations, selected-code context and\nchat mode in memory. Unsent drafts are not persisted across app restarts.\nOne turn runs at a time in each project window. Switching chats does not cancel\nthat turn, and later events are saved to its original session. The tree marks the\nrunning session; other chats show that another session is running and cannot send\nuntil it finishes. Stop interrupts the running turn even while viewing another\nchat. Provider/model controls still come from the existing agent configuration.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The mode switch is available in the shared desktop and visionOS workspace. The dedicated\niPhone UI and iOS agent implementation are outside this feature's scope.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Scene annotations",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open a scene and choose **Annotate** in its toolbar. Click an object in the 2D or\n3D viewport, or in the hierarchy, write a note and choose **Add to message**.\nThe assistant opens with an editable draft. Add more notes before pressing Send;\nadding a note never starts an agent turn. Up to eight notes fit in one message.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Numbered chips above the composer edit or remove notes; remaining numbers stay\nstable. Manual edits in the composer remain authoritative. Object references\ninclude the originating scene and entity ID, so similarly named objects in\ndifferent scenes remain distinct. Sent references persist with the conversation.\nUnsent notes follow the same in-memory lifetime as other native chat drafts.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Annotation picking suppresses transform gizmos and scene selection writes.\nCamera navigation still works. Choose another editing tool or press Escape in\nthe viewport to leave picking mode. Scene Play and standalone model previews do\nnot expose annotation authoring. This operates on authored scene entities; it\ndoes not identify individual pixels or nested widgets inside a rendered UI.",
         "level": 0,
         "links": []
       }

@@ -412,8 +412,8 @@ struct AdaEngineStyleUITests {
         #expect(compact.toolbarWindowControlClearance == 0)
         #endif
         #expect(!compact.showsToolbarSceneName)
-        #expect(compact.toolbarRunDestinationWidth == 96)
-        #expect(compact.toolbarRunControlsWidth == 98)
+        #expect(compact.toolbarRunDestinationWidth == (AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 80 : 96))
+        #expect(compact.toolbarRunControlsWidth == (AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 82 : 98))
     }
 
     @Test("empty hierarchy fills its panel and stays top aligned")
@@ -685,8 +685,8 @@ struct AdaEngineStyleUITests {
     func previewSplitWidthIsResizable() {
         #expect(EditorPreviewSplitLayout.previewWidth(requestedWidth: 500, availableWidth: 1_000) == 500)
         #expect(EditorPreviewSplitLayout.previewWidth(requestedWidth: 100, availableWidth: 1_000) == 260)
-        #expect(EditorPreviewSplitLayout.previewWidth(requestedWidth: 900, availableWidth: 1_000) == 672)
-        #expect(EditorPreviewSplitLayout.previewWidth(requestedWidth: 360, availableWidth: 500) == 172)
+        #expect(EditorPreviewSplitLayout.previewWidth(requestedWidth: 900, availableWidth: 1_000) == 680 - EditorPreviewSplitLayout.dividerWidth)
+        #expect(EditorPreviewSplitLayout.previewWidth(requestedWidth: 360, availableWidth: 500) == 180 - EditorPreviewSplitLayout.dividerWidth)
     }
 
     @Test("workspace reserves sidebars and output panel before sizing the scene viewport")
@@ -704,9 +704,9 @@ struct AdaEngineStyleUITests {
         )
 
         #expect(layout.leftPanelWidth == 260)
-        #expect(layout.mainPanelWidth == 624)
+        #expect(layout.mainPanelWidth == 640 - 2 * EditorWorkspaceLayout.dividerSize)
         #expect(layout.rightPanelWidth == 300)
-        #expect(layout.mainPanelHeight == 512)
+        #expect(layout.mainPanelHeight == 520 - EditorWorkspaceLayout.dividerSize)
         #expect(layout.bottomPanelHeight == 180)
     }
 
@@ -724,8 +724,8 @@ struct AdaEngineStyleUITests {
             fallbackRightPanelWidth: 300
         )
 
-        #expect(abs(layout.leftPanelWidth - 460) < 0.001)
-        #expect(abs(layout.rightPanelWidth - 460) < 0.001)
+        #expect(abs(layout.leftPanelWidth - (468 - EditorWorkspaceLayout.dividerSize)) < 0.001)
+        #expect(abs(layout.rightPanelWidth - (468 - EditorWorkspaceLayout.dividerSize)) < 0.001)
         #expect(layout.mainPanelWidth == 0)
         #expect(abs(layout.mainPanelHeight - EditorWorkspaceLayout.minimumMainPanelHeight) < 0.001)
     }
@@ -745,7 +745,7 @@ struct AdaEngineStyleUITests {
         )
 
         #expect(layout.leftPanelWidth == 900)
-        #expect(layout.mainPanelWidth == 892)
+        #expect(layout.mainPanelWidth == 900 - EditorWorkspaceLayout.dividerSize)
     }
 
     @Test("workspace does not impose an artificial maximum on the right sidebar")
@@ -763,7 +763,7 @@ struct AdaEngineStyleUITests {
         )
 
         #expect(layout.rightPanelWidth == 1_200)
-        #expect(layout.mainPanelWidth == 592)
+        #expect(layout.mainPanelWidth == 600 - EditorWorkspaceLayout.dividerSize)
     }
 
     @Test("workspace expands the editor viewport into hidden sidebar slots")
@@ -813,11 +813,11 @@ struct AdaEngineStyleUITests {
             fallbackRightPanelWidth: 300
         )
 
-        #expect(visible.mainPanelWidth == 624)
+        #expect(visible.mainPanelWidth == 640 - 2 * EditorWorkspaceLayout.dividerSize)
         #expect(leftHidden.leftPanelWidth == 0)
-        #expect(leftHidden.mainPanelWidth == 892)
+        #expect(leftHidden.mainPanelWidth == 900 - EditorWorkspaceLayout.dividerSize)
         #expect(rightHidden.rightPanelWidth == 0)
-        #expect(rightHidden.mainPanelWidth == 932)
+        #expect(rightHidden.mainPanelWidth == 940 - EditorWorkspaceLayout.dividerSize)
         #expect(hidden.leftPanelWidth == 0)
         #expect(hidden.mainPanelWidth == 1_200)
         #expect(hidden.rightPanelWidth == 0)
@@ -2242,7 +2242,6 @@ private final class EditorWindowTestWindowManager: UIWindowManager {
     override func getMouseMode() -> Input.MouseMode { mouseMode }
     override func setCursorImage(for _: Input.CursorShape, texture _: Texture2D?, hotspot _: Vector2) {}
     override func updateCursor() {}
-
 
     override func showWindow(_: UIWindow, isFocused _: Bool) {}
     override func closeWindow(_: UIWindow) {}

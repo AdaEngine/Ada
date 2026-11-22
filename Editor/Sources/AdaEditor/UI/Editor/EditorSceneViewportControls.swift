@@ -11,10 +11,21 @@ struct EditorSceneViewportControls: View {
     let onStop: () -> Void
     var showsEditingTools = true
     var showsPlayback = true
+    var inline = false
 
     @Environment(\.theme) private var theme
+    private var compact: Bool { AdaEngineStyleLayoutSpec.usesCompactWorkspace }
 
+    @ViewBuilder
     var body: some View {
+        if inline {
+            controls
+        } else {
+            overlayControls
+        }
+    }
+
+    private var overlayControls: some View {
         VStack(alignment: .leading, spacing: 0) {
             #if os(iOS)
             ScrollView(.horizontal) {
@@ -24,9 +35,17 @@ struct EditorSceneViewportControls: View {
             .frame(width: size.width, height: 42)
             .padding(.top, displayMode == .twoD ? 38 : 24)
             #else
-            controlsPill
-                .padding(.leading, 24)
-                .padding(.top, displayMode == .twoD ? 38 : 24)
+            if compact && size.width < 230 {
+                ScrollView(.horizontal, showsIndicators: true) {
+                    controlsPill.fixedSize(horizontal: true, vertical: false)
+                }
+                .frame(width: size.width, height: 34)
+                .padding(.top, displayMode == .twoD ? 38 : 6)
+            } else {
+                controlsPill
+                    .padding(.leading, compact ? 6 : 24)
+                    .padding(.top, displayMode == .twoD ? 38 : compact ? 6 : 24)
+            }
             #endif
             Spacer()
         }
@@ -34,7 +53,28 @@ struct EditorSceneViewportControls: View {
     }
 
     private var controlsPill: some View {
-        HStack(spacing: 5) {
+        controls
+            .padding(compact ? 2 : 5)
+            .background {
+                if compact {
+                    RoundedRectangleShape(cornerRadius: AdaEngineStyleLayoutSpec.workspaceControlRadius)
+                        .fill(theme.editorColors.surface)
+                } else {
+                    CapsuleShape().fill(theme.editorColors.surface)
+                        .shadow(color: .black.opacity(0.38), radius: 9, x: 0, y: 5, shape: .capsule)
+                }
+            }
+            .overlay {
+                if compact {
+                    adaEditorPanelBorder(theme: theme, cornerRadius: AdaEngineStyleLayoutSpec.workspaceControlRadius)
+                } else {
+                    CapsuleShape().stroke(theme.editorColors.border.opacity(0.9), lineWidth: 1)
+                }
+            }
+    }
+
+    private var controls: some View {
+        HStack(spacing: compact ? 3 : 5) {
             if isPlaying {
                 Text(L10n.text("Playing"))
                     .font(.system(size: 10, weight: .bold))
@@ -70,12 +110,6 @@ struct EditorSceneViewportControls: View {
                 }
             }
         }
-        .padding(5)
-        .background(CapsuleShape().fill(theme.editorColors.surface))
-        .overlay {
-            CapsuleShape().stroke(theme.editorColors.border.opacity(0.9), lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.38), radius: 9, x: 0, y: 5, shape: .capsule)
         .accessibilityIdentifier("AdaEditor.SceneViewport.Controls")
     }
 
@@ -91,6 +125,7 @@ struct EditorSceneViewportControls: View {
         }
     }
 
+    @ViewBuilder
     private func pillButton(
         _ title: String,
         symbol: String,
@@ -98,11 +133,24 @@ struct EditorSceneViewportControls: View {
         color: Color? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            pillLabel(title, symbol: symbol, active: active, color: color)
+        let identifier = "AdaEditor.SceneViewport.Control.\(title)"
+        if compact && !symbol.isEmpty {
+            EditorSceneToolbarButton(
+                title: title,
+                symbol: symbol,
+                identifier: identifier,
+                isSelected: active,
+                compact: true,
+                tint: color ?? (active ? theme.editorColors.text : theme.editorColors.muted),
+                action: action
+            )
+        } else {
+            Button(action: action) {
+                pillLabel(title, symbol: symbol, active: active, color: color)
+            }
+            .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
+            .accessibilityIdentifier(identifier)
         }
-        .buttonStyle(DefaultButtonStyle())
-        .accessibilityIdentifier("AdaEditor.SceneViewport.Control.\(title)")
     }
 
     private func pillLabel(_ title: String, symbol: String, active: Bool, color: Color?) -> some View {
@@ -110,7 +158,7 @@ struct EditorSceneViewportControls: View {
             #if !os(iOS)
             if !symbol.isEmpty {
                 Text(symbol)
-                    .font(AdaEditorMaterialSymbolFont.font(size: 15))
+                    .font(AdaEditorMaterialSymbolFont.font(size: compact ? AdaEngineStyleLayoutSpec.workspaceIconSize : 15))
             }
             #endif
             Text(L10n.tr(title))
@@ -119,7 +167,14 @@ struct EditorSceneViewportControls: View {
         .foregroundColor(color ?? (active ? theme.editorColors.text : theme.editorColors.muted))
         .padding(.horizontal, 7)
         .frame(height: 26)
-        .background(CapsuleShape().fill(active ? theme.editorColors.blue.opacity(0.22) : Color.clear))
+        .background {
+            if compact {
+                RoundedRectangleShape(cornerRadius: AdaEngineStyleLayoutSpec.workspaceControlRadius)
+                    .fill(active ? theme.editorColors.blue.opacity(0.22) : .clear)
+            } else {
+                CapsuleShape().fill(active ? theme.editorColors.blue.opacity(0.22) : .clear)
+            }
+        }
     }
 }
 

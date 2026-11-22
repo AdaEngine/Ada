@@ -1,22 +1,25 @@
 # Agent Interface
 
-Desktop and visionOS Ada Studio have two presentation modes, selected with **Editor / Agent**
-in the top toolbar. Editor is the default. The choice is remembered for each
-project on this computer.
+On desktop, use the mode icon in the top toolbar to switch between Editor and Agent.
+The choice is remembered for each project on this computer. The editor can also
+show Agent Chat as a sidebar. Both desktop chat surfaces use the same conversation layout.
 
-Agent Interface follows the session-oriented arrangement of the supplied
-JetBrains Air reference: a session tree on the left, conversation tabs and
-transcript in the central area, and the composer at the bottom. Messages, context
-and composer share a centered column up to 800 points wide; narrower panes use
-the available width. Session tabs and their Retry/New Session actions remain on
-one full-width toolbar, with the actions anchored on the right. **New Session**
-creates a persisted project conversation. **Add Project** uses Studio's existing
-project picker and opens the selected project in its own workspace window.
-**Agent Settings** opens the existing agent/provider catalog and configuration.
-The session list scrolls within its panel and displays a scrollbar when it overflows;
-its header and Agent Settings stay visible. The document panel has rounded, clipped
-corners matching the conversation. The session tree represents the project belonging to the current window;
-this version does not aggregate sessions from multiple projects in one tree.
+In a new conversation, the prompt is ready for input at the top. The first sent message
+appears in its own outlined block and the agent replies below it. From that point,
+the composer stays at the bottom, including when you reopen the conversation.
+Use `/` for available commands and skills or `@` for project context. The suggestion
+menu opens near the caret. Use arrow keys and Enter to choose a result, or Escape
+to dismiss the menu. Attached files, images, code selections and scene annotations
+appear beside the draft. The bottom toolbar contains context, provider settings,
+and Send or Stop.
+
+The chat header shows the current conversation and offers **New Session**. In the
+editor sidebar, **Session history** opens conversations and their deletion actions.
+Agent has a project session list on the left. The history button appears in its
+chat header when the list cannot fit. **Add Project** opens Studio's project picker,
+and **Agent Settings** opens the provider catalog and configuration. The messages,
+composer, and toolbar span the available conversation pane, including when the
+workbench is open beside it.
 
 ## Documents and results
 
@@ -36,7 +39,7 @@ the standard Editor mode's panel preferences.
 The activity strip's **Show Workspace** action opens the existing document workbench beside
 the conversation in wide windows. In smaller windows it occupies the central
 area; **Back to Chat** returns to the conversation. The result panel fills its
-allocated area directly, with a visible, draggable 8-point divider in the side-by-side layout. Dragging
+allocated area with square outer corners on desktop, with a visible divider and a wider drag target in the side-by-side layout. Dragging
 changes the conversation/document proportions while keeping both panes usable;
 closing it restores the conversation to the full available width. Code, scenes, asset previews
 and scene Play use their existing implementations. **Editor** restores the full

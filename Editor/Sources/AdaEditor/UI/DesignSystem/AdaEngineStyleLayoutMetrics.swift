@@ -15,7 +15,10 @@ struct AdaEngineStyleLayoutMetrics: Hashable {
     }
 
     var topToolbarHeight: Float {
-        size.height < 520 ? 38 : AdaEngineStyleLayoutSpec.topToolbarHeight
+        if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+            return 34
+        }
+        return size.height < 520 ? 38 : AdaEngineStyleLayoutSpec.topToolbarHeight
     }
 
     var footerHeight: Float {
@@ -27,7 +30,10 @@ struct AdaEngineStyleLayoutMetrics: Hashable {
     }
 
     var toolStripWidth: Float {
-        size.width < 700 ? 34 : AdaEngineStyleLayoutSpec.toolStripWidth
+        if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+            return 32
+        }
+        return size.width < 700 ? 34 : AdaEngineStyleLayoutSpec.toolStripWidth
     }
 
     var showsProjectSidebar: Bool {
@@ -82,7 +88,7 @@ struct AdaEngineStyleLayoutMetrics: Hashable {
         return clamped(availableWidth, min: minimumWidth, max: 520)
     }
 
-    var workspaceSpacer: Float = 4
+    var workspaceSpacer: Float = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 0 : 4
 
     var panelSpacing: Float {
         size.width < 700 ? 6 : AdaEngineStyleLayoutSpec.panelSpacing
@@ -93,11 +99,11 @@ struct AdaEngineStyleLayoutMetrics: Hashable {
     }
 
     var toolbarRunDestinationWidth: Float {
-        96
+        AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 80 : 96
     }
 
     var toolbarRunControlsWidth: Float {
-        98
+        AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 82 : 98
     }
 
     var workbenchWidth: Float {
@@ -138,7 +144,7 @@ struct AdaEngineStyleLayoutMetrics: Hashable {
         return AdaEngineStyleContent.aiChips
     }
 
-    var panelsRoundedCorner: Float = 12
+    var panelsRoundedCorner: Float = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 0 : 12
 
     var outputTabs: [String] {
         if size.width < 620 {

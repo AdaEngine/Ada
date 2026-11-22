@@ -42,6 +42,20 @@ struct VectorPolygonClippingTests {
         #expect(UITessellator().clipPolygons([polygon], to: [clip]) == [polygon])
     }
 
+    @Test("square masks retain content at fractional size after resizing")
+    func squareMaskPreservesInteriorAtFractionalBounds() {
+        let bounds = Rect(x: 0, y: 0, width: 1025.2, height: 620.33333)
+        let mask = RoundedRectangleShape(cornerRadius: 0).path(in: bounds)
+        // The tessellator converts path Y coordinates into the up-axis render space.
+        let content: [Vector2] = [[500, -300], [520, -300], [520, -320], [500, -320]]
+
+        let tessellator = UITessellator()
+        let clip = tessellator.clipPathPolygons(mask, transform: .identity)
+
+        #expect(clip.first?.count == 4)
+        #expect(tessellator.clipPolygons([content], to: clip) == [content])
+    }
+
     @Test
     func multipleClipPolygonsPreserveSeparatePieces() {
         let polygon: [Vector2] = [[-4, -2], [4, -2], [4, 2], [-4, 2]]

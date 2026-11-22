@@ -27,7 +27,7 @@ struct EditorProjectTreeSelectionRow<Content: View>: View {
 final class EditorProjectTreePresentation {
     typealias Item = EditorProjectSidebarViewModel.Item
     nonisolated static let duration: Double = 0.18
-    nonisolated static let rowHeight: Float = 28
+    nonisolated static let rowHeight: Float = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 22 : 28
     private static let maxAnimatedVisibilityChanges = 64
 
     struct Row: Identifiable {
@@ -101,7 +101,9 @@ final class EditorProjectTreePresentation {
 
         let current = Dictionary(rows(at: date).map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
         entries = order.compactMap { id in
-            guard let item = targets[id] ?? current[id]?.item else { return nil }
+            guard let item = targets[id] ?? current[id]?.item else {
+                return nil
+            }
             return Entry(item: item, start: current[id]?.fraction ?? 0, visible: targets[id] != nil)
         }
         startedAt = date
@@ -128,7 +130,9 @@ struct EditorProjectTreeRows<RowContent: View>: View {
     @State private var presentation: EditorProjectTreePresentation
 
     init(
-        items: [EditorProjectSidebarViewModel.Item], order: [String], onSettled: @escaping () -> Void,
+        items: [EditorProjectSidebarViewModel.Item],
+        order: [String],
+        onSettled: @escaping () -> Void,
         @ViewBuilder row: @escaping (EditorProjectSidebarViewModel.Item) -> RowContent
     ) {
         self.items = items
@@ -141,7 +145,7 @@ struct EditorProjectTreeRows<RowContent: View>: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 60, paused: !presentation.isAnimating)) { context in
             let rows = presentation.rows(at: context.date)
-            LazyVStack(rows, alignment: .leading, spacing: 0, estimatedRowHeight: 28, rowHeight: { $0.height }) { entry in
+            LazyVStack(rows, alignment: .leading, spacing: 0, estimatedRowHeight: EditorProjectTreePresentation.rowHeight, rowHeight: { $0.height }) { entry in
                 row(entry.item)
                     .opacity(entry.fraction)
                     .frame(height: entry.height, alignment: .topLeading)

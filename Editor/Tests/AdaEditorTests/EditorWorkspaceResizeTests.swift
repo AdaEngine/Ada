@@ -36,6 +36,34 @@ struct EditorWorkspaceResizeTests {
         #expect(layout.bottomPanelHeight == 72)
     }
 
+    #if os(macOS) || os(Windows) || os(Linux)
+    @Test("desktop workspace dividers leave a one-point seam and retain a wider drag target")
+    func desktopDividerSeams() async throws {
+        let model = EditorViewModel(project: nil)
+        model.showLeftPanel = true
+        model.showRightPanel = true
+        model.showBottomPanel = true
+        let container = makeContainer(model)
+        await settle(container)
+
+        let left = try container.uiNode(matching: .accessibilityIdentifier("test.left")).absoluteFrame
+        let main = try container.uiNode(matching: .accessibilityIdentifier("test.main")).absoluteFrame
+        let right = try container.uiNode(matching: .accessibilityIdentifier("test.right")).absoluteFrame
+        let bottom = try container.uiNode(matching: .accessibilityIdentifier("test.bottom")).absoluteFrame
+        let leftHandle = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Workspace.ResizeLeft")).absoluteFrame
+        let bottomHandle = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Workspace.ResizeBottom")).absoluteFrame
+
+        #expect(main.minX - left.maxX == 1)
+        #expect(right.minX - main.maxX == 1)
+        #expect(bottom.minY - main.maxY == 1)
+        #expect(leftHandle.width == 8)
+        #expect(bottomHandle.height == 8)
+        #expect(bottom.minX == main.minX)
+        #expect(bottom.maxX == main.maxX)
+        #expect(left.maxY == bottom.maxY && right.maxY == bottom.maxY)
+    }
+    #endif
+
     @Test("resize highlight follows hover and stays visible throughout dragging", arguments: [true, false])
     func resizeHighlight(horizontal: Bool) async throws {
         let container = UIContainerView(
@@ -81,8 +109,13 @@ struct EditorWorkspaceResizeTests {
     @Test("panels and dividers fit even a tiny workspace", arguments: [Float(0), 1, 7, 8, 100, 187, 188, 219, 220, 227, 228, 400, 416, 600])
     func constrainedWorkspaceFits(extent: Float) {
         let layout = layout(size: Size(width: extent, height: extent))
-        let horizontalHandles = Float((layout.showsLeftPanel ? 1 : 0) + (layout.showsRightPanel ? 1 : 0)) * 8
-        let verticalHandle: Float = layout.showsBottomPanel ? 8 : 0
+        #if os(macOS) || os(Windows) || os(Linux)
+        let divider: Float = 1
+        #else
+        let divider: Float = 8
+        #endif
+        let horizontalHandles = Float((layout.showsLeftPanel ? 1 : 0) + (layout.showsRightPanel ? 1 : 0)) * divider
+        let verticalHandle: Float = layout.showsBottomPanel ? divider : 0
         #expect(abs(layout.leftPanelWidth + layout.mainPanelWidth + layout.rightPanelWidth + horizontalHandles - extent) < 0.001)
         #expect(abs(layout.mainPanelHeight + layout.bottomPanelHeight + verticalHandle - extent) < 0.001)
         #expect(!layout.showsLeftPanel || layout.leftPanelWidth >= 180)

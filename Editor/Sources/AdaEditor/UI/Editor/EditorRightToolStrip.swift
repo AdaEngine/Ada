@@ -7,7 +7,7 @@ struct EditorRightToolStrip: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 4 : 8) {
             ForEach(viewModel.toolStrip.rightTools, id: \.identifier) { item in
                 adaEditorStripButton(
                     item,
@@ -22,8 +22,13 @@ struct EditorRightToolStrip: View {
             }
             Spacer()
         }
-        .padding(.vertical, 9)
+        .padding(.vertical, AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 5 : 9)
         .background(theme.editorColors.background)
+        .overlay(anchor: .leading) {
+            if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+                RectangleShape().fill(theme.editorColors.border).frame(width: 1).allowsHitTesting(false)
+            }
+        }
     }
 }
 
@@ -35,7 +40,7 @@ struct EditorLeftToolStrip: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 4 : 8) {
             ForEach(viewModel.toolStrip.leftTopTools, id: \.identifier) { item in
                 adaEditorStripButton(
                     item,
@@ -58,7 +63,12 @@ struct EditorLeftToolStrip: View {
                 )
             }
         }
-        .padding(.vertical, 9)
+        .padding(.vertical, AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 5 : 9)
         .background(theme.editorColors.background)
+        .overlay(anchor: .trailing) {
+            if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+                RectangleShape().fill(theme.editorColors.border).frame(width: 1).allowsHitTesting(false)
+            }
+        }
     }
 }

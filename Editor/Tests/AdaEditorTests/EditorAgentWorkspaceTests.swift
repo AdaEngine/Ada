@@ -61,15 +61,18 @@ struct EditorAgentWorkspaceTests {
         container.bounds.size = container.frame.size
         await settle(container)
         defer { model.stopProjectFileWatching() }
-        let modeFrame = try #require(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.InterfaceMode.agent")).first).absoluteFrame
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        let enterAgent = UINodeSelector.accessibilityIdentifier(compact ? "AdaEditor.InterfaceMode.Toggle" : "AdaEditor.InterfaceMode.agent")
+        let enterEditor = UINodeSelector.accessibilityIdentifier(compact ? "AdaEditor.InterfaceMode.Toggle" : "AdaEditor.InterfaceMode.editor")
+        let modeFrame = try #require(container.uiFindNodes(matching: enterAgent).first).absoluteFrame
         let searchFrame = try #require(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.ProjectSearch")).first).absoluteFrame
         #expect(modeFrame.maxX <= searchFrame.minX)
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.InterfaceMode.agent"))
+        _ = try container.uiTapNode(matching: enterAgent)
         await settle(container)
         #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace")).count == 1)
         #expect(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Sessions")).count == 1)
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Prompt"))
-        _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.InterfaceMode.editor"))
+        _ = try container.uiTapNode(matching: enterEditor)
         await settle(container)
         #expect(model.interface.mode == .editor)
         #expect(model.agent === agent)
@@ -117,26 +120,28 @@ struct EditorAgentWorkspaceTests {
         container.frame = Rect(x: 0, y: 0, width: width, height: 800)
         container.bounds.size = container.frame.size
         await settle(container)
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        let rightStrip: Float = compact ? 36 : 44
+        let seam: Float = compact ? 1 : 8
         for _ in 0..<3 {
             _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.ToggleArtifact"))
             await settle(container)
             let artifact = try #require(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Artifact")).first).absoluteFrame
             let chat = container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Agent.Header")).first
-            let leading: Float = width >= 680 ? min(310, max(220, width * 0.25)) + 8 : 0
-            if width - leading - 44 >= 640 {
+            let leading: Float = width >= 680 ? min(310, max(220, width * 0.25)) + (compact ? 0 : 8) : 0
+            if width - leading - rightStrip >= 640 {
                 let chatFrame = try #require(chat).absoluteFrame
-                #expect(abs(artifact.minX - chatFrame.maxX - 8) < 1)
+                #expect(abs(artifact.minX - chatFrame.maxX - seam) < 1)
                 #expect(chatFrame.width > 200)
             } else {
                 #expect(chat == nil)
-                let leading: Float = width >= 680 ? min(310, max(220, width * 0.25)) + 8 : 0
                 #expect(abs(artifact.minX - leading) < 1)
             }
-            #expect(abs(artifact.maxX - (width - 44)) < 1)
+            #expect(abs(artifact.maxX - (width - rightStrip)) < 1)
             _ = try container.uiTapNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.CloseArtifact"))
             await settle(container)
             let closedChat = try #require(container.uiFindNodes(matching: .accessibilityIdentifier("AdaEditor.Agent.Header")).first).absoluteFrame
-            #expect(abs(closedChat.maxX - (width - 44)) < 1)
+            #expect(abs(closedChat.maxX - (width - rightStrip)) < 1)
             #expect(!model.interface.showsArtifact)
             #expect(model.agent.prompt == "Keep this panel draft")
             #expect(model.workbench.activeDocument?.id == documentID)
@@ -314,12 +319,7 @@ extension EditorAgentWorkspaceTests {
         let root = try makeProject()
         defer { try? FileManager.default.removeItem(at: root) }
         let imageURL = root.appendingPathComponent("preview.png")
-        let png = try #require(Data(base64Encoded:
-            "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAAw0lEQVR4nO3QMQ1CURTA0OcOVThAE3JwwAwO/nZzLqFDxyZNz+P5/lxxu78u+XX/6ADtN0AH" +
-            "aL8BOkD7DdAB2j/bA6f9BugA7TdAB2i/ATpA+w3YHjjtN0AHaL8BOkD7DdAB2m/A9sBpvwE6QPsN0AHab4AO0H4DtgdO+w3QAdpvgA7QfgN0gPYbsD1w2m+A" +
-            "DtB+A3SA9hugA7TfgO2B034DdID2G6ADtN8AHaD9BmwPnPYboAO03wAdoP0G6ADt//2AL6IBOsLaSzBFAAAAAElFTkSuQmCC"
-        ))
-        try png.write(to: imageURL)
+        try Image(width: 64, height: 64, color: .white).writePNG(to: imageURL)
         let model = try makeModel(root)
         await model.agent.loadSessions()
         model.interface.mode = .agent
@@ -421,7 +421,11 @@ extension EditorAgentWorkspaceTests {
         await settle(container)
         let artifact = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.Artifact")).absoluteFrame
         let handle = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.AgentWorkspace.ResizeArtifact")).absoluteFrame
-        _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.ResizeHandle.Grip"))
+        let compact = AdaEngineStyleLayoutSpec.usesCompactWorkspace
+        let decoration = compact ? "AdaEditor.ResizeHandle.Divider" : "AdaEditor.ResizeHandle.Grip"
+        let line = try container.uiNode(matching: .accessibilityIdentifier(decoration)).absoluteFrame
+        #expect(handle.width == 8)
+        #expect(line.width == (compact ? 1 : 3))
         for (phase, offset) in [(MouseEvent.Phase.began, Float(0)), (.changed, 100), (.ended, 100)] {
             container.onMouseEvent(MouseEvent(window: RID(), button: .left, mousePosition: Point(handle.midX + offset, handle.midY), phase: phase, modifierKeys: [], time: 0))
             await settle(container)

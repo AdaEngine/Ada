@@ -10,6 +10,7 @@ struct EditorSceneHierarchySidebar: View {
     let document: EditorSceneDocument?
     let presentation: EditorSceneHierarchyPresentation
     let showsHeader: Bool
+    let showsGroupShortcut: Bool
     let touchSelection: Bool
     let onSelectEntity: (String) -> Void
     let onToggleEntityExpanded: (String) -> Void
@@ -31,10 +32,17 @@ struct EditorSceneHierarchySidebar: View {
     @State private var dropTargetEntityID: String?
     @State private var searchText = ""
 
+    private var compactChrome: Bool {
+        AdaEngineStyleLayoutSpec.usesCompactWorkspace && presentation == .embedded && !usesTouchSelection
+    }
+
+    private var rowHeight: Float { compactChrome ? 24 : 34 }
+
     init(
         document: EditorSceneDocument?,
         presentation: EditorSceneHierarchyPresentation = .workspacePanel,
         showsHeader: Bool = true,
+        showsGroupShortcut: Bool = true,
         touchSelection: Bool = false,
         onSelectEntity: @escaping (String) -> Void,
         onToggleEntityExpanded: @escaping (String) -> Void,
@@ -51,6 +59,7 @@ struct EditorSceneHierarchySidebar: View {
         self.document = document
         self.presentation = presentation
         self.showsHeader = showsHeader
+        self.showsGroupShortcut = showsGroupShortcut
         self.touchSelection = touchSelection
         self.onSelectEntity = onSelectEntity
         self.onToggleEntityExpanded = onToggleEntityExpanded
@@ -77,10 +86,10 @@ struct EditorSceneHierarchySidebar: View {
                         hierarchyBackground(sceneModel: sceneModel, size: geometry.size)
 
                         ScrollView(showsIndicators: true) {
-                            LazyVStack(items, id: \.id, alignment: .leading, spacing: 0, estimatedRowHeight: 34, rowHeight: { _ in 34 }) { item in
+                            LazyVStack(items, id: \.id, alignment: .leading, spacing: 0, estimatedRowHeight: rowHeight, rowHeight: { _ in rowHeight }) { item in
                                 hierarchyRow(item, items: items, sceneModel: sceneModel)
                             }
-                            .padding(.horizontal, 8)
+                            .padding(.horizontal, compactChrome ? 0 : 8)
                             .padding(.bottom, 8)
                             if items.isEmpty && !searchText.isEmpty {
                                 Text(L10n.text("No matching entities"))
@@ -109,26 +118,29 @@ struct EditorSceneHierarchySidebar: View {
         case .workspacePanel:
             adaEditorPanelTitle("HIERARCHY", trailing: trailingTitle, theme: theme)
         case .embedded:
-            HStack(spacing: 8) {
+            HStack(spacing: compactChrome ? 3 : 8) {
                 Text(L10n.text("Hierarchy"))
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(theme.editorColors.text)
-                    .padding(.horizontal, 8)
-                    .frame(height: 30)
-                    .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.16)))
-                Spacer()
-                Text(trailingTitle)
-                    .font(.system(size: 10))
-                    .foregroundColor(theme.editorColors.muted)
-                    .lineLimit(1)
-                if let onAddGroup {
+                    .lineLimit(compactChrome ? 2 : 1)
+                    .padding(.horizontal, compactChrome ? 0 : 8)
+                    .frame(height: compactChrome ? 26 : 30)
+                    .background(RoundedRectangleShape(cornerRadius: 6).fill(compactChrome ? .clear : theme.editorColors.blue.opacity(0.16)))
+                Spacer(minLength: 0)
+                if !compactChrome {
+                    Text(trailingTitle)
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.editorColors.muted)
+                        .lineLimit(1)
+                }
+                if showsGroupShortcut, let onAddGroup {
                     Button(action: { onAddGroup(nil) }) {
                         Text("\u{E2CC}")
-                            .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                            .font(AdaEditorMaterialSymbolFont.font(size: compactChrome ? AdaEngineStyleLayoutSpec.workspaceIconSize : 16))
                             .foregroundColor(theme.editorColors.blue)
                             .frame(width: 28, height: 28)
                     }
-                    .buttonStyle(DefaultButtonStyle())
+                    .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
                     .accessibilityIdentifier("AdaEditor.SceneHierarchy.AddGroup")
                 }
                 Button(action: { onAddEntity(defaultParentID) }) {
@@ -138,20 +150,22 @@ struct EditorSceneHierarchySidebar: View {
                                 .font(AdaEditorMaterialSymbolFont.font(size: 18))
                         #else
                             Text("\u{E145}")
-                                .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                                .font(AdaEditorMaterialSymbolFont.font(size: compactChrome ? AdaEngineStyleLayoutSpec.workspaceIconSize : 16))
                         #endif
                     }
                     .foregroundColor(theme.editorColors.blue)
                     .frame(width: 28, height: 28)
-                    .background(RoundedRectangleShape(cornerRadius: 6).fill(theme.editorColors.blue.opacity(0.14)))
+                    .background(RoundedRectangleShape(cornerRadius: 6).fill(compactChrome ? .clear : theme.editorColors.blue.opacity(0.14)))
                 }
-                .buttonStyle(DefaultButtonStyle())
+                .buttonStyle(EditorChromeHoverButtonStyle(theme: theme))
                 .accessibilityIdentifier("AdaEditor.SceneHierarchy.AddEntity")
             }
-            .frame(height: 32)
-            .padding(10)
+            .frame(height: compactChrome ? AdaEngineStyleLayoutSpec.workspaceHeaderHeight : 32)
+            .padding(.horizontal, compactChrome ? 8 : 10)
+            .padding(.vertical, compactChrome ? 0 : 10)
+            .background(compactChrome ? theme.editorColors.surface : .clear)
             RectangleShape()
-                .fill(theme.editorColors.border.opacity(0.45))
+                .fill(compactChrome ? theme.editorColors.border : theme.editorColors.border.opacity(0.45))
                 .frame(height: 1)
         }
     }
@@ -179,14 +193,19 @@ struct EditorSceneHierarchySidebar: View {
             }
         }
         .padding(.horizontal, 8)
-        .frame(height: 30)
-        .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.background))
-        .padding(8)
+        .frame(height: compactChrome ? 26 : 30)
+        .background(RoundedRectangleShape(cornerRadius: compactChrome ? 3 : 5).fill(theme.editorColors.background))
+        .overlay {
+            if compactChrome {
+                adaEditorPanelBorder(theme: theme, cornerRadius: AdaEngineStyleLayoutSpec.workspaceControlRadius)
+            }
+        }
+        .padding(compactChrome ? 6 : 8)
     }
 
     private var panelBackground: some View {
         RoundedRectangleShape(cornerRadius: presentation == .embedded ? 0 : metrics.panelsRoundedCorner)
-            .fill(presentation == .embedded ? theme.editorColors.surface : theme.editorColors.surfaceElevated)
+            .fill(presentation == .embedded && !compactChrome ? theme.editorColors.surface : theme.editorColors.surfaceElevated)
     }
 
     private var panelMask: RoundedRectangleShape {
@@ -277,7 +296,7 @@ struct EditorSceneHierarchySidebar: View {
                 Text(disclosureIcon(for: item))
                     .font(AdaEditorMaterialSymbolFont.font(size: 13))
                     .foregroundColor(item.hasChildren ? theme.editorColors.muted : Color.clear)
-                    .frame(width: 16, height: 34)
+                    .frame(width: 16, height: rowHeight)
             }
             .buttonStyle(DefaultButtonStyle())
 
@@ -299,7 +318,7 @@ struct EditorSceneHierarchySidebar: View {
                     renameButton(symbol: "\u{E86C}", identifier: "Confirm", action: commitRename)
                     renameButton(symbol: "\u{E5CD}", identifier: "Cancel", action: cancelRename)
                 }
-                .frame(height: 34)
+                .frame(height: rowHeight)
                 .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 HStack(spacing: 0) {
@@ -318,7 +337,7 @@ struct EditorSceneHierarchySidebar: View {
                                     .fixedSize(horizontal: true, vertical: false)
                                     .layoutPriority(1)
                             }
-                            .frame(height: 34)
+                            .frame(height: rowHeight)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .mask(RectangleShape())
                         }.buttonStyle(DefaultButtonStyle())
@@ -327,7 +346,7 @@ struct EditorSceneHierarchySidebar: View {
                     } else {
                         HStack(spacing: 8) {
                             Text(EditorSceneHierarchyIcon.symbol(for: item))
-                                .font(AdaEditorMaterialSymbolFont.font(size: 16))
+                                .font(AdaEditorMaterialSymbolFont.font(size: compactChrome ? AdaEngineStyleLayoutSpec.workspaceIconSize : 16))
                                 .foregroundColor(item.isSelected ? theme.editorColors.blue : theme.editorColors.muted)
                                 .frame(width: 18, height: 18)
                                 .accessibilityIdentifier("AdaEditor.SceneHierarchy.Icon.\(item.id)")
@@ -338,7 +357,7 @@ struct EditorSceneHierarchySidebar: View {
                                 .fixedSize(horizontal: true, vertical: false)
                                 .layoutPriority(1)
                         }
-                        .frame(height: 34)
+                        .frame(height: rowHeight)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .mask(RectangleShape())
                         .gesture(
@@ -351,33 +370,36 @@ struct EditorSceneHierarchySidebar: View {
 
                     Button(action: { onSetEntityEnabled(item.id, !item.isEnabled) }) {
                         Text(item.isEnabled ? "\u{E8F4}" : "\u{E8F5}")
-                            .font(AdaEditorMaterialSymbolFont.font(size: 15))
+                            .font(AdaEditorMaterialSymbolFont.font(size: compactChrome ? AdaEngineStyleLayoutSpec.workspaceIconSize : 15))
                             .foregroundColor(item.isEnabled ? theme.editorColors.muted : theme.editorColors.blue)
                             .frame(width: 24, height: 24)
                     }
                     .buttonStyle(DefaultButtonStyle())
                     .accessibilityIdentifier("AdaEditor.SceneHierarchy.Visibility.\(item.id)")
                 }
-                .frame(height: 34)
+                .frame(height: rowHeight)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.leading, 4 + Float(item.level) * 16)
+        .padding(.leading, 4 + Float(item.level) * (compactChrome ? 13 : 16))
+        .padding(.trailing, compactChrome ? 4 : 0)
         .background(rowBackground(item: item, isHovered: isHovered, isDropTarget: isDropTarget))
         .overlay(anchor: .leading) {
             if item.isSelected {
                 RectangleShape()
                     .fill(theme.editorColors.blue)
-                    .frame(width: 3, height: 26)
+                    .frame(width: compactChrome ? 2 : 3, height: compactChrome ? rowHeight : 26)
                     .allowsHitTesting(false)
             }
         }
         .overlay(anchor: .bottom) {
-            theme.editorColors.border.opacity(0.72)
-                .frame(height: 1)
-                .allowsHitTesting(false)
-                .accessibilityIdentifier("AdaEditor.SceneHierarchy.Separator.\(item.id)")
+            if !compactChrome {
+                theme.editorColors.border.opacity(0.72)
+                    .frame(height: 1)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("AdaEditor.SceneHierarchy.Separator.\(item.id)")
+            }
         }
         .contextMenu(onPresent: { onSelectEntity(item.id) }) {
             if let onAddGroup {
@@ -434,7 +456,7 @@ struct EditorSceneHierarchySidebar: View {
                 Color.clear
             }
         let state = isDropTarget ? "dropTarget" : (item.isSelected ? "selected" : (isHovered ? "hovered" : "normal"))
-        return RoundedRectangleShape(cornerRadius: 5)
+        return RoundedRectangleShape(cornerRadius: compactChrome ? 0 : 5)
             .fill(color)
             .allowsHitTesting(false)
             .accessibilityIdentifier("AdaEditor.SceneHierarchy.RowState.\(item.id).\(state)")
@@ -521,7 +543,7 @@ struct EditorSceneHierarchySidebar: View {
         guard let sourceIndex = items.firstIndex(where: { $0.id == item.id }) else {
             return nil
         }
-        let rowOffset = Int((translationY / 34).rounded())
+        let rowOffset = Int((translationY / rowHeight).rounded())
         guard rowOffset != 0 else {
             return nil
         }

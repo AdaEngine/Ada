@@ -30,15 +30,15 @@ struct EditorPreviewPanelsLayout: Layout {
             return
         }
         let previewWidth = EditorPreviewSplitLayout.previewWidth(requestedWidth: state.width, availableWidth: bounds.width)
-        let handleWidth = min(bounds.width, EditorPreviewSplitLayout.resizeHandleWidth)
-        let editorWidth = max(0, bounds.width - handleWidth - previewWidth)
-        var x = bounds.minX
-        for (index, width) in [editorWidth, handleWidth, previewWidth].enumerated() {
+        let divider = min(bounds.width, EditorPreviewSplitLayout.dividerWidth)
+        let editorWidth = max(0, bounds.width - divider - previewWidth)
+        let hitSize = AdaEngineStyleLayoutSpec.dividerHitSize
+        let positions = [Float(0), editorWidth + divider, editorWidth - (hitSize - divider) / 2]
+        for (index, width) in [editorWidth, previewWidth, hitSize].enumerated() {
             var childProposal = proposal
             childProposal.width = width
             childProposal.height = bounds.height
-            subviews[index].place(at: Point(x, bounds.minY), anchor: .topLeading, proposal: childProposal)
-            x += width
+            subviews[index].place(at: Point(bounds.minX + positions[index], bounds.minY), anchor: .topLeading, proposal: childProposal)
         }
     }
 }

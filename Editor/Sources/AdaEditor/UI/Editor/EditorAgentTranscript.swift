@@ -113,10 +113,11 @@ private struct EditorAgentTranscriptRows: View {
     let state: EditorAgentTranscriptState
     let viewModel: EditorAgentViewModel?
     let a2uiPresentation: EditorAgentA2UIPresentation?
+    let compactMessages: Bool
 
     var body: some View {
         ForEach(state.rows) { row in
-            EditorAgentTranscriptRowView(row: row, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
+            EditorAgentTranscriptRowView(row: row, viewModel: viewModel, a2uiPresentation: a2uiPresentation, compactMessages: compactMessages)
         }
     }
 }
@@ -125,11 +126,12 @@ private struct EditorAgentTranscriptRowView: View {
     let row: EditorAgentTranscriptRow
     let viewModel: EditorAgentViewModel?
     let a2uiPresentation: EditorAgentA2UIPresentation?
+    let compactMessages: Bool
 
     var body: some View {
         switch row.entry {
         case let .event(event):
-            EditorAgentEventCard(event: event, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
+            EditorAgentEventCard(event: event, viewModel: viewModel, a2uiPresentation: a2uiPresentation, compactMessages: compactMessages)
         case let .actions(id, events):
             EditorAgentActionsDisclosure(id: id, events: events, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
         }
@@ -185,10 +187,11 @@ struct EditorAgentTranscript: View {
     @State private var standaloneState = EditorAgentTranscriptState()
     static let bottomID = "AdaEditor.Agent.Transcript.Bottom"
 
-    init(viewModel: EditorAgentViewModel) {
+    init(viewModel: EditorAgentViewModel, compactMessages: Bool = false) {
         self.viewModel = viewModel
         self.standaloneEvents = nil
         self.standaloneSessionID = nil
+        self.compactMessages = compactMessages
     }
 
     init(events: [EditorAgentEvent], sessionID: String) {
@@ -199,6 +202,7 @@ struct EditorAgentTranscript: View {
     }
 
     var a2uiPresentation: EditorAgentA2UIPresentation?
+    private var compactMessages = false
     var contentInsets = EdgeInsets(top: 10, leading: 10, bottom: 10, trailing: 10)
     var scrollContentInsets: EdgeInsets?
     var scrollRespectsSafeArea = true
@@ -216,7 +220,12 @@ struct EditorAgentTranscript: View {
                     extendsUnderNavigationBar: scrollExtendsUnderNavigationBar
                 ) {
                     VStack(alignment: .leading, spacing: 8) {
-                        EditorAgentTranscriptRows(state: state, viewModel: viewModel, a2uiPresentation: a2uiPresentation)
+                        EditorAgentTranscriptRows(
+                            state: state,
+                            viewModel: viewModel,
+                            a2uiPresentation: a2uiPresentation,
+                            compactMessages: compactMessages
+                        )
                         Color.clear.frame(height: contentInsets.bottom + 1)
                             .id(Self.bottomID)
                             .accessibilityIdentifier(Self.bottomID)

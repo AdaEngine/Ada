@@ -134,6 +134,7 @@ struct EditorWindowContentView: View {
                     viewModel.startEditorSessionIfNeeded()
                 }
                 .frame(height: metrics.topToolbarHeight)
+                .modifier(EditorWorkspaceHeader())
                 .zIndex(10)
 
                 #if os(macOS) || os(Windows) || os(Linux) || os(visionOS)
@@ -151,6 +152,12 @@ struct EditorWindowContentView: View {
 
                 EditorFooterRegion(viewModel: viewModel)
                     .frame(height: metrics.footerHeight)
+                    .background(AdaEngineStyleLayoutSpec.usesCompactWorkspace ? theme.editorColors.surface : .clear)
+                    .overlay(anchor: .top) {
+                        if AdaEngineStyleLayoutSpec.usesCompactWorkspace {
+                            RectangleShape().fill(theme.editorColors.border).frame(height: 1).allowsHitTesting(false)
+                        }
+                    }
             }
             .frame(
                 minWidth: 0,
@@ -230,7 +237,7 @@ struct EditorWindowContentView: View {
                 }
             }
         }
-        .padding(.all, 4)
+        .padding(.all, AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 0 : 4)
         .background {
             EditorSafeAreaBackground()
         }
@@ -600,6 +607,7 @@ struct EditorResizeHandle: View {
     let onResize: (Size) -> Void
     let onResizeEnded: () -> Void
     var showsGrip = false
+    var showsDivider = false
 
     @State private var isHovered = false
     @State private var isDragging = false
@@ -609,12 +617,14 @@ struct EditorResizeHandle: View {
         axis: Axis,
         onResize: @escaping (Size) -> Void = { _ in },
         onResizeEnded: @escaping () -> Void = {},
-        showsGrip: Bool = false
+        showsGrip: Bool = false,
+        showsDivider: Bool = false
     ) {
         self.axis = axis
         self.onResize = onResize
         self.onResizeEnded = onResizeEnded
         self.showsGrip = showsGrip
+        self.showsDivider = showsDivider
     }
 
     @ViewBuilder
@@ -622,11 +632,11 @@ struct EditorResizeHandle: View {
         switch axis {
         case .horizontal:
             hitArea
-                .frame(width: 8)
+                .frame(width: AdaEngineStyleLayoutSpec.dividerHitSize)
                 .frame(maxHeight: .infinity)
         case .vertical:
             hitArea
-                .frame(height: 8)
+                .frame(height: AdaEngineStyleLayoutSpec.dividerHitSize)
                 .frame(maxWidth: .infinity)
         }
     }
@@ -634,6 +644,15 @@ struct EditorResizeHandle: View {
     private var hitArea: some View {
         RectangleShape()
             .fill(Color.clear)
+            .overlay {
+                if showsDivider {
+                    RectangleShape()
+                        .fill(theme.editorColors.border)
+                        .frame(width: axis == .horizontal ? 1 : nil, height: axis == .vertical ? 1 : nil)
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier("AdaEditor.ResizeHandle.Divider")
+                }
+            }
             .overlay {
                 if showsGrip {
                     RoundedRectangleShape(cornerRadius: 1.5)
