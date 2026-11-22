@@ -41,12 +41,19 @@
         #if SAGA_METAL_NATIVE_PASS
         private var groupableDraws: [Int: MetalIndexedDrawGrouping] = [:]
 
-        func recordIndexedDrawGrouping(_ grouping: IndexedDrawGrouping) {
-            groupableDraws[builders.count] = switch grouping {
-            case .ui: .ui
-            case .shadowDepth: .shadowDepth
-            case .geometry: .geometry
+        func recordIndexedDrawGrouping(_ grouping: IndexedDrawGrouping, colorCount: Int, hasDepthStencil: Bool) {
+            let permissions: MetalIndexedDrawGrouping
+            switch grouping {
+            case .ui where colorCount == 1 && !hasDepthStencil:
+                permissions = .color
+            case .shadowDepth where colorCount == 1 && hasDepthStencil:
+                permissions = [.color, .depthStencil]
+            case .geometry where colorCount > 1 && hasDepthStencil:
+                permissions = [.color, .depthStencil, .multipleColorAttachments]
+            default:
+                return
             }
+            groupableDraws[builders.count] = permissions
         }
         #endif
         private var completedHandlers: [@Sendable () -> Void] = []
@@ -461,7 +468,7 @@
             let indexBinding = (format: index.format, offset: UInt64(index.offset), length: UInt64(index.buffer.length - index.offset))
             #if SAGA_METAL_NATIVE_PASS
             if let indexedDrawGrouping {
-                buffer.recordIndexedDrawGrouping(indexedDrawGrouping)
+                buffer.recordIndexedDrawGrouping(indexedDrawGrouping, colorCount: colors.count, hasDepthStencil: depth != nil)
             }
             #endif
             emit { target in
