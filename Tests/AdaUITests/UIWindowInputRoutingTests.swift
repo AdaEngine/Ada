@@ -5,12 +5,13 @@
 //  Created by Codex on 19.02.2026.
 //
 
-import Testing
-@testable import AdaUI
-@testable import AdaPlatform
 import AdaInput
 import AdaUtils
 import Math
+import Testing
+
+@testable import AdaPlatform
+@testable import AdaUI
 
 @MainActor
 struct UIWindowInputRoutingTests {
@@ -58,6 +59,22 @@ struct UIWindowInputRoutingTests {
         #expect(overlay.parentView == nil)
         #expect(overlayClosed)
         #expect(gameClosed)
+    }
+
+    @Test
+    func interactiveWindowOverlayReceivesButtonClick() {
+        var clicks = 0
+        let content = UIContainerView(rootView: Button("Trace") { clicks += 1 })
+        let window = UIWindow(frame: Rect(x: 0, y: 0, width: 240, height: 80))
+        let overlay = UIWindowOverlayView(content: content, interactive: true)
+        overlay.frame = window.bounds
+        content.frame = window.bounds
+        window.addSubview(overlay)
+        window.layoutSubviews()
+        for phase in [MouseEvent.Phase.began, .ended] {
+            window.sendEvent(MouseEvent(window: window.id, button: .left, mousePosition: Point(120, 40), phase: phase, modifierKeys: [], time: 0))
+        }
+        #expect(clicks == 1)
     }
 
     @Test

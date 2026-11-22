@@ -1,0 +1,314 @@
+{
+  "format": "ada.scene",
+  "schemaVersion": 1,
+  "engineVersion": "1.0.0",
+  "scene": {
+    "id": "green-valley",
+    "name": "Green Valley"
+  },
+  "entities": [
+    {
+      "id": "camera",
+      "name": "Meadow camera",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            -35.834686479063535,
+            8.629308734161564,
+            -300
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaRender.Camera": {
+          "isActive": true,
+          "renderOrder": 0,
+          "projection": "perspective",
+          "backgroundColor": {
+            "red": 0.46,
+            "green": 0.69,
+            "blue": 0.88,
+            "alpha": 1
+          }
+        },
+        "AdaCorePipelines.Environment3D": {
+          "fog": {
+            "isEnabled": true,
+            "color": {
+              "red": 0.73,
+              "green": 0.8,
+              "blue": 0.84,
+              "alpha": 1
+            },
+            "density": 0.0017,
+            "heightFalloff": 0.0045,
+            "baseHeight": 35,
+            "startDistance": 70,
+            "maximumOpacity": 0.96,
+            "skyInfluence": 0.25,
+            "sunInscattering": 0.12,
+            "sunExponent": 12
+          },
+          "skyZenithColor": {
+            "red": 0.16,
+            "green": 0.35,
+            "blue": 0.62,
+            "alpha": 1
+          },
+          "skyHorizonColor": {
+            "red": 0.78,
+            "green": 0.83,
+            "blue": 0.84,
+            "alpha": 1
+          }
+        },
+        "valley.walker": {}
+      }
+    },
+    {
+      "id": "environment",
+      "name": "Valley",
+      "enabled": true,
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "terrain",
+      "name": "Hills and vegetation",
+      "enabled": true,
+      "parent": "environment",
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Terrain3DSource": {
+          "source": "@res://Terrain/Valley.aterrain",
+          "color": {
+            "x": 1,
+            "y": 1,
+            "z": 1,
+            "w": 1
+          },
+          "streamingRadius": null,
+          "maximumMeshBytes": 402653184,
+          "lodDistance": 85,
+          "generatesCollision": true,
+          "cameraRefreshDistance": 12
+        }
+      }
+    },
+    {
+      "id": "horizon",
+      "name": "Distant ridges",
+      "enabled": true,
+      "parent": "environment",
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Model3DSource": {
+          "source": "@res://Terrain/horizon.glb"
+        }
+      }
+    },
+    {
+      "id": "sun",
+      "name": "Afternoon sun",
+      "enabled": true,
+      "parent": "environment",
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0.4439481069655198,
+            0,
+            0,
+            0.8960524975255252
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.DirectionalLightComponent": {
+          "radiance": [
+            1,
+            0.94,
+            0.8
+          ],
+          "intensity": 2.4,
+          "castShadows": true,
+          "shadowDistance": 65,
+          "shadowBias": 0.0008,
+          "shadowSlopeBias": 0.003
+        }
+      }
+    },
+    {
+      "id": "sky-fill",
+      "name": "Open sky fill",
+      "enabled": true,
+      "parent": "environment",
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0.922689838671033,
+            0,
+            0,
+            0.385543073615936
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.DirectionalLightComponent": {
+          "radiance": [
+            0.85,
+            0.94,
+            1
+          ],
+          "intensity": 1.15,
+          "castShadows": false,
+          "shadowDistance": 65,
+          "shadowBias": 0.0008,
+          "shadowSlopeBias": 0.003
+        }
+      }
+    },
+    {
+      "id": "coastal-forest",
+      "name": "Coastal tree groves",
+      "enabled": true,
+      "parent": "environment",
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Terrain3DSource": {
+          "source": "@res://Terrain/Forest.aterrain",
+          "streamingRadius": 1020,
+          "generatesCollision": false,
+          "cameraRefreshDistance": 40
+        }
+      }
+    },
+    {
+      "id": "grass",
+      "name": "Valley grass",
+      "enabled": true,
+      "parent": "environment",
+      "components": {
+        "AdaTransform.Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "AdaScene.Terrain3DSource": {
+          "source": "@res://Terrain/Grass.aterrain",
+          "generatesCollision": false,
+          "maximumLOD": 0,
+          "streamingRadius": 200,
+          "cameraRefreshDistance": 16
+        }
+      }
+    }
+  ]
+}

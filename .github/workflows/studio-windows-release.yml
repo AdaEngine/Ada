@@ -31,6 +31,7 @@ defaults:
 
 jobs:
   build:
+    if: github.event_name != 'release' || !startsWith(github.event.release.tag_name, 'kimodo-v')
     name: Build and package Windows x64
     runs-on: windows-2022
     timeout-minutes: 120
@@ -76,6 +77,7 @@ jobs:
           STUDIO_BIN: ${{ steps.build.outputs.bin }}
           STUDIO_GRAVITY: ${{ steps.build.outputs.gravity }}
           RELEASE_TAG: ${{ github.event.release.tag_name }}
+          KIMODO_RELEASE_PUBLIC_KEY: ${{ vars.KIMODO_RELEASE_PUBLIC_KEY }}
         run: |
           $studioVersion = if ($env:RELEASE_TAG) { $env:RELEASE_TAG } else { "ci-$($env:GITHUB_SHA.Substring(0, 12))" }
           python script/package_studio_windows.py --bin "$env:STUDIO_BIN" --compiler-root "$env:STUDIO_GRAVITY" --version "$studioVersion"

@@ -7,9 +7,12 @@ public struct TerrainMeshPrototypeReference: Codable, Equatable, Sendable {
     public let scene: Int?
     /// Optional world-space draw distance; nil retains the instance at every distance.
     public let maximumDistance: Float?
+    /// Maximum camera-to-hit distance for ray intersections. Nil keeps distant shadow casters.
+    public let pathTracingMaximumDistance: Float?
 
-    public init(id: UInt16, assetPath: String, scene: Int? = nil, maximumDistance: Float? = nil) {
+    public init(id: UInt16, assetPath: String, scene: Int? = nil, maximumDistance: Float? = nil, pathTracingMaximumDistance: Float? = nil) {
         self.id = id; self.assetPath = assetPath; self.scene = scene; self.maximumDistance = maximumDistance
+        self.pathTracingMaximumDistance = pathTracingMaximumDistance
     }
 
     func validate() throws {
@@ -19,7 +22,8 @@ public struct TerrainMeshPrototypeReference: Codable, Equatable, Sendable {
             components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." && $0.utf8.count <= 128 && $0.last != "." && $0.last != " " }),
             ["gltf", "glb", "obj", "vox"].contains(URL(fileURLWithPath: assetPath).pathExtension.lowercased()),
             scene.map({ (0..<4_096).contains($0) }) ?? true,
-            maximumDistance.map({ $0.isFinite && $0 > 0 }) ?? true
+            maximumDistance.map({ $0.isFinite && $0 > 0 }) ?? true,
+            pathTracingMaximumDistance.map({ $0.isFinite && $0 > 0 }) ?? true
         else { throw TerrainManifestError.malformed("invalid static model palette reference") }
     }
 }

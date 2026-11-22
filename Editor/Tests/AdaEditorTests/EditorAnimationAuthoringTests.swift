@@ -18,7 +18,10 @@ struct EditorAnimationAuthoringTests {
 
     @Test func draftsAreNotAutosavedOrSavedBySwitchingAndClosingTabs() async throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let service = try #require(fixture.editor.workbench.animationService)
         let document = try service.create("Assets/Animations/Draft.animlib", library: library())
         fixture.editor.workbench.selectDocument(id: "asset:\(document.relativePath)")
@@ -39,13 +42,20 @@ struct EditorAnimationAuthoringTests {
 
     @Test func sharedRequestsUseRevisionedUndoAndExplicitDiskRecovery() async throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let service = try #require(fixture.editor.workbench.animationService)
         let document = try service.create("Assets/Test.animlib", library: library())
         try document.save(expectedRevision: document.revision)
         let revision = document.revision
-        let request = AnimationAuthoringRequest(action: .apply, path: document.relativePath, expectedRevision: revision,
-            operations: [.init(id: "rename", kind: .configureClip, clipID: "idle", name: "From API")])
+        let request = AnimationAuthoringRequest(
+            action: .apply,
+            path: document.relativePath,
+            expectedRevision: revision,
+            operations: [.init(id: "rename", kind: .configureClip, clipID: "idle", name: "From API")]
+        )
         let response = try await service.execute(request, workbench: fixture.editor.workbench)
         #expect(response["revision"] as? String == document.revision)
         #expect(document.library.clips.first?.name == "From API")
@@ -54,7 +64,8 @@ struct EditorAnimationAuthoringTests {
         #expect(document.library.clips.first?.name == "Idle")
         try document.redo(expectedRevision: document.revision)
         #expect(document.library.clips.first?.name == "From API")
-        var external = library(); external.clips[0].name = "External"
+        var external = library()
+        external.clips[0].name = "External"
         try external.encodedData().write(to: document.url)
         #expect(throws: AnimationAuthoringError.self) { try document.save(expectedRevision: document.revision) }
         #expect(throws: AnimationAuthoringError.self) { try service.reload(document, expectedRevision: document.revision) }
@@ -62,25 +73,61 @@ struct EditorAnimationAuthoringTests {
         #expect(document.library == external)
         #expect(!document.isDirty && !document.canUndo)
         let old = document.revision
-        _ = try await service.execute(.init(action: .discard, path: document.relativePath, expectedRevision: old, discardChanges: true), workbench: fixture.editor.workbench)
+        _ = try await service.execute(
+            .init(action: .discard, path: document.relativePath, expectedRevision: old, discardChanges: true),
+            workbench: fixture.editor.workbench
+        )
         #expect(service.documents.isEmpty)
         #expect(document.isDiscarded)
         #expect(try service.open(document.relativePath) !== document)
     }
 
+    @Test func failedAtomicClipSaveLeavesTheSharedDraftUntouched() throws {
+        let fixture = try makeFixture()
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
+        let service = try #require(fixture.editor.workbench.animationService)
+        let saved = library()
+        let document = try service.create("Assets/Test.animlib", library: saved, saveImmediately: true)
+        let revision = document.revision
+        var external = saved
+        external.clips[0].name = "External edit"
+        try external.encodedData().write(to: document.url)
+        var generated = saved
+        generated.clips.append(.init(id: "generated", name: "Generated", duration: 4))
+        #expect(throws: AnimationAuthoringError.self) { try document.commitAndSave(generated, expectedRevision: revision) }
+        #expect(document.library == saved)
+        #expect(document.revision == revision && !document.isDirty && !document.canUndo)
+        #expect(try AnimationLibrary.decode(Data(contentsOf: document.url)) == external)
+    }
+
     @Test func sceneReferencesAndOpenDocumentsRejectChangedResourceLocations() throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let service = try #require(fixture.editor.workbench.animationService)
         let scene = fixture.root.appendingPathComponent("Assets/Scenes/Main.ascn")
         // Payload resolution checks existence/extension here; native decoding is exercised by the extraction test.
         try Data().write(to: fixture.root.appendingPathComponent("Assets/Robot.glb"))
-        #expect(EditorSceneFileLoader.resolveTileMapReference("../../Outside.animlib", relativeTo: scene,
-            resourceRootURL: service.assetsURL, fileExtension: "animlib") == nil)
+        #expect(
+            EditorSceneFileLoader.resolveTileMapReference(
+                "../../Outside.animlib",
+                relativeTo: scene,
+                resourceRootURL: service.assetsURL,
+                fileExtension: "animlib"
+            ) == nil
+        )
         #expect(throws: (any Error).self) {
-            _ = try EditorSceneFileLoader.resolvedComponentPayload(typeName: EditorBuiltInComponentType.model3DSource,
+            _ = try EditorSceneFileLoader.resolvedComponentPayload(
+                typeName: EditorBuiltInComponentType.model3DSource,
                 payload: ["source": .string("@res://Robot.glb"), "animationLibraries": .array([.string("../../Outside.animlib")])],
-                sourceURL: scene, resourceRootURL: service.assetsURL)
+                sourceURL: scene,
+                resourceRootURL: service.assetsURL
+            )
         }
         let document = try service.create("Assets/Animations/Location.animlib", library: library())
         let originalDirectory = document.url.deletingLastPathComponent()
@@ -98,7 +145,10 @@ struct EditorAnimationAuthoringTests {
 
     @Test func projectDeletionEvictsCachedDraftAndAllowsRecreation() throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let service = try #require(fixture.editor.workbench.animationService)
         let document = try service.create("Assets/Deleted.animlib", library: library())
         try document.save(expectedRevision: document.revision)
@@ -112,7 +162,10 @@ struct EditorAnimationAuthoringTests {
 
     @Test func nativeExtractionBindingGraphAndRuntimeReopenPreserveSourceAndRejectDuplicates() async throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let service = try #require(fixture.editor.workbench.animationService)
         let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Tests/AdaEngineTests/Fixtures/SkeletalGardenAssets/GardenRobot.glb")
@@ -128,22 +181,44 @@ struct EditorAnimationAuthoringTests {
         try document.save(expectedRevision: document.revision)
         let sceneID = "scene:Assets/Main.ascn"
         fixture.editor.workbench.updateSceneModelDocument(id: sceneID, status: "Test model") { scene in
-            scene.entities.append(.init(id: "robot", name: "Robot", enabled: true, parent: nil, components: [
-                EditorBuiltInComponentType.transform: EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.transform),
-                EditorBuiltInComponentType.model3DSource: ["source": .string("@res://Robot.glb"), "animation": .string("Walk"), "autoplay": .bool(true), "repeats": .bool(true)]
-            ]))
+            scene.entities.append(
+                .init(
+                    id: "robot",
+                    name: "Robot",
+                    enabled: true,
+                    parent: nil,
+                    components: [
+                        EditorBuiltInComponentType.transform: EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.transform),
+                        EditorBuiltInComponentType.model3DSource: [
+                            "source": .string("@res://Robot.glb"), "animation": .string("Walk"), "autoplay": .bool(true), "repeats": .bool(true),
+                        ],
+                    ]
+                )
+            )
         }
         let before = try #require(fixture.editor.workbench.sceneDocument(id: sceneID))
-        try await fixture.editor.workbench.bindAnimationLibrary(document, sceneID: sceneID, entityID: "robot",
-            expectedSceneRevision: EditorAgentSceneToolService.revision(for: before.content), expectedResourceRevision: document.revision, clipID: clip.id)
+        try await fixture.editor.workbench.bindAnimationLibrary(
+            document,
+            sceneID: sceneID,
+            entityID: "robot",
+            expectedSceneRevision: EditorAgentSceneToolService.revision(for: before.content),
+            expectedResourceRevision: document.revision,
+            clipID: clip.id
+        )
         let bound = try #require(fixture.editor.workbench.sceneDocument(id: sceneID))
         let reference = try #require(bound.sceneModel?.entities.first { $0.id == "robot" }?.components[EditorBuiltInComponentType.model3DSource])
         #expect(reference["animation"] == .string(document.library.runtimeName(for: clip.id)))
         let duplicate = try service.create("Assets/Duplicate.animlib", library: document.library)
         try duplicate.save(expectedRevision: duplicate.revision)
         await #expect(throws: (any Error).self) {
-            try await fixture.editor.workbench.bindAnimationLibrary(duplicate, sceneID: sceneID, entityID: "robot",
-                expectedSceneRevision: EditorAgentSceneToolService.revision(for: bound.content), expectedResourceRevision: duplicate.revision, clipID: clip.id)
+            try await fixture.editor.workbench.bindAnimationLibrary(
+                duplicate,
+                sceneID: sceneID,
+                entityID: "robot",
+                expectedSceneRevision: EditorAgentSceneToolService.revision(for: bound.content),
+                expectedResourceRevision: duplicate.revision,
+                clipID: clip.id
+            )
         }
         #expect(fixture.editor.workbench.sceneDocument(id: sceneID)?.content == bound.content)
         GLTFLoaderResolver.shared.setLoader(NativeGLTFLoader())
@@ -167,7 +242,10 @@ struct EditorAnimationAuthoringTests {
 
     @Test func documentedToolPanelUsesTheSameDraftAndRevocationCancelsQueuedJobs() async throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let service = try #require(fixture.editor.workbench.animationService)
         let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Tests/AdaEngineTests/Fixtures/SkeletalGardenAssets/GardenRobot.glb")
@@ -177,10 +255,20 @@ struct EditorAnimationAuthoringTests {
         let original = document.library
         let sceneID = "scene:Assets/Main.ascn"
         fixture.editor.workbench.updateSceneModelDocument(id: sceneID, status: "Test model") { scene in
-            scene.entities.append(.init(id: "robot", name: "Robot", enabled: true, parent: nil, components: [
-                EditorBuiltInComponentType.transform: EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.transform),
-                EditorBuiltInComponentType.model3DSource: ["source": .string("@res://Robot.glb"), "animation": .string("Walk"), "autoplay": .bool(true), "repeats": .bool(true)]
-            ]))
+            scene.entities.append(
+                .init(
+                    id: "robot",
+                    name: "Robot",
+                    enabled: true,
+                    parent: nil,
+                    components: [
+                        EditorBuiltInComponentType.transform: EditorComponentRegistry.defaultPayload(for: EditorBuiltInComponentType.transform),
+                        EditorBuiltInComponentType.model3DSource: [
+                            "source": .string("@res://Robot.glb"), "animation": .string("Walk"), "autoplay": .bool(true), "repeats": .bool(true),
+                        ],
+                    ]
+                )
+            )
         }
         let example = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appendingPathComponent("Documentation/Examples/StudioTools/AnimationHelper")
@@ -211,8 +299,9 @@ struct EditorAnimationAuthoringTests {
         #expect(panel.runtime.values["clipID"] == .string(original.clips[0].id))
         try await performAndPoll("inspectTracks")
         try await performAndPoll("inspectKeys")
-        guard case let .string(trackID) = panel.runtime.values["trackID"],
-            let track = original.clips[0].tracks.first(where: { $0.id == trackID }), let first = track.keys.first else {
+        guard case .string(let trackID) = panel.runtime.values["trackID"],
+            let track = original.clips[0].tracks.first(where: { $0.id == trackID }), let first = track.keys.first
+        else {
             Issue.record("The real Tool must inspect a compatible rotation track and key.")
             return
         }
@@ -226,7 +315,8 @@ struct EditorAnimationAuthoringTests {
         try ui.apply([edit], expectedRevision: ui.revision)
         let agent = try service.create("Assets/Agent.animlib", library: original)
         let request = AnimationAuthoringRequest(action: .apply, path: agent.relativePath, expectedRevision: agent.revision, operations: [edit])
-        let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
+        let data = try JSONEncoder().encode(request)
+        let json = try #require(String(bytes: data, encoding: .utf8))
         _ = try await EditorAgentAnimationTools.execute(name: "editor.animation.apply", arguments: ["requestJSON": .string(json)], viewModel: fixture.editor)
         #expect(ui.library == agent.library)
         #expect(document.library == agent.library)
@@ -235,7 +325,7 @@ struct EditorAnimationAuthoringTests {
         }
         #expect(document.isDirty)
         try await performAndPoll("sample")
-        guard case let .double(sampledZ) = panel.runtime.values["sampledRotationZ"] else {
+        guard case .double(let sampledZ) = panel.runtime.values["sampledRotationZ"] else {
             Issue.record("The Tool must read a sampled bone rotation from a nested pose/list response.")
             return
         }
@@ -258,18 +348,21 @@ struct EditorAnimationAuthoringTests {
     }
 
     @Test func scriptRequestExpansionIsBoundedBeforeJSONEncoding() throws {
-        let source = AdaScriptSource(path: "Amplify.ada", source: """
-            @tool(id: "test.expansion", api: 2, platforms: ["macos", "windows"], permissions: ["editor.animations.read"])
-            class Amplify {
-                func activate(editor) { editor.addPanel(id: "main", title: "Tests", location: "right", ui: "Panel.ui"); }
-                func amplify(editor) {
-                    var value = ["leaf": "value"];
-                    var i = 0;
-                    while (i < 14) { value = ["a": value, "b": value]; i += 1; }
-                    editor.animations.submit(["action": "inspect", "path": "Assets/Test.animlib", "extra": value]);
+        let source = AdaScriptSource(
+            path: "Amplify.ada",
+            source: """
+                @tool(id: "test.expansion", api: 2, platforms: ["macos", "windows"], permissions: ["editor.animations.read"])
+                class Amplify {
+                    func activate(editor) { editor.addPanel(id: "main", title: "Tests", location: "right", ui: "Panel.ui"); }
+                    func amplify(editor) {
+                        var value = ["leaf": "value"];
+                        var i = 0;
+                        while (i < 14) { value = ["a": value, "b": value]; i += 1; }
+                        editor.animations.submit(["action": "inspect", "path": "Assets/Test.animlib", "extra": value]);
+                    }
                 }
-            }
-            """)
+                """
+        )
         let schema = try #require(AdaScriptSchemaParser.parseTools(sources: [source]).first)
         let runtime = try AdaScriptToolRuntime(sources: [source], schema: schema, grantedPermissions: schema.permissions)
         defer { runtime.deactivate() }
@@ -290,9 +383,11 @@ struct EditorAnimationAuthoringTests {
         #expect(throws: NativeGLTFLoader.GLTFError.self) { _ = try NativeGLTFLoader(resourceRoot: root).load(data: unused, baseURL: root) }
         // A small zero-based accessor is legal without a buffer. Repeated references still consume decoded work.
         let primitive: [String: Any] = ["attributes": ["POSITION": 0]]
-        let object: [String: Any] = ["asset": ["version": "2.0"],
+        let object: [String: Any] = [
+            "asset": ["version": "2.0"],
             "accessors": [["componentType": 5126, "count": 16, "type": "VEC3"]],
-            "meshes": [["primitives": Array(repeating: primitive, count: 32)]]]
+            "meshes": [["primitives": Array(repeating: primitive, count: 32)]],
+        ]
         let data = try JSONSerialization.data(withJSONObject: object)
         #expect(data.count < 4096)
         #expect(throws: NativeGLTFLoader.GLTFError.self) {
@@ -306,7 +401,10 @@ struct EditorAnimationAuthoringTests {
 
     @Test func revokingToolCancelsRunningAndQueuedMutations() async throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let service = try #require(fixture.editor.workbench.animationService)
         let document = try service.create("Assets/Test.animlib", library: library())
         try document.save(expectedRevision: document.revision)
@@ -315,42 +413,48 @@ struct EditorAnimationAuthoringTests {
         let directory = fixture.root.appendingPathComponent("Tools/Cancel")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try """
-            @tool(id: "test.cancel", api: 2, platforms: ["macos", "windows"], permissions: ["editor.animations.read", "editor.animations.write"])
-            class CancelTool {
-                @export var revision = "";
-                @export var submitted = 0;
-                func activate(editor) { editor.addPanel(id: "main", title: "Cancel", location: "right", ui: "Panel.ui"); }
-                func mutate(editor) {
-                    editor.animations.submit(["action": "apply", "path": "Assets/Test.animlib", "expectedRevision": revision,
-                        "operations": [["id": "rename", "kind": "clip.configure", "clipID": "idle", "name": "Late mutation"]]]);
-                    submitted += 1;
-                }
-                func inspect(editor) { editor.animations.submit(["action": "inspect", "path": "Assets/Test.animlib"]); submitted += 1; }
+        @tool(id: "test.cancel", api: 2, platforms: ["macos", "windows"], permissions: ["editor.animations.read", "editor.animations.write"])
+        class CancelTool {
+            @export var revision = "";
+            @export var submitted = 0;
+            func activate(editor) { editor.addPanel(id: "main", title: "Cancel", location: "right", ui: "Panel.ui"); }
+            func mutate(editor) {
+                editor.animations.submit(["action": "apply", "path": "Assets/Test.animlib", "expectedRevision": revision,
+                    "operations": [["id": "rename", "kind": "clip.configure", "clipID": "idle", "name": "Late mutation"]]]);
+                submitted += 1;
             }
-            """.write(to: directory.appendingPathComponent("Cancel.ada"), atomically: true, encoding: .utf8)
+            func inspect(editor) { editor.animations.submit(["action": "inspect", "path": "Assets/Test.animlib"]); submitted += 1; }
+        }
+        """.write(to: directory.appendingPathComponent("Cancel.ada"), atomically: true, encoding: .utf8)
         try """
-            format: ada.ui
-            schemaVersion: 1
-            inputs:
-              - {name: revision, type: string, defaultValue: ''}
-            actions:
-              - {name: mutate}
-              - {name: inspect}
-            root:
-              id: cancel
-              type: Text
-              arguments:
-                text: {value: Cancellation test}
-            """.write(to: directory.appendingPathComponent("Panel.ui"), atomically: true, encoding: .utf8)
+        format: ada.ui
+        schemaVersion: 1
+        inputs:
+          - {name: revision, type: string, defaultValue: ''}
+        actions:
+          - {name: mutate}
+          - {name: inspect}
+        root:
+          id: cancel
+          type: Text
+          arguments:
+            text: {value: Cancellation test}
+        """.write(to: directory.appendingPathComponent("Panel.ui"), atomically: true, encoding: .utf8)
         let gate = AnimationJobGate()
         let defaults = try #require(UserDefaults(suiteName: "AnimationCancel-\(UUID())"))
         // Suspend only scheduling; the resumed request still executes the real project service.
-        let host = EditorStudioToolHost(defaults: defaults, animationExecutor: { request, workbench in
-            if request.action == .apply { await gate.pause() }
-            defer { gate.finished = true }
-            return try await service.execute(request, workbench: workbench)
-        })
-        defer { gate.resume(); host.close() }
+        let host = EditorStudioToolHost(
+            defaults: defaults,
+            animationExecutor: { request, workbench in
+                if request.action == .apply { await gate.pause() }
+                defer { gate.finished = true }
+                return try await service.execute(request, workbench: workbench)
+            }
+        )
+        defer {
+            gate.resume()
+            host.close()
+        }
         host.open(projectURL: fixture.root, editor: fixture.editor)
         host.enable("test.cancel")
         host.approve(try #require(host.permissionRequest).id)
@@ -371,14 +475,17 @@ struct EditorAnimationAuthoringTests {
     }
 
     @Test func detachedToolRequestsPreserveUTF8IncludingNull() throws {
-        let source = AdaScriptSource(path: "Strings.ada", source: """
-            @tool(id: "test.strings", api: 2, platforms: ["macos", "windows"], permissions: ["editor.animations.read"])
-            class Strings {
-                @export var path = "";
-                func activate(editor) { editor.addPanel(id: "main", title: "Tests", location: "right", ui: "Panel.ui"); }
-                func inspect(editor) { editor.animations.submit(["action": "inspect", "path": path]); }
-            }
-            """)
+        let source = AdaScriptSource(
+            path: "Strings.ada",
+            source: """
+                @tool(id: "test.strings", api: 2, platforms: ["macos", "windows"], permissions: ["editor.animations.read"])
+                class Strings {
+                    @export var path = "";
+                    func activate(editor) { editor.addPanel(id: "main", title: "Tests", location: "right", ui: "Panel.ui"); }
+                    func inspect(editor) { editor.animations.submit(["action": "inspect", "path": path]); }
+                }
+                """
+        )
         let schema = try #require(AdaScriptSchemaParser.parseTools(sources: [source]).first)
         let runtime = try AdaScriptToolRuntime(sources: [source], schema: schema, grantedPermissions: schema.permissions)
         defer { runtime.deactivate() }
@@ -390,7 +497,10 @@ struct EditorAnimationAuthoringTests {
 
     @Test func libraryPreviewUsesBoundedImportBeforeGPUWork() async throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let model = fixture.root.appendingPathComponent("Assets/Oversized.gltf")
         // An unused accessor makes the unprotected baseline safe to run while still testing early inventory rejection.
         try Data(#"{"asset":{"version":"2.0"},"accessors":[{"componentType":5126,"count":1000000000,"type":"SCALAR"}]}"#.utf8).write(to: model)
@@ -405,7 +515,10 @@ struct EditorAnimationAuthoringTests {
 
     @Test func scopedImportRejectsPrimaryModelOutsideAssets() async throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let assets = fixture.root.appendingPathComponent("Assets").resolvingSymlinksInPath().standardizedFileURL
         let inside = assets.appendingPathComponent("Inside.gltf")
         let outside = fixture.root.appendingPathComponent("Outside.gltf")
@@ -419,12 +532,24 @@ struct EditorAnimationAuthoringTests {
 
     @Test func openedModelIsAnAnimatorTargetWithoutAnySceneDocument() throws {
         let fixture = try makeFixture()
-        defer { fixture.editor.studioTools.close(); try? FileManager.default.removeItem(at: fixture.root) }
+        defer {
+            fixture.editor.studioTools.close()
+            try? FileManager.default.removeItem(at: fixture.root)
+        }
         let workbench = fixture.editor.workbench
         workbench.openDocuments = []
-        let model = EditorAssetDocument(id: "asset:Assets/Robot.glb", title: "Robot.glb", relativePath: "Assets/Robot.glb",
-            absolutePath: fixture.root.appendingPathComponent("Assets/Robot.glb").path, assetReference: "@res://Robot.glb",
-            kind: .model3D, fileExtension: "glb", byteCount: nil, modifiedAt: nil, errorMessage: nil)
+        let model = EditorAssetDocument(
+            id: "asset:Assets/Robot.glb",
+            title: "Robot.glb",
+            relativePath: "Assets/Robot.glb",
+            absolutePath: fixture.root.appendingPathComponent("Assets/Robot.glb").path,
+            assetReference: "@res://Robot.glb",
+            kind: .model3D,
+            fileExtension: "glb",
+            byteCount: nil,
+            modifiedAt: nil,
+            errorMessage: nil
+        )
         workbench.open(.asset(model))
         #expect(workbench.activeSceneDocument == nil)
         let target = try #require(fixture.editor.skeletalAnimationTarget)
@@ -444,9 +569,24 @@ struct EditorAnimationAuthoringTests {
         let scene = root.appendingPathComponent("Assets/Main.ascn")
         try content.write(to: scene, atomically: true, encoding: .utf8)
         let editor = EditorViewModel(project: .init(name: "Animation", path: root.path), autosaveDelay: .milliseconds(10))
-        editor.workbench.open(.scene(.init(id: "scene:Assets/Main.ascn", title: "Main.ascn", relativePath: "Assets/Main.ascn", absolutePath: scene.path,
-            content: content, lastSavedContent: content, isReadOnly: false, sceneModel: model, errorMessage: nil, isDirty: false,
-            statusMessage: nil, loadSummary: EditorSceneFileLoader.summary(from: content))))
+        editor.workbench.open(
+            .scene(
+                .init(
+                    id: "scene:Assets/Main.ascn",
+                    title: "Main.ascn",
+                    relativePath: "Assets/Main.ascn",
+                    absolutePath: scene.path,
+                    content: content,
+                    lastSavedContent: content,
+                    isReadOnly: false,
+                    sceneModel: model,
+                    errorMessage: nil,
+                    isDirty: false,
+                    statusMessage: nil,
+                    loadSummary: EditorSceneFileLoader.summary(from: content)
+                )
+            )
+        )
         return (root, editor)
     }
 }
@@ -460,5 +600,8 @@ private final class AnimationJobGate {
         started = true
         await withCheckedContinuation { continuation = $0 }
     }
-    func resume() { continuation?.resume(); continuation = nil }
+    func resume() {
+        continuation?.resume()
+        continuation = nil
+    }
 }

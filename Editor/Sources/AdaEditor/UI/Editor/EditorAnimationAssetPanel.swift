@@ -6,19 +6,22 @@ struct EditorAnimationAssetPanel: View {
     let workspace: EditorAnimationAssetWorkspace
     let service: EditorAnimationAuthoringService?
     @Environment(\.theme) private var theme
+    #if os(Windows)
+        @State private var showsKimodo = false
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             toolbar
-            if workspace.mode == .graph {
-                EditorAnimationGraphEditor(model: workspace.graph)
-            } else if workspace.sourceLibrary != nil || workspace.library != nil {
-                EditorAnimationTimeline(workspace: workspace)
-            } else {
-                Text(L10n.text("Choose an imported clip to copy, or create an animation from the rig's rest pose."))
-                    .font(.system(size: 12)).padding(8)
-                Spacer()
-            }
+            #if os(Windows)
+                if showsKimodo {
+                    EditorKimodoPanel(workspace: workspace) { showsKimodo = false }
+                } else {
+                    animatorContent
+                }
+            #else
+                animatorContent
+            #endif
             if !workspace.error.isEmpty {
                 Text(L10n.text("Animation edit failed: \(workspace.error)")).font(.system(size: 11)).foregroundColor(.red)
             }
@@ -35,6 +38,18 @@ struct EditorAnimationAssetPanel: View {
         .accessibilityIdentifier("AdaEditor.Animator.Asset")
     }
 
+    @ViewBuilder private var animatorContent: some View {
+        if workspace.mode == .graph {
+            EditorAnimationGraphEditor(model: workspace.graph)
+        } else if workspace.sourceLibrary != nil || workspace.library != nil {
+            EditorAnimationTimeline(workspace: workspace)
+        } else {
+            Text(L10n.text("Choose an imported clip to copy, or create an animation from the rig's rest pose."))
+                .font(.system(size: 12)).padding(8)
+            Spacer()
+        }
+    }
+
     private var clipBrowser: some View {
         ScrollView(.vertical, showsIndicators: true) {
             VStack(alignment: .leading, spacing: 6) {
@@ -49,8 +64,12 @@ struct EditorAnimationAssetPanel: View {
                 if let document = workspace.library {
                     Text(document.relativePath).font(.system(size: 11))
                     ForEach(document.library.clips, id: \.id) { clip in
-                        action(clip.name, id: "Clip.\(clip.id)", localized: false,
-                            selected: workspace.preview.selectedAnimation == document.library.runtimeName(for: clip.id)) {
+                        action(
+                            clip.name,
+                            id: "Clip.\(clip.id)",
+                            localized: false,
+                            selected: workspace.preview.selectedAnimation == document.library.runtimeName(for: clip.id)
+                        ) {
                             document.selectedClipID = clip.id
                             workspace.mode = .keys
                             workspace.applyModePreview()
@@ -69,18 +88,33 @@ struct EditorAnimationAssetPanel: View {
             mode(.keys, title: "Timeline")
             mode(.curves, title: "Curves")
             mode(.graph, title: "Animation Graph")
-            action(workspace.preview.showsBones ? "Hide bones" : "Show bones", id: "Bones", selected: workspace.preview.showsBones) { workspace.preview.showsBones.toggle() }
+            action(workspace.preview.showsBones ? "Hide bones" : "Show bones", id: "Bones", selected: workspace.preview.showsBones) {
+                workspace.preview.showsBones.toggle()
+            }
+            #if os(Windows)
+                if workspace.preview.asset?.animationRig != nil, service != nil {
+                    action("Generate from Text…", id: "Kimodo", selected: showsKimodo) { showsKimodo.toggle() }
+                }
+            #endif
             Spacer()
         }
     }
 
     private var sourceControls: some View {
         HStack(spacing: 6) {
-            EditorEnumField(cases: workspace.preview.animationNames,
-                selection: Binding(get: { workspace.sourceClip.isEmpty ? "Rest pose" : workspace.sourceClip }, set: {
-                    workspace.sourceClip = $0 == "Rest pose" ? "" : $0
-                    if workspace.mode == .clips || workspace.library == nil { workspace.preview.selectedAnimation = $0 }
-                }), accessibilityID: "AdaEditor.Animator.Asset.ImportedClip", labels: ["Rest pose": L10n.tr("Rest pose")], localizesValues: false).frame(width: 160)
+            EditorEnumField(
+                cases: workspace.preview.animationNames,
+                selection: Binding(
+                    get: { workspace.sourceClip.isEmpty ? "Rest pose" : workspace.sourceClip },
+                    set: {
+                        workspace.sourceClip = $0 == "Rest pose" ? "" : $0
+                        if workspace.mode == .clips || workspace.library == nil { workspace.preview.selectedAnimation = $0 }
+                    }
+                ),
+                accessibilityID: "AdaEditor.Animator.Asset.ImportedClip",
+                labels: ["Rest pose": L10n.tr("Rest pose")],
+                localizesValues: false
+            ).frame(width: 160)
             field("Animation library path", text: Binding(get: { workspace.libraryPath }, set: { workspace.libraryPath = $0 }))
                 .frame(minWidth: 140, maxWidth: 320).frame(height: 28)
             field("Clip name", text: Binding(get: { workspace.clipName }, set: { workspace.clipName = $0 })).frame(width: 110, height: 28)
@@ -115,9 +149,13 @@ struct EditorAnimationAssetViewport: View {
 
     var body: some View {
         ZStack {
-            if workspace.preview.isLoading { Text(L10n.text("Loading animation model…")).foregroundColor(theme.editorColors.muted) }
-            else if let error = workspace.preview.error { Text(error).foregroundColor(.red).padding(16) }
-            else if workspace.preview.asset != nil { EditorAnimationModelWorkspace(workspace: workspace) }
+            if workspace.preview.isLoading {
+                Text(L10n.text("Loading animation model…")).foregroundColor(theme.editorColors.muted)
+            } else if let error = workspace.preview.error {
+                Text(error).foregroundColor(.red).padding(16)
+            } else if workspace.preview.asset != nil {
+                EditorAnimationModelWorkspace(workspace: workspace)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear { workspace.start() }

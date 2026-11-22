@@ -19,7 +19,7 @@ final class EditorViewModel {
     let tests = EditorTestExplorer()
     let terminals = EditorTerminalWorkspace()
     #if canImport(Network) || os(Windows)
-    let playerSession = EditorPlayerSession()
+        let playerSession = EditorPlayerSession()
     #endif
     var playerPairingWindow: UIWindow?
     let debugger = EditorDebugger()
@@ -43,7 +43,7 @@ final class EditorViewModel {
     var activeOutputTab: String
     var workspaceStatus: EditorWorkspaceStatus {
         didSet {
-            if case let .failed(message) = workspaceStatus, workspaceStatus != oldValue, notificationWorkspaceRunID == nil {
+            if case .failed(let message) = workspaceStatus, workspaceStatus != oldValue, notificationWorkspaceRunID == nil {
                 reportProjectError(message)
             }
         }
@@ -73,8 +73,8 @@ final class EditorViewModel {
     var androidRunningSession: EditorAndroidRunSession?
     @ObservationIgnored var androidDiscoveryTask: Task<Void, Never>?
     #if os(macOS) || os(Windows) || os(Linux)
-    @ObservationIgnored var androidRunner: EditorProcessRunner?
-    @ObservationIgnored var androidTools: EditorAndroidTools?
+        @ObservationIgnored var androidRunner: EditorProcessRunner?
+        @ObservationIgnored var androidTools: EditorAndroidTools?
     #endif
     var selectedRunDestination: EditorRunDestination
     var dependencyLocation = ""
@@ -91,6 +91,9 @@ final class EditorViewModel {
     var selectedTestFilter: String
     var playModeState: EditorPlayModeState
     var isNewFileDialogPresented = false
+    #if os(Windows)
+        let kimodoInstaller = EditorKimodoInstallModel()
+    #endif
     var pendingDeleteProjectItem: EditorProjectSidebarViewModel.Item?
     var newFileKind = EditorNewFileKind.scene
     var isNewFileKindPreselected = false
@@ -214,11 +217,15 @@ final class EditorViewModel {
         playModeState: EditorPlayModeState = .editing,
         autosaveDelay: Duration = .milliseconds(350)
     ) {
-        let savedProject = startupData?.metadata ?? project.flatMap {
-            try? ProjectSystem.loadProject(at: URL(fileURLWithPath: $0.path, isDirectory: true), fileManager: fileManager)
-        }
+        let savedProject =
+            startupData?.metadata
+            ?? project.flatMap {
+                try? ProjectSystem.loadProject(at: URL(fileURLWithPath: $0.path, isDirectory: true), fileManager: fileManager)
+            }
         let scriptableObjectSupport: EditorScriptableObjectCatalogLoader.Result? = project.flatMap { reference in
-            if let startupData { return startupData.scriptSupport }
+            if let startupData {
+                return startupData.scriptSupport
+            }
             guard let savedProject, savedProject.build.system.isAdaScript else {
                 return nil
             }
@@ -283,7 +290,8 @@ final class EditorViewModel {
             self.selectedRunDestination = selectedRunDestination ?? .iPadOS
         #elseif os(Windows)
             let savedDestination = savedProject.map { Self.editorRunDestination(from: $0.run.destination) }
-            self.selectedRunDestination = selectedRunDestination
+            self.selectedRunDestination =
+                selectedRunDestination
                 ?? savedDestination.flatMap { EditorRunDestination.availableCases.contains($0) ? $0 : nil }
                 ?? .windows
         #elseif os(Linux)
@@ -316,7 +324,7 @@ final class EditorViewModel {
             return workbench?.openDocuments
                 .compactMap { document -> String? in
                     guard
-                        case let .ui(ui) = document, let sourcePath = ui.absolutePath,
+                        case .ui(let ui) = document, let sourcePath = ui.absolutePath,
                         URL(fileURLWithPath: sourcePath).standardizedFileURL.resolvingSymlinksInPath() == target
                     else {
                         return nil
@@ -340,7 +348,9 @@ final class EditorViewModel {
             }
         )
         self.agent.setA2UIPreviewHandler { [weak self] path in
-            guard let self, let item = self.projectSidebar.items.first(where: { $0.relativePath == path }) else { return }
+            guard let self, let item = self.projectSidebar.items.first(where: { $0.relativePath == path }) else {
+                return
+            }
             self.openProjectItem(item)
         }
         self.workbench.setActiveDocumentWillChangeHandler { [weak self] in

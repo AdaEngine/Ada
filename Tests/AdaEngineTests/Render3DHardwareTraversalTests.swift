@@ -10,6 +10,16 @@ struct Render3DHardwareTraversalTests {
         #expect(selection.traversal.rawValue == "vulkan-ray-query")
     }
 
+    @Test("Path tracing preserves the raster-first default for older settings and persists full primary rays")
+    func rasterFirstHitSettings() throws {
+        let legacy = try JSONDecoder().decode(PathTracing3D.self, from: Data("{\"isEnabled\":true}".utf8))
+        #expect(legacy.rasterFirstHit)
+        var fullRay = legacy
+        fullRay.rasterFirstHit = false
+        let encoded = try JSONEncoder().encode(fullRay)
+        #expect(try JSONDecoder().decode(PathTracing3D.self, from: encoded).rasterFirstHit == false)
+    }
+
     @Test func softwareIsAlwaysChosenWhenRequestedWithoutAReason() {
         let selection = PathTracingTraversalSelection.select(.software, deviceSupportsRayQueries: true, sceneBlocker: nil)
         #expect(selection.traversal == .softwareBVH && selection.fallbackReason == nil)

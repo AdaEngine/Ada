@@ -37,16 +37,20 @@ public struct PathTracingTraversalSelection: Equatable, Sendable {
     /// Chooses the traversal. `sceneBlocker` names why the scene cannot use hardware (skinned or morphed meshes, budgets,
     /// a failed build), or is nil when it can.
     public static func select(
-        _ intersection: PathTracingIntersection, deviceSupportsRayQueries: Bool, sceneBlocker: String?
-    ) -> PathTracingTraversalSelection {
+        _ intersection: PathTracingIntersection,
+        deviceSupportsRayQueries: Bool,
+        sceneBlocker: String?
+    ) -> Self {
         guard intersection == .automatic, automaticPrefersHardware else {
-            return PathTracingTraversalSelection(traversal: .softwareBVH, fallbackReason: nil)
+            return Self(traversal: .softwareBVH, fallbackReason: nil)
         }
         guard deviceSupportsRayQueries else {
-            return PathTracingTraversalSelection(traversal: .softwareBVH, fallbackReason: "The device does not support ray queries")
+            return Self(traversal: .softwareBVH, fallbackReason: "The device does not support ray queries")
         }
-        if let sceneBlocker { return PathTracingTraversalSelection(traversal: .softwareBVH, fallbackReason: sceneBlocker) }
-        return PathTracingTraversalSelection(traversal: .hardwareRayQuery, fallbackReason: nil)
+        if let sceneBlocker {
+            return Self(traversal: .softwareBVH, fallbackReason: sceneBlocker)
+        }
+        return Self(traversal: .hardwareRayQuery, fallbackReason: nil)
     }
 }
 
@@ -70,6 +74,9 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
     public var denoiser: PathTracingDenoiser = .automatic
     /// Intersection selection. See ``PathTracingIntersection``.
     public var intersection: PathTracingIntersection = .automatic
+    /// Use the raster G-buffer for the first visible surface when supported.
+    /// Disable to find the first surface with a ray as well. Ray Reconstruction needs the raster guides.
+    public var rasterFirstHit: Bool = true
     /// Smallest weight a new frame gets in the portable denoiser's history. Smaller values converge to less noise
     /// in still views; larger ones follow moving lights faster.
     public var minimumHistoryWeight: Float = 1.0 / 32
@@ -78,8 +85,13 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
     /// softer detail. It does not affect DLSS Ray Reconstruction or plain accumulation.
     public var denoiserStrength: Float = 1
 
-    public init(isEnabled: Bool = false, samplesPerPixel: Int = 1, maximumBounces: Int = 3,
-                resolutionScale: Float = 0.5, historyLimit: Int = 32) {
+    public init(
+        isEnabled: Bool = false,
+        samplesPerPixel: Int = 1,
+        maximumBounces: Int = 3,
+        resolutionScale: Float = 0.5,
+        historyLimit: Int = 32
+    ) {
         self.isEnabled = isEnabled
         self.samplesPerPixel = samplesPerPixel
         self.maximumBounces = maximumBounces
@@ -107,7 +119,7 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
 
     private enum CodingKeys: CodingKey {
         case isEnabled, samplesPerPixel, maximumBounces, resolutionScale, textureTileSize, maximumDistance, maximumRadiance, historyLimit, rayBias
-        case denoiser, minimumHistoryWeight, intersection, denoiserStrength
+        case denoiser, minimumHistoryWeight, intersection, rasterFirstHit, denoiserStrength
     }
 
     public init(from decoder: Decoder) throws {
@@ -124,6 +136,7 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
         denoiser = try c.decodeIfPresent(PathTracingDenoiser.self, forKey: .denoiser) ?? .automatic
         minimumHistoryWeight = try c.decodeIfPresent(Float.self, forKey: .minimumHistoryWeight) ?? 1.0 / 32
         intersection = try c.decodeIfPresent(PathTracingIntersection.self, forKey: .intersection) ?? .automatic
+        rasterFirstHit = try c.decodeIfPresent(Bool.self, forKey: .rasterFirstHit) ?? true
         denoiserStrength = try c.decodeIfPresent(Float.self, forKey: .denoiserStrength) ?? 1
     }
 }

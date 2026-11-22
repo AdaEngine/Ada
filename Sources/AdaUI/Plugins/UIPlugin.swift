@@ -18,11 +18,31 @@ import Math
 public struct UIPlugin: Plugin, DeferredRenderSnapshotPlugin {
     public init() {}
 
+    private struct WindowOverlayPassInstalled: Resource {}
+
+    /// Composites interactive game controls over the primary window's cameras.
     @MainActor
-    package static func installWindowOverlayPass(in app: AppWorlds) {
-        guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
+    public static func addWindowOverlay(_ content: UIView, in app: borrowing AppWorlds) {
+        guard let window = app.getResource(PrimaryWindow.self)?.window else {
             return
         }
+        installWindowOverlayPass(in: app)
+        let overlay = UIWindowOverlayView(content: content, interactive: true)
+        overlay.frame = window.bounds
+        content.frame = window.bounds
+        window.addSubview(overlay)
+        overlay.setNeedsLayout()
+        overlay.setNeedsDisplay()
+    }
+
+    @MainActor
+    package static func installWindowOverlayPass(in app: borrowing AppWorlds) {
+        guard let renderWorld = app.getSubworldBuilder(by: .renderWorld),
+            renderWorld.getResource(WindowOverlayPassInstalled.self) == nil
+        else {
+            return
+        }
+        renderWorld.insertResource(WindowOverlayPassInstalled())
         let graph = renderWorld.getRefResource(RenderGraph.self)
         let name: RenderNodeLabel = "PrimaryWindowOverlay"
         graph.wrappedValue.addNode(UIRenderNode(isWindowOverlay: true), by: name)
@@ -237,7 +257,7 @@ extension UIWindow.Chrome {
 extension UIWindow.Background {
     init(_ background: WindowBackground) {
         switch background {
-        case let .opaque(color):
+        case .opaque(let color):
             self = .opaque(color)
         case .transparent:
             self = .transparent
@@ -250,7 +270,7 @@ extension UIWindow.BackgroundEffect {
         switch effect {
         case .none:
             self = .none
-        case let .blur(material):
+        case .blur(let material):
             self = .blur(Self.BlurMaterial(material))
         }
     }
@@ -348,13 +368,13 @@ public func UpdateWindowManager(
     frameRequests.wrappedValue.beginFrame()
     let primaryID = primaryWindow.wrappedValue?.windowId
     onDemandCameras.forEach { camera in
-        guard camera.isActive, case let .window(window) = camera.renderTarget else {
+        guard camera.isActive, case .window(let window) = camera.renderTarget else {
             return
         }
         frameRequests.wrappedValue.include(window, primary: primaryID, onDemand: true)
     }
     continuousCameras.forEach { camera in
-        guard camera.isActive, case let .window(window) = camera.renderTarget else {
+        guard camera.isActive, case .window(let window) = camera.renderTarget else {
             return
         }
         frameRequests.wrappedValue.include(window, primary: primaryID, onDemand: false)

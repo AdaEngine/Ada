@@ -30,19 +30,22 @@ enum TerrainSourceMaterialUpload {
         let cells = storage.tileCellCounts(at: coordinate)
         guard volume || cells != nil, let first = positions.first,
             let ids = descriptor[TerrainSourceMaterials.layerIDs]?.elements,
-            let weights = descriptor[TerrainSourceMaterials.weights]?.elements else { throw TerrainSourceError.changedDuringBuild }
+            let weights = descriptor[TerrainSourceMaterials.weights]?.elements
+        else { throw TerrainSourceError.changedDuringBuild }
         let triangles = (usesTriangleField ? descriptor.indicies.count : positions.count) / 3
         let columns = max(1, Int(ceil(Double(triangles).squareRoot())))
         let fieldWidth = volume ? columns * 2 : (cells?.x ?? 0) + 1
         let fieldHeight = volume ? max(1, (triangles + columns - 1) / columns) * 2 : (cells?.z ?? 0) + 1
         guard ids.count == fieldWidth * fieldHeight, weights.count == ids.count,
-            volume || positions.count == ids.count else { throw TerrainSourceError.changedDuringBuild }
+            volume || positions.count == ids.count
+        else { throw TerrainSourceError.changedDuringBuild }
         let maximumCoordinate = positions.reduce(Double(0)) { max($0, abs(Double($1.x)), abs(Double($1.z))) }
         let maximumShaderCoordinate = Double(Float.greatestFiniteMagnitude) / 16
         let minimumShaderScale = Double(Float.leastNormalMagnitude)
         let layers = palette.layers.sorted { $0.id < $1.id }
         let slots = Dictionary(uniqueKeysWithValues: layers.enumerated().map { ($0.element.id, UInt8($0.offset)) })
-        var idBytes = Data(count: ids.count * 4), weightBytes = Data(count: ids.count * 4)
+        var idBytes = Data(count: ids.count * 4)
+        var weightBytes = Data(count: ids.count * 4)
         let maximumHeight = positions.reduce(Double(0)) { max($0, abs(Double($1.y))) }
         for index in ids.indices {
             for channel in 0..<4 {
@@ -54,21 +57,21 @@ enum TerrainSourceMaterialUpload {
                 weightBytes[index * 4 + channel] = UInt8((weight * 255).rounded())
             }
         }
-        func field(_ bytes: Data) -> Texture2D {
+        func fieldTexture(_ image: Image) -> Texture2D {
             var texture = TextureDescriptor(
-                width: fieldWidth,
-                height: fieldHeight,
+                width: image.width,
+                height: image.height,
                 pixelFormat: .rgba8,
                 textureUsage: [.read],
                 textureType: .texture2D,
-                image: Image(width: fieldWidth, height: fieldHeight, data: bytes)
+                image: image
             )
             texture.allowsBindingCache = false
             return Texture2D(descriptor: texture)
         }
-        let idsTexture = field(idBytes)
-        let weightsTexture = field(weightBytes)
-        let surfaceTexture: Texture2D?
+        let idsImage = Image(width: fieldWidth, height: fieldHeight, data: idBytes)
+        let weightsImage = Image(width: fieldWidth, height: fieldHeight, data: weightBytes)
+        let surfaceImage: Image?
         let tintRows = descriptor[TerrainSourceMaterials.surfaceTint]?.elements
         let maskRows = descriptor[TerrainSourceMaterials.roughnessMask]?.elements
         if tintRows != nil || maskRows != nil {
@@ -84,17 +87,10 @@ enum TerrainSourceMaterialUpload {
                 guard mask.isFinite, (0...1).contains(mask) else { throw TerrainSourceError.changedDuringBuild }
                 bytes[ids.count * 4 + index * 4] = UInt8((mask * 255).rounded())
             }
-            var texture = TextureDescriptor(
-                width: fieldWidth,
-                height: fieldHeight * 2,
-                pixelFormat: .rgba8,
-                textureUsage: [.read],
-                textureType: .texture2D,
-                image: Image(width: fieldWidth, height: fieldHeight * 2, data: bytes)
-            )
-            texture.allowsBindingCache = false
-            surfaceTexture = Texture2D(descriptor: texture)
-        } else { surfaceTexture = nil }
+            surfaceImage = Image(width: fieldWidth, height: fieldHeight * 2, data: bytes)
+        } else {
+            surfaceImage = nil
+        }
         // Exact std140 layout: one grid vector, then 32 tints, surface vectors, variation controls and variation scales.
         var parameters = [Vector4](repeating: .zero, count: 129)
         parameters[0] = volume ? [0, 0, -1, Float(layers.count)] : [first.x, first.z, gridScale, Float(layers.count)]
@@ -123,7 +119,14 @@ enum TerrainSourceMaterialUpload {
         buffer.setElements(&parameters)
         let material = PBRMaterial()
         material.baseColorFactor = color
-        material.terrainBindings = TerrainMaterialBindings(maps: maps, layerIDs: idsTexture, weights: weightsTexture, parameters: buffer, surface: surfaceTexture)
+        material.terrainBindings = TerrainMaterialBindings(
+            maps: maps,
+            layerIDs: fieldTexture(idsImage),
+            weights: fieldTexture(weightsImage),
+            parameters: buffer,
+            surface: surfaceImage.map(fieldTexture),
+            tracingField: TerrainMaterialTracingField(layerIDs: idsImage, weights: weightsImage, surface: surfaceImage, parameters: parameters)
+        )
         return material
     }
 }

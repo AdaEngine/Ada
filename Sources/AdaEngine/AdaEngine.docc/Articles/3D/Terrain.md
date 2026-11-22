@@ -4,6 +4,20 @@ Create editable ground with `Terrain3D`. Its heights describe one square surface
 in the entity's local X/Z plane. `Model3DPlugin` generates the visible geometry;
 `Physics3DPlugin` adds matching static triangle collision.
 
+## Walk through Green Valley
+
+Open `Editor/Samples/GreenValley` in Ada Studio and press Play to explore a 4 × 4 km heightfield. The trail starts in a meadow surrounded by mixed woodland. Use W/A/S/D to move. F switches between walking and free flight. In flight, Space climbs, Ctrl descends, and Shift increases speed. R starts the guided walk and G starts the guided flyover. Each view reads the same saved region files. To repeat a scene from a fixed seed, run `python Editor/Samples/GreenValley/generate.py` from the repository root.
+
+Green Valley keeps all playable ground resident and reduces mesh detail with distance. A separate grass source streams 500 m regions across the map. Grass patches reach 150 m and the most distant tree model reaches 950 m. The outer hills match the terrain samples along the edge of the map. Height fog softens the distant tree line. In the standalone raster player, gusts bend the grass near the camera while its roots stay anchored.
+
+The standalone raster player fills in the distant forest with canopy meshes baked from a 2.5 m voxel grid. The generator uses the original tree placements, limits each baked crown to 12 triangles, and shares a single crown among far trees in each occupied 20 m patch. Climb in free flight to see the distant tree line from above. Path tracing continues to use the original tree meshes.
+
+The trail is a painted soil layer in the canonical terrain material field. Its texture follows the visible surface at every mesh LOD, and the same field supplies the traced view. Short blade meshes fill the shoulders where the soil blends into grass.
+
+In standalone, click **Switch to Path Tracing** or press **P**. The player loads all terrain and forest regions. The status changes to **Path Tracing (Vulkan)** after the renderer reports an encoded frame on the ray-query backend. A second press restores raster rendering and nearby-region streaming at the same viewpoint. Check the status when comparing captures. See <doc:HardwarePathTracing> for GPU requirements.
+
+For Windows performance captures, run the sample's standalone Release player. Set `GREEN_VALLEY_ROUTE` to `walk` or `fly` and use the same native resolution for every run. Inspect the slowest frames while crossing region boundaries. The sample README lists the launch command, camera controls and capture procedure. [Green Valley sample](https://github.com/AdaEngine/AdaEngine/tree/main/Editor/Samples/GreenValley)
+
 ## Load Mesh Terrain
 
 Mesh Terrain uses a `Terrain3DSource` whose `.aterrain` manifest references an
@@ -278,11 +292,11 @@ Tile meshes, canonical material fields and collision preparation use the separat
 `maximumTileUpdatesPerFrame` allowance. Completed arrays are shared across tiles
 and retained across idle frames and visual LOD changes.
 
-Terrain layer shading uses the raster PBR pipeline. When a view requests the
-experimental portable path tracer, layered terrain selects the existing raster
-fallback for that view and records the reason in `Render3DPathTracingStatistics`.
-Its layer colors, maps and manual fields remain visible. Ordinary PBR meshes and
-terrain without a layer palette keep their existing tracing behavior.
+Vulkan hardware path tracing samples the terrain layer IDs, weights, paint and
+palette textures at the hit location. Set `environment.pathTracing.rasterFirstHit = false`
+to trace the primary ray as well as shadow and bounce rays. The portable shader
+BVH uses a raster fallback for layered terrain and records the reason in
+`Render3DPathTracingStatistics`.
 
 For a region-file round trip, enumerate `resourceCoordinates` and call
 `regionAsset(at:)` for each address, then encode its returned asset. This list
@@ -715,7 +729,9 @@ and saves preserve records in hidden dirty regions, including placement-only res
 removal. Decoded placement rows have an independent 16 MiB default storage/cache
 budget; expanded draw records and renderer buffers have separate costs. A manifest's `meshPrototypes` table assigns stable `UInt16` IDs to static model
 paths relative to the manifest directory. It also selects an optional imported
-scene and world-space draw distance. Nonempty palettes use manifest version two;
+scene and world-space draw distance. Set `pathTracingMaximumDistance` on grass
+to limit camera-to-hit distance for Vulkan ray queries. Omit it on trees to
+keep distant and offscreen shadows. Nonempty palettes use manifest version two;
 empty palettes keep version one. Both save modes preserve model references.
 
 Source loading creates one shared batch per imported mesh node, prototype and

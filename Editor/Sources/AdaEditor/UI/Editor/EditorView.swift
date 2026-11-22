@@ -59,7 +59,7 @@ enum AdaEngineStyleContent {
     static let defaultSceneModel = EditorSceneModel.default(projectName: "Main")
     static let defaultSceneContent =
         (try? defaultSceneModel.encodedYAML())
-            ?? SceneDocumentFormat.defaultSceneYAML(projectName: "Main")
+        ?? SceneDocumentFormat.defaultSceneYAML(projectName: "Main")
     static let defaultEditorDocuments: [EditorWorkbenchDocument] = [
         .text(
             EditorTextDocument(
@@ -137,16 +137,16 @@ struct EditorWindowContentView: View {
                 .zIndex(10)
 
                 #if os(macOS) || os(Windows) || os(Linux) || os(visionOS)
-                if viewModel.interface.mode == .agent {
-                    EditorAgentWorkspace(viewModel: viewModel)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
+                    if viewModel.interface.mode == .agent {
+                        EditorAgentWorkspace(viewModel: viewModel)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        EditorWorkspaceRegion(viewModel: viewModel, usesNativeOrnaments: usesNativeOrnaments)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                #else
                     EditorWorkspaceRegion(viewModel: viewModel, usesNativeOrnaments: usesNativeOrnaments)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                #else
-                EditorWorkspaceRegion(viewModel: viewModel, usesNativeOrnaments: usesNativeOrnaments)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 #endif
 
                 EditorFooterRegion(viewModel: viewModel)
@@ -222,8 +222,10 @@ struct EditorWindowContentView: View {
                         Color.clear.frame(maxWidth: .infinity, maxHeight: .infinity)
                             .onTapGesture { viewModel.buildTargets.isMenuPresented = false }
                         EditorBuildTargetMenu(viewModel: viewModel)
-                            .offset(x: -(metrics.toolbarRunControlsWidth + metrics.toolbarRunDestinationWidth + 40),
-                                    y: metrics.topToolbarHeight - 2)
+                            .offset(
+                                x: -(metrics.toolbarRunControlsWidth + metrics.toolbarRunDestinationWidth + 40),
+                                y: metrics.topToolbarHeight - 2
+                            )
                     }.zIndex(31)
                 }
             }
@@ -241,9 +243,12 @@ struct EditorWindowContentView: View {
     var body: some View {
         // Keep the window presentation value small as editor overlays grow.
         AnyView(editorContent)
-            .fullScreenCover(isPresented: Binding(
-                get: { viewModel.buildTargets.isPresented }, set: { viewModel.buildTargets.isPresented = $0 }
-            )) {
+            .fullScreenCover(
+                isPresented: Binding(
+                    get: { viewModel.buildTargets.isPresented },
+                    set: { viewModel.buildTargets.isPresented = $0 }
+                )
+            ) {
                 EditorBuildTargetsDialog(viewModel: viewModel)
             }
             .fullScreenCover(isPresented: viewModel.movieMakerPresentation) {
@@ -252,7 +257,10 @@ struct EditorWindowContentView: View {
                     canStart: viewModel.canStartMovie,
                     onStart: viewModel.startMovieRecording,
                     onBrowse: viewModel.browseMovieFolder,
-                    onClose: { viewModel.movieMaker.saveSettings(); viewModel.movieMaker.isPresented = false },
+                    onClose: {
+                        viewModel.movieMaker.saveSettings()
+                        viewModel.movieMaker.isPresented = false
+                    },
                     onReveal: {
                         if let url = viewModel.movieMaker.outputURL { _ = viewModel.externalURLOpener(url.deletingLastPathComponent()) }
                     }
@@ -260,6 +268,7 @@ struct EditorWindowContentView: View {
             }
             .modifier(EditorStudioToolPermissionPresentation(host: viewModel.studioTools, presentation: .workspace))
             .modifier(EditorTextSearchPresentation(viewModel: viewModel))
+            .modifier(EditorKimodoInstallationPresentation(viewModel: viewModel))
             .fullScreenCover(isPresented: viewModel.isNewFileDialogPresentedBinding) {
                 EditorNewFileDialog(viewModel: viewModel)
             }
@@ -282,19 +291,19 @@ struct EditorWindowContentView: View {
             .fullScreenCover(isPresented: viewModel.inspectorSidebar.componentPickerPresentationBinding) {
                 EditorAddComponentDialog(viewModel: viewModel.inspectorSidebar)
             }
-        #if os(iOS)
-            .fullScreenCover(item: viewModel.settingsPresentationBinding) { section in
-                EditorSettingsWindowView(
-                    viewModel: EditorSettingsWindowViewModel(
-                        editorViewModel: viewModel,
-                        selectedSection: section,
-                        selectedPage: viewModel.requestedSettingsPage
-                    ),
-                    showsCloseButton: true
-                )
-                .theme(.adaEditor)
-            }
-        #endif
+            #if os(iOS)
+                .fullScreenCover(item: viewModel.settingsPresentationBinding) { section in
+                    EditorSettingsWindowView(
+                        viewModel: EditorSettingsWindowViewModel(
+                            editorViewModel: viewModel,
+                            selectedSection: section,
+                            selectedPage: viewModel.requestedSettingsPage
+                        ),
+                        showsCloseButton: true
+                    )
+                    .theme(.adaEditor)
+                }
+            #endif
             .alert(
                 "Delete item?",
                 isPresented: viewModel.isDeleteProjectItemAlertPresentedBinding,
@@ -311,18 +320,18 @@ struct EditorWindowContentView: View {
             )
             .menuBar(EditorMenuBar.makeMenus(), foregroundColor: theme.editorColors.text, backgroundColor: theme.editorColors.surface)
             .keyboardShortcuts(editorKeyboardShortcuts)
-        #if os(macOS) || os(Windows) || os(Linux)
-            .onChange(of: viewModel.settingsPresentationToken) { _, _ in
-                guard let section = viewModel.requestedSettingsSection else {
-                    return
+            #if os(macOS) || os(Windows) || os(Linux)
+                .onChange(of: viewModel.settingsPresentationToken) { _, _ in
+                    guard let section = viewModel.requestedSettingsSection else {
+                        return
+                    }
+                    EditorSettingsWindowController.open(
+                        editorViewModel: viewModel,
+                        selectedSection: section,
+                        selectedPage: viewModel.requestedSettingsPage
+                    )
                 }
-                EditorSettingsWindowController.open(
-                    editorViewModel: viewModel,
-                    selectedSection: section,
-                    selectedPage: viewModel.requestedSettingsPage
-                )
-            }
-        #endif
+            #endif
             .task {
                 RuntimeLogStore.shared.setEnabled(true)
                 while !Task.isCancelled {
@@ -484,7 +493,7 @@ private struct EditorWorkspaceRegion: View {
 
 struct EditorLeftSidebarContent: View {
     let viewModel: EditorViewModel
-    var tool: String? = nil
+    var tool: String?
 
     var body: some View {
         if (tool ?? viewModel.toolStrip.activeLeftTopTool) == "sourceControl" {
@@ -543,9 +552,12 @@ private struct EditorRightSidebarContent: View {
         if viewModel.toolStrip.activeRightTool == "agentChat" {
             EditorAgentSidebar(viewModel: viewModel.agent, onOpenCatalog: { viewModel.presentSettings(.agent) })
         } else if viewModel.toolStrip.activeRightTool == "studioTools" {
-            EditorStudioToolsSidebar(host: viewModel.studioTools, onOpenSettings: {
-                viewModel.presentSettings(.project, page: EditorSettingsPage.studioTools)
-            })
+            EditorStudioToolsSidebar(
+                host: viewModel.studioTools,
+                onOpenSettings: {
+                    viewModel.presentSettings(.project, page: EditorSettingsPage.studioTools)
+                }
+            )
         } else if viewModel.toolStrip.activeRightTool == "inspector" {
             EditorContextualInspector(
                 document: viewModel.workbench.activeDocument,

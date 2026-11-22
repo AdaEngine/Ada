@@ -31,6 +31,50 @@ Opening a GLB/glTF or `.animlib` reveals Animator automatically. An open scene i
 does not reload the model. Save the library before using **Add to Scene**; its saved
 library references accompany the selected authored clip or graph.
 
+## Generate an animation with Kimodo on Windows
+
+This workflow requires a standalone Windows x64 Studio release that includes the
+public key for the signed Kimodo ZIP. The [Kimodo Motion Plugin repository](https://github.com/AdaEngine/Kimodo-Motion-Plugin)
+hosts the package and its release workflow. The private preview ZIP requires the
+matching preview Studio build and access to the plugin repository.
+
+In Studio, select **File → Install Extension from File…**, choose the ZIP, and
+click **Install** once Studio displays its verified publisher and version.
+To update, repeat the same steps with a newer compatible ZIP.
+
+The worker runs in Ubuntu on WSL 2 and uses the Windows NVIDIA driver with CUDA
+support inside WSL. First use downloads the model and runtime dependencies. Open
+the [Llama 3 model page](https://huggingface.co/meta-llama/Meta-Llama-3-8B-Instruct),
+request access, then create a read token in [Hugging Face settings](https://huggingface.co/settings/tokens).
+If the Hugging Face CLI is available in Ubuntu, run `hf auth login`. The default
+Linux credential file can also be configured from the Ubuntu terminal with:
+
+```bash
+mkdir -p "$HOME/.cache/huggingface"
+read -rs -p 'Hugging Face read token: ' kimodo_hf_token
+printf '\n'
+(umask 077; printf '%s' "$kimodo_hf_token" > "$HOME/.cache/huggingface/token")
+chmod 600 "$HOME/.cache/huggingface/token"
+unset kimodo_hf_token
+```
+
+The generation process runs on your computer and reads credentials from the Linux
+user's Hugging Face environment or credential cache.
+
+Import and open the [Ada humanoid reference model](https://github.com/AdaEngine/AdaEngine/blob/main/Tests/AdaAssetsTests/Fixtures/TestHumanoid.glb).
+The first profile expects `Root`, `Spine`, `Head`, `ArmL`, `ForeArmL`, `ArmR`,
+`ForeArmR`, `LegL`, `LowerLegL`, `LegR` and `LowerLegR` in the reference hierarchy.
+In Animator, select **Generate from Text…**, enter `A person takes two steps forward
+and waves with their right hand.`, and set **Duration in seconds** to `4`. The form
+shows setup and generation status and offers cancellation. Review the motion in
+the model viewport, name the clip and choose **Save Clip…** to keep the editable
+keys in the model's `.animlib` library.
+
+If Studio rejects the ZIP, download the release again and check its minimum
+Studio version. If it reports missing CUDA, check `nvidia-smi` in Ubuntu before
+retrying. For a rig error, switch to the reference humanoid. Other platforms can
+play saved `.animlib` clips through the existing animation player.
+
 ## Timeline and keys
 
 All bone rows share one seconds ruler and playhead. Expand a bone row to see

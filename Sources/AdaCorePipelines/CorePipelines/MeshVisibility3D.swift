@@ -62,6 +62,8 @@ public struct Mesh3DRenderSource: Sendable {
     public var thresholds: [Float]
     public var hysteresis: Float
     public var maximumDistance: Float?
+    /// Optional camera-to-hit distance for hardware path tracing, independent of raster culling.
+    public var pathTracingMaximumDistance: Float?
     public var fadeDistance: Float
     public var forceVisible: Bool
     public var castShadows: Bool
@@ -134,7 +136,9 @@ public struct ExtractedMesh3DSources: Resource {
 
     /// The meshes the path tracer intersects: raster meshes that are not raster-only, plus the proxies.
     public var pathTracedMeshes: [Mesh3DRenderSource] {
-        guard meshes.contains(where: { $0.pathTracing == PathTracingGeometry3D.rasterOnly }) || !pathTracingProxies.isEmpty else { return meshes }
+        guard meshes.contains(where: { $0.pathTracing == PathTracingGeometry3D.rasterOnly }) || !pathTracingProxies.isEmpty else {
+            return meshes
+        }
         return meshes.filter { $0.pathTracing != PathTracingGeometry3D.rasterOnly } + pathTracingProxies
     }
 }

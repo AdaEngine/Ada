@@ -110,7 +110,12 @@ Current limits:
 
 - 1–8 samples/pixel and surface interactions; the default three interactions
   allow two indirect surface bounces. Radiance and ray distance are bounded.
-- 131072 triangles, 256 texture tiles. There is no silent geometry truncation.
+- Up to 131072 placed triangles in the portable BVH, or 1,398,101 shared triangle records
+  and 1,048,576 placed parts with Vulkan ray queries. Each view supports up to 256 texture atlas tiles.
+  When the scene exceeds a budget, the status reports the reason.
+- Vulkan ray queries can sample authored terrain layer weights and paint. Layered terrain uses the raster
+  fallback on the portable BVH. Run [Green Valley](../Editor/Samples/GreenValley/README.md) and press **P**
+  to try the Vulkan path on terrain with instanced vegetation.
 - Moving geometry currently prepares CPU triangles and uploads them. The shader BVH refits; the hardware path
   instead rebuilds a top-level acceleration structure over per-part bottom-level structures. There is no GPU
   skinning or refit: skinned meshes make a view use the shader BVH.

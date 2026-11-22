@@ -1,7 +1,8 @@
 @_spi(Internal) import AdaRender
-@testable import AdaCorePipelines
 import Math
 import Testing
+
+@testable import AdaCorePipelines
 
 private final class FakeStructure: AccelerationStructure, @unchecked Sendable {
     let kind: AccelerationStructureKind
@@ -21,16 +22,16 @@ struct Render3DAccelerationStructureOwnerTests {
 
     // MARK: Instance plan
 
-    @Test func instancesFollowPlacementOrderAndEachStartsWhereThePreviousTrianglesEnd() {
+    @Test func instancesFollowPlacementOrderAndIndexTheirOwnMetadata() {
         let plan = PathTracing3DInstancePlan.make([placement(first, triangles: 2), placement(second, triangles: 1), placement(first, triangles: 2, x: 5)])
-        #expect(plan.instances.map(\.firstTriangle) == [0, 2, 3])
+        #expect(plan.instances.map(\.metadataIndex) == [0, 1, 2])
         #expect(plan.triangleTotal == 5)
         #expect(plan.instances.map(\.key) == [first, second, first])
     }
 
-    @Test func aHitTriangleIsTheInstanceStartPlusThePrimitiveIndex() {
+    @Test func metadataIndexIsIndependentOfTheNumberOfPrimitives() {
         let plan = PathTracing3DInstancePlan.make([placement(first, triangles: 4), placement(second, triangles: 3)])
-        #expect(plan.instances.map { Int($0.firstTriangle) + 2 } == [2, 6])
+        #expect(plan.instances.map(\.metadataIndex) == [0, 1])
     }
 
     @Test func shadowCastersCarryTheShadowBitAndAreStillSeenByEveryRay() {
@@ -48,15 +49,28 @@ struct Render3DAccelerationStructureOwnerTests {
     @Test func emptyPartsAndEmptyInputProduceNoInstances() {
         #expect(PathTracing3DInstancePlan.make([]).instances.isEmpty)
         let plan = PathTracing3DInstancePlan.make([placement(first, triangles: 0), placement(second, triangles: 2)])
-        #expect(plan.instances.map(\.firstTriangle) == [0] && plan.triangleTotal == 2)
+        #expect(plan.instances.map(\.metadataIndex) == [0] && plan.triangleTotal == 2)
     }
 
     // MARK: Cache
 
+    @Test func resettingSceneStructuresPreservesDeviceShaderFailure() {
+        var views = PathTracing3DViews()
+        views.hardwareShaderFailure = "Ray-query shader compiler unavailable"
+        views.hardwareFailure = "Instance allocation error"
+        views.failedSceneDigest = 123
+        views.resetStructures()
+        #expect(views.hardwareShaderFailure == "Ray-query shader compiler unavailable")
+        #expect(views.hardwareFailure == nil && views.failedSceneDigest == nil)
+    }
+
     @Test func aPartIsBuiltOnceAndSharedByEveryPlacement() {
         let owner = PathTracing3DAccelerationStructures()
         var created = 0
-        let make: (Int) -> (any AccelerationStructure)? = { created += 1; return FakeStructure(.bottomLevel(triangleCapacity: $0)) }
+        let make: (Int) -> (any AccelerationStructure)? = {
+            created += 1
+            return FakeStructure(.bottomLevel(triangleCapacity: $0))
+        }
         let a = owner.resolveBottom(first, triangleCount: 2, create: make)
         let b = owner.resolveBottom(first, triangleCount: 2, create: make)
         #expect(created == 1 && a?.isNew == true && b?.isNew == false)
@@ -67,7 +81,16 @@ struct Render3DAccelerationStructureOwnerTests {
         let owner = PathTracing3DAccelerationStructures()
         #expect(owner.resolveBottom(first, triangleCount: 2, create: { _ in nil }) == nil)
         var created = 0
-        #expect(owner.resolveBottom(first, triangleCount: 2, create: { created += 1; return FakeStructure(.bottomLevel(triangleCapacity: $0)) })?.isNew == true)
+        #expect(
+            owner.resolveBottom(
+                first,
+                triangleCount: 2,
+                create: {
+                    created += 1
+                    return FakeStructure(.bottomLevel(triangleCapacity: $0))
+                }
+            )?.isNew == true
+        )
         #expect(created == 1)
     }
 
@@ -84,7 +107,10 @@ struct Render3DAccelerationStructureOwnerTests {
     @Test func theTopLevelStructureGrowsOnlyWhenItsCapacityIsExceeded() {
         let owner = PathTracing3DAccelerationStructures()
         var created: [Int] = []
-        let make: (Int) -> (any AccelerationStructure)? = { created.append($0); return FakeStructure(.topLevel(instanceCapacity: $0)) }
+        let make: (Int) -> (any AccelerationStructure)? = {
+            created.append($0)
+            return FakeStructure(.topLevel(instanceCapacity: $0))
+        }
         #expect(owner.resolveTop(instanceCount: 3, create: make)?.isNew == true)
         let capacity = created.first ?? 0
         #expect(capacity >= 3)

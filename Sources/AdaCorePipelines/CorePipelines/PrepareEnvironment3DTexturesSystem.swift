@@ -78,7 +78,7 @@ public struct PrepareEnvironment3DTexturesSystem {
             colorCorrection.prepare(environment.postProcess.colorGrading, view: source.entityId)
             // Path tracing takes its first hit from the G-buffer. Its surface needs both optional outputs, which
             // screen-space reflections and GI do not use while tracing.
-            let pathSurface = environment.pathTracing.sanitized.isEnabled && environment.debugView == .none
+            let pathSurface = environment.pathTracing.sanitized.isEnabled && environment.pathTracing.rasterFirstHit && environment.debugView == .none
                 && device.renderDevice.supportsHybridReflections && device.renderDevice.supportsLightingSurfaceBuffer
             target.pathTracingSurfaceActive = pathSurface
             let hybrid = pathSurface || (environment.imageBasedLighting?.asset.asset != nil && environment.screenSpaceReflection.isEnabled

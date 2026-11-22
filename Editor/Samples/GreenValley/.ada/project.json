@@ -1,0 +1,144 @@
+{
+  "schemaVersion": 3,
+  "project": {
+    "name": "GreenValley",
+    "displayName": "Green Valley"
+  },
+  "paths": {
+    "sources": "Sources",
+    "assets": "Assets",
+    "resourceRoots": [
+      "Assets"
+    ]
+  },
+  "build": {
+    "system": "adascript"
+  },
+  "runtime": {
+    "entry": {
+      "scene": "Assets/Scenes/Main.ascn"
+    },
+    "moduleName": "GreenValley",
+    "plugins": {
+      "preset": "game3d",
+      "presetVersion": 1,
+      "enable": [],
+      "disable": []
+    }
+  },
+  "editor": {
+    "startupScene": "Assets/Scenes/Main.ascn"
+  },
+  "inputActions": [
+    {
+      "name": "Forward",
+      "bindings": [
+        {
+          "key": {
+            "_0": "w"
+          }
+        }
+      ],
+      "deadZone": 0.2
+    },
+    {
+      "name": "Back",
+      "bindings": [
+        {
+          "key": {
+            "_0": "s"
+          }
+        }
+      ],
+      "deadZone": 0.2
+    },
+    {
+      "name": "Left",
+      "bindings": [
+        {
+          "key": {
+            "_0": "a"
+          }
+        }
+      ],
+      "deadZone": 0.2
+    },
+    {
+      "name": "Right",
+      "bindings": [
+        {
+          "key": {
+            "_0": "d"
+          }
+        }
+      ],
+      "deadZone": 0.2
+    },
+    {
+      "name": "Walk",
+      "bindings": [
+        {
+          "key": {
+            "_0": "r"
+          }
+        }
+      ],
+      "deadZone": 0.2
+    },
+    {
+      "name": "Fly",
+      "bindings": [
+        {
+          "key": {
+            "_0": "g"
+          }
+        }
+      ],
+      "deadZone": 0.2
+    },
+    {
+      "name": "FreeFlight",
+      "bindings": [
+        {
+          "key": {
+            "_0": "f"
+          }
+        }
+      ],
+      "deadZone": 0.2
+    },
+    {
+      "name": "Ascend",
+      "bindings": [
+        {
+          "key": {
+            "_0": " "
+          }
+        }
+      ],
+      "deadZone": 0.2
+    },
+    {
+      "name": "Descend",
+      "bindings": [
+        {
+          "key": {
+            "_0": "ctrl"
+          }
+        }
+      ],
+      "deadZone": 0.2
+    },
+    {
+      "name": "Sprint",
+      "bindings": [
+        {
+          "key": {
+            "_0": "shift"
+          }
+        }
+      ],
+      "deadZone": 0.2
+    }
+  ]
+}

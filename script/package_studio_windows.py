@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Package a relocatable Windows x64 Studio ZIP and its SHA-256 checksum."""
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
@@ -10,7 +11,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-import urllib.request
+from urllib.request import HTTPSHandler, OpenerDirector, ProxyHandler
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,13 +150,24 @@ def package(binary_directory, compiler, output, version, smoke_test=True, *, sta
         swift_tag = metadata["swiftCompilerTag"]
         if not re.fullmatch(r"swift-[0-9.]+-RELEASE", swift_tag):
             raise RuntimeError("Use an official Swift release toolchain to package Studio.")
-        with urllib.request.urlopen(f"https://raw.githubusercontent.com/swiftlang/swift/{swift_tag}/LICENSE.txt", timeout=30) as response:
+        license_client = OpenerDirector()
+        license_client.add_handler(ProxyHandler())
+        license_client.add_handler(HTTPSHandler())
+        license_url = f"https://raw.githubusercontent.com/swiftlang/swift/{swift_tag}/LICENSE.txt"
+        with license_client.open(license_url, timeout=30) as response:
+            if response.status != 200:
+                raise RuntimeError(f"Could not download the Swift license (HTTP {response.status}).")
             (swift_notice / "LICENSE.txt").write_bytes(response.read())
         shutil.copy2(ROOT / "LICENSE", directory)
         for installer in ["install_studio_windows.ps1", "install_studio_windows.cmd"]:
             shutil.copy2(ROOT / "script" / installer, directory)
         (directory / "release.json").write_text(json.dumps({"version": version, "distribution": "standalone", "commit": run("git", "-C", ROOT, "rev-parse", "HEAD"),
                                                            "swift": metadata["compilerVersion"], "target": metadata["target"]["triple"]}, indent=2) + "\n")
+        kimodo_key = os.environ.get("KIMODO_RELEASE_PUBLIC_KEY", "").strip()
+        if kimodo_key:
+            if len(base64.b64decode(kimodo_key, validate=True)) != 32:
+                raise RuntimeError("Expected a base64 Ed25519 Kimodo public key.")
+            (directory / "kimodo-keys.json").write_text(json.dumps([kimodo_key]) + "\n", encoding="utf-8")
         (directory / "README.txt").write_text(
             "Ada Studio for Windows x64\n\nExtract the entire ZIP, then run install_studio_windows.cmd.\n"
             "Installs to %LOCALAPPDATA%\\Programs\\Ada Studio with a Start menu shortcut; no administrator rights required.\n"

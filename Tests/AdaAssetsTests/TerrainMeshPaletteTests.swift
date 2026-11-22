@@ -10,7 +10,7 @@ struct TerrainMeshPaletteTests {
 
     @Test("Stable prototype references survive loading and both atomic save modes")
     func paletteSurvivesRegionSaves() async throws {
-        let entries: [[String: Any]] = [["id": 17, "assetPath": "Models/rock.glb", "scene": 1, "maximumDistance": 500]]
+        let entries: [[String: Any]] = [["id": 17, "assetPath": "Models/rock.glb", "scene": 1, "maximumDistance": 500, "pathTracingMaximumDistance": 180]]
         let decoded = try? TerrainManifestAsset(data: bytes(entries))
         let manifest = try #require(decoded != nil ? decoded : nil)
         func check(_ value: TerrainManifestAsset) throws {
@@ -22,6 +22,7 @@ struct TerrainMeshPaletteTests {
             #expect(table.first?["assetPath"] as? String == "Models/rock.glb")
             #expect(table.first?["scene"] as? Int == 1)
             #expect(table.first?["maximumDistance"] as? Int == 500)
+            #expect(table.first?["pathTracingMaximumDistance"] as? Int == 180)
         }
         try check(manifest)
         let root = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
@@ -52,7 +53,7 @@ struct TerrainMeshPaletteTests {
         }
         #expect(throws: (any Error).self) { try TerrainManifestAsset(data: bytes([valid, valid])) }
         #expect(throws: (any Error).self) { try TerrainManifestAsset(data: bytes(Array(repeating: valid, count: 257))) }
-        for extra: [String: Any] in [["scene": -1], ["scene": 4096], ["maximumDistance": 0], ["maximumDistance": -1], ["id": 65536]] {
+        for extra: [String: Any] in [["scene": -1], ["scene": 4096], ["maximumDistance": 0], ["maximumDistance": -1], ["pathTracingMaximumDistance": 0], ["id": 65536]] {
             let value = valid.merging(extra) { _, new in new }
             #expect(throws: (any Error).self) { try TerrainManifestAsset(data: bytes([value])) }
         }

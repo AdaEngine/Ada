@@ -30,7 +30,8 @@
             heightBlend: Bool = false,
             missingHeight: Bool = false,
             heightFade: String? = nil,
-            surfaceMode: String? = nil
+            surfaceMode: String? = nil,
+            crossesRegionBoundary: Bool = false
         ) async throws -> (app: AppWorlds, owner: Entity, camera: Entity, target: RenderTexture, engine: RenderEngine) {
             let file = try await makeTerrain(
                 in: directory,
@@ -49,7 +50,8 @@
                 heightBlend: heightBlend,
                 missingHeight: missingHeight,
                 heightFade: heightFade,
-                surfaceMode: surfaceMode
+                surfaceMode: surfaceMode,
+                crossesRegionBoundary: crossesRegionBoundary
             )
             let requested: RenderBackendType = GoldenFrame.activeBackend == .saga ? .saga : .metal
             unsafe RenderEngine.configurations.preferredBackend = requested
@@ -116,7 +118,8 @@
         }
 
         func waitForMaterialEdit(_ app: AppWorlds, owner: Entity, id: UUID) async throws {
-            let clock = ContinuousClock(), deadline = ContinuousClock().now.advanced(by: .seconds(15))
+            let clock = ContinuousClock()
+            let deadline = ContinuousClock().now.advanced(by: .seconds(15))
             while clock.now < deadline {
                 await app.main.runScheduler(.preUpdate)
                 if let status = owner.components[Terrain3DEditStatus.self], status.id == id, status.phase != .pending {
@@ -154,7 +157,8 @@
             heightBlend: Bool = false,
             missingHeight: Bool = false,
             heightFade: String? = nil,
-            surfaceMode: String? = nil
+            surfaceMode: String? = nil,
+            crossesRegionBoundary: Bool = false
         ) async throws -> URL {
             if textured {
                 try Image(width: 1, height: 1, color: .red).writePNG(to: directory.appendingPathComponent("low.png"))
@@ -178,7 +182,9 @@
                     }
                 }
                 try Image(width: 8, height: 8, data: bytes).writePNG(to: directory.appendingPathComponent("pattern.png"))
-                try Image(width: 1, height: 1, color: stripes ? Color(0.5, 0.5, 1, 1) : Color(1, 0.5, 0.5, 1)).writePNG(to: directory.appendingPathComponent("variation-normal.png"))
+                try Image(width: 1, height: 1, color: stripes ? Color(0.5, 0.5, 1, 1) : Color(1, 0.5, 0.5, 1)).writePNG(
+                    to: directory.appendingPathComponent("variation-normal.png")
+                )
             }
             var terrain = Terrain3D(resolution: 129, size: 4)
             for z in 0..<terrain.resolution {
@@ -258,10 +264,16 @@
             }
             if mixedProjection, let first = palette.layers.first {
                 let planar = TerrainLayerReference(
-                    id: 42, name: "Planar mix", albedoPath: first.albedoPath, normalPath: first.normalPath, scale: first.scale
+                    id: 42,
+                    name: "Planar mix",
+                    albedoPath: first.albedoPath,
+                    normalPath: first.normalPath,
+                    scale: first.scale
                 )
                 palette = TerrainMaterialPalette(
-                    layers: [first, planar], fallbackLayerID: first.id, rules: [.init(layerID: first.id), .init(layerID: 42)]
+                    layers: [first, planar],
+                    fallbackLayerID: first.id,
+                    rules: [.init(layerID: first.id), .init(layerID: 42)]
                 )
             }
             if let surfaceMode {
@@ -271,14 +283,16 @@
                         if surfaceMode == "layer" {
                             painted.append(.init(x: UInt8(x), z: UInt8(z), layerIDs: [12, 0, 0, 0], weights: [1, 0, 0, 0], overrideStrength: 1))
                         } else {
-                            painted.append(.init(
-                                x: UInt8(x),
-                                z: UInt8(z),
-                                tint: [0.25, 0.5, 0.75, 1],
-                                tintStrength: 0.5,
-                                roughness: 0.2,
-                                roughnessStrength: 0.5
-                            ))
+                            painted.append(
+                                .init(
+                                    x: UInt8(x),
+                                    z: UInt8(z),
+                                    tint: [0.25, 0.5, 0.75, 1],
+                                    tintStrength: 0.5,
+                                    roughness: 0.2,
+                                    roughnessStrength: 0.5
+                                )
+                            )
                         }
                     }
                 }
@@ -289,7 +303,27 @@
                     palette = TerrainMaterialPalette(layers: [.init(id: 7, name: "White base", roughness: 0.8)], fallbackLayerID: 7)
                 }
             }
-            let layout = TerrainManifestAsset(spacing: storage.spacing, originX: storage.origin.x, originZ: storage.origin.y, materials: palette)
+            var originX = storage.origin.x
+            if crossesRegionBoundary {
+                let source = try #require(regions.first)
+                try #require(regions.count == 1 && source.x == 0 && source.z == 0 && source.surface.isEmpty)
+                // Move the left tile column into the last column of the neighboring resource,
+                // while retaining exactly the same world-space fixture and seam samples.
+                regions = [false, true].map { right in
+                    TerrainRegionAsset(
+                        x: right ? 0 : -1,
+                        z: 0,
+                        tiles: source.tiles.filter { ($0.x > 0) == right }.map {
+                            .init(x: right ? $0.x - 1 : 3, z: $0.z, cellCountX: $0.cellCountX, cellCountZ: $0.cellCountZ)
+                        },
+                        pages: source.pages.filter { ($0.x > 0) == right }.map {
+                            .init(x: right ? $0.x - 1 : 3, z: $0.z, samples: $0.samples)
+                        }
+                    )
+                }
+                originX += storage.spacing * 64
+            }
+            let layout = TerrainManifestAsset(spacing: storage.spacing, originX: originX, originZ: storage.origin.y, materials: palette)
             let file = directory.appendingPathComponent("world.aterrain")
             _ = try await AssetsManager.saveTerrainRegions(regions, manifest: layout, at: file.path)
             return file

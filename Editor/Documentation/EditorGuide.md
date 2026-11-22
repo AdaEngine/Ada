@@ -50,6 +50,9 @@ assets; editable animation clips are stored separately as described below.
 
 ## Edit bone animation
 
+On Windows, see [Generate an animation with Kimodo](AnimationAuthoring.md#generate-an-animation-with-kimodo-on-windows)
+to install the extension and save generated motion as an editable clip.
+
 Select a Model 3D entity and open **Animator → Bone Keyframes**. Extract an editable
 copy of an imported clip or create a clip from the rig's rest pose. Select bones,
 tracks and timeline keys to edit translation, rotation, scale or morph weights.
