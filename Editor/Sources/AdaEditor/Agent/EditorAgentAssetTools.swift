@@ -132,9 +132,36 @@ enum EditorAgentAssetTools {
             ),
             tool(
                 "editor.sprite.generate",
-                "Draw a pixel-art PNG from an AdaScript `func build(sprite)` (palette, shapes, outline, mirror) and save it under Assets. Read the ada-pixel-art skill for the sprite API. Runs in an isolated VM; existing files are preserved.",
-                ["source": string, "destination": string],
+                """
+                Draw a pixel-art PNG from an AdaScript `func build(sprite)` and save it under Assets.
+                Frame scripts also write an Aseprite-compatible .sheet.json. Pass recipe to record the .adas path.
+                Read the ada-pixel-art skill for the sprite API. Runs in an isolated VM. Existing files are preserved.
+                """,
+                ["source": string, "destination": string, "recipe": string],
                 ["source", "destination"],
+                false
+            ),
+            tool(
+                "editor.palette.extract",
+                """
+                Extract a dominant-color palette from a reference PNG under Assets.
+                Use the saved palette with sprite.palettePreset("user:<name>"). Existing palettes are preserved.
+                """,
+                ["image": string, "name": string, "maxColors": integer],
+                ["image", "name"],
+                false
+            ),
+            tool(
+                "editor.sprite.gif",
+                """
+                Render a PNG sheet or sprite as a looping GIF at an integer scale for chat previews.
+                Optional firstFrame and lastFrame select an inclusive zero-based range. Existing files are preserved.
+                """,
+                [
+                    "path": string, "destination": string, "scale": integer, "frameWidth": integer, "frameHeight": integer,
+                    "frameDuration": integer, "firstFrame": integer, "lastFrame": integer,
+                ],
+                ["path", "destination"],
                 false
             ),
             tool(

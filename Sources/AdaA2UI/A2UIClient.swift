@@ -16,11 +16,19 @@ public final class A2UIClient {
     public let maximumMessageBytes: Int
     public let maximumComponents: Int
     public let maximumSurfaces: Int
+    /// Project-scoped resource root for `Image` component previews; surfaces resolve paths inside it.
+    public let resources: UISceneResources?
 
-    public init(maximumMessageBytes: Int = 1_048_576, maximumComponents: Int = 1024, maximumSurfaces: Int = 16) {
+    public init(
+        maximumMessageBytes: Int = 1_048_576,
+        maximumComponents: Int = 1024,
+        maximumSurfaces: Int = 16,
+        resources: UISceneResources? = nil
+    ) {
         self.maximumMessageBytes = max(1, maximumMessageBytes)
         self.maximumComponents = max(1, maximumComponents)
         self.maximumSurfaces = max(1, maximumSurfaces)
+        self.resources = resources
     }
 
     /// Metadata to include in the host transport's capability negotiation.
@@ -85,7 +93,7 @@ public final class A2UIClient {
             guard surfaces[message.surfaceID] == nil, surfaces.count < maximumSurfaces else {
                 throw A2UIValidationError(message: "Surface already exists or surface limit reached.")
             }
-            let surface = try A2UISurface(id: message.surfaceID, sendDataModel: body["sendDataModel"]?.bool ?? false)
+            let surface = try A2UISurface(id: message.surfaceID, sendDataModel: body["sendDataModel"]?.bool ?? false, resources: resources)
             surface.emit = { [weak self] event in self?.onEvent?(event) }
             surface.didChange = { [weak self] in self?.onSurfaceChanged?(message.surfaceID) }
             surfaces[message.surfaceID] = surface

@@ -86,7 +86,7 @@ final class EditorCloudToolHost {
         let notes: Set<String> = ["AGENTS.md", "DESIGN.md", "PLAN.md", "PROGRESS.md", "README.md"]
         guard !path.isEmpty, path.utf8.count <= 512, !path.contains("\\"), !path.contains(":"), !path.unicodeScalars.contains(where: { $0.value < 32 }),
             parts.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }),
-            roots.contains(String(parts[0])) || notes.contains(path) || path.hasPrefix(".ada/skills/")
+            roots.contains(String(parts[0])) || notes.contains(path) || path.hasPrefix(".ada/skills/") || EditorAgentGeneratorToolService.isRecipePath(path)
         else {
             throw EditorAgentServiceError.pathOutsideProject(path)
         }
@@ -113,7 +113,9 @@ final class EditorCloudToolHost {
             }
         }
         let extensions: Set<String> = ["ada", "ascn", "ui", "md", "txt", "json", "glsl", "swift", "wesl", "wgsl"]
-        guard extensions.contains(url.pathExtension.lowercased()) else { throw EditorAIError.invalidResponse }
+        guard extensions.contains(url.pathExtension.lowercased()) || EditorAgentGeneratorToolService.isRecipePath(path) else {
+            throw EditorAIError.invalidResponse
+        }
         if name == "editor.file.read" {
             guard try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0 <= 128_000 else { throw EditorAIError.invalidResponse }
             return try String(contentsOf: url, encoding: .utf8)

@@ -15,6 +15,12 @@ The Project Navigator shows project files. Select a source file to edit it, or a
 
 Use **File > Save** to save the active document, or **File > Save All** to save all documents. The Code menu includes tab actions and editor font size controls.
 
+## Generate pixel art
+
+Ask the Studio agent for a pixel sprite or a short animation. The
+[pixel art guide](AgentPixelArt.md) covers palettes, saved AdaScript recipes,
+animation sheets and GIF previews in the chat.
+
 ## Import and place a 3D model
 
 Use **File > Import Assets** or drop a `.glb`, `.gltf` or MagicaVoxel `.vox` into the project navigator.

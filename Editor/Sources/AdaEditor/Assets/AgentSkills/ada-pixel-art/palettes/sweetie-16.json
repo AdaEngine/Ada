@@ -1,0 +1,11 @@
+{
+  "name": "sweetie-16",
+  "description": "Sweetie 16 palette by GrafxKid. Warm, vibrant game jam favorite with excellent contrast.",
+  "max_colors": 16,
+  "colors": [
+    "#1A1C2C", "#5D275D", "#B13E53", "#EF7D57",
+    "#FFCD75", "#A7F070", "#38B764", "#257179",
+    "#29366F", "#3B5DC9", "#41A6F6", "#73EFF7",
+    "#F4F4F4", "#94B0C2", "#566C86", "#333C57"
+  ]
+}

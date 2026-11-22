@@ -49,8 +49,14 @@ def sources():
 
 
 def fingerprints():
-    return {path: hashlib.sha256((ROOT / path).read_bytes()).hexdigest()
-            for path in sources()}
+    result = {}
+    for path in sources():
+        source = ROOT / path
+        data = source.read_bytes()
+        if source.suffix in {'.ada', '.md', '.swift', '.txt', '.ui'}:
+            data = data.replace(b'\r\n', b'\n')
+        result[path] = hashlib.sha256(data).hexdigest()
+    return result
 
 
 def validate(value):
@@ -74,7 +80,7 @@ def main():
     args = parser.parse_args()
     expected = fingerprints()
     if args.check:
-        value = json.loads(args.output.read_text())
+        value = json.loads(args.output.read_text(encoding='utf-8'))
         validate(value)
         if value.get('sourceHashes') != expected:
             raise SystemExit('Native agent contract is stale; rebuild Studio and run scripts/export-web-agent-contract.py --studio <AdaEditor>')
@@ -92,7 +98,7 @@ def main():
             raw = Path(directory) / 'native.json'
             subprocess.run([str(studio), '--ada-studio-cli', 'agent-resources',
                             '--output', str(raw), '--format', 'json'], check=True, cwd=EDITOR)
-            value = json.loads(raw.read_text())
+            value = json.loads(raw.read_text(encoding='utf-8'))
         validate(value)
         if fingerprints() != expected:
             raise SystemExit('Contract sources changed during export; rebuild and retry')

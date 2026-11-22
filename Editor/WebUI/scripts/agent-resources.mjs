@@ -64,7 +64,9 @@ export async function agentResources(output, root = repositoryRoot) {
     },
   };
   const contract = match[1]
+    .replaceAll("\r\n", "\n")
     .replace(/^        /gm, "")
+    .replace(/^Native Studio Image .*\n/m, "")
     .replaceAll(
       "\\(A2UIClient.catalogID)",
       "https://adaengine.org/a2ui/catalogs/forms/v1",
@@ -86,6 +88,10 @@ export async function agentResources(output, root = repositoryRoot) {
   const examples = browserExamples(nativeContract);
   const browserContract = { ...nativeContract };
   delete browserContract.examples; // Only the adapted complete examples are shipped below.
+  const a2uiCatalog = JSON.parse(
+    await read("Sources/AdaA2UI/Resources/catalog.json"),
+  );
+  delete a2uiCatalog.components.Image;
   await mkdir(output, { recursive: true });
   await writeFile(
     path.join(output, "agent-resources.json"),
@@ -95,9 +101,7 @@ export async function agentResources(output, root = repositoryRoot) {
       skills,
       docs,
       examples,
-      a2uiCatalog: JSON.parse(
-        await read("Sources/AdaA2UI/Resources/catalog.json"),
-      ),
+      a2uiCatalog,
     }),
   );
   await writeFile(

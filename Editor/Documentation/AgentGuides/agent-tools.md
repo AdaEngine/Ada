@@ -56,7 +56,12 @@ Scripted asset generation ([ADR-0026](../../../Documentation/ArchitectureDecisio
 `editor.voxel.generate` (`.vox`), `editor.model.generate` (`.glb`), `editor.audio.generate` (`.wav`)
 and `editor.sprite.generate` (`.png`) run an agent-authored AdaScript `build` function in an isolated VM and
 write a new file under the assets root (never overwriting); `editor.audio.inspect` measures any WAV (peak,
-loudness, clipping, silence, pitch, envelope). Skills `ada-voxel-models`, `ada-procedural-models`,
+loudness, clipping, silence, pitch, envelope). The sprite tool records the recipe path, supports named
+layers, frame strips with per-frame durations and named tags (written as an Aseprite-compatible
+`<name>.sheet.json` sidecar), and bundled palette presets plus `user:<name>` palettes saved by
+`editor.palette.extract` (from a project image, never overwriting); `editor.sprite.gif` renders a looping
+GIF preview from the sidecar at an integer scale for in-chat A2UI `Image` previews. Guide:
+[AgentPixelArt.md](../../Documentation/AgentPixelArt.md). Skills `ada-voxel-models`, `ada-procedural-models`,
 `ada-pixel-art` and `ada-sound-design` document the script APIs, and a test runs their examples.
 `ada-autonomous-studio` is the whole-game workflow (clarify, `DESIGN.md` with acceptance criteria,
 `PLAN.md` milestones, build-play-check loop, acceptance pass). The `AudioSource` component plays WAV/MP3/FLAC

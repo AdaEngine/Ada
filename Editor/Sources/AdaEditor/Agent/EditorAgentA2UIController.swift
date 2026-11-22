@@ -1,4 +1,5 @@
 import AdaA2UI
+import AdaUI
 import AdaUIDescription
 import Foundation
 import Observation
@@ -11,7 +12,7 @@ private final class EditorAgentA2UIDisplayText {
 @MainActor @Observable
 final class EditorAgentA2UISession {
     let id: String
-    let client = A2UIClient()
+    let client: A2UIClient
     private(set) var records: [String: EditorAgentA2UISurfaceRecord] = [:]
     private(set) var eventErrors: [String: String] = [:]
     private(set) var displayTexts: [String: String] = [:]
@@ -25,9 +26,10 @@ final class EditorAgentA2UISession {
     @ObservationIgnored var onRecordsChanged: (([EditorAgentA2UISurfaceRecord]) -> Void)?
     @ObservationIgnored var onSubmission: ((EditorAgentA2UISubmission) -> Void)?
 
-    init(session: EditorAgentSession) {
+    init(session: EditorAgentSession, resources: UISceneResources? = nil) {
         id = session.id
         agentIdentity = session.agentTargetIdentity
+        client = A2UIClient(resources: resources)
         restoring = true
         client.onSurfaceChanged = { [weak self] surfaceID in self?.surfaceChanged(surfaceID) }
         client.onEvent = { [weak self] event in self?.receiveClientEvent(event) }
@@ -242,15 +244,17 @@ final class EditorAgentA2UISession {
 @MainActor @Observable
 final class EditorAgentA2UIController {
     private(set) var sessions: [String: EditorAgentA2UISession] = [:]
+    /// Project resource root for `Image` previews in chat cards; set when a project opens.
+    var resources: UISceneResources?
     @ObservationIgnored var onRecordsChanged: ((String, [EditorAgentA2UISurfaceRecord]) -> Void)?
     @ObservationIgnored var onSubmission: ((EditorAgentA2UISubmission) -> Void)?
 
     @discardableResult
-    func restoreIfNeeded(_ session: EditorAgentSession) -> EditorAgentA2UISession {
+    func restoreIfNeeded(_ session: EditorAgentSession, resources: UISceneResources? = nil) -> EditorAgentA2UISession {
         if let existing = sessions[session.id] {
             return existing
         }
-        let ui = EditorAgentA2UISession(session: session)
+        let ui = EditorAgentA2UISession(session: session, resources: resources ?? self.resources)
         ui.onRecordsChanged = { [weak self] records in self?.onRecordsChanged?(session.id, records) }
         ui.onSubmission = { [weak self] submission in self?.onSubmission?(submission) }
         sessions[session.id] = ui

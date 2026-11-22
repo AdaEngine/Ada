@@ -1,0 +1,15 @@
+{
+  "name": "snes",
+  "description": "Super Nintendo curated palette. 64 commonly used SNES-era colors covering full hue spectrum.",
+  "max_colors": 64,
+  "colors": [
+    "#000000", "#1F0E3C", "#3C1361", "#5B1E8C", "#7B2FB5", "#9B44D8", "#B76AE8", "#D39AF5",
+    "#0D1B47", "#1A3370", "#2B5098", "#3F72BF", "#5A97DC", "#7BBCE8", "#A3D9F5", "#D0EFFC",
+    "#0A2E1A", "#145C33", "#1F8A4B", "#2DB566", "#47D87F", "#6FE89A", "#99F2B8", "#C5F9D8",
+    "#3C1A00", "#6B3010", "#9A4A20", "#C46830", "#E88A45", "#F5AD6A", "#FACA90", "#FDE4C0",
+    "#3C0000", "#6B0000", "#9A0000", "#C40000", "#E82020", "#F55050", "#FA8080", "#FCC0C0",
+    "#3C3C00", "#6B6B00", "#9A9A00", "#C4C400", "#E8E820", "#F5F550", "#FAFA80", "#FCFCC0",
+    "#3C003C", "#6B006B", "#9A009A", "#C400C4", "#E820E8", "#F550F5", "#FA80FA", "#FCC0FC",
+    "#1A1A1A", "#333333", "#4D4D4D", "#666666", "#808080", "#999999", "#B3B3B3", "#FFFFFF"
+  ]
+}

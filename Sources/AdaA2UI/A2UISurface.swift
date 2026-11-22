@@ -17,10 +17,14 @@ public final class A2UISurface {
     private var mountedActions = Set<String>()
     private var bindingValues: [String: A2UIDynamicValue] = [:]
 
-    init(id: String, sendDataModel: Bool) throws {
+    init(id: String, sendDataModel: Bool, resources: UISceneResources? = nil) throws {
         self.id = id
         self.sendDataModel = sendDataModel
-        scene = try UISceneInstance(document: .init(root: .init(id: "root", type: "EmptyView")))
+        scene = try UISceneInstance(
+            document: .init(root: .init(id: "root", type: "EmptyView")),
+            catalog: A2UIImageCatalog.catalog,
+            resources: resources
+        )
     }
 
     /// Converts the supported surface into an editable `.ui` document for Ada Studio.
@@ -195,6 +199,10 @@ public final class A2UISurface {
             let action = try A2UIAction(component.properties["action"])
             actions[component.id] = action.name
             node.actions["action"] = actionToken(component.id)
+        case "Image":
+            node.type = A2UIImageCatalog.viewType
+            node.arguments["path"] = .init(value: component.properties["path"] ?? .string(""))
+            node.arguments["zoom"] = .init(value: component.properties["zoom"] ?? .number(0))
         default: break
         }
         let checks = try A2UIFormChecks(component.properties["checks"])

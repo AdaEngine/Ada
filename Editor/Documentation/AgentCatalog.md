@@ -84,6 +84,10 @@ The workflow covers a playable loop, persistent scene/script/resource wiring,
 2D/3D authoring, desktop/touch controls, HUD and restart, and separate build,
 simulation and visible Play checks. It reuses the current AdaScript or Swift
 project and tools advertised by the host. It does not add engine capabilities.
+Pixel-art sprites and animation strips are covered by the bundled
+`ada-pixel-art` skill: locked palettes (including user palettes extracted from
+reference images), layers, Aseprite-compatible sheet metadata and GIF chat
+previews — see [AI-assisted pixel art](AgentPixelArt.md).
 
 For multi-session games, it reuses project design/progress notes and records
 remaining checks. It does not require a new planning ceremony for each feature.
