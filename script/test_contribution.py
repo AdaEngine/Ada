@@ -587,6 +587,7 @@ class AdapterTests(RepositoryFixture):
             "path": "sample.py", "type": "Example", "fingerprint": "sha1:reviewed", "reason": "Public checksum"}]})
         self.assertEqual(adapters.reviewed_findings(self.root, findings)[name],
                          [{"type": "Example", fingerprint_key: "different"}])
+    @unittest.skipUnless(importlib.util.find_spec("detect_secrets"), "Use the validation venv for secret scanning")
     def test_native_contract_validates_hashes_and_scans_plaintext_and_pcm(self):
         root = self.root.resolve()
         exporter_name = "Editor/scripts/export-web-agent-contract.py"
