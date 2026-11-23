@@ -2217,6 +2217,18 @@
         "text": "Swift systems use the same methods on their `Input` resource. `InputPlugin()`\nloads the `inputActions` section from `.ada/project.json` in the current working\ndirectory, including games launched from the editor. Packaged Swift applications\ncan decode `[InputAction]` from an included resource and pass it to\n`InputPlugin(actions:)`, or call `try input.setInputActions(actions)` on an existing\nresource. Explicit `InputPlugin(actions: [])` disables automatic project loading.",
         "level": 0,
         "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Input keyboard bindings",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "To bind Space to jumping, open **Project Settings → Input Bindings**, select\nor add the `Jump` action, and add a keyboard binding for Space. Save the project\nsettings, then start Play and press Space. The script checks `Jump` through\nthe Input resource, so you can change the bound key without editing the script.",
+        "level": 0,
+        "links": []
       }
     ]
   },

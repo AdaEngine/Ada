@@ -106,6 +106,7 @@ class ProfileTests(unittest.TestCase):
         checks = build_checks(REPO, ["Editor/WebUI/package.json"], CONFIG, REPO / "files.json", REPO)
         names = {check.name for check in checks}
         self.assertTrue({"web-tests", "web-analysis-build", "runtime-smoke", "dependency-review"}.issubset(names))
+        self.assertIn("--test-reporter=tap", next(check.argv for check in checks if check.name == "web-tests"))
 
     def test_explicit_platform_and_dependency_checks_are_executed(self):
         checks = build_checks(REPO, ["Package.swift"], CONFIG, REPO / "files.json", REPO,

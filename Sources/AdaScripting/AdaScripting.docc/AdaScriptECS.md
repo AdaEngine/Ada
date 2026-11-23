@@ -225,3 +225,10 @@ directory, including games launched from the editor. Packaged Swift applications
 can decode `[InputAction]` from an included resource and pass it to
 `InputPlugin(actions:)`, or call `try input.setInputActions(actions)` on an existing
 resource. Explicit `InputPlugin(actions: [])` disables automatic project loading.
+
+### Input keyboard bindings
+
+To bind Space to jumping, open **Project Settings → Input Bindings**, select
+or add the `Jump` action, and add a keyboard binding for Space. Save the project
+settings, then start Play and press Space. The script checks `Jump` through
+the Input resource, so you can change the bound key without editing the script.

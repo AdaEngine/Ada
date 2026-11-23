@@ -130,7 +130,8 @@ def build_checks(root, paths, config, paths_file, logs, quick=False, runtime=Non
         if not quick:
             checks.append(Check("web-analysis-build", "analysis", ["node", "scripts/build.mjs"], cwd="Editor/WebUI", timeout=timeout))
             tests = sorted(str(p.relative_to(root / "Editor/WebUI")) for p in (root / "Editor/WebUI/test").glob("*.test.mjs"))
-            checks.append(Check("web-tests", "tests", ["node", "--test", *tests], cwd="Editor/WebUI", tests=True, timeout=timeout))
+            checks.append(Check("web-tests", "tests", ["node", "--test", "--test-reporter=tap", *tests],
+                                cwd="Editor/WebUI", tests=True, timeout=timeout))
             checks.append(Check("web-localization", "style", ["node", "scripts/check-localization.mjs"], cwd="Editor/WebUI", timeout=timeout))
     if not quick and "gpu" in profiles:
         checks.append(Check("gpu", "dynamic", ["bash", "script/validate_gpu.sh"], timeout=timeout,
