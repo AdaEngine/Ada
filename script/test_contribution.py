@@ -2,13 +2,16 @@
 
 import json
 import importlib.util
+import base64
 import contextlib
 import io
 import os
+import runpy
 import shlex
 import shutil
 from pathlib import Path
 import subprocess
+import struct
 import sys
 import tempfile
 import unittest
@@ -583,6 +586,95 @@ class AdapterTests(RepositoryFixture):
             "path": "sample.py", "type": "Example", "fingerprint": "sha1:reviewed", "reason": "Public checksum"}]})
         self.assertEqual(adapters.reviewed_findings(self.root, findings)[name],
                          [{"type": "Example", fingerprint_key: "different"}])
+    def test_native_contract_validates_hashes_and_scans_plaintext_and_pcm(self):
+        root = self.root.resolve()
+        exporter_name = "Editor/scripts/export-web-agent-contract.py"
+        exporter = root / exporter_name
+        exporter.parent.mkdir(parents=True)
+        shutil.copyfile(REPO / exporter_name, exporter)
+        verifier = runpy.run_path(str(exporter))
+        for filename in verifier["sources"]():
+            source = root / filename
+            source.parent.mkdir(parents=True, exist_ok=True)
+            source.write_bytes(b"Example source.\n")
+        name = "Editor/WebUI/assets/agent-contract.json"
+        contract = root / name
+        contract.parent.mkdir(parents=True)
+
+        def pcm(samples):
+            header = struct.pack(
+                "<4sI8sIHHIIHH4sI", b"RIFF", len(samples) + 36, b"WAVEfmt ", 16,
+                1, 1, 8000, 16000, 2, 16, b"data", len(samples),
+            )
+            return base64.b64encode(header + samples).decode("ascii")
+
+        asset = "Assets/Audio/flap.wav"
+        example = {"id": "side-scroller-3d", "assets": {asset: pcm(b"\0\0" * 250)}}
+        payload = {
+            "version": 1, "runtimeAPI": 4, "components": [{"typeName": "Example"}],
+            "input": {"bindings": ["binding"]}, "api": {"types": ["type"]},
+            "examples": [example], "sourceHashes": verifier["fingerprints"](),
+        }
+        token = "gh" + "p_" + "0123456789abcdefABCDEF0123456789abcdef"
+        write_json(contract, payload)
+
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            outcome = adapters.secrets(root, [name])
+        self.assertFalse(outcome, log.getvalue())
+
+        payload["notes"] = {"token": token}
+        write_json(contract, payload)
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertTrue(adapters.secrets(root, [name]))
+        self.assertIn("GitHub", log.getvalue())
+        self.assertNotIn(token, log.getvalue())
+        payload["notes"] = {"label": chr(0x401), "token": token + " # pragma: allowlist secret"}
+        write_json(contract, payload)
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertTrue(adapters.secrets(root, [name]))
+        self.assertIn("GitHub", log.getvalue())
+        payload.pop("notes")
+
+        example["assets"][asset] = pcm(token.encode("ascii"))
+        write_json(contract, payload)
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertTrue(adapters.secrets(root, [name]))
+        self.assertIn("GitHub", log.getvalue())
+        self.assertNotIn(token, log.getvalue())
+
+        samples = ("sound # pragma: allowlist secret" + chr(0) + token).encode("ascii")
+        example["assets"][asset] = pcm(samples + bytes(len(samples) % 2))
+        write_json(contract, payload)
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertTrue(adapters.secrets(root, [name]))
+        self.assertIn("GitHub", log.getvalue())
+
+        digest = next(iter(verifier["fingerprints"]().values()))
+        samples = b"part of the waveform" + bytes(1) + digest.encode("ascii") + bytes(1) + b"end."
+        example["assets"][asset] = pcm(samples + bytes(len(samples) % 2))
+        write_json(contract, payload)
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertTrue(adapters.secrets(root, [name]))
+        self.assertIn("Hex High Entropy String", log.getvalue())
+
+        example["assets"][asset] = "invalid!"
+        write_json(contract, payload)
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertTrue(adapters.secrets(root, [name]))
+        self.assertIn("WAV", log.getvalue())
+
+        example["assets"][asset] = pcm(b"\0\0" * 250)
+        payload["sourceHashes"][next(iter(payload["sourceHashes"]))] = "0" * 64
+        write_json(contract, payload)
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertTrue(adapters.secrets(root, [name]))
+        self.assertIn("stale", log.getvalue())
+
+        contract.write_text('{"sourceHashes": {}, "sourceHashes": {}}', encoding="utf-8")
+        with contextlib.redirect_stdout(io.StringIO()) as log:
+            self.assertTrue(adapters.secrets(root, [name]))
+        self.assertIn("duplicate", log.getvalue())
+
     def test_conflict_markers_fail_content_check(self):
         (self.root / "design.md").write_text("<<<<<<< HEAD\none\n=======\ntwo\n>>>>>>> branch\n")
         self.assertTrue(adapters.content(self.root, ["design.md"]))

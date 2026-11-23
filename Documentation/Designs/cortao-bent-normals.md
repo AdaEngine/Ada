@@ -258,6 +258,6 @@ Where the implementation differs from the design text, and what was verified.
   (`ComputePipelineState.isReady`); bent-normal lighting is skipped for lightmapped and irradiance-grid surfaces, which
   the composite would otherwise double count; CORTAO targets and the bent-normal flag are released when a view stops
   using them; the usage example and the Vulkan-only validation are stated in `RenderingFoundation.md`. Accepted and
-  documented: RGBA16F pyramid depth precision, and the history lookup ignoring upscaler jitter. Open: regenerating
-  `Editor/WebUI/assets/agent-contract.json` (the generator was not found in this repository, so it was not edited by
-  hand), and test gaps (odd sizes, targets below 8 px, resize and per-view cleanup, bent-normal fallback without IBL).
+  documented: RGBA16F pyramid depth precision, and the history lookup ignoring upscaler jitter. The native Studio exporter regenerated
+  `Editor/WebUI/assets/agent-contract.json` when integrating the change. Open test gaps include odd sizes, targets
+  below 8 px, resize and per-view cleanup, and bent-normal fallback without IBL.

@@ -423,6 +423,8 @@ extension Render3DGPUTests {
             try scene.configure { $0.ambientOcclusion.technique = .ssao }
             let ssao = try await scene.render(.ambientOcclusion)
             try scene.configure { $0.ambientOcclusion.technique = .cortao }
+            // Read back a warm-up frame so async pipeline creation completes before comparing techniques.
+            _ = try await scene.render(.ambientOcclusion, frames: 1)
             let cortao = try await scene.render(.ambientOcclusion)
             func mean(_ image: Image) -> Float {
                 let bytes = Array(image.data)

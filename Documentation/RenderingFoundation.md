@@ -60,10 +60,11 @@ how much of their lobe sees open space (cone-cone intersection, Jimenez et al. 2
 image-based lighting, compute passes and the lighting surface attachment; otherwise the scalar AO is used. The
 `bentNormals` debug view shows it. Design: [cortao-bent-normals.md](Designs/cortao-bent-normals.md).
 
-CORTAO needs a device with compute passes (`RenderDevice.supportsComputePasses`: SAGA Vulkan and Metal; validated on Vulkan only, Metal is expected to work but has not been run), a perspective camera and targets
-of at least 8x8 pixels. Other devices, including the browser host, and other camera projections use SSAO. `bias` lifts the shaded
-point along its normal, which hides self-occlusion on tessellated surfaces; raise it if curved meshes look
-blotchy. The pyramid stores depth in RGBA16F, which limits precision on grazing surfaces at long range; the normal offset
+CORTAO needs a device with compute passes (`RenderDevice.supportsComputePasses`), a perspective camera and targets
+of at least 8x8 pixels. SAGA Vulkan has been validated. SAGA Metal exposes compute passes and still needs runtime
+validation. The renderer uses SSAO while the CORTAO compute pipeline initializes. Devices without compute support,
+including the browser host, and other camera projections also use SSAO. Increase `bias` if self-occlusion makes a
+curved mesh look blotchy. It lifts the shaded point along its surface normal. The pyramid stores depth in RGBA16F, which limits precision on grazing surfaces at long range; the normal offset
 absorbs it at normal distances. With temporal upscaling the history lookup ignores the upscaler jitter, a sub-pixel
 error that the neighbourhood clamp hides. Lightmapped and irradiance-grid surfaces keep the scalar AO. Not ported: the reference occluder and bent-normal look-up tables (the table is generated at start-up and the bent normal is summed directly).
 
@@ -81,7 +82,7 @@ indirect illumination. Existing IBL and hybrid SSR stay enabled.
 The current bloom source and auto-exposure meter use the earlier scene buffer;
 the added diffuse bounce does not feed those two measurements yet.
 
-Limits: 1–16 rays, 4–32 steps, one bounce, opaque receivers, visible geometry
+Limits: 1â€“16 rays, 4â€“32 steps, one bounce, opaque receivers, visible geometry
 only. Hidden/off-screen surfaces, paths behind the camera and hardware RTGI are
 outside this method. Thin geometry and disocclusion can reveal screen-space
 errors. The pass has spatial filtering; selected TAA/DLSS can stabilize the
@@ -167,7 +168,7 @@ existing bounded light selection; it is not a per-froxel cluster.
 Shader reconstruction uses the existing eight-sample jitter sequence and
 camera, rigid, skeletal, morph and sky motion. Foreground depth dilates motion;
 previous projected depth rejects disocclusion. History is clipped to the current
-3×3 YCoCg neighborhood, with reactive transparency and movement weighting.
+3Ã—3 YCoCg neighborhood, with reactive transparency and movement weighting.
 HDR brightness is compressed during the weighted blend. Each camera owns two
 HDR color and R32F depth histories; resize, camera cuts, discontinuity, method
 changes and reset generation invalidate history. UI is composited afterwards.
