@@ -3133,5 +3133,14 @@
   "Kimodo could not generate the animation. Check the model setup and retry.": "Kimodo не удалось создать анимацию. Проверьте настройку модели и попробуйте снова.",
   "Kimodo returned an invalid animation.": "Kimodo вернул некорректную анимацию.",
   "Shorten the motion description and try again.": "Сократите описание движения и попробуйте снова.",
-  "The selected humanoid has a missing or unsupported joint: {0}.": "В скелете персонажа отсутствует или не поддерживается сустав {0}."
+  "The selected humanoid has a missing or unsupported joint: {0}.": "В скелете персонажа отсутствует или не поддерживается сустав {0}.",
+  "Checking the build…": "Проверяю сборку…",
+  "Creating assets…": "Создаю ресурсы…",
+  "Planning the next steps…": "Планирую следующие шаги…",
+  "Reading project context…": "Читаю данные проекта…",
+  "Testing the game…": "Тестирую игру…",
+  "Updating the scene…": "Обновляю сцену…",
+  "Waiting for your approval…": "Жду вашего подтверждения…",
+  "Working on your game…": "Работаю над игрой…",
+  "Writing code…": "Пишу код…"
 }

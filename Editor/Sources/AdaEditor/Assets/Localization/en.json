@@ -3133,5 +3133,14 @@
   "Kimodo could not generate the animation. Check the model setup and retry.": "Kimodo could not generate the animation. Check the model setup and retry.",
   "Kimodo returned an invalid animation.": "Kimodo returned an invalid animation.",
   "Shorten the motion description and try again.": "Shorten the motion description and try again.",
-  "The selected humanoid has a missing or unsupported joint: {0}.": "The selected humanoid has a missing or unsupported joint: {0}."
+  "The selected humanoid has a missing or unsupported joint: {0}.": "The selected humanoid has a missing or unsupported joint: {0}.",
+  "Checking the build…": "Checking the build…",
+  "Creating assets…": "Creating assets…",
+  "Planning the next steps…": "Planning the next steps…",
+  "Reading project context…": "Reading project context…",
+  "Testing the game…": "Testing the game…",
+  "Updating the scene…": "Updating the scene…",
+  "Waiting for your approval…": "Waiting for your approval…",
+  "Working on your game…": "Working on your game…",
+  "Writing code…": "Writing code…"
 }
