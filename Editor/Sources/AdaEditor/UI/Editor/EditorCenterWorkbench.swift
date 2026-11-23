@@ -215,7 +215,7 @@ extension EditorCenterWorkbench {
                     if let language = textLanguage(for: document), let image = EditorLanguageLogo.image(for: language) {
                         image
                             .resizable()
-                            .aspectRatio(contentMode: .fit)
+                            .scaledToFit()
                             .frame(width: 14, height: 14)
                     } else {
                         Text(tabIcon(for: document))

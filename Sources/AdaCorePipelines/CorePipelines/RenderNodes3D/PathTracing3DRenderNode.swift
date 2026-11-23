@@ -91,6 +91,8 @@ struct PathTracing3DViews: Resource {
     var scene = PathTracing3DScene()
     var entries: [Entity.ID: Entry] = [:]
     var activeCameras: Set<Entity.ID> = []
+    /// Includes tracing cameras still preparing geometry before any history exists.
+    var traceOwners: Set<Entity.ID> = []
     var uniforms = FrameUniformCache3D<PathTracing3DUniform>()
     var pipeline: (any RenderPipeline)?
     /// The ray-query variant of the trace pipeline, and the structures it traces.
@@ -105,6 +107,15 @@ struct PathTracing3DViews: Resource {
     var nearest: (any Sampler)?
     var linear: (any Sampler)?
     var lastFailure: String?
+
+    mutating func stopTracing(_ view: Entity.ID) {
+        entries.removeValue(forKey: view)
+        guard traceOwners.remove(view) != nil, traceOwners.isEmpty else {
+            return
+        }
+        scene = PathTracing3DScene()
+        resetStructures()
+    }
 
     /// Releases the acceleration structures, for example when no view traces any more.
     mutating func resetStructures(clearSceneFailure: Bool = true) {
@@ -322,14 +333,9 @@ public struct PathTracing3DRenderNode: RenderNode {
         // camera identities collected from the source world, not those transient entities.
         let active = cameraTargets.activeCameraIDs
         if active != resources.activeCameras {
-            let removed = resources.activeCameras.subtracting(active)
-            for id in removed {
-                resources.entries.removeValue(forKey: id)
+            for id in resources.activeCameras.subtracting(active) {
+                resources.stopTracing(id)
                 statistics.discard(id)
-            }
-            if !removed.isEmpty && resources.entries.isEmpty {
-                resources.scene = PathTracing3DScene()
-                resources.resetStructures()
             }
             resources.activeCameras = active
         }
@@ -350,14 +356,11 @@ public struct PathTracing3DRenderNode: RenderNode {
         guard settings.isEnabled, environment.debugView != .meshlets, !environment.debugView.showsWireframe, let color = target.sceneColor3DTexture,
             let normal = target.normalRoughness3DTexture, let position = target.viewPositionMetallic3DTexture
         else {
-            resources.entries.removeValue(forKey: id)
+            resources.stopTracing(id)
             statistics.discard(id)
-            if resources.entries.isEmpty {
-                resources.scene = PathTracing3DScene()
-                resources.resetStructures()
-            }
             return []
         }
+        resources.traceOwners.insert(id)
         // Raster-only detail is seen through the G-buffer first hit; the tracer intersects its proxies instead.
         let sources = context.world.getResource(ExtractedMesh3DSources.self)?.pathTracedMeshes ?? []
         var scene = resources.scene
@@ -411,7 +414,7 @@ public struct PathTracing3DRenderNode: RenderNode {
             status.intersectionFallback = selection.fallbackReason
             statistics.record(status, view: id)
             resources.entries.removeValue(forKey: id)
-            if resources.entries.isEmpty {
+            if resources.traceOwners.count == 1 {
                 resources.scene = PathTracing3DScene()
                 resources.resetStructures(clearSceneFailure: false)
             }

@@ -39,6 +39,7 @@ For more details and guides, check out the tutorials below.
 - <doc:AdaUIIdentity>
 - <doc:ImageDecoders>
 - <doc:AnimationAuthoring>
+- <doc:CharacterLocomotion3D>
 - <doc:AnimationIK>
 - <doc:Atmosphere>
 - <doc:GameDiagnosticsOverlay>

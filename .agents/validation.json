@@ -1,6 +1,7 @@
 {
   "version": 1,
   "timeout_seconds": 900,
+  "windows_swift_build_timeout_seconds": 1800,
   "profiles": {
     "python": {
       "paths": [

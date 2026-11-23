@@ -113,6 +113,10 @@ CI mappings live in `.agents/validation.json` and must reference existing push/P
 A publication report never satisfies `verify --stage done`; it is not proof that CI has passed.
 The complete `run --stage review` profile stays strict, including missing native/advisory adapters.
 
+On Windows, `windows_swift_build_timeout_seconds` in `.agents/validation.json` gives each Swift
+build (engine and Editor) 30 minutes to produce the compiler log. Analysis and test deadlines use
+their regular settings.
+
 Full reports/logs are under `.build-tools/contribution/`; stdout contains compact statuses and paths.
 Hooks can be bypassed; use required hosted CI statuses for actual merge blocking. Local validation and
 an unpushed workflow file do not prove that server-side rules or remote jobs are enabled.

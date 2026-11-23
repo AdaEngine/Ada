@@ -100,6 +100,7 @@ def build_checks(root, paths, config, paths_file, logs, quick=False, runtime=Non
                       Check("swift-lint", "style", status="not_applicable", reason="No existing Swift source changed"))
         if not quick:
             packages = (["."] if "swift" in profiles else []) + ["Editor"]
+            build_timeout = config.get("windows_swift_build_timeout_seconds", timeout) if sys.platform == "win32" else timeout
             for package in packages:
                 prefix = "editor" if package == "Editor" else "swift"
                 scratch = config["swift_scratch"] + ("-editor" if package == "Editor" else "")
@@ -114,7 +115,7 @@ def build_checks(root, paths, config, paths_file, logs, quick=False, runtime=Non
                         test_timeout = timeout * 2
                 else:
                     test_options = ["--parallel"]
-                checks.append(Check(prefix + "-build", "analysis", ["swift", "build", "--build-tests", "-v", *jobs, *common], timeout=timeout))
+                checks.append(Check(prefix + "-build", "analysis", ["swift", "build", "--build-tests", "-v", *jobs, *common], timeout=build_timeout))
                 selected = [p for p in swift_paths if p.startswith("Editor/") == (package == "Editor")]
                 checks.append(adapter(prefix + "-analysis", "analysis") if selected else
                               Check(prefix + "-analysis", "analysis", status="not_applicable",

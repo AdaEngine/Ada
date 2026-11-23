@@ -361,7 +361,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animation IK and pose modifiers\n• Atmosphere\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• DLSS Upscaling\n• Hardware Path Tracing\n• Terrain\n• Procedural Noise\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animate a 3D character from movement\n• Animation IK and pose modifiers\n• Atmosphere\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• DLSS Upscaling\n• Hardware Path Tracing\n• Terrain\n• Procedural Noise\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
         "level": 0,
         "links": [
           {
@@ -383,6 +383,10 @@
           {
             "title": "Authoring skeletal animation",
             "destination": "AnimationAuthoring"
+          },
+          {
+            "title": "Animate a 3D character from movement",
+            "destination": "CharacterLocomotion3D"
           },
           {
             "title": "Animation IK and pose modifiers",
@@ -5076,6 +5080,92 @@
       {
         "kind": "text",
         "text": "This article describes 3D skeletal IK. Native 2D weighted deformation, continuous-turn angles,\nspline-chain authoring and typed timeline bindings for modifier parameters remain separate\nimplementation stages. A 3D numerical solve does not establish those workflows.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "CharacterLocomotion3D",
+    "title": "Animate a 3D character from movement",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/Developers/CharacterLocomotion3D.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Use `CharacterLocomotion3DComponent` to play skeletal animations from an upright 3D character's\nactual movement. Add it to the root entity that owns the character controller and skinned model.\nYour input or AI continues to set `desiredVelocity` and `jumpRequested`. Locomotion reads the\nresolved motion after physics, so holding forward against a wall can leave the character idle.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Set up your character in Swift",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Enable the 3D model and physics plugins in your game. Add a static floor and put your skinned\nmodel in the project assets. This example uses `Character.glb` and the default clip names.\nSpawn the character's root entity in the scene world.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "let character = world.spawn(\"Character\") {\n    Transform(position: [0, 0.005, 0])\n    CharacterController3DComponent()\n    Model3DSource(source: \"@res://Character.glb\", animation: \"Idle\", autoplay: true)\n    CharacterLocomotion3DComponent()\n}\n\n// Set these from your input system. Request a jump once on the press edge.\ncharacter.components[CharacterController3DComponent.self]?.desiredVelocity = [0, 0, 1.65]\n// To run, increase horizontal speed to 3.3.\n// To jump, set jumpRequested to true.",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The default component maps `Idle`, `Walk`, `Run`, `Jump`, `Fall`, and `Land`.\nAfter the character accelerates it walks, then runs at the higher speed. Releasing movement\nreturns it to idle after braking. `Jump` plays on ascent, `Fall` holds its final pose during\ndescent, and `Land` plays briefly before the character resumes the current grounded gait.\nStepping off a ledge goes straight to `Fall` after two consecutive ungrounded physics samples.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Set up your character in Ada Studio",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In Ada Studio's desktop scene inspector, select the root entity that owns the model and\ncontroller. Choose **Add Component**, then **3D Locomotion**. Assign the six clip slots to your\nmodel's animations before starting the scene.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• **Facing** controls whether the character turns toward its movement and which axis on\n  the model points forward.\n• **Clips** lists animations from the model and its attached libraries. Choose a clip for\n  each state. The inspector marks names that are missing or ambiguous. If a model swap fails\n  because the new model lacks the previous startup clip, clear or update **Animation** on\n  **3D Model** to load the new clip list.\n• **Directional clips** opens in **Keep facing** mode. Pick a walk and run for each\n  direction or use the forward clip. Saved assignments are available in either facing mode.\n• **Timing and speed** controls clip playback rates and transition durations. Press Enter\n  to apply a number. Save the scene to keep the settings. Use Undo or Redo to revisit an edit.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In Swift, configure the same fields through `CharacterLocomotion3DComponent.Configuration`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Set `configuration.clips` to the exact names of the six clips on your model. Use in-place\nclips. The controller moves the character and locomotion plays the poses. Match the walk\nand run reference speeds to the authored strides to reduce foot sliding.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "• `turnToMovement` uses forward gaits and turns the root entity toward its resolved movement.\n  The default forward axis is `positiveZ`. Set `forwardAxis` to match the model.\n• `keepFacing` leaves the root orientation to your game. Set the optional\n  `configuration.left`, `right`, and `back` gait mappings to use clips relative to that\n  orientation. Each missing slot falls back to its forward gait. Align the footfall phase\n  of directional, walk, and run loops for continuous transitions.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A model with a manual `ModelAnimationPlayback3DComponent` or an active animation graph\nretains that playback. Inspect `diagnostic` to find conflicts, missing clips, and invalid\ntuning. Scene serialization preserves the settings and each actor starts with independent\nlocomotion state. Scene data can omit settings that use the component defaults.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Locomotion uses the platform's existing 3D physics and skeletal playback. It samples one\ncontroller result per fixed step and reuses the model's existing pose sampling and animation\nLOD. Gameplay supplies input, the physics controller moves the character, and the existing\npose modifiers handle procedural adjustments such as foot IK.",
         "level": 0,
         "links": []
       }

@@ -290,7 +290,7 @@ struct EditorProjectSidebar: View {
                 if let language = textLanguage(for: item), let image = EditorLanguageLogo.image(for: language) {
                     image
                         .resizable()
-                        .aspectRatio(contentMode: .fit)
+                        .scaledToFit()
                         .frame(width: compact ? 14 : 18, height: compact ? 14 : 18)
                 } else {
                     Text(fileIcon(for: item))

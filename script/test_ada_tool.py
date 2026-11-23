@@ -742,6 +742,7 @@ class StaticPreviewTests(unittest.TestCase):
             (root / "player").mkdir()
             (root / "studio/index.html").write_text("Studio HTML")
             (root / "player/AdaWebPlayer.wasm").write_bytes(b"\0asm")
+            (root / "player/runtime.mjs").write_bytes(b"export {};")
             server = ThreadingHTTPServer(("127.0.0.1", 0), partial(PreviewHandler, directory=directory))
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -753,6 +754,11 @@ class StaticPreviewTests(unittest.TestCase):
                 response = connection.getresponse()
                 self.assertEqual(response.headers["Content-Type"], "application/wasm")
                 self.assertEqual(response.read(), b"\0asm")
+                with patch("http.server.mimetypes.guess_type", return_value=("text/plain", None)):
+                    connection.request("GET", "/player/runtime.mjs")
+                    response = connection.getresponse()
+                    self.assertEqual(response.headers["Content-Type"], "text/javascript")
+                    self.assertEqual(response.read(), b"export {};")
             finally:
                 connection.close()
                 server.shutdown()

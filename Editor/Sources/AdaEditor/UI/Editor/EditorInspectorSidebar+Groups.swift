@@ -1,10 +1,10 @@
 @_spi(AdaEngine) import AdaEngine
 
 extension EditorInspectorSidebar {
-    func fieldGroupHeader(_ row: EditorInspectorFieldLayout.Row, namespace: String) -> some View {
+    func fieldGroupHeader(_ row: EditorInspectorFieldLayout.Row, namespace: String, collapsedByDefault: Bool = false) -> some View {
         let path = row.groupPath.joined(separator: "/")
         let tint = EditorInspectorGroupColor.tint(for: "\(namespace)/\(row.id)")
-        let collapsed = collapsedFieldGroups[namespace]?.contains(path) == true
+        let collapsed = (collapsedFieldGroups[namespace]?.contains(path) == true) != collapsedByDefault
         return Button(action: {
             var groups = collapsedFieldGroups[namespace] ?? []
             if !groups.insert(path).inserted { groups.remove(path) }

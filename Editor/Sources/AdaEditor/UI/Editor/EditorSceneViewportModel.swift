@@ -122,6 +122,7 @@ final class EditorSceneViewportModel {
 
     var onSelectEntity: ((String?) -> Void)?
     var onSelectionChanged: ((EditorInspectorSidebarViewModel.SelectedEntity?) -> Void)?
+    private var onLocomotionInspectorChanged: ((String, EditorLocomotionInspectorState) -> Void)?
     var onDocumentContentChanged: ((String) -> Void)?
     private(set) var onTransformChanged: ((String, EditorComponentPayload) -> Void)?
 
@@ -148,7 +149,8 @@ final class EditorSceneViewportModel {
         isHistoryChange: Bool = false,
         onSelectionChanged: @escaping (EditorInspectorSidebarViewModel.SelectedEntity?) -> Void,
         onDocumentContentChanged: @escaping (String) -> Void,
-        onTransformChanged: ((String, EditorComponentPayload) -> Void)? = nil
+        onTransformChanged: ((String, EditorComponentPayload) -> Void)? = nil,
+        onLocomotionInspectorChanged: ((String, EditorLocomotionInspectorState) -> Void)? = nil
     ) -> EditorSceneRuntimeLoadResult? {
         let contentChanged = self.sceneContent != sceneContent
         let contextChanged = sceneSourceURL != sourceURL || sceneResourceRootURL != resourceRootURL
@@ -156,6 +158,7 @@ final class EditorSceneViewportModel {
         self.sceneResourceRootURL = resourceRootURL
         self.scriptableObjectCatalog = scriptableObjectCatalog
         self.onSelectionChanged = onSelectionChanged
+        self.onLocomotionInspectorChanged = onLocomotionInspectorChanged
         self.onDocumentContentChanged = onDocumentContentChanged
         self.onTransformChanged = onTransformChanged
         self.onSelectEntity = { [weak self] editorID in
@@ -246,6 +249,7 @@ final class EditorSceneViewportModel {
         isAnnotating = false
         annotationEntityIDs = []
         onSelectionChanged = nil
+        onLocomotionInspectorChanged = nil
         onTransformChanged = nil
         onDocumentContentChanged = nil
     }
@@ -258,6 +262,7 @@ final class EditorSceneViewportModel {
         cameraEntityID = isImmersive ? nil : findCameraEntity(in: world)?.id
         if !isImmersive { applyCamera() }
         if terrainEditing.isEnabled { refreshMeshTerrainControls() }
+        refreshLocomotionInspector()
     }
 
     @discardableResult
@@ -276,8 +281,10 @@ final class EditorSceneViewportModel {
         }
         // The immersive editor supplies its own world lifecycle rather than a SceneView application.
         guard !isImmersive && (needsAssets || model.entities.count > 128 || previousLoad != nil) else {
+            sceneLoadTask = nil
             onSceneLoadingChanged?(false)
             let result = installSceneRuntime(model, in: world)
+            refreshLocomotionInspector()
             onSceneLoaded?(result)
             return result
         }
@@ -323,6 +330,7 @@ final class EditorSceneViewportModel {
                 }
                 self.sceneLoadTask = nil
                 self.onSceneLoadingChanged?(false)
+                self.refreshLocomotionInspector()
                 self.onSceneLoaded?(result)
             } catch is CancellationError {
                 // A newer document or a closed viewport owns the next load.
@@ -332,9 +340,11 @@ final class EditorSceneViewportModel {
                 }
                 self.sceneLoadTask = nil
                 self.onSceneLoadingChanged?(false)
+                self.refreshLocomotionInspector()
                 self.onSceneLoaded?(.emptyWithWarnings([error.localizedDescription]))
             }
         }
+        refreshLocomotionInspector()
         return nil
     }
 
@@ -903,7 +913,9 @@ extension EditorSceneViewportModel {
         else {
             return false
         }
-        guard beginMeshTerrainDrag(editorID: selectedEditorID, payload: payload, pose: transform) else { return false }
+        guard beginMeshTerrainDrag(editorID: selectedEditorID, payload: payload, pose: transform) else {
+            return false
+        }
         transformDrag = TransformDrag(
             editorID: selectedEditorID,
             startContent: sceneContent,
@@ -940,7 +952,9 @@ extension EditorSceneViewportModel {
         guard let editorID = selectedEditorID, let model = sceneModel,
             let entity = model.entities.first(where: { $0.id == editorID }) else { return false }
         let binding = entity.components[String(reflecting: MeshTerrain3DBinding.self)]
-        guard (binding != nil && binding?["enabled"] != .bool(false)) || !meshTerrainBoundDescendants(of: editorID, in: model).isEmpty else { return false }
+        guard (binding != nil && binding?["enabled"] != .bool(false)) || !meshTerrainBoundDescendants(of: editorID, in: model).isEmpty else {
+            return false
+        }
         guard !terrainEditing.isSourceBusy, let initial = entity.components[EditorBuiltInComponentType.transform],
             let initialPose = try? EditorComponentPayloadDecoder.decode(Transform.self, payload: initial) as? Transform else { return true }
         var payload = initial
@@ -1041,7 +1055,9 @@ extension EditorSceneViewportModel {
     }
 
     func syncRuntimeTransform(editorID: String, payload: EditorComponentPayload) {
-        if terrainEditing.meshGroupDrag?.editorID == editorID { return }
+        if terrainEditing.meshGroupDrag?.editorID == editorID {
+            return
+        }
         guard
             let runtimeID = entitiesByEditorID[editorID],
             let entity = world?.getEntityByID(runtimeID),
@@ -1553,7 +1569,32 @@ extension EditorSceneViewportModel {
             addableScriptableObjects: scriptableObjectCatalog.filter { !attachedScriptableIDs.contains($0.identifier) },
             gizmo: gizmo,
             hasExplicitGizmo: entity.components[EditorSceneYAMLDocument.editorGizmoComponentName] != nil,
-            hasJoinedDescendant: !meshTerrainBoundDescendants(of: editorID, in: model).isEmpty
+            hasJoinedDescendant: !meshTerrainBoundDescendants(of: editorID, in: model).isEmpty,
+            locomotion: locomotionInspectorState(for: entity)
+        )
+    }
+
+    private func refreshLocomotionInspector() {
+        guard let onLocomotionInspectorChanged,
+              let entity = sceneModel?.entities.first(where: { $0.id == selectedEditorID }),
+              let state = locomotionInspectorState(for: entity)
+        else {
+            return
+        }
+        onLocomotionInspectorChanged(entity.id, state)
+    }
+
+    private func locomotionInspectorState(for entity: EditorSceneEntity) -> EditorLocomotionInspectorState? {
+        guard entity.components[EditorBuiltInComponentType.locomotion3D] != nil else {
+            return nil
+        }
+        return EditorLocomotionInspectorState(
+            entity: entity,
+            owner: runtimeEntity(for: entity.id),
+            world: world,
+            isLoading: sceneLoadTask != nil,
+            sourceURL: sceneSourceURL,
+            resourceRootURL: sceneResourceRootURL
         )
     }
 
@@ -1776,9 +1817,17 @@ extension EditorSceneViewportModel {
     }
 
     func cancelActiveMeshTerrainTransform() -> Bool {
-        guard terrainEditing.meshDragSession != nil || terrainEditing.meshGroupDrag != nil else { return false }
-        if spatialEdit != nil { endSpatialTransform(cancelled: true); return true }
-        if transformDrag != nil { endTransformDrag(cancelled: true); return true }
+        guard terrainEditing.meshDragSession != nil || terrainEditing.meshGroupDrag != nil else {
+            return false
+        }
+        if spatialEdit != nil {
+            endSpatialTransform(cancelled: true)
+            return true
+        }
+        if transformDrag != nil {
+            endTransformDrag(cancelled: true)
+            return true
+        }
         return false
     }
 }

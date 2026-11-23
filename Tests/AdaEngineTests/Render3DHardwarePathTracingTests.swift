@@ -67,8 +67,7 @@
                 let hardwareStatus = try Self.status(scene)
                 #expect(
                     hardwareStatus.implementation == PathTracingTraversalSelection.Traversal.hardwareRayQuery.rawValue,
-                    "implementation \(hardwareStatus.implementation), fallback \(String(describing: hardwareStatus.intersectionFallback)), "
-                        + "failure \(String(describing: hardwareStatus.failure))"
+                    "traversal \(hardwareStatus.implementation), fallback \(String(describing: hardwareStatus.intersectionFallback)), error \(String(describing: hardwareStatus.failure))"
                 )
                 #expect(hardwareStatus.intersectionFallback == nil && hardwareStatus.failure == nil)
 
