@@ -82,7 +82,7 @@ indirect illumination. Existing IBL and hybrid SSR stay enabled.
 The current bloom source and auto-exposure meter use the earlier scene buffer;
 the added diffuse bounce does not feed those two measurements yet.
 
-Limits: 1â€“16 rays, 4â€“32 steps, one bounce, opaque receivers, visible geometry
+Limits: 1–16 rays, 4–32 steps, one bounce, opaque receivers, visible geometry
 only. Hidden/off-screen surfaces, paths behind the camera and hardware RTGI are
 outside this method. Thin geometry and disocclusion can reveal screen-space
 errors. The pass has spatial filtering; selected TAA/DLSS can stabilize the
@@ -168,7 +168,7 @@ existing bounded light selection; it is not a per-froxel cluster.
 Shader reconstruction uses the existing eight-sample jitter sequence and
 camera, rigid, skeletal, morph and sky motion. Foreground depth dilates motion;
 previous projected depth rejects disocclusion. History is clipped to the current
-3Ã—3 YCoCg neighborhood, with reactive transparency and movement weighting.
+3×3 YCoCg neighborhood, with reactive transparency and movement weighting.
 HDR brightness is compressed during the weighted blend. Each camera owns two
 HDR color and R32F depth histories; resize, camera cuts, discontinuity, method
 changes and reset generation invalidate history. UI is composited afterwards.
