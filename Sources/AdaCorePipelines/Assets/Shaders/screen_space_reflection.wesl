@@ -1,3 +1,4 @@
+import package::cortao_common::{cortaoOctDecode};
 import package::fullscreen::{FullscreenVertex, fullscreenVertex};
 import package::environment_composite::{
     sceneColor, normalRoughness, viewPositionMetallic, linearSampler, gBufferSampler, environment,
@@ -13,6 +14,9 @@ import package::environment_composite::{
 @group(0) @binding(17) var reflectionResponse: texture_2d<f32>;
 @group(0) @binding(18) var prefilteredEnvironment: texture_2d<f32>;
 @group(0) @binding(20) var diffuseImage: texture_2d<f32>;
+// Diffuse image-based light and the diffuse surface response, for bent-normal lighting (diffuseGI.w).
+@if(ADA_CORTAO_BENT_NORMALS) @group(0) @binding(26) var irradianceImage: texture_2d<f32>;
+@if(ADA_CORTAO_BENT_NORMALS) @group(0) @binding(27) var diffuseSurfaceImage: texture_2d<f32>;
 
 const PI: f32 = 3.14159265359;
 const MINIMUM_TRACED_REFLECTIVITY: f32 = 0.004;
@@ -217,14 +221,17 @@ fn traceReflection(origin: vec3f, direction: vec3f) -> ScreenPoint {
     return ScreenPoint(vec2f(0.0), false);
 }
 
-fn ambientOcclusion(uv: vec2f, position: vec3f, normal: vec3f) -> f32 {
+// x = visibility, yzw = bent normal in view space (zero when the pass produced none).
+fn ambientOcclusion(uv: vec2f, position: vec3f, normal: vec3f) -> vec4f {
     if environment.quality.x < 0.5 {
-        return 1.0;
+        return vec4f(1.0, 0.0, 0.0, 0.0);
     }
+    let hasBentNormal = environment.diffuseGI.w > 0.5;
     let size = vec2f(textureDimensions(aoImage, 0));
     let base = floor(uv * size - 0.5);
     let fraction = fract(uv * size - 0.5);
     var sum = 0.0;
+    var bentSum = vec3f(0.0);
     var weights = 0.0;
     for (var y = 0; y < 2; y++) {
         for (var x = 0; x < 2; x++) {
@@ -237,14 +244,41 @@ fn ambientOcclusion(uv: vec2f, position: vec3f, normal: vec3f) -> f32 {
             let bilinear = select(fraction.x, 1.0 - fraction.x, x == 0) * select(fraction.y, 1.0 - fraction.y, y == 0);
             var weight = bilinear * exp(-abs(position.z - other.z) / max(0.02, environment.quality.y * 0.1));
             weight *= pow(max(dot(normal, normalize(otherNormal)), 0.0), 8.0);
-            sum += sampleAt(aoImage, gBufferSampler, at).r * weight;
+            let aoTexel = sampleAt(aoImage, gBufferSampler, at);
+            sum += aoTexel.r * weight;
+            if hasBentNormal {
+                bentSum += cortaoOctDecode(aoTexel.gb * 2.0 - vec2f(1.0)) * weight;
+            }
             weights += weight;
         }
     }
     if weights > 0.0001 {
-        return sum / weights;
+        var bent = vec3f(0.0);
+        if hasBentNormal && dot(bentSum, bentSum) > 0.0001 {
+            bent = normalize(bentSum);
+        }
+        return vec4f(sum / weights, bent);
     }
-    return 1.0;
+    return vec4f(1.0, 0.0, 0.0, 0.0);
+}
+
+// Fraction of the reflection lobe that sees open sky, from the intersection of two cones (Jimenez et al. 2016,
+// "Practical Real-Time Strategies for Accurate Indirect Occlusion"): the visibility cone around the bent normal, whose
+// half-angle follows from the cosine-weighted visibility (V = sin^2 of the half-angle), and the reflection lobe around
+// the mirror direction, whose half-angle grows with roughness. Both are caps on the sphere, so the overlap is
+// interpolated between "no overlap" and "one cap inside the other". The result never drops below the scalar
+// visibility, so the new term cannot darken more than the old one.
+fn specularOcclusion(visibility: f32, bent: vec3f, reflectionDirection: vec3f, roughness: f32) -> f32 {
+    let visibleAngle = asin(sqrt(clamp(visibility, 0.0, 1.0)));
+    let lobeAngle = max(roughness, 0.1) * (0.5 * PI);
+    let between = acos(clamp(dot(bent, reflectionDirection), -1.0, 1.0));
+    let lobeArea = 1.0 - cos(lobeAngle);
+    let visibleArea = 1.0 - cos(visibleAngle);
+    let difference = abs(visibleAngle - lobeAngle);
+    let sum = visibleAngle + lobeAngle;
+    let contact = clamp((sum - between) / max(sum - difference, 0.0001), 0.0, 1.0);
+    let overlap = min(lobeArea, visibleArea) * smoothstep(0.0, 1.0, contact);
+    return clamp(overlap / max(lobeArea, 0.0001), visibility, 1.0);
 }
 
 @diagnostic(off, derivative_uniformity)
@@ -305,17 +339,35 @@ fn ssr_fragment(input: FullscreenVertex) -> @location(0) vec4f {
     }
 
     let normal = normalize(surface.xyz);
-    let ao = ambientOcclusion(uv, position, normal);
+    let occlusionSample = ambientOcclusion(uv, position, normal);
+    let ao = occlusionSample.x;
     let indirect = sampleAt(indirectImage, linearSampler, uv).rgb;
-    var baseColor = max(foreground.rgb - indirect * (1.0 - ao), vec3f(0.0));
-    baseColor += sampleDiffuseGI(uv, position, normal) * ao;
     let roughness = clamp(surface.w, 0.04, 1.0);
     let metallic = clamp(positionMetallic.w, 0.0, 1.0);
     let viewDirection = normalize(position);
     let reflectionDirection = normalize(reflect(viewDirection, normal));
+    var specularAO = ao;
+    var baseColor = max(foreground.rgb - indirect * (1.0 - ao), vec3f(0.0));
+    @if(ADA_CORTAO_BENT_NORMALS) if environment.diffuseGI.w > 0.5 && dot(occlusionSample.yzw, occlusionSample.yzw) > 0.5 {
+        // Bent normals: the diffuse image-based light is looked up along the open direction instead of the surface
+        // normal, and the reflection is occluded by what its own lobe sees. The specular part of the ambient light is
+        // what remains of the indirect buffer after the diffuse part.
+        let bent = occlusionSample.yzw;
+        let worldNormal = normalize((environment.inverseView * vec4f(normal, 0.0)).xyz);
+        let worldBent = normalize((environment.inverseView * vec4f(bent, 0.0)).xyz);
+        let irradianceNormal = textureSampleLevel(irradianceImage, iblSampler, skyUV(rotateSky(worldNormal, environment.ibl.z)), 0.0).rgb;
+        let irradianceBent = textureSampleLevel(irradianceImage, iblSampler, skyUV(rotateSky(worldBent, environment.ibl.z)), 0.0).rgb;
+        let diffuseSurface = sampleAt(diffuseSurfaceImage, gBufferSampler, uv).rgb * environment.ibl.y / PI;
+        let diffuseNormal = diffuseSurface * irradianceNormal;
+        let diffuseBent = diffuseSurface * irradianceBent;
+        specularAO = specularOcclusion(ao, bent, reflectionDirection, roughness);
+        let specular = max(indirect - diffuseNormal, vec3f(0.0));
+        baseColor = max(foreground.rgb - indirect + specular * specularAO + diffuseBent * ao, vec3f(0.0));
+    }
+    baseColor += sampleDiffuseGI(uv, position, normal) * ao;
     if environment.ibl.x > 0.5 {
         if environment.quality.w > 0.5 && environment.reflection.x > 0.5 && environment.reflectionQuality.y > 0.0 {
-            let response = sampleAt(reflectionResponse, gBufferSampler, uv).rgb * ao;
+            let response = sampleAt(reflectionResponse, gBufferSampler, uv).rgb * specularAO;
             if max(response.r, max(response.g, response.b)) > MINIMUM_TRACED_REFLECTIVITY {
                 let hit = traceReflection(position + normal * environment.reflection.w, reflectionDirection);
                 if hit.visible {
@@ -337,7 +389,7 @@ fn ssr_fragment(input: FullscreenVertex) -> @location(0) vec4f {
     reflectivity *= (1.0 - roughness * 0.7) * environment.reflectionQuality.y;
     var reflectedColor = sky;
     var visibility = 0.0;
-    if environment.reflection.x > 0.5 && reflectivity * ao > MINIMUM_TRACED_REFLECTIVITY {
+    if environment.reflection.x > 0.5 && reflectivity * specularAO > MINIMUM_TRACED_REFLECTIVITY {
         let hit = traceReflection(position + normal * environment.reflection.w, reflectionDirection);
         if hit.visible {
             reflectedColor = blurredScene(hit.uv, roughness);

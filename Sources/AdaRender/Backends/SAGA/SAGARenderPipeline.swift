@@ -36,6 +36,17 @@
         }
     }
 
+    /// A compute stage translated by SAGA's compiler for the device's shader format.
+    @_spi(Internal)
+    public final class SAGAComputeShader: CompiledShader, @unchecked Sendable {
+        let artifact: ComputeShaderArtifact
+
+        init(shader: Shader, output: ShaderOutputFormat) throws {
+            guard case .code(let source) = shader.source else { throw SAGAShaderError.spirvUnsupported }
+            artifact = try IndependentShaderCompiler().compileCompute(.wgsl(source), entryPoint: shader.entryPoint, to: output)
+        }
+    }
+
     final class SAGARenderPipeline: RenderPipeline, @unchecked Sendable {
         let descriptor: RenderPipelineDescriptor
         let slot = ResourceSlot<SAGATypes.RenderPipeline>()
@@ -57,7 +68,9 @@
 
         func rasterizedVariant(layer: UInt32) throws -> SAGARenderPipeline {
             try rasterizedVariants.withLock { variants in
-                if let cached = variants[layer] { return cached }
+                if let cached = variants[layer] {
+                    return cached
+                }
                 let pipeline = try SAGARenderPipeline(context: context, descriptor: descriptor, rasterizationLayer: layer)
                 variants[layer] = pipeline
                 return pipeline
@@ -87,7 +100,10 @@
             if let rasterizationLayer {
                 guard case let .code(source) = descriptor.vertex.source else { throw SAGAShaderError.spirvUnsupported }
                 vertexStage = try IndependentShaderCompiler().compileMetalRasterizedVertexStage(
-                    .wgsl(source), entryPoint: descriptor.vertex.entryPoint, layer: rasterizationLayer)
+                    .wgsl(source),
+                    entryPoint: descriptor.vertex.entryPoint,
+                    layer: rasterizationLayer
+                )
             } else {
                 vertexStage = vertex.artifact
             }
@@ -107,7 +123,9 @@
             self.vertexInputLocations = vertexStage.vertexInputs.map(\.location)
             let layouts = Self.vertexLayouts(for: descriptor)
             var resolvedColorTargets = descriptor.colorAttachments.compactMap { attachment -> RenderColorTarget? in
-                guard let format = attachment.format.sagaFormat else { return nil }
+                guard let format = attachment.format.sagaFormat else {
+                    return nil
+                }
                 return RenderColorTarget(format: format, colorState: attachment.sagaColorState)
             }
             if resolvedColorTargets.isEmpty, descriptor.depthStencilDescriptor != nil {
@@ -124,7 +142,9 @@
                 cullMode: descriptor.backfaceCulling ? .back : .none
             )
             let depth = descriptor.depthStencilDescriptor.flatMap { depth -> RenderDepthState? in
-                guard let format = descriptor.depthPixelFormat.sagaFormat else { return nil }
+                guard let format = descriptor.depthPixelFormat.sagaFormat else {
+                    return nil
+                }
                 let stencil = depth.stencilOperationDescriptor.map { op in
                     let face = RenderStencilFaceState(
                         compare: op.compare.saga, fail: op.fail.saga, depthFail: op.depthFail.saga, pass: op.pass.saga
@@ -161,7 +181,9 @@
             let vertexDescriptor = descriptor.vertexDescriptor
             return vertexDescriptor.activeBufferIndices.map { bufferIndex in
                 let attributes = vertexDescriptor.attributes.buffer.enumerated().compactMap { location, attribute -> VertexAttribute? in
-                    guard attribute.format != .invalid, attribute.bufferIndex == bufferIndex else { return nil }
+                    guard attribute.format != .invalid, attribute.bufferIndex == bufferIndex else {
+                        return nil
+                    }
                     return VertexAttribute(location: UInt32(location), offset: UInt32(attribute.offset), format: attribute.format.saga)
                 }
                 // A fallback attribute buffer holds one constant record shared by every vertex.
@@ -180,7 +202,9 @@
 
     extension RenderPipelineColorAttachmentDescriptor {
         var sagaColorState: RenderColorState {
-            guard isBlendingEnabled else { return RenderColorState() }
+            guard isBlendingEnabled else {
+                return RenderColorState()
+            }
             return RenderColorState(
                 blend: RenderBlendState(
                     color: RenderBlendComponent(
@@ -198,8 +222,8 @@
         }
     }
 
-    extension IndexPrimitive {
-        fileprivate var saga: RenderPrimitiveState.Topology {
+    private extension IndexPrimitive {
+        var saga: RenderPrimitiveState.Topology {
             switch self {
             case .triangle: .triangleList
             case .triangleStrip: .triangleStrip
@@ -210,8 +234,8 @@
         }
     }
 
-    extension VertexFormat {
-        fileprivate var saga: SAGATypes.VertexFormat {
+    private extension VertexFormat {
+        var saga: SAGATypes.VertexFormat {
             switch self {
             case .invalid, .float: .float32
             case .vector2: .float32x2
@@ -223,8 +247,8 @@
         }
     }
 
-    extension BlendFactor {
-        fileprivate var saga: RenderBlendFactor {
+    private extension BlendFactor {
+        var saga: RenderBlendFactor {
             switch self {
             case .zero: .zero
             case .one: .one
@@ -243,8 +267,8 @@
         }
     }
 
-    extension BlendOperation {
-        fileprivate var saga: RenderBlendOperation {
+    private extension BlendOperation {
+        var saga: RenderBlendOperation {
             switch self {
             case .add: .add
             case .subtract: .subtract
@@ -255,8 +279,8 @@
         }
     }
 
-    extension CompareOperation {
-        fileprivate var saga: CompareFunction {
+    private extension CompareOperation {
+        var saga: CompareFunction {
             switch self {
             case .never: .never
             case .less: .less
@@ -270,8 +294,8 @@
         }
     }
 
-    extension StencilOperation {
-        fileprivate var saga: RenderStencilOperation {
+    private extension StencilOperation {
+        var saga: RenderStencilOperation {
             switch self {
             case .keep: .keep
             case .zero: .zero

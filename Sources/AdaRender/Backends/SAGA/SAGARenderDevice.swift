@@ -82,8 +82,24 @@
         }
 
         public func compileShader(from shader: Shader) throws -> any CompiledShader {
-            try SAGAShader(shader: shader, output: context.shaderOutput)
+            if shader.stage == .compute {
+                return try SAGAComputeShader(shader: shader, output: context.shaderOutput)
+            }
+            return try SAGAShader(shader: shader, output: context.shaderOutput)
         }
+
+        #if SAGA_NATIVE || SAGA_METAL
+        public var supportsComputePasses: Bool { true }
+
+        public func createComputePipeline(from descriptor: ComputePipelineDescriptor) -> (any ComputePipelineState)? {
+            do {
+                return try SAGAComputePipeline(context: context, descriptor: descriptor)
+            } catch {
+                context.logger.error("Cannot create compute pipeline \(descriptor.debugName): \(error)")
+                return nil
+            }
+        }
+        #endif
 
         public func createRenderPipeline(from descriptor: RenderPipelineDescriptor) -> any RenderPipeline {
             do {
@@ -129,13 +145,17 @@
         }
 
         public func createAccelerationStructure(_ kind: AccelerationStructureKind) -> (any AccelerationStructure)? {
-            guard supportsRayQueries else { return nil }
+            guard supportsRayQueries else {
+                return nil
+            }
             return SAGAAccelerationStructure(context: context, kind: kind)
         }
 
         public func createTemporalUpscaler(inputSize: SizeInt, outputSize: SizeInt) -> (any TemporalUpscaler)? {
             #if SAGA_NATIVE && os(Windows) && canImport(SAGAVulkan)
-                guard let session = context.dlssSession.withLock({ $0 }) else { return nil }
+                guard let session = context.dlssSession.withLock({ $0 }) else {
+                    return nil
+                }
                 return SAGADLSSUpscaler(session: session, context: context, inputSize: inputSize, outputSize: outputSize)
             #else
                 return nil
@@ -154,7 +174,9 @@
 
         @MainActor
         public func createSwapchain(from window: WindowID) -> (any Swapchain)? {
-            guard let window = windows?.window(for: window) else { return nil }
+            guard let window = windows?.window(for: window) else {
+                return nil
+            }
             return SAGASwapchain(window: window)
         }
     }

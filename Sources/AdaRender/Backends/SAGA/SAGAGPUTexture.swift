@@ -9,6 +9,7 @@
     import SAGA
     import SAGACore
     import SAGATypes
+    import Synchronization
 
     enum SAGATextureError: Error {
         case unsupportedPixelFormat
@@ -46,6 +47,9 @@
         let allowsBindingCache: Bool
         let allowsTransientBindingCache: Bool
         private let ownsResource: Bool
+        /// Single-level views, created on first use. Compute passes write one level at a time through these.
+        private let mipViews = Mutex<[Int: ResourceSlot<ResourceID>]>([:])
+        private let mipLevelCount: Int
 
         init(context: SAGAContext, descriptor: TextureDescriptor) throws {
             guard let format = descriptor.pixelFormat.sagaFormat else {
@@ -58,6 +62,7 @@
             self.allowsBindingCache = descriptor.allowsBindingCache && !descriptor.textureUsage.contains(.renderTarget)
             self.allowsTransientBindingCache = descriptor.allowsBindingCache
             self.ownsResource = true
+            self.mipLevelCount = max(1, descriptor.mipmapLevel)
 
             var usage: TextureUsage = []
             if descriptor.textureUsage.contains(.read) {
@@ -69,6 +74,9 @@
                 // Vendor reconstruction (DLSS) writes its output as a storage image; only the Vulkan renderer needs this.
                 if descriptor.pixelFormat == .rgba_16f || descriptor.pixelFormat == .rgba_32f { usage.insert(.storageBinding) }
                 #endif
+            }
+            if descriptor.textureUsage.contains(.storage) {
+                usage.formUnion([.storageBinding, .textureBinding, .copySource])
             }
             if descriptor.textureUsage.contains(.renderTarget) {
                 usage.formUnion([.renderAttachment, .copySource])
@@ -117,11 +125,37 @@
             }
         }
 
+        /// A view of one mip level, for storage writes or single-level sampling.
+        func mipView(_ level: Int) -> ResourceSlot<ResourceID> {
+            let level = min(max(level, 0), mipLevelCount - 1)
+            let source = slot
+            return mipViews.withLock { views in
+                if let existing = views[level] {
+                    return existing
+                }
+                let view = ResourceSlot<ResourceID>()
+                views[level] = view
+                context.queue.enqueue { device in
+                    view.fulfill(try await device.createTextureView(
+                        texture: try source.get(),
+                        .init(baseMipLevel: UInt32(level), mipLevelCount: 1)
+                    ))
+                }
+                return view
+            }
+        }
+
         deinit {
-            guard ownsResource else { return }
+            guard ownsResource else {
+                return
+            }
             let slot = self.slot
             let viewSlot = self.viewSlot
+            let mipSlots = mipViews.withLock { Array($0.values) }
             context.queue.enqueue { device in
+                for mip in mipSlots {
+                    if let view = try? mip.get() { try await device.destroyTextureView(view) }
+                }
                 if let viewSlot, let view = try? viewSlot.get() {
                     try await device.destroyTextureView(view)
                 }
@@ -137,8 +171,10 @@
                 data,
                 bytesPerRow: bytesPerRow,
                 region: TextureCopyRegion(
-                    x: UInt32(region.origin.x), y: UInt32(region.origin.y),
-                    width: UInt32(region.size.width), height: UInt32(region.size.height),
+                    x: UInt32(region.origin.x),
+                    y: UInt32(region.origin.y),
+                    width: UInt32(region.size.width),
+                    height: UInt32(region.size.height),
                     mipLevel: UInt32(mipmapLevel)
                 )
             )
@@ -152,8 +188,10 @@
                 data,
                 bytesPerRow: bytesPerRow,
                 region: TextureCopyRegion(
-                    width: UInt32(image.width), height: UInt32(image.height),
-                    mipLevel: UInt32(resource.mipLevel), arrayLayer: UInt32(resource.slice)
+                    width: UInt32(image.width),
+                    height: UInt32(image.height),
+                    mipLevel: UInt32(resource.mipLevel),
+                    arrayLayer: UInt32(resource.slice)
                 )
             )
         }

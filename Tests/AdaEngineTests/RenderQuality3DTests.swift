@@ -48,6 +48,58 @@ struct CascadedShadow3DTests {
         #expect(environment.antiAliasing == .none)
         #expect(environment.shadows.cascadeCount == 1)
     }
+
+    @Test
+    func ambientOcclusionTechniqueDefaultsToSSAOAndRoundTrips() throws {
+        let legacy = try JSONDecoder().decode(ScreenSpaceAO3D.self, from: Data(#"{"isEnabled":true,"radius":1,"intensity":1,"bias":0.02,"sampleCount":12}"#.utf8))
+        #expect(legacy.technique == .ssao)
+        #expect(legacy.isEnabled && legacy.sampleCount == 12)
+        let encoded = try JSONEncoder().encode(ScreenSpaceAO3D(isEnabled: true, technique: .cortao))
+        #expect(try JSONDecoder().decode(ScreenSpaceAO3D.self, from: encoded).technique == .cortao)
+    }
+
+    @Test
+    func cortaoTemporalAccumulationDefaultsOnAndRoundTrips() throws {
+        #expect(ScreenSpaceAO3D().temporalAccumulation)
+        let legacy = try JSONDecoder().decode(ScreenSpaceAO3D.self, from: Data(#"{"technique":"cortao"}"#.utf8))
+        #expect(legacy.temporalAccumulation)
+        let encoded = try JSONEncoder().encode(ScreenSpaceAO3D(technique: .cortao, temporalAccumulation: false))
+        #expect(try JSONDecoder().decode(ScreenSpaceAO3D.self, from: encoded).temporalAccumulation == false)
+    }
+
+    @Test
+    func cortaoBentNormalsDefaultOnAndRoundTrip() throws {
+        #expect(ScreenSpaceAO3D().bentNormals)
+        let legacy = try JSONDecoder().decode(ScreenSpaceAO3D.self, from: Data(#"{"technique":"cortao","temporalAccumulation":false}"#.utf8))
+        #expect(legacy.bentNormals)
+        let encoded = try JSONEncoder().encode(ScreenSpaceAO3D(technique: .cortao, bentNormals: false))
+        #expect(try JSONDecoder().decode(ScreenSpaceAO3D.self, from: encoded).bentNormals == false)
+        #expect(DebugView3D.bentNormals.replacesFinalImage)
+        #expect(DebugView3D.bentNormals.shaderMode == 8)
+    }
+
+    @Test
+    func cortaoOccluderTableMatchesConeGeometry() {
+        let center = CortaoOccluderTable.directionResolution / 2
+        // Cells next to the table centre look straight up the surface normal.
+        let up = (center, center)
+        let rays = CortaoOccluderTable.rayCount
+        #expect(CortaoOccluderTable.mask(x: up.0, y: up.1, slice: 0) == 0, "a tiny occluder blocks no ray")
+        #expect(CortaoOccluderTable.mask(x: up.0, y: up.1, slice: CortaoOccluderTable.radiusResolution - 1) == (1 << UInt32(rays)) - 1,
+                "a hemisphere-sized occluder blocks every ray")
+        // A larger occluder never blocks fewer rays.
+        var previous: UInt32 = 0
+        for slice in 0..<CortaoOccluderTable.radiusResolution {
+            let mask = CortaoOccluderTable.mask(x: up.0, y: up.1, slice: slice)
+            #expect(mask & previous == previous)
+            previous = mask
+        }
+        // Table cells outside the spheremap disc hold no direction.
+        #expect(CortaoOccluderTable.mask(x: 0, y: 0, slice: 2) == 0)
+        let texels = CortaoOccluderTable.texels()
+        #expect(texels.count == CortaoOccluderTable.width * CortaoOccluderTable.height)
+        #expect(texels.allSatisfy { $0 >= 0 && $0 <= 65535 && $0 == $0.rounded() })
+    }
 }
 
 @MainActor
@@ -122,6 +174,15 @@ struct RenderQuality3DIntegrationTests {
         let sample = try #require(metrics.samples.first)
         #expect(sample.count == 2)
         #expect(sample.averageMilliseconds == 3)
+    }
+
+    @Test
+    func cortaoShadersLinkAndPipelinesBuildWhereSupported() throws {
+        try setup()
+        let device = unsafe RenderEngine.shared.renderDevice
+        var pipelines = ScreenQuality3DPipelines(device: device)
+        _ = pipelines.cortaoPipeline(device: device)
+        _ = pipelines.cortaoPyramidPipeline(device: device)
     }
 
     private func setup() throws {

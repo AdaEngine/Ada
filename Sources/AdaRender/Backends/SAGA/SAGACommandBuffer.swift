@@ -82,6 +82,12 @@
         }
         #endif
 
+        #if SAGA_NATIVE || SAGA_METAL
+        func beginComputePass(_: ComputePassDescriptor) -> (any ComputeCommandEncoder)? {
+            SAGAComputeCommandEncoder(buffer: self)
+        }
+        #endif
+
         func beginBlitPass(_: BlitPassDescriptor) -> BlitCommandEncoder {
             SAGABlitCommandEncoder(buffer: self)
         }
@@ -264,8 +270,10 @@
                     slot: texture.slot,
                     clear: loads == .clear
                         ? RenderClearColor(
-                            red: Double(color.red), green: Double(color.green),
-                            blue: Double(color.blue), alpha: Double(color.alpha)
+                            red: Double(color.red),
+                            green: Double(color.green),
+                            blue: Double(color.blue),
+                            alpha: Double(color.alpha)
                         ) : nil,
                     store: .store,
                     resolve: (attachment.resolveTexture?.gpuTexture as? SAGAGPUTexture)?.slot,
@@ -280,13 +288,19 @@
                 if let placeholder = try? SAGAGPUTexture(
                     context: buffer.context,
                     descriptor: AdaRender.TextureDescriptor(
-                        width: depthTexture.size.width, height: depthTexture.size.height, pixelFormat: .rgba8,
-                        textureUsage: [.renderTarget], textureType: .texture2D, mipmapLevel: 1
+                        width: depthTexture.size.width,
+                        height: depthTexture.size.height,
+                        pixelFormat: .rgba8,
+                        textureUsage: [.renderTarget],
+                        textureType: .texture2D,
+                        mipmapLevel: 1
                     )
                 ) {
-                    colors = [PassColor(
+                    colors = [
+                        PassColor(
                         slot: placeholder.slot, clear: nil, store: .store, resolve: nil, format: .rgba8Unorm, owners: [placeholder]
-                    )]
+                    )
+                    ]
                 }
             }
             self.colors = colors
@@ -329,7 +343,9 @@
         // MARK: Resources
 
         private func binding(_ buffer: any Buffer, offset: Int) -> BufferBinding? {
-            guard let buffer = buffer as? SAGABuffer else { return nil }
+            guard let buffer = buffer as? SAGABuffer else {
+                return nil
+            }
             return BufferBinding(buffer: buffer, offset: offset, size: buffer.length - offset)
         }
 
@@ -346,23 +362,31 @@
         }
 
         func setVertexBuffer<T>(_ bufferData: BufferData<T>, offset: Int, slot: Int) {
-            guard let raw = bufferData.buffer, let bound = binding(raw, offset: offset) else { return }
+            guard let raw = bufferData.buffer, let bound = binding(raw, offset: offset) else {
+                return
+            }
             uniforms[ComputeBindingSlot(group: 0, binding: UInt32(slot))] = bound
             vertexBuffers[slot] = bound
         }
 
         func setFragmentBuffer<T>(_ bufferData: BufferData<T>, offset: Int, slot: Int) {
-            guard let raw = bufferData.buffer else { return }
+            guard let raw = bufferData.buffer else {
+                return
+            }
             uniforms[ComputeBindingSlot(group: 0, binding: UInt32(slot))] = binding(raw, offset: offset)
         }
 
         func setIndexBuffer<T>(_ bufferData: BufferData<T>, indexFormat: IndexBufferFormat) {
-            guard let buffer = bufferData.buffer as? SAGABuffer else { return }
+            guard let buffer = bufferData.buffer as? SAGABuffer else {
+                return
+            }
             index = (buffer, indexFormat == .uInt32 ? .uint32 : .uint16, 0)
         }
 
         func setIndexBuffer(_ buffer: IndexBuffer, offset: Int) {
-            guard let buffer = buffer as? SAGAIndexBuffer else { return }
+            guard let buffer = buffer as? SAGAIndexBuffer else {
+                return
+            }
             index = (buffer, buffer.indexFormat == .uInt32 ? .uint32 : .uint16, offset)
         }
 
@@ -401,15 +425,19 @@
 
         func setViewport(_ viewport: Rect) {
             self.viewport = RenderViewport(
-                x: Float(viewport.origin.x), y: Float(viewport.origin.y),
-                width: Float(viewport.size.width), height: Float(viewport.size.height)
+                x: Float(viewport.origin.x),
+                y: Float(viewport.origin.y),
+                width: Float(viewport.size.width),
+                height: Float(viewport.size.height)
             )
         }
 
         func setScissorRect(_ rect: Rect) {
             scissor = RenderScissor(
-                x: UInt32(max(0, rect.origin.x)), y: UInt32(max(0, rect.origin.y)),
-                width: UInt32(max(0, rect.size.width)), height: UInt32(max(0, rect.size.height))
+                x: UInt32(max(0, rect.origin.x)),
+                y: UInt32(max(0, rect.origin.y)),
+                width: UInt32(max(0, rect.size.width)),
+                height: UInt32(max(0, rect.size.height))
             )
         }
 
@@ -435,8 +463,10 @@
                     indirectBuffer: try arguments.slot.get(),
                     indirectOffset: UInt64(offset),
                     indexBuffer: IndexBufferBinding(
-                        buffer: try index.buffer.slot.get(), format: index.format,
-                        offset: UInt64(index.offset), size: UInt64(index.buffer.length - index.offset)
+                        buffer: try index.buffer.slot.get(),
+                        format: index.format,
+                        offset: UInt64(index.offset),
+                        size: UInt64(index.buffer.length - index.offset)
                     ),
                     vertexBuffers: try state.vertexBindings(),
                     uniforms: try state.uniformBindings(),
@@ -458,7 +488,9 @@
         }
 
         func drawIndexed(indexCount: Int, indexBufferOffset: Int, instanceCount: Int, firstInstance: Int) {
-            guard let index, let state = captureState() else { return }
+            guard let index, let state = captureState() else {
+                return
+            }
             let draw = IndexedDraw(
                 indexCount: UInt32(indexCount),
                 firstIndex: UInt32(indexBufferOffset / Int(index.format.byteSize)),
@@ -477,8 +509,10 @@
                     target: target.color0,
                     colorLoad: target.colorLoad,
                     indexBuffer: IndexBufferBinding(
-                        buffer: try indexSlot.get(), format: indexBinding.format,
-                        offset: indexBinding.offset, size: indexBinding.length
+                        buffer: try indexSlot.get(),
+                        format: indexBinding.format,
+                        offset: indexBinding.offset,
+                        size: indexBinding.length
                     ),
                     draw: draw,
                     vertexBuffers: try state.vertexBindings(),
@@ -496,7 +530,9 @@
         }
 
         func draw(type _: IndexPrimitive, vertexStart: Int, vertexCount: Int, instanceCount: Int) {
-            guard let state = captureState() else { return }
+            guard let state = captureState() else {
+                return
+            }
             emit { target in
                 .render(
                     pipeline: try state.pipeline.slot.get(),
@@ -520,7 +556,9 @@
         }
 
         func endRenderPass() {
-            guard !drewInPass, !colors.isEmpty || depth != nil else { return }
+            guard !drewInPass, !colors.isEmpty || depth != nil else {
+                return
+            }
             // No draw recorded: draw a degenerate triangle so the pass still applies its clears.
             #if SAGA_METAL_NATIVE_PASS
             let layer = rateMap?.vertexLayer
@@ -608,7 +646,9 @@
         }
 
         private func captureState() -> DrawState? {
-            guard let pipeline else { return nil }
+            guard let pipeline else {
+                return nil
+            }
             var retained: [AnyObject] = []
             var vertex: [(slot: UInt32, buffer: ResourceSlot<ResourceID>, offset: UInt64)] = []
             for (engineSlot, gpuSlot) in pipeline.vertexBufferSlots.sorted(by: { $0.value < $1.value }) {
@@ -646,8 +686,11 @@
                     a.format == .invalid ? nil : "loc\(index):\(a.name)@buf\(a.bufferIndex)+\(a.offset)/\(a.format)"
                 }
                 let layouts = vd.activeBufferIndices.map { i in "buf\(i): stride=\(vd.layouts.buffer[i].stride) \(vd.layouts.buffer[i].stepFunction)" }
-                print("[SAGA] pipeline '\(pipeline.descriptor.debugName)' vertex attrs=\(attrs) layouts=\(layouts) mapped=\(pipeline.vertexBufferSlots) boundEngineSlots=\(vertexBuffers.keys.sorted()) shaderInputs=\(pipeline.vertexInputLocations)")
-                print("[SAGA] pipeline '\(pipeline.descriptor.debugName)' declares uniforms=\(names(pipeline.uniformSlots)) textures=\(names(pipeline.textureSlots)) samplers=\(names(pipeline.samplerSlots)); unbound uniforms=\(names(missingBuffers)) textures=\(names(missingTextures)) samplers=\(names(missingSamplers))")
+                print("[SAGA] pipeline '\(pipeline.descriptor.debugName)' vertex attrs=\(attrs) layouts=\(layouts)"
+                    + " mapped=\(pipeline.vertexBufferSlots) boundEngineSlots=\(vertexBuffers.keys.sorted()) shaderInputs=\(pipeline.vertexInputLocations)")
+                print("[SAGA] pipeline '\(pipeline.descriptor.debugName)' declares uniforms=\(names(pipeline.uniformSlots))"
+                    + " textures=\(names(pipeline.textureSlots)) samplers=\(names(pipeline.samplerSlots));"
+                    + " unbound uniforms=\(names(missingBuffers)) textures=\(names(missingTextures)) samplers=\(names(missingSamplers))")
             }
             return DrawState(
                 pipeline: pipeline,
@@ -724,18 +767,32 @@
         func popDebugName() {}
 
         func copyTextureToTexture(
-            source: Texture, sourceOrigin: Origin3D, sourceSize: Size3D, sourceMipLevel: Int, sourceSlice: Int,
-            destination: Texture, destinationOrigin: Origin3D, destinationMipLevel: Int, destinationSlice: Int
+            source: Texture,
+            sourceOrigin: Origin3D,
+            sourceSize: Size3D,
+            sourceMipLevel: Int,
+            sourceSlice: Int,
+            destination: Texture,
+            destinationOrigin: Origin3D,
+            destinationMipLevel: Int,
+            destinationSlice: Int
         ) {
-            guard let from = source.gpuTexture as? SAGAGPUTexture, let to = destination.gpuTexture as? SAGAGPUTexture else { return }
+            guard let from = source.gpuTexture as? SAGAGPUTexture, let to = destination.gpuTexture as? SAGAGPUTexture else {
+                return
+            }
             let region = TextureCopyRegion(
-                x: UInt32(sourceOrigin.x), y: UInt32(sourceOrigin.y),
-                width: UInt32(sourceSize.width), height: UInt32(sourceSize.height),
-                mipLevel: UInt32(sourceMipLevel), arrayLayer: UInt32(sourceSlice)
+                x: UInt32(sourceOrigin.x),
+                y: UInt32(sourceOrigin.y),
+                width: UInt32(sourceSize.width),
+                height: UInt32(sourceSize.height),
+                mipLevel: UInt32(sourceMipLevel),
+                arrayLayer: UInt32(sourceSlice)
             )
             let origin = TextureCopyOrigin(
-                x: UInt32(destinationOrigin.x), y: UInt32(destinationOrigin.y),
-                mipLevel: UInt32(destinationMipLevel), arrayLayer: UInt32(destinationSlice)
+                x: UInt32(destinationOrigin.x),
+                y: UInt32(destinationOrigin.y),
+                mipLevel: UInt32(destinationMipLevel),
+                arrayLayer: UInt32(destinationSlice)
             )
             let (src, dst) = (from.slot, to.slot)
             buffer.append {
@@ -744,30 +801,48 @@
         }
 
         func copyBufferToBuffer(source: Buffer, sourceOffset: Int, destination: Buffer, destinationOffset: Int, size: Int) {
-            guard let from = source as? SAGABuffer, let to = destination as? SAGABuffer else { return }
+            guard let from = source as? SAGABuffer, let to = destination as? SAGABuffer else {
+                return
+            }
             to.excludeFromShadowCache()
             let (src, dst) = (from.slot, to.slot)
             buffer.append {
                 .copy(
-                    source: try src.get(), sourceOffset: UInt64(sourceOffset),
-                    destination: try dst.get(), destinationOffset: UInt64(destinationOffset), byteCount: UInt64(size)
+                    source: try src.get(),
+                    sourceOffset: UInt64(sourceOffset),
+                    destination: try dst.get(),
+                    destinationOffset: UInt64(destinationOffset),
+                    byteCount: UInt64(size)
                 )
             }
         }
 
         func copyBufferToTexture(
-            source: Buffer, sourceOffset: Int, sourceBytesPerRow: Int, sourceBytesPerImage: Int, sourceSize: Size3D,
-            destination: Texture, destinationOrigin: Origin3D, destinationMipLevel: Int, destinationSlice: Int
+            source: Buffer,
+            sourceOffset: Int,
+            sourceBytesPerRow: Int,
+            sourceBytesPerImage: Int,
+            sourceSize: Size3D,
+            destination: Texture,
+            destinationOrigin: Origin3D,
+            destinationMipLevel: Int,
+            destinationSlice: Int
         ) {
-            guard let from = source as? SAGABuffer, let to = destination.gpuTexture as? SAGAGPUTexture else { return }
+            guard let from = source as? SAGABuffer, let to = destination.gpuTexture as? SAGAGPUTexture else {
+                return
+            }
             let layout = TextureBufferLayout(
-                offset: UInt64(sourceOffset), bytesPerRow: UInt32(sourceBytesPerRow),
+                offset: UInt64(sourceOffset),
+                bytesPerRow: UInt32(sourceBytesPerRow),
                 rowsPerImage: sourceBytesPerRow > 0 ? UInt32(sourceBytesPerImage / sourceBytesPerRow) : nil
             )
             let region = TextureCopyRegion(
-                x: UInt32(destinationOrigin.x), y: UInt32(destinationOrigin.y),
-                width: UInt32(sourceSize.width), height: UInt32(sourceSize.height),
-                mipLevel: UInt32(destinationMipLevel), arrayLayer: UInt32(destinationSlice)
+                x: UInt32(destinationOrigin.x),
+                y: UInt32(destinationOrigin.y),
+                width: UInt32(sourceSize.width),
+                height: UInt32(sourceSize.height),
+                mipLevel: UInt32(destinationMipLevel),
+                arrayLayer: UInt32(destinationSlice)
             )
             let (src, dst) = (from.slot, to.slot)
             buffer.append {
@@ -776,19 +851,32 @@
         }
 
         func copyTextureToBuffer(
-            source: Texture, sourceOrigin: Origin3D, sourceMipLevel: Int, sourceSlice: Int, sourceSize: Size3D,
-            destination: Buffer, destinationOffset: Int, destinationBytesPerRow: Int, destinationBytesPerImage: Int
+            source: Texture,
+            sourceOrigin: Origin3D,
+            sourceMipLevel: Int,
+            sourceSlice: Int,
+            sourceSize: Size3D,
+            destination: Buffer,
+            destinationOffset: Int,
+            destinationBytesPerRow: Int,
+            destinationBytesPerImage: Int
         ) {
-            guard let from = source.gpuTexture as? SAGAGPUTexture, let to = destination as? SAGABuffer else { return }
+            guard let from = source.gpuTexture as? SAGAGPUTexture, let to = destination as? SAGABuffer else {
+                return
+            }
             to.excludeFromShadowCache()
             let layout = TextureBufferLayout(
-                offset: UInt64(destinationOffset), bytesPerRow: UInt32(destinationBytesPerRow),
+                offset: UInt64(destinationOffset),
+                bytesPerRow: UInt32(destinationBytesPerRow),
                 rowsPerImage: destinationBytesPerRow > 0 ? UInt32(destinationBytesPerImage / destinationBytesPerRow) : nil
             )
             let region = TextureCopyRegion(
-                x: UInt32(sourceOrigin.x), y: UInt32(sourceOrigin.y),
-                width: UInt32(sourceSize.width), height: UInt32(sourceSize.height),
-                mipLevel: UInt32(sourceMipLevel), arrayLayer: UInt32(sourceSlice)
+                x: UInt32(sourceOrigin.x),
+                y: UInt32(sourceOrigin.y),
+                width: UInt32(sourceSize.width),
+                height: UInt32(sourceSize.height),
+                mipLevel: UInt32(sourceMipLevel),
+                arrayLayer: UInt32(sourceSlice)
             )
             let (src, dst) = (from.slot, to.slot)
             buffer.append {

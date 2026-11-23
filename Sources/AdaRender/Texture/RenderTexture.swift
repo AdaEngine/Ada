@@ -39,7 +39,8 @@ public final class RenderTexture: Texture2D, @unchecked Sendable {
         debugLabel: String? = nil,
         samplerDescription: SamplerDescriptor = SamplerDescriptor(),
         usage: Texture.Usage = [.renderTarget, .read],
-        usesPrivateStorage: Bool = false
+        usesPrivateStorage: Bool = false,
+        mipLevelCount: Int = 1
     ) {
         var descriptor = TextureDescriptor(
             width: size.width,
@@ -47,6 +48,7 @@ public final class RenderTexture: Texture2D, @unchecked Sendable {
             pixelFormat: format,
             textureUsage: usage,
             textureType: .texture2D,
+            mipmapLevel: mipLevelCount,
             debugLabel: debugLabel,
             samplerDescription: samplerDescription
         )

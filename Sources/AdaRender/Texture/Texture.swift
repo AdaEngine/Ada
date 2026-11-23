@@ -130,6 +130,9 @@ extension Texture {
 
         /// An option for rendering to the texture in a render pass.
         public static let renderTarget = Self(rawValue: 1 << 2)
+
+        /// An option for writing to the texture from a compute shader through a storage texture binding.
+        public static let storage = Self(rawValue: 1 << 3)
     }
 }
 

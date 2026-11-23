@@ -1,3 +1,4 @@
+import package::cortao_common::{cortaoOctDecode, cortaoOctEncode};
 import package::fullscreen::{FullscreenVertex, fullscreenVertex};
 
 struct SSAOUniform {
@@ -21,10 +22,13 @@ fn sampleAt(image: texture_2d<f32>, uv: vec2f) -> vec3f {
     return textureSampleLevel(image, nearestSampler, uv, 0.0).xyz;
 }
 
-fn bilateralAO(uv: vec2f, position: vec3f, normal: vec3f) -> f32 {
+// x = filtered visibility, yz = filtered bent normal (octahedral, 0...1) when passParameters.y is set.
+fn bilateralAO(uv: vec2f, position: vec3f, normal: vec3f) -> vec3f {
     let pixel = 1.0 / vec2f(textureDimensions(rawAO, 0));
     var sum = 0.0;
+    var bentSum = vec3f(0.0);
     var weightSum = 0.0;
+    let hasBentNormal = ssao.passParameters.y > 0.5;
     for (var y = -2; y <= 2; y++) {
         for (var x = -2; x <= 2; x++) {
             let sampleUV = clamp(uv + vec2f(f32(x), f32(y)) * pixel, pixel * 0.5, vec2f(1.0) - pixel * 0.5);
@@ -35,14 +39,38 @@ fn bilateralAO(uv: vec2f, position: vec3f, normal: vec3f) -> f32 {
             }
             var weight = exp(-f32(x*x + y*y) / 4.0) * exp(-abs(position.z - other.z) / max(0.02, ssao.parameters.x * 0.1));
             weight *= pow(max(dot(normal, normalize(otherNormal)), 0.0), 8.0);
-            sum += sampleAt(rawAO, sampleUV).r * weight;
+            let rawSample = textureSampleLevel(rawAO, nearestSampler, sampleUV, 0.0);
+            sum += rawSample.r * weight;
             weightSum += weight;
         }
     }
-    if weightSum > 0.0001 {
-        return sum / weightSum;
+    if hasBentNormal {
+        // A bent normal comes from a handful of random rays, so it is noisier than the visibility and, lit through
+        // an environment, shows as ripple. It gets a wider kernel (7 x 7 texels) with the same depth
+        // and normal weights. Vectors are averaged decoded; averaging the octahedral encoding would not average directions.
+        for (var y = -3; y <= 3; y++) {
+            for (var x = -3; x <= 3; x++) {
+                let sampleUV = clamp(uv + vec2f(f32(x), f32(y)) * pixel, pixel * 0.5, vec2f(1.0) - pixel * 0.5);
+                let other = sampleAt(positionImage, sampleUV);
+                let otherNormal = sampleAt(normalImage, sampleUV);
+                if other.z <= 0.0 || length(otherNormal) < 0.1 {
+                    continue;
+                }
+                var weight = exp(-f32(x*x + y*y) / 8.0) * exp(-abs(position.z - other.z) / max(0.02, ssao.parameters.x * 0.1));
+                weight *= pow(max(dot(normal, normalize(otherNormal)), 0.0), 8.0);
+                let rawSample = textureSampleLevel(rawAO, nearestSampler, sampleUV, 0.0);
+                bentSum += cortaoOctDecode(rawSample.gb * 2.0 - vec2f(1.0)) * weight;
+            }
+        }
     }
-    return 1.0;
+    if weightSum > 0.0001 {
+        var bent = vec2f(0.5);
+        if hasBentNormal && dot(bentSum, bentSum) > 0.0001 {
+            bent = cortaoOctEncode(normalize(bentSum)) * 0.5 + vec2f(0.5);
+        }
+        return vec3f(sum / weightSum, bent);
+    }
+    return vec3f(1.0, 0.5, 0.5);
 }
 
 fn rawOcclusion(screenPosition: vec2f, position: vec3f, normal: vec3f) -> f32 {
@@ -88,7 +116,11 @@ fn ssao_fragment(input: FullscreenVertex) -> @location(0) vec4f {
     }
     let direction = normalize(normal);
     if ssao.passParameters.x > 0.5 {
-        return vec4f(vec3f(bilateralAO(input.uv, position, direction)), 1.0);
+        let filtered = bilateralAO(input.uv, position, direction);
+        if ssao.passParameters.y > 0.5 {
+            return vec4f(filtered, 1.0);
+        }
+        return vec4f(vec3f(filtered.x), 1.0);
     }
     return vec4f(vec3f(rawOcclusion(input.position.xy, position, direction)), 1.0);
 }

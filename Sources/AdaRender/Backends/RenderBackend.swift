@@ -127,6 +127,12 @@ public protocol RenderDevice: AnyObject, Sendable {
     /// Create pipeline state from shader.
     func createRenderPipeline(from descriptor: RenderPipelineDescriptor) -> RenderPipeline
 
+    /// Whether ``CommandBuffer/beginComputePass(_:)`` and ``createComputePipeline(from:)`` are available.
+    var supportsComputePasses: Bool { get }
+
+    /// Creates a compute pipeline, or nil when the backend does not support compute passes.
+    func createComputePipeline(from descriptor: ComputePipelineDescriptor) -> (any ComputePipelineState)?
+
     /// Create a new GPU sampler from descriptor.
     func createSampler(from descriptor: SamplerDescriptor) -> Sampler
 
@@ -180,6 +186,8 @@ extension RenderDevice {
     public func createGPUShadowClusterCullProcessor() -> (any GPUShadowClusterCullProcessor)? { nil }
     public var supportsGPUShadowClusterCull: Bool { false }
     public var supportsMultiDrawIndirect: Bool { false }
+    public var supportsComputePasses: Bool { false }
+    public func createComputePipeline(from _: ComputePipelineDescriptor) -> (any ComputePipelineState)? { nil }
     public var supportsSpatialUpscaling: Bool { false }
     public var supportsTemporalUpscaling: Bool { false }
     public var dlssStatus: DLSSRuntimeStatus { .unavailable(reason: "DLSS is not supported by this renderer") }

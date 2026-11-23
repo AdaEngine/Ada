@@ -198,6 +198,26 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                     uniform.fogColor.w = 0
                 }
             }
+            // Bent-normal lighting needs the AO target to hold a bent normal this frame, image-based light to look up, and the
+            // diffuse surface response to scale it. Anything missing leaves the scalar AO in charge.
+            let irradiance = environment.imageBasedLighting?.asset.asset?.irradiance
+            let bentNormals = environment.ambientOcclusion.isEnabled && environment.ambientOcclusion.technique == .cortao
+                && environment.ambientOcclusion.bentNormals && environment.imageBasedLighting?.asset.asset != nil
+                && irradiance != nil && target.diffuseSurface3DTexture != nil
+                && context.world.getResource(ScreenQuality3DScratch.self)?.bentNormalViews.contains(source.entityId) == true
+                && context.world.getResource(PathTracing3DViews.self)?.entries[source.entityId]?.active != true
+            // Lightmaps and irradiance grids replace the sky irradiance in the main pass. The composite only knows the sky
+            // term, so bent-normal lighting would double count those surfaces: leave them to the scalar AO.
+            var bakedLighting = false
+            if bentNormals {
+                let lightmapped = context.world.getResource(VisibleMesh3DLists.self)?.items(view: source.entityId, pass: -1).contains { item in
+                    (item.material as? PBRMaterial)?.lightmapTexture != nil && item.mesh.models[item.modelIndex].parts[item.partIndex]
+                        .vertexDescriptor.attributes.containsAttribute(by: MeshDescriptor.textureCoordinates1.id.name)
+                } ?? false
+                bakedLighting = target.irradianceGridActive || lightmapped
+            }
+            let bentNormalLighting = pipeline.supportsBentNormalLighting && bentNormals && !bakedLighting
+            uniform.diffuseGI.w = bentNormalLighting ? 1 : 0
             let constants = scratch.cache.write(uniform, view: source.entityId, device: renderDevice.renderDevice)
 
             let environmentTexture = skybox.texture?.asset ?? Texture2D.whiteTexture
@@ -245,7 +265,18 @@ public struct ScreenSpaceReflectionRenderNode: RenderNode {
                         .init(binding: 23, shaderStages: .fragment, resource: .texture(atmosphereTables?.transmittance ?? Texture2D.whiteTexture)),
                         .init(binding: 24, shaderStages: .fragment, resource: .texture(atmosphereTables?.aerialTransmittance ?? Texture2D.whiteTexture)),
                         .init(binding: 25, shaderStages: .fragment, resource: .texture(cloudTexture ?? Texture2D.whiteTexture)),
-                    ]
+                    ] + (pipeline.supportsBentNormalLighting ? [
+                        .init(
+                            binding: 26,
+                            shaderStages: .fragment,
+                            resource: .texture(bentNormalLighting ? (irradiance ?? Texture2D.whiteTexture) : Texture2D.whiteTexture)
+                        ),
+                        .init(
+                            binding: 27,
+                            shaderStages: .fragment,
+                            resource: .texture(bentNormalLighting ? (target.diffuseSurface3DTexture ?? Texture2D.whiteTexture) : Texture2D.whiteTexture)
+                        ),
+                    ] : [])
                 ),
                 index: 0
             )

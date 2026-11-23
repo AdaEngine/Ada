@@ -88,7 +88,12 @@ public struct PrepareEnvironment3DTexturesSystem {
             } else if !hybrid {
                 target.reflectionResponse3DTexture = nil
             }
-            if pathSurface || (environment.screenSpaceGI.isEnabled && device.renderDevice.supportsLightingSurfaceBuffer && environment.debugView == .none) {
+            // CORTAO bent normals scale the diffuse image-based light by the diffuse surface response.
+            let bentNormalSurface = environment.ambientOcclusion.isEnabled && environment.ambientOcclusion.technique == .cortao
+                && environment.ambientOcclusion.bentNormals && environment.imageBasedLighting?.asset.asset != nil
+                && device.renderDevice.supportsComputePasses && device.renderDevice.supportsLightingSurfaceBuffer && environment.debugView == .none
+            if pathSurface || bentNormalSurface
+                || (environment.screenSpaceGI.isEnabled && device.renderDevice.supportsLightingSurfaceBuffer && environment.debugView == .none) {
                 if target.diffuseSurface3DTexture?.size != size {
                     target.diffuseSurface3DTexture = RenderTexture(size: size, scaleFactor: scale, format: .rgba8, debugLabel: "3D Diffuse Surface Response")
                 }

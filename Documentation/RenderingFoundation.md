@@ -22,6 +22,51 @@ environment.fog.localVolumes = [LocalFogVolume3D(
     minimum: [-2, 0, 3], maximum: [2, 3, 8], density: 0.08, edgeFade: 0.25)]
 ```
 
+## Ambient occlusion: SSAO and CORTAO
+
+```swift
+var environment = Environment3D()
+environment.ambientOcclusion = ScreenSpaceAO3D(
+    isEnabled: true,
+    technique: .cortao,          // default .ssao
+    temporalAccumulation: true,  // default; CORTAO only
+    bentNormals: true            // default; CORTAO only
+)
+camera.components[Environment3D.self] = environment
+```
+
+`ScreenSpaceAO3D.technique` selects the algorithm for a camera: `.ssao` (default) or `.cortao`. Both write the
+half-resolution AO target, share `radius`, `intensity`, `bias` and `sampleCount`, and use the same depth/normal
+bilateral filter, so the rest of the frame does not change.
+
+CORTAO (Circular Occluder Ray-Traced Ambient Occlusion, Daniel Isheden, MIT licence,
+<https://github.com/theagentd/CORTAO>) treats nearby depth/normal samples as circular occluders and traces 16 rays
+against them. It is more accurate than hemisphere SSAO on slanted surfaces and thin occluders. The port runs four
+steps per frame:
+
+1. A compute dispatch builds a four-level depth/normal pyramid (one RGBA16F texture with four mips; each level keeps
+   one pseudo-random texel of every 2x2 block, as in the reference, and remembers which pixel it came from).
+2. A fragment pass samples the pyramid on a golden-angle spiral and looks up which rays each occluder blocks in the
+   occluder table, a 24 x 24 x 16 table of 16-bit ray masks generated at start-up.
+3. With `temporalAccumulation` (default on) the pass uses a new random seed every frame, and a temporal pass blends
+   the result into a reprojected history. History is rejected where depth changes and clamped to the current
+   neighbourhood; very fast-moving objects can leave a faint trail. Turn it off for a fixed, noisier result.
+4. The same depth/normal bilateral filter as SSAO.
+
+With `bentNormals` (default on) CORTAO also writes a bent normal, the average direction of the rays that reach open
+space. With image-based lighting the composite pass then looks up the diffuse light along that direction instead of
+the surface normal, so a surface near an occluder takes on the colour of the open side, and it occludes reflections by
+how much of their lobe sees open space (cone-cone intersection, Jimenez et al. 2016) instead of by the scalar AO. It needs
+image-based lighting, compute passes and the lighting surface attachment; otherwise the scalar AO is used. The
+`bentNormals` debug view shows it. Design: [cortao-bent-normals.md](Designs/cortao-bent-normals.md).
+
+CORTAO needs a device with compute passes (`RenderDevice.supportsComputePasses`: SAGA Vulkan and Metal; validated on Vulkan only, Metal is expected to work but has not been run), a perspective camera and targets
+of at least 8x8 pixels. Other devices, including the browser host, and other camera projections use SSAO. `bias` lifts the shaded
+point along its normal, which hides self-occlusion on tessellated surfaces; raise it if curved meshes look
+blotchy. The pyramid stores depth in RGBA16F, which limits precision on grazing surfaces at long range; the normal offset
+absorbs it at normal distances. With temporal upscaling the history lookup ignores the upscaler jitter, a sub-pixel
+error that the neighbourhood clamp hides. Lightmapped and irradiance-grid surfaces keep the scalar AO. Not ported: the reference occluder and bent-normal look-up tables (the table is generated at start-up and the bent normal is summed directly).
+
 ## SSGI
 
 One diffuse bounce of visible direct illumination and emission. A cosine-weighted

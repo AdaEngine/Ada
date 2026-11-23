@@ -105,6 +105,7 @@ Override the destination with `-InstallDirectory` (the app folder) on Windows or
 * **[API Docs](https://docs.adaengine.org/documentation/adaengine/):** Ada's API docs, which are automatically generated from the doc comments in this repo.
 * **[Tutorials](https://docs.adaengine.org/tutorials/adaengine/)**: Ada's official tutorials with how to start your first project.
 * **Building & Contributing Guides:** [Building](Sources/AdaEngine/AdaEngine.docc/Building.md), [Contributing](Sources/AdaEngine/AdaEngine.docc/Contributing.md)
+* **[Rendering Foundation](Documentation/RenderingFoundation.md)** covers 3D lighting, ambient occlusion, and other rendering features.
 * **[Architecture Decision Records](Documentation/ArchitectureDecisions/README.md):** Accepted architectural decisions and their implementation status.
 * **[Playground Mascot](Documentation/Brand/PlaygroundMascot.md):** Character guide, turnaround views and detailed generation prompts.
 

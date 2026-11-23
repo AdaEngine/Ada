@@ -119,6 +119,10 @@ public protocol CommandBuffer: AnyObject {
     /// - Returns: A ``BlitCommandEncoder`` for encoding blit commands.
     func beginBlitPass(_ desc: BlitPassDescriptor) -> BlitCommandEncoder
 
+    /// Begins a compute pass, or returns nil when the backend does not support compute
+    /// (see ``RenderDevice/supportsComputePasses``).
+    func beginComputePass(_ desc: ComputePassDescriptor) -> (any ComputeCommandEncoder)?
+
     /// Encodes a backend-native spatial upscale when the source and destination are supported.
     ///
     /// - Returns: `true` when the upscale was encoded; otherwise `false` so the caller can use a fallback pass.

@@ -47,7 +47,8 @@ public struct DebugView3DRenderNode: RenderNode {
                 let sceneColor = target.sceneColor3DTexture,
                 let output = target.mainTexture
             else { return }
-            let constants = pipelines.uniform.write(Vector4(mode.shaderMode, 0.2, 0, 0), view: source.entityId, device: device.renderDevice)
+            let bentNormals = context.world.getResource(ScreenQuality3DScratch.self)?.bentNormalViews.contains(source.entityId) == true
+            let constants = pipelines.uniform.write(Vector4(mode.shaderMode, 0.2, bentNormals ? 1 : 0, 0), view: source.entityId, device: device.renderDevice)
             let command = renderContext.commandQueue.makeCommandBuffer()
             command.label = "Debug View 3D"
             let pass = command.beginRenderPass(RenderPassDescriptor(

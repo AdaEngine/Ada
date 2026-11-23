@@ -6,6 +6,7 @@
 import AdaAssets
 import AdaECS
 import AdaRender
+import AdaUtils
 import Math
 
 /// GPU resources used by the 3D environment composite pass.
@@ -14,14 +15,19 @@ public struct ScreenSpaceReflectionPipeline: Resource {
     public let sampler: Sampler
     public let hdrRenderPipeline: RenderPipeline
     let nearest: Sampler
+    let supportsBentNormalLighting: Bool
 
     public init(device: RenderDevice) {
         self.init(device: device, pathTracingPresentation: false)
     }
 
     public init(device: RenderDevice, pathTracingPresentation: Bool) {
-        let shader = CorePipelineShaders.loadRequiredBuiltin(
-            pathTracingPresentation ? "path_tracing_composite_3d" : "screen_space_reflection"
+        supportsBentNormalLighting = !pathTracingPresentation && device.supportsComputePasses && device.supportsLightingSurfaceBuffer
+        let shaderName = pathTracingPresentation ? "path_tracing_composite_3d" : "screen_space_reflection"
+        let shader = ShaderModule.loadRequiredBuiltinVariant(
+            at: "Shaders/\(shaderName).wesl",
+            from: .adaModule,
+            defines: supportsBentNormalLighting ? ["ADA_CORTAO_BENT_NORMALS"] : []
         )
         var descriptor = RenderPipelineDescriptor(
             vertex: shader.asset.requiredShader(for: .vertex),

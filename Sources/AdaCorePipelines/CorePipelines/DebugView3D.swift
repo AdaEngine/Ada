@@ -20,6 +20,9 @@ public enum DebugView3D: String, Codable, Sendable, CaseIterable {
     case metallic
     /// Filtered screen-space ambient occlusion. White when SSAO is disabled.
     case ambientOcclusion
+    /// View-space bent normal that CORTAO writes next to its occlusion (average direction of the open rays), remapped to
+    /// `0...1`. Mid gray when the camera produces none (SSAO, or ``ScreenSpaceAO3D/bentNormals`` off).
+    case bentNormals
     /// Ambient and image-based light the main pass accumulated before reflections, brightened with an
     /// exponential curve so the usually dim values are readable.
     case indirectLighting
@@ -49,6 +52,7 @@ public enum DebugView3D: String, Codable, Sendable, CaseIterable {
         case .metallic: 4
         case .ambientOcclusion: 5
         case .indirectLighting: 6
+        case .bentNormals: 8
         case .albedo, .cascades, .lightCount, .meshlets: 7
         }
     }

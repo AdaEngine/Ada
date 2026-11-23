@@ -340,8 +340,15 @@ extension Render3DGPUTests {
                 Mesh3DComponent(mesh: Mesh.generateCube(size: [10, 0.1, 10], renderDevice: device), materials: [ground])
                 Transform(position: [0, -0.05, 0])
             }
-            return Scene(app: app, device: device, target: target, camera: cameraEntity, sun: sunEntity,
-                         groundMaterial: ground, sphereEntities: sphereEntities)
+            return Scene(
+                app: app,
+                device: device,
+                target: target,
+                camera: cameraEntity,
+                sun: sunEntity,
+                groundMaterial: ground,
+                sphereEntities: sphereEntities
+            )
         }
 
         private static func expectGolden(_ image: Image, named name: String) throws {
@@ -411,12 +418,128 @@ extension Render3DGPUTests {
         }
 
         @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
+        func cortaoOcclusionDarkensContactsAndDiffersFromSSAO() async throws {
+            let scene = try await Self.makeScene()
+            try scene.configure { $0.ambientOcclusion.technique = .ssao }
+            let ssao = try await scene.render(.ambientOcclusion)
+            try scene.configure { $0.ambientOcclusion.technique = .cortao }
+            let cortao = try await scene.render(.ambientOcclusion)
+            func mean(_ image: Image) -> Float {
+                let bytes = Array(image.data)
+                var total = 0
+                var count = 0
+                for index in stride(from: 0, to: bytes.count, by: 4) {
+                    total += Int(bytes[index])
+                    count += 1
+                }
+                return Float(total) / Float(max(count, 1)) / 255
+            }
+            // Open sky and ground read near white; contacts between the spheres and the ground must darken the view.
+            #expect(mean(cortao) < 0.995, "CORTAO produced no occlusion")
+            #expect(mean(cortao) > 0.4, "CORTAO over-darkened the view")
+            #expect(cortao.data != ssao.data, "CORTAO fell back to SSAO")
+        }
+
+        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
+        func cortaoBentNormalsFeedImageBasedLightingAndTheDebugView() async throws {
+            let scene = try await Self.makeScene()
+            try scene.setSunIntensity(0)
+            try #require(scene.device.supportsComputePasses && scene.device.supportsLightingSurfaceBuffer,
+                         "Bent-normal lighting needs compute passes and the lighting surface attachment.")
+            // A vertical gradient: bright above, dim below, so the direction the AO looks up the light along matters.
+            // Smooth, like a real irradiance map: a hard step would flip with every pixel of noise in the bent normal.
+            var gradient = Data()
+            for row in 0..<32 {
+                let t = Float(row) / 31
+                gradient.append(contentsOf: [UInt8(10 + 245 * t), UInt8(20 + 210 * t), UInt8(60 + 140 * t), 255])
+            }
+            let irradiance = Texture2D(image: Image(width: 1, height: 32, data: gradient, format: .rgba8))
+            let black = Texture2D(image: Image(width: 2, height: 2, color: .black))
+            let maps = AssetHandle(ImageBasedLighting3D(irradiance: irradiance, specular: black, brdf: black, specularLevels: 2))
+            try scene.configure {
+                $0.imageBasedLighting = ImageBasedLightingSettings(asset: maps)
+                $0.screenSpaceReflection.isEnabled = false
+                $0.ambientOcclusion.technique = .cortao
+            }
+            try scene.configure { $0.ambientOcclusion.bentNormals = false }
+            let scalar = try await scene.render(.none, frames: 24)
+            let scalarBent = try await scene.render(.bentNormals, frames: 2)
+            try scene.configure { $0.ambientOcclusion.bentNormals = true }
+            let bent = try await scene.render(.none, frames: 24)
+            let bentView = try await scene.render(.bentNormals, frames: 24)
+            let normals = try await scene.render(.normals, frames: 2)
+
+            /// Mean absolute difference between horizontal neighbours over the lower half of the spheres, where the bent
+            /// normal is noisiest.
+            func roughness(_ image: Image) -> Float {
+                let bytes: [UInt8] = Array(image.data)
+                var total = 0
+                var count = 0
+                for y in 245..<295 {
+                    for x in 90..<550 {
+                        let index = (y * Self.width + x) * 4
+                        total += abs(Int(bytes[index]) - Int(bytes[index + 4]))
+                        count += 1
+                    }
+                }
+                return Float(total) / Float(count) / 255
+            }
+            #expect(roughness(bent) < roughness(scalar) * 1.5 + 0.002, "bent \(roughness(bent)) vs scalar \(roughness(scalar))")
+            #expect(bent.data != scalar.data, "Bent-normal lighting must change the lit image")
+            // Without a bent normal the debug view is uniform mid gray on covered pixels.
+            let center = (Self.height / 2) * Self.width + Self.width / 4
+            let scalarBytes: [UInt8] = Array(scalarBent.data)
+            let grayValue = Int(scalarBytes[center * 4])
+            #expect(abs(grayValue - 128) <= 2, "Off: the debug view must be mid gray")
+            #expect(bentView.data != scalarBent.data && bentView.data != normals.data, "On: the debug view shows bent normals")
+            // Open ground far from the spheres keeps a bent normal close to the surface normal (pointing up).
+            let ground = (Self.height - 20) * Self.width + Self.width / 2
+            let bentBytes: [UInt8] = Array(bentView.data)
+            let normalBytes: [UInt8] = Array(normals.data)
+            var groundDifference = 0
+            for channel in 0..<3 {
+                let bentValue = Int(bentBytes[ground * 4 + channel])
+                let normalValue = Int(normalBytes[ground * 4 + channel])
+                groundDifference = max(groundDifference, abs(bentValue - normalValue))
+            }
+            #expect(groundDifference < 60, "Open ground: bent normal \(groundDifference) steps from the normal")
+        }
+
+        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
+        func cortaoTemporalAccumulationReducesNoiseOnAStaticScene() async throws {
+            let scene = try await Self.makeScene()
+            /// Mean absolute difference between horizontal neighbours over the band that crosses the spheres.
+            func roughness(_ image: Image) -> Float {
+                let bytes = Array(image.data)
+                var total = 0
+                var count = 0
+                for y in 190..<300 {
+                    for x in 90..<550 {
+                        let index = (y * Self.width + x) * 4
+                        total += abs(Int(bytes[index]) - Int(bytes[index + 4]))
+                        count += 1
+                    }
+                }
+                return Float(total) / Float(count) / 255
+            }
+            try scene.configure {
+                $0.ambientOcclusion.technique = .cortao
+                $0.ambientOcclusion.temporalAccumulation = false
+            }
+            let single = try await scene.render(.ambientOcclusion, frames: 24)
+            try scene.configure { $0.ambientOcclusion.temporalAccumulation = true }
+            let accumulated = try await scene.render(.ambientOcclusion, frames: 24)
+            #expect(roughness(accumulated) < roughness(single) * 0.8, "accumulated \(roughness(accumulated)) vs single \(roughness(single))")
+            #expect(accumulated.data != single.data)
+        }
+
+        @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
         func everyViewMatchesItsGoldenFrame() async throws {
             let scene = try await Self.makeScene()
             let beauty = try await scene.render(.none)
             // Meshlet coloring needs prepared cluster data; its actual cluster coverage/colors are
             // exercised by Render3DGPUTests.Meshlets rather than these legacy sphere golden frames.
-            for view in DebugView3D.allCases where view != .meshlets {
+            for view in DebugView3D.allCases where view != .meshlets && view != .bentNormals {
                 let image = view == .none ? beauty : try await scene.render(view)
                 let isNoOp = view == .none
                 if !isNoOp {
@@ -598,14 +721,22 @@ extension Render3DGPUTests {
             for sphere in scene.sphereEntities { scene.app.main.removeEntity(sphere.id, recursively: true) }
             try scene.configure { $0.ambientOcclusion.isEnabled = false }
             let wall = scene.app.main.spawn("Occluder") {
-                Mesh3DComponent(mesh: Mesh.generateCube(size: [100, 100, 0.5], renderDevice: scene.device),
-                    materials: [PBRMaterial()], castShadows: false, receiveShadows: false)
+                Mesh3DComponent(
+                    mesh: Mesh.generateCube(size: [100, 100, 0.5], renderDevice: scene.device),
+                    materials: [PBRMaterial()],
+                    castShadows: false,
+                    receiveShadows: false
+                )
                 Transform(position: [0, 0.5, 150])
             }
             let baseline = try await scene.render(.shadedWireframe)
             let hidden = scene.app.main.spawn("Occluded edges") {
-                Mesh3DComponent(mesh: Mesh.generateCube(size: [45, 45, 0.25], renderDevice: scene.device),
-                    materials: [PBRMaterial()], castShadows: false, receiveShadows: false)
+                Mesh3DComponent(
+                    mesh: Mesh.generateCube(size: [45, 45, 0.25], renderDevice: scene.device),
+                    materials: [PBRMaterial()],
+                    castShadows: false,
+                    receiveShadows: false
+                )
                 Transform(position: [0, 0.5, 150.8])
             }
             let occluded = try await scene.render(.shadedWireframe)

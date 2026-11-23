@@ -1,3 +1,4 @@
+import package::cortao_common::{cortaoOctDecode};
 import package::fullscreen::{FullscreenVertex, fullscreenVertex};
 
 struct DebugViewUniform {
@@ -51,6 +52,12 @@ fn debug_view_fragment(input: FullscreenVertex) -> @location(0) vec4f {
     } else if mode < 6.5 {
         if covered {
             color = vec3f(1.0) - exp(-sampleAt(indirectImage, uv).rgb * 24.0);
+        }
+    } else if mode > 7.5 {
+        // Bent normal: mid gray when this camera produced none (parameters.z).
+        color = vec3f(0.5);
+        if covered && debugView.parameters.z > 0.5 {
+            color = cortaoOctDecode(sampleAt(occlusionImage, uv).gb * 2.0 - vec2f(1.0)) * 0.5 + vec3f(0.5);
         }
     } else if covered {
         // Albedo, cascades, and light count are display-ready in scene color.
