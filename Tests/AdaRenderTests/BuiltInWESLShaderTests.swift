@@ -1,6 +1,6 @@
 #if canImport(AdaWGSLCompiler) && !os(WASI) && !os(Android)
-    import AdaWGSLCompiler
     @testable import AdaRender
+    import AdaWGSLCompiler
     import Foundation
     import Testing
 
@@ -91,7 +91,7 @@
             Expectation(
                 path: "Sources/AdaCorePipelines/Assets/Shaders/path_tracing_3d.wesl",
                 entryPoints: ["path_vertex": "vertex", "path_fragment": "fragment"],
-                uniformBytes: [4: 400]
+                uniformBytes: [4: 480]
             ),
             Expectation(
                 path: "Sources/AdaCorePipelines/Assets/Shaders/particles_3d.wesl",
