@@ -20,6 +20,7 @@ struct Model3DExtractionCache: Resource {
         var localBounds: AABB?
         var isStatic: Bool
         var settlesInstances = false
+        var decalRevision: RID?
     }
     private var worldID: World.ID?
     private var entries: [Key: Entry] = [:]
@@ -41,6 +42,7 @@ struct Model3DExtractionCache: Resource {
     private var materialSlots: [RID: [MaterialSlot]] = [:]
     private var canApplyTransformChanges = false
     private var usesMaterialSnapshots = false
+    private var decalStorageRevision: RID?
     private var settlingTransforms: Set<Entity.ID> = []
     /// Every extracted mesh, indexed by ``Entry/index``; ``ExtractedMesh3DSources`` publishes views of it.
     private var storage: [Mesh3DRenderSource] = []
@@ -74,11 +76,14 @@ struct Model3DExtractionCache: Resource {
         sources.pathTracingProxies = []
         sources.transformChanges = nil
         let changes = synchronizeSourceWorld(sourceWorld)
+        let decalsByReceiver = sourceWorld?.getResource(Decal3DStorage.self)
+        let decalsChanged = decalStorageRevision != decalsByReceiver?.revision
+        decalStorageRevision = decalsByReceiver?.revision
         animatedBounds.beginFrame()
         skinning.beginFrame(device: device)
         morphUniforms.beginFrame()
         materials.beginFrame()
-        if let sourceWorld, let changes, canApplyTransformChanges,
+        if let sourceWorld, let changes, canApplyTransformChanges, !decalsChanged,
             usesMaterialSnapshots == snapshotsMaterials,
             let update = applyTransformChanges(changes, from: sourceWorld) {
             sources.meshes = storage
@@ -164,6 +169,9 @@ struct Model3DExtractionCache: Resource {
             }
             let lod = lodByEntity[entity.id]
             let palette = skinning.buffer(for: entity.id)
+            let decalState = decalsByReceiver?.receivers[entity.id].flatMap { state in
+                mask == nil && state.matches(entity, mesh: component) ? state : nil
+            }
             let forceVisible = forced.contains(entity.id)
             let matrix = global.matrix
             let pathTracing = role(entity.id)
@@ -171,7 +179,7 @@ struct Model3DExtractionCache: Resource {
             if let entry = entries[key], entry.isStatic, palette == nil, morphByEntity[entity.id] == nil,
                 storage[entry.index].pathTracing == pathTracing,
                 entry.meshRevision == component.extractionRevision, entry.lodRevision == lod?.extractionRevision,
-                entry.terrainMaskRevision == mask?.revision {
+                entry.terrainMaskRevision == mask?.revision, entry.decalRevision == decalState?.revision {
                 let index = entry.index
                 seen[index] = true
                 // Do not write unchanged array elements: render nodes retain the last array snapshot.
@@ -189,6 +197,8 @@ struct Model3DExtractionCache: Resource {
             }
 
             let mesh = mask.map { MeshTerrainDrawMasking.applying($0, to: component.mesh) } ?? component.mesh
+            let allowsLOD = decalState == nil || palette == nil && !mesh.hasMorphTargets
+                && decalState?.lodTopology == (lod?.alternatives ?? []).map(Decal3DStorage.topology)
             var bounds: AABB? = palette == nil ? mesh.bounds : posedBounds[entity.id]
             if palette == nil, let lod {
                 for level in lod.alternatives {
@@ -218,7 +228,8 @@ struct Model3DExtractionCache: Resource {
                 materials: component.materials,
                 transform: matrix,
                 bounds: bounds.map { MeshVisibility3DMath.transformed($0, by: matrix) },
-                alternatives: mask == nil && morphBuffers.isEmpty && (palette == nil || lod?.skeletonCompatible == true && bounds != nil) ? lod?.alternatives ?? [] : [],
+                alternatives: mask == nil && allowsLOD && morphBuffers.isEmpty
+                    && (palette == nil || lod?.skeletonCompatible == true && bounds != nil) ? lod?.alternatives ?? [] : [],
                 thresholds: lod?.screenThresholds ?? [],
                 hysteresis: lod?.hysteresis ?? 0.15,
                 maximumDistance: lod?.maximumDistance,
@@ -231,6 +242,7 @@ struct Model3DExtractionCache: Resource {
                 morphBuffers: morphBuffers,
                 skinningOffset: skinning.packedOffset(for: entity.id)
             )
+            source.decals = decalState?.draws ?? [:]
             source.pathTracing = pathTracing
             source.pathTracingMaximumDistance = lod?.pathTracingMaximumDistance
             if index == storage.count {
@@ -246,7 +258,8 @@ struct Model3DExtractionCache: Resource {
                 lodRevision: lod?.extractionRevision,
                 terrainMaskRevision: mask?.revision,
                 localBounds: bounds,
-                isStatic: palette == nil && morphByEntity[entity.id] == nil
+                isStatic: palette == nil && morphByEntity[entity.id] == nil,
+                decalRevision: decalState?.revision
             )
             geometryBuildCount &+= 1
         }

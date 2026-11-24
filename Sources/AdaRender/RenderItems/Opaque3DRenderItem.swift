@@ -18,6 +18,7 @@ public struct Opaque3DRenderItem: RenderItem {
     public var meshletOverride: MeshletDrawOverride?
     /// Explicit force-visible meshes bypass cluster rejection too.
     public var forceVisible: Bool = false
+    package var decals: Decal3DDraw?
 
     public let modelIndex: Int
     public let partIndex: Int

@@ -361,7 +361,7 @@
       },
       {
         "kind": "text",
-        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animate a 3D character from movement\n• Animation IK and pose modifiers\n• Atmosphere\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• DLSS Upscaling\n• Hardware Path Tracing\n• Terrain\n• Procedural Noise\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
+        "text": "• Building Ada\n• Contributing to Ada\n• AdaUI View Identity\n• Loading images and adding formats\n• Authoring skeletal animation\n• Animate a 3D character from movement\n• Animation IK and pose modifiers\n• Atmosphere\n• Game diagnostics overlay\n• Movie Maker\n• Pipelined Rendering\n• DLSS Upscaling\n• Hardware Path Tracing\n• Terrain\n• 3D Decals\n• Procedural Noise\n• visionOS Windowed Mode\n• Compile modular WESL shaders",
         "level": 0,
         "links": [
           {
@@ -419,6 +419,10 @@
           {
             "title": "Terrain",
             "destination": "Terrain"
+          },
+          {
+            "title": "3D Decals",
+            "destination": "Decals"
           },
           {
             "title": "Procedural Noise",
@@ -3758,6 +3762,110 @@
       {
         "kind": "text",
         "text": "• The camera stays inside the atmosphere; planetary views from space are not a goal.\n• The ground below the horizon is a lit planet surface, so over an empty world the\n  horizon is a clear edge. Cover the ground with geometry or fog to soften it.\n• Terrain and objects do not shadow the haze, and clouds do not shadow anything.\n• Haze is computed from the camera's point of view for 8, 16 or 24 distance\n  slices, depending on the tier. Very large `aerialPerspectiveMaxDistance` values\n  spread those slices thinly.\n• The shaders are shared by every SAGA backend, but this feature was checked only on\n  the Vulkan backend. Metal and browser results have not been verified, and their\n  golden-frame references are not recorded yet.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "Decals",
+    "title": "3D Decals",
+    "section": "AdaEngine",
+    "source": "Sources/AdaEngine/AdaEngine.docc/Articles/3D/Decals.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Use `Decal3D` to stamp an image onto an opaque 3D mesh. The image moves\nwith the mesh. A stamp on an animated model deforms with the surface,\nincluding across a joint, and can be placed while that joint is bent.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Stamp a moving car",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Call `Decal3D.place` on the main actor after the receiving entity has\njoined the scene. Pass the entity that holds `Mesh3DComponent`. If a car's\nphysics body is the parent of its bodywork mesh, pass the bodywork entity.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "import AdaEngine\n\n@MainActor\nfunc applySticker(to bodywork: Entity, frame: Transform3D, artwork: Image) throws -> Decal3D.Handle {\n    try Decal3D.place(\n        on: bodywork,\n        projector: .init(transform: frame, size: [0.45, 0.25, 0.10]),\n        appearance: .init(color: artwork)\n    )\n}",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The frame is the decal's world-space position and orientation. Its local\nnegative Z axis points toward the surface and positive Y points toward\nthe top of the image. The size gives the full width, height, and depth.\nUse a shallow depth to reach the intended surface. To restrict the stamp\nto a specific mesh part, pass its ID as `part:`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A physics raycast can supply an approximate hit position and normal.\nUse a frame with its positive Z axis aligned with the hit normal. The\nplacement call checks the render mesh for actual coverage and throws\n`Decal3D.PlacementError.missesReceiver` if the volume misses.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Stamp a character",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Pass the skinned mesh entity, such as the part holding the character's\nshirt, and call the same `applySticker` function after animation and\ntransform evaluation. A placement samples the current evaluated pose.\nThe same portion of the shirt then carries the stamp through subsequent\nposes. The shader uses the stamp's own coordinates, so the model's\nmaterial UVs can be shared or mirrored.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "While a skinned or morphed mesh carries a decal, it draws the source\ntopology to preserve the stamp's attachment. Removing its last decal\nrestores the normal mesh LOD selection. Replacing the mesh discards its\nattachments. If an alternative mesh changes or cannot represent a stamp,\nthe receiver uses its source mesh until the decals are removed.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Change a stamp",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Keep the returned handle to update or remove a decal from the same entity.\nA larger priority draws on top of smaller priorities. Equal priorities\ndraw in creation order.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "try Decal3D.update(sticker, on: bodywork, appearance: .init(color: newArtwork, priority: 1))\ntry Decal3D.remove(sticker, from: bodywork)",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The image's alpha controls coverage. You can also supply a linear\ntangent-space normal image and a linear roughness image using its red\nchannel. Alpha blends those channels into the existing material before\nthe lighting calculation.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Limits",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Decals use the native SAGA raster path and standard opaque PBR materials\non indexed triangle meshes. Browser WebGPU and headless backends return\n`unsupportedBackend`. Decal rendering is available in the raster view.\nPlacement is through Swift during scene setup or gameplay.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A receiver can hold eight decals. All active images for a receiver must\nfit a 2048 × 2048 atlas. Placement and expanded mesh storage also have\nbounded budgets. When a placement or appearance update exceeds its budget,\nit throws `capacityExceeded` and keeps the receiver's existing decals.\nDecals require geometry whose render buffers still match its mesh\ndescriptor. A direct edit to those buffers invalidates existing stamps.",
         "level": 0,
         "links": []
       }

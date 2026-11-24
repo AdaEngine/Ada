@@ -267,7 +267,7 @@ final class PBR3DShaderVariants: @unchecked Sendable {
             // A plain shader has no fifth fragment output and cannot safely write a hybrid render pass.
             // Morph changes the vertex contract too. These defines remain mandatory even when a layer fails.
             let required = features.intersection([
-                .hybridReflection, .morph, .diffuseSurface, .lightmap, .irradianceGrid, .terrain, .wireframe, .pathTracingSurface,
+                .hybridReflection, .morph, .diffuseSurface, .lightmap, .irradianceGrid, .terrain, .wireframe, .pathTracingSurface, .decals,
             ])
             if required.isEmpty {
                 variant = fallback
