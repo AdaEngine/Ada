@@ -213,6 +213,47 @@ final class EditorAgentWorkspaceMCPTools {
         return try json(["accepted": true, "status": viewModel.workspaceStatus.title, "playMode": String(describing: viewModel.playModeState)])
     }
 
+    #if os(Windows)
+    func startTrackedPlay(document: EditorSceneDocument, entityID: String, editor: EditorViewModel) async throws -> EditorTrackedScenePlay {
+        try Task.checkCancellation()
+        guard editor.workspaceTask == nil, editor.csgPlayPreparation == nil else {
+            throw EditorBlenderSceneJob.Failure.playBusy
+        }
+        if editor.playModeState.isPlaying {
+            if let run = editor.trackedScenePlay, run.matches(document), run.entityID == entityID {
+                editor.selectWorkbenchDocument(id: document.id)
+                if editor.interface.mode == .agent { editor.interface.showsArtifact = true }
+                return run
+            }
+            throw EditorBlenderSceneJob.Failure.playBusy
+        }
+        if document.isDirty, !editor.workbench.saveSceneDocument(id: document.id) {
+            throw EditorWorkspaceMCPError.documentSaveFailed
+        }
+        editor.selectWorkbenchDocument(id: document.id)
+        guard let saved = editor.workbench.activeSceneDocument, saved.id == document.id else {
+            throw EditorBlenderSceneJob.Failure.playChanged
+        }
+        let run = EditorTrackedScenePlay(id: UUID(), sceneDocumentID: document.id, entityID: entityID,
+                                        sceneRevision: EditorAgentSceneToolService.revision(for: saved.content))
+        editor.runActiveSceneInEditor(tracking: run)
+        if let preparation = editor.csgPlayPreparation {
+            await withTaskCancellationHandler {
+                await preparation.value
+            } onCancel: {
+                preparation.cancel()
+            }
+            try Task.checkCancellation()
+        }
+        guard editor.trackedScenePlay == run, editor.playModeState.isPlaying,
+              run.matches(editor.workbench.activeSceneDocument) else {
+            throw EditorBlenderSceneJob.Failure.playChanged
+        }
+        if editor.interface.mode == .agent { editor.interface.showsArtifact = true }
+        return run
+    }
+    #endif
+
     private func stopTask() throws -> String {
         let viewModel = try requireViewModel()
         guard

@@ -27,6 +27,9 @@ animation sheets and GIF previews in the chat.
 
 ## Import and place a 3D model
 
+To create and export a Blender model with Ada AI on Windows, see the
+[Blender export example](Agent3DWorkflow.md#export-from-blender-on-windows).
+
 Use **File > Import Assets** or drop a `.glb`, `.gltf` or MagicaVoxel `.vox` into the project navigator.
 Models open in a 3D preview with camera navigation, mesh/material/skin counts,
 and a named animation picker with Play/Pause. Preview framing fits the model;

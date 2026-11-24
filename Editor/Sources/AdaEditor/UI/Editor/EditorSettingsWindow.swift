@@ -62,6 +62,10 @@ final class EditorSettingsWindowViewModel {
         }
     }
     var selectedPage: String?
+    #if os(macOS) || os(Windows)
+    var localMCPServer: UUID?
+    var localMCPToolDetails: String?
+    #endif
     var collapsedSections: Set<EditorSettingsSection> = []
     private let globalAgent = EditorAgentViewModel(project: nil)
     var agent: EditorAgentViewModel { editorViewModel?.agent ?? globalAgent }
@@ -446,7 +450,7 @@ struct EditorSettingsWindowView: View {
     let showsCloseButton: Bool
     let showsWindowTitleBar: Bool
 
-    @Environment(\.theme) private var theme
+    @Environment(\.theme) var theme
     @Environment(\.dismiss) private var dismiss
 
     init(
@@ -562,7 +566,7 @@ struct EditorSettingsWindowView: View {
                 .id("\(viewModel.selectedSection.rawValue).\(viewModel.selectedPage ?? "overview")")
 
                 if (viewModel.editorViewModel != nil || viewModel.selectedSection == .buildExport), viewModel.selectedSection != .achievements,
-                   !viewModel.showsPage(EditorSettingsPage.studioTools) {
+                   !viewModel.showsPage(EditorSettingsPage.studioTools), !viewModel.showsPage(EditorSettingsPage.localMCP) {
                     settingsFooter
                 }
             }
@@ -822,6 +826,16 @@ struct EditorSettingsWindowView: View {
                     .padding(.bottom, 20)
                 EditorAgentCatalogView(agent: agent, showsToolbar: false)
             }
+            #if os(macOS) || os(Windows)
+            if viewModel.showsPage(EditorSettingsPage.localMCP) {
+                localMCPSettings(EditorLocalMCPSettings.shared)
+            }
+            #endif
+            #if os(Windows)
+            settingsGroup(EditorSettingsPage.blenderMCP) {
+                blenderMCPSettings(EditorBlenderMCPSettings.shared)
+            }
+            #endif
             settingsGroup("ACP CONNECTION") {
                 Text(L10n.text("Configure the agent used by all projects in AdaEditor."))
                     .font(.system(size: 11))
@@ -859,6 +873,39 @@ struct EditorSettingsWindowView: View {
             }
         }
     }
+
+    #if os(Windows)
+    private func blenderMCPSettings(_ blender: EditorBlenderMCPSettings) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L10n.text("Connect only a Blender MCP executable you trust. It runs with your Windows account's permissions."))
+                .font(.system(size: 11))
+                .foregroundColor(theme.editorColors.muted)
+            Text(L10n.text("Blender MCP executable"))
+                .font(.system(size: 12))
+                .foregroundColor(theme.editorColors.text)
+            settingsInput("Path to mcp-for-blender.exe", text: Binding(get: { blender.executablePath }, set: { blender.executablePath = $0 }))
+                .disabled(blender.connected || blender.connecting)
+                .accessibilityIdentifier("AdaEditor.Settings.BlenderMCP.Executable")
+            HStack(spacing: 8) {
+                if blender.connected || blender.connecting {
+                    compactButton(blender.connecting ? "Cancel" : "Disconnect") { Task { await blender.disconnect() } }
+                } else {
+                    compactButton("Connect") { Task { await blender.connect() } }
+                        .disabled(blender.executablePath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                Text(L10n.tr(blender.connecting ? "Connecting to Blender MCP…" : blender.connected ? "Blender MCP connected" : "Blender MCP disconnected"))
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.editorColors.muted)
+            }
+            if let message = blender.errorMessage {
+                Text(L10n.tr(message)).font(.system(size: 12)).foregroundColor(theme.editorColors.text)
+            }
+            Toggle(L10n.text("Allow Ada AI to create and export GLB models"), isOn: Binding(get: { blender.isEnabled }, set: { blender.enable($0) }))
+                .disabled(!blender.connected)
+                .accessibilityIdentifier("AdaEditor.Settings.BlenderMCP.Export")
+        }
+    }
+    #endif
 
     private var emptyProjectSettings: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -924,7 +971,7 @@ struct EditorSettingsWindowView: View {
         }
     }
 
-    private func settingsInput(_ placeholder: String, text: Binding<String>) -> some View {
+    func settingsInput(_ placeholder: String, text: Binding<String>) -> some View {
         TextField(L10n.tr(placeholder), text: text)
             .font(.system(size: 12))
             .foregroundColor(theme.editorColors.text)
@@ -941,9 +988,9 @@ struct EditorSettingsWindowView: View {
             .textFieldStyle(PlainTextFieldStyle())
     }
 
-    private func selectionButton(_ title: String, selected: Bool, action: @escaping () -> Void) -> some View {
+    func selectionButton(_ title: String, selected: Bool, localizesTitle: Bool = true, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(L10n.tr(title))
+            Text(localizesTitle ? L10n.tr(title) : title)
                 .font(.system(size: 11))
                 .foregroundColor(selected ? theme.editorColors.text : theme.editorColors.muted)
                 .padding(.horizontal, 10)
@@ -956,7 +1003,7 @@ struct EditorSettingsWindowView: View {
         .buttonStyle(DefaultButtonStyle())
     }
 
-    private func compactButton(_ title: String, action: @escaping () -> Void) -> some View {
+    func compactButton(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(L10n.tr(title))
                 .font(.system(size: 11))

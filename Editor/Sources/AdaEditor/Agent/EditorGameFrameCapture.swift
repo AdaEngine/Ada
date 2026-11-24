@@ -2,6 +2,43 @@
 import AdaMCPCore
 import Foundation
 
+struct EditorTrackedScenePlay: Equatable, Resource {
+    let id: UUID
+    let sceneDocumentID: String
+    let entityID: String
+    let sceneRevision: String
+
+    private struct TrackedEntity: Component {
+        let sceneID: String
+    }
+
+    func matches(_ document: EditorSceneDocument?) -> Bool {
+        guard let document, document.id == sceneDocumentID else { return false }
+        return EditorAgentSceneToolService.revision(for: document.content) == sceneRevision
+    }
+
+    @MainActor func install(in world: World, result: EditorSceneRuntimeLoadResult) {
+        world.insertResource(self)
+        if let runtimeID = result.entitiesByEditorID[entityID], let entity = world.getEntityByID(runtimeID) {
+            entity.components[TrackedEntity.self] = TrackedEntity(sceneID: entityID)
+        }
+    }
+
+    @MainActor func isLoaded(modelPath: String, in world: World) throws -> Bool {
+        guard world.getResource(Self.self) == self,
+              let entity = world.getEntities().first(where: { $0.components[TrackedEntity.self]?.sceneID == entityID }),
+              let source = entity.components[Model3DSource.self], source.source == modelPath,
+              let state = entity.components[Model3DSourceState.self], state.reference == source else { return false }
+        if let error = state.error { throw EditorTrackedModelLoadError(message: error) }
+        return state.rootEntityID.flatMap(world.getEntityByID)?.parent?.id == entity.id
+    }
+}
+
+private struct EditorTrackedModelLoadError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
 /// Reads finished frames of the running game and stores them as PNG files.
 ///
 /// Studio's own render world only contains editor UI cameras. Games are rendered by
@@ -69,23 +106,32 @@ enum EditorGameFrameCapture {
     }
 
     @discardableResult
-    static func write(_ image: Image, to directory: URL, name: String) throws -> URL {
+    static func write(_ image: Image, to directory: URL, name: String, retainingPrefix: String? = nil) throws -> URL {
         let manager = FileManager.default
         try manager.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent("\(name)-\(UUID().uuidString.prefix(8)).png")
         try image.pngData().write(to: url, options: .atomic)
-        prune(directory, keeping: maxRetainedFiles)
+        prune(directory, keeping: maxRetainedFiles, namePrefix: retainingPrefix)
         return url
     }
 
-    static func prune(_ directory: URL, keeping limit: Int) {
+    static func prune(_ directory: URL, keeping limit: Int, namePrefix: String? = nil) {
         let manager = FileManager.default
-        guard let urls = try? manager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey]),
-            urls.count > limit
-        else { return }
+        let keys: Set<URLResourceKey> = [.contentModificationDateKey, .isRegularFileKey, .isSymbolicLinkKey]
+        guard let paths = try? manager.contentsOfDirectory(at: directory, includingPropertiesForKeys: Array(keys)) else { return }
+        let urls = paths.filter { url in
+            guard url.pathExtension == "png", namePrefix.map({ url.lastPathComponent.hasPrefix($0) }) ?? true,
+                  let values = try? url.resourceValues(forKeys: keys) else { return false }
+            return values.isRegularFile == true && values.isSymbolicLink != true
+        }
+        guard urls.count > limit else { return }
         let dated = urls.map { ($0, (try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) }
         for (url, _) in dated.sorted(by: { $0.1 < $1.1 }).prefix(urls.count - limit) {
+            #if os(Windows)
+            EditorBlenderMCPExport.removeDirectFile(url)
+            #else
             try? manager.removeItem(at: url)
+            #endif
         }
     }
 
@@ -108,4 +154,44 @@ enum EditorGameFrameCapture {
             "kind": "game-frame",
         ]
     }
+
+    #if os(Windows)
+    static func captureTrackedModel(
+        _ run: EditorTrackedScenePlay,
+        modelPath: String,
+        projectURL: URL,
+        isCurrent: @MainActor () -> Bool
+    ) async throws -> EditorCloudValue {
+        let clock = ContinuousClock()
+        let deadline = clock.now + .seconds(20)
+        while clock.now < deadline {
+            try Task.checkCancellation()
+            guard isCurrent() else { throw EditorBlenderSceneJob.Failure.playChanged }
+            let source = SceneViewFrameRegistry.sources.last {
+                $0.label == gameLabel && $0.world?.getResource(EditorTrackedScenePlay.self) == run
+            }
+            if let source, try source.withWorldExecutionContext({ try run.isLoaded(modelPath: modelPath, in: $0) }) == true {
+                // Earlier submissions can finish after the model is loaded. Wait through the renderer's in-flight frames.
+                let baseline = source.frameSequence + max(1, unsafe RenderEngine.configurations.maxFramesInFlight)
+                let frame = try await source.captureFrame(after: baseline, maxDimension: EditorPlayScenario.Limits.maxDimension, timeout: .seconds(6))
+                try Task.checkCancellation()
+                guard isCurrent(), source.isAlive, try source.withWorldExecutionContext({ try run.isLoaded(modelPath: modelPath, in: $0) }) == true else {
+                    throw EditorBlenderSceneJob.Failure.playChanged
+                }
+                guard !frame.activeCameras.isEmpty else { throw SceneViewFrameCaptureError.noCompletedFrame }
+                for path in [".ada", ".ada/workspace", ".ada/workspace/agent-captures"] {
+                    try EditorBlenderMCPExport.ensureDirectory(projectURL.appendingPathComponent(path, isDirectory: true))
+                }
+                let url = try write(frame.image, to: capturesDirectory(projectURL: projectURL), name: "blender-play", retainingPrefix: "blender-play-")
+                return [
+                    "playStatus": "captured", "runtimeModelLoaded": true, "runID": .string(run.id.uuidString),
+                    "frameSequence": .integer(Int64(frame.sequence)), "activeCameras": .array(frame.activeCameras.map(EditorCloudValue.string)),
+                    "capturePath": .string(".ada/workspace/agent-captures/\(url.lastPathComponent)"), "visualConfirmationRequired": true
+                ]
+            }
+            try await Task.sleep(for: .milliseconds(30))
+        }
+        throw EditorBlenderSceneJob.Failure.modelNotLoaded
+    }
+    #endif
 }

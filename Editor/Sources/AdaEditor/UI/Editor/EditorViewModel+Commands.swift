@@ -607,6 +607,10 @@ extension EditorViewModel {
     }
 
     func runActiveSceneInEditor() {
+        runActiveSceneInEditor(tracking: nil)
+    }
+
+    func runActiveSceneInEditor(tracking run: EditorTrackedScenePlay?) {
         guard csgPlayPreparation == nil else {
             return
         }
@@ -631,7 +635,7 @@ extension EditorViewModel {
         }
 
         guard model.requiresCSGPreparation else {
-            startScenePlay(document)
+            startScenePlay(document, tracking: run)
             return
         }
         let source = document.absolutePath.map { URL(fileURLWithPath: $0) }
@@ -652,7 +656,7 @@ extension EditorViewModel {
                 }
                 var prepared = current
                 prepared.csgPlayProducts = products
-                self.startScenePlay(prepared)
+                self.startScenePlay(prepared, tracking: run)
             } catch is CancellationError {
                 self.workspaceStatus = .ready
             } catch let error as EditorCSGScene.Failure {
@@ -665,9 +669,10 @@ extension EditorViewModel {
         }
     }
 
-    private func startScenePlay(_ document: EditorSceneDocument) {
+    private func startScenePlay(_ document: EditorSceneDocument, tracking run: EditorTrackedScenePlay?) {
         workbench.open(.scene(document))
         toolbar.sceneName = URL(fileURLWithPath: document.title).deletingPathExtension().lastPathComponent
+        trackedScenePlay = run
         playModeState = .playing(sceneDocumentID: document.id, title: document.title)
         workspaceStatus = .running("Play \(document.title)")
         appendOutput("Playing \(document.relativePath)")
@@ -708,6 +713,7 @@ extension EditorViewModel {
         }
 
         playModeState = .editing
+        trackedScenePlay = nil
         workspaceStatus = .ready
         appendOutput("Stopped Play Mode")
     }

@@ -241,6 +241,7 @@ struct EditorAgentPermissionRequest: Codable, Equatable, Identifiable, Sendable 
     var options: [EditorAgentPermissionOption]
     var state: EditorAgentPermissionState
     var selectedOptionID: String?
+    var inputDetails: String? = nil
 }
 
 struct EditorAgentEvent: Codable, Equatable, Identifiable, Sendable {

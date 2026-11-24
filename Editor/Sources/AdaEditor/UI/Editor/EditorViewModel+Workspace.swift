@@ -320,6 +320,7 @@ extension EditorViewModel {
 
     func failPlayMode(_ message: String) {
         playModeState = .failed(message)
+        trackedScenePlay = nil
         workspaceStatus = .failed(message)
         appendOutput("Play failed: \(message)")
     }

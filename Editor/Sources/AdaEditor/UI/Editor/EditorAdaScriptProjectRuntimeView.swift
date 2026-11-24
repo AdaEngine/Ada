@@ -230,7 +230,8 @@ struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
     let assetsDirectory: URL
     var sourceURL: URL?
     var recordsAchievement = true
-    var onInitialSceneLoaded: (@MainActor @Sendable (EditorSceneRuntimeLoadResult) -> Void)?
+    var trackedScenePlay: EditorTrackedScenePlay? = nil
+    var onInitialSceneLoaded: (@MainActor @Sendable (EditorSceneRuntimeLoadResult) -> Void)? = nil
     var csgProducts: [EditorCSGScene.Product] = []
 
     func setup(in app: borrowing AppWorlds) {
@@ -261,6 +262,7 @@ struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
         let runtimeModel = sceneModel.withoutCSGAuthoring()
         var result = EditorSceneFileLoader.load(model: runtimeModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)
         EditorCSGScene.install(csgProducts, in: scene.world, result: &result)
+        trackedScenePlay?.install(in: scene.world, result: result)
         navigator.installInitialScene(scene, make: {
             let scene = Scene(name: sceneModel.scene.name)
             var result = EditorSceneFileLoader.load(model: runtimeModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)
