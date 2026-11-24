@@ -5,6 +5,7 @@ struct EditorCenterWorkbench: View {
     let viewModel: EditorWorkbenchViewModel
     let inspectorViewModel: EditorInspectorSidebarViewModel
     let playModeState: EditorPlayModeState
+    var trackedScenePlay: EditorTrackedScenePlay? = nil
     let scenePlayRuntime: EditorScenePlayRuntime?
     let sceneResourceRootURL: URL?
     let onPlayScene: (() -> Void)?
@@ -682,6 +683,7 @@ extension EditorCenterWorkbench {
             uiCatalog: viewModel.uiCatalog,
             inspectorViewModel: inspectorViewModel,
             playModeState: playModeState,
+            trackedScenePlay: trackedScenePlay,
             playRuntime: scenePlayRuntime,
             onEntitySelected: onSceneEntitySelected,
             onTerrainToolSelected: onTerrainToolSelected,

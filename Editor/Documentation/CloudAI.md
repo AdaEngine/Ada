@@ -53,6 +53,48 @@ apply a project transaction or import a bundled example. Native hosts can
 search and fetch public web references, and approved Build actions can download
 assets. The external agent and Web BYOK catalogs use their own contracts.
 
+## Connect a local MCP server
+
+On Windows or macOS, open **Settings → Agents → Local MCP servers** and choose
+**Add MCP server**. Give it a unique name and enter the full path to its
+executable. Add one row for each argument and keep the launch order. For a local
+Python MCP server, use the path to the Python executable and add the full path
+to the server script as the first argument. Studio launches the executable
+directly over stdio with a separate working directory and a minimal environment.
+The process runs with your operating-system account's permissions, so connect
+commands you trust.
+
+Choose **Connect**, open **Input details** to inspect a tool's schema, and check
+the tools you want Ada AI to use. Tools start unchecked. Tool schemas that Studio
+cannot validate are disabled. The settings support up to 12 saved servers and 32
+selected tools. Disconnect stops the connection and keeps selections for a later
+reconnect to the same executable, arguments and tool schemas. Changed tools
+require another review. Studio starts no saved servers automatically.
+
+With an Ada Cloud server that supports the desktop tool contract v3, Ada AI in
+Ask and Plan can look up selected tools. In Build, each call shows the project,
+server, tool and arguments in a permission card. Results can contain bounded
+text and structured JSON. Keep private data out of tools you intend to use with
+Ada AI. For the Blender workflow, use the existing preset below.
+
+## Export a model from Blender on Windows
+
+The Windows Blender preset requires the hosted tool contract version 3 and a
+local MCP for Blender installation. The first verified local configuration uses
+MCP for Blender 2.2.4, add-on 1.8 and Blender 5.3.0. Open Blender and start its
+MCP add-on on the default loopback port. In Studio open **Settings → Agents →
+Blender MCP**, enter the full path to the trusted `mcp-for-blender.exe`, and
+choose **Connect**. The executable runs with your Windows account permissions.
+
+Enable **Allow Ada AI to create and export GLB models**. Select Ada AI and Build
+mode, then follow the [Blender example](Agent3DWorkflow.md#export-from-blender-on-windows).
+You approve each export in the conversation. Ask and Plan can describe the
+selected tools. The preset creates static models from colored primitives and
+saves a GLB in the project's `Downloads/Blender` folder. Use the returned job ID
+to import, place, and verify the model in visible Play. Disconnect in Settings
+to revoke calls to Blender. You can still finish a job whose export completed.
+Reconnect when you need a new export after closing Blender or after an MCP timeout.
+
 ## Accounting and recovery
 
 The server reserves a bounded request before calling OpenRouter, rechecks Billing

@@ -5,12 +5,10 @@ import Observation
 @Observable
 @MainActor
 final class EditorAgentSettingsStore {
-    static let shared = EditorAgentSettingsStore(
-        fileURL:
-            FileManager.default
-            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("AdaEditor/Agents/settings.json")
-    )
+    static let directory = FileManager.default
+        .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("AdaEditor/Agents", isDirectory: true)
+    static let shared = EditorAgentSettingsStore(fileURL: directory.appendingPathComponent("settings.json"))
 
     private(set) var configuration = AdaProjectAgent()
     var agentEnabled = false

@@ -89,6 +89,17 @@
       },
       {
         "kind": "text",
+        "text": "To create and export a Blender model with Ada AI on Windows, see the\nBlender export example.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Blender export example",
+            "destination": "Agent3DWorkflow"
+          }
+        ]
+      },
+      {
+        "kind": "text",
         "text": "Use **File > Import Assets** or drop a `.glb`, `.gltf` or MagicaVoxel `.vox` into the project navigator.\nModels open in a 3D preview with camera navigation, mesh/material/skin counts,\nand a named animation picker with Play/Pause. Preview framing fits the model;\nplacing it in a scene preserves its original scale.",
         "level": 0,
         "links": []
@@ -2496,6 +2507,24 @@
       },
       {
         "kind": "heading",
+        "text": "Export from Blender on Windows",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "With the Blender preset connected and enabled in Agent Settings and a compatible\nAda Cloud server, ask Ada AI in Build mode to create a small orange traffic cone\nwith a dark base in Blender and export it as GLB. Approve the Blender call when\nthe chat shows the model and project names. The preset creates a temporary\nBlender scene and exports a self-contained GLB. It returns a path of the form\n`Downloads/Blender/<job>/Model.glb` and a job ID. To continue, ask Ada AI to\nimport the cone into `Assets/Models`, place it in the open 3D scene, and check it\nin Play. Approve each step. Studio reuses the imported asset and scene entity\nwhen you retry the same job, and removes the staging GLB after import. If the\nscene changed before placement, read its current revision and retry the placement.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Studio starts scene Play and checks that the model loaded in that run. When a\ngame camera finishes a fresh frame, the chat reports the capture path under\n`.ada/workspace/agent-captures`. Inspect that PNG or the live viewport to confirm\nthe cone is visible. If Play fails, the imported model and scene edit remain\navailable. If Blender disconnects during export, reconnect in Agent Settings\nand export again.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
         "text": "Materials and lighting",
         "level": 2,
         "links": []
@@ -2538,7 +2567,7 @@
       },
       {
         "kind": "text",
-        "text": "After validation and build, inspect a completed frame from visible Play. A 3D scene needs a camera, a light and an `Environment3D` (or a camera `backgroundColor`/clear flags) so the frame is not a flat clear color; `editor.play.run_scenario` can capture before/after frames around input. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Native desktop agents can create/extract and edit skeletal/morph clips using the revision-checked `editor.animation.*` API; read [Animation authoring](AnimationAuthoring.md) for explicit Save, scene binding, shared Tool API 2, budgets and verification. Query `animationAuthoring` in desktop project context before use; mobile hosts do not advertise these desktop authoring commands. Blender execution, visual rig-structure editing and automatic rig inference remain unavailable. To create a new low-poly model use editor.model.generate (an AdaScript program that writes a GLB) or editor.voxel.generate (a .vox).",
+        "text": "After validation and build, inspect a completed frame from visible Play. A 3D scene needs a camera, a light and an `Environment3D` (or a camera `backgroundColor`/clear flags) so the frame is not a flat clear color; `editor.play.run_scenario` can capture before/after frames around input. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Native desktop agents can create/extract and edit skeletal/morph clips using the revision-checked `editor.animation.*` API; read [Animation authoring](AnimationAuthoring.md) for explicit Save, scene binding, shared Tool API 2, budgets and verification. Query `animationAuthoring` in desktop project context before use; mobile hosts do not advertise these desktop authoring commands. The built-in Windows Blender preset supports static models. The standard tool catalog can also create low-poly models with `editor.model.generate` (an AdaScript program that writes a GLB) or `editor.voxel.generate` (a `.vox`).",
         "level": 0,
         "links": []
       }

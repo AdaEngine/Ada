@@ -18,6 +18,26 @@ Read `editor.components.describe` with query `Model3DSource`. Its `source` uses 
 
 Desktop agents should use `editor.scene.get/apply` with the latest revision to place models in open scenes and retain document undo. Mobile agents use their project file tools for scene YAML. Imported meshes do not automatically receive physics bodies or colliders; read the PhysicsBody3DComponent descriptor before adding one.
 
+## Export from Blender on Windows
+
+With the Blender preset connected and enabled in Agent Settings and a compatible
+Ada Cloud server, ask Ada AI in Build mode to create a small orange traffic cone
+with a dark base in Blender and export it as GLB. Approve the Blender call when
+the chat shows the model and project names. The preset creates a temporary
+Blender scene and exports a self-contained GLB. It returns a path of the form
+`Downloads/Blender/<job>/Model.glb` and a job ID. To continue, ask Ada AI to
+import the cone into `Assets/Models`, place it in the open 3D scene, and check it
+in Play. Approve each step. Studio reuses the imported asset and scene entity
+when you retry the same job, and removes the staging GLB after import. If the
+scene changed before placement, read its current revision and retry the placement.
+
+Studio starts scene Play and checks that the model loaded in that run. When a
+game camera finishes a fresh frame, the chat reports the capture path under
+`.ada/workspace/agent-captures`. Inspect that PNG or the live viewport to confirm
+the cone is visible. If Play fails, the imported model and scene edit remain
+available. If Blender disconnects during export, reconnect in Agent Settings
+and export again.
+
 ## Materials and lighting
 
 `editor.model.material.edit` accepts `path`, zero-based `material` and `settingsJSON`. Supported patch keys are `baseColorFactor` (linear RGBA), `metallicFactor`, `roughnessFactor`, `emissiveFactor` (linear RGB), `alphaMode`, `alphaCutoff` and `doubleSided`. Invalid patches fail before writing. Unpatched material fields, hierarchy, animation data and GLB binary chunks are preserved.
@@ -32,4 +52,4 @@ Read exact Camera, Mesh3DComponent, light, Environment3D and physics payloads fr
 
 Desktop uses `editor.build.start`, `editor.play.start`, `editor.task.status`, `editor.output.read`, `editor.play.capture` / `render.capture_screenshot` (the running game's camera frame; the editor window is returned only when no game runs, and is not evidence) and `editor.play.run_scenario` for scripted input, frames and state. Mobile uses `editor.build`, `editor.play.start`, `editor.play.capture` and `editor.image.read`. Select the tools actually advertised by the current host. Desktop asset tools exclude mobile vision analysis and direct on-disk scene assignment; desktop scene edits go through the revision/undo workflow. Save dirty asset documents before tool writes.
 
-After validation and build, inspect a completed frame from visible Play. A 3D scene needs a camera, a light and an `Environment3D` (or a camera `backgroundColor`/clear flags) so the frame is not a flat clear color; `editor.play.run_scenario` can capture before/after frames around input. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Native desktop agents can create/extract and edit skeletal/morph clips using the revision-checked `editor.animation.*` API; read [Animation authoring](AnimationAuthoring.md) for explicit Save, scene binding, shared Tool API 2, budgets and verification. Query `animationAuthoring` in desktop project context before use; mobile hosts do not advertise these desktop authoring commands. Blender execution, visual rig-structure editing and automatic rig inference remain unavailable. To create a new low-poly model use editor.model.generate (an AdaScript program that writes a GLB) or editor.voxel.generate (a .vox).
+After validation and build, inspect a completed frame from visible Play. A 3D scene needs a camera, a light and an `Environment3D` (or a camera `backgroundColor`/clear flags) so the frame is not a flat clear color; `editor.play.run_scenario` can capture before/after frames around input. Exercise selected clips and compare frames at different times for animation. Isolated simulation verifies logic and keyboard/physics behavior; it does not install Model3D or prove rendering. Native desktop agents can create/extract and edit skeletal/morph clips using the revision-checked `editor.animation.*` API; read [Animation authoring](AnimationAuthoring.md) for explicit Save, scene binding, shared Tool API 2, budgets and verification. Query `animationAuthoring` in desktop project context before use; mobile hosts do not advertise these desktop authoring commands. The built-in Windows Blender preset supports static models. The standard tool catalog can also create low-poly models with `editor.model.generate` (an AdaScript program that writes a GLB) or `editor.voxel.generate` (a `.vox`).

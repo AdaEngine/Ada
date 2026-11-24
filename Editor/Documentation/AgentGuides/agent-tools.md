@@ -46,6 +46,12 @@ anatomy inference and visual imported-rig editing remain outside these tools.
 Desktop scene changes use document revisions
 and undo, and asset writes reject matching dirty open documents.
 
+Ada AI on desktop can connect user-configured local MCP stdio executables from
+**Settings → Agents → Local MCP servers**. Studio keeps launch settings and tool
+selections on the desktop. Discover and describe in Ask, Plan or Build, and use
+the existing per-call approval in Build. Hosted sends require desktop contract
+v3. See [Cloud AI](../CloudAI.md#connect-a-local-mcp-server).
+
 The bundled `ada-game-builder` workflow is advertised in desktop and mobile
 session catalogs without per-project installation. Agents load it on demand for
 game creation and iteration. It covers playable loops, persistent authoring,

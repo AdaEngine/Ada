@@ -35,10 +35,18 @@ final class EditorAgentMCPTools {
     private weak var viewModel: EditorViewModel?
 
     var activeViewModel: EditorViewModel? { viewModel }
+    private(set) var workspaceGeneration: UInt64 = 0
+
+    var allowsExternalInvocations: Bool { viewModel.map { $0.agent.agentPermissionMode != .deny } ?? false }
+
+    func isCurrentWorkspace(_ root: URL, generation: UInt64) -> Bool {
+        workspaceGeneration == generation && viewModel?.projectURL?.resolvingSymlinksInPath().standardizedFileURL.pathComponents == root.pathComponents
+    }
 
     private init() {}
 
     func activate(_ viewModel: EditorViewModel) {
+        if self.viewModel !== viewModel { workspaceGeneration &+= 1 }
         self.viewModel = viewModel
     }
 
@@ -46,6 +54,7 @@ final class EditorAgentMCPTools {
         guard self.viewModel === viewModel else {
             return
         }
+        workspaceGeneration &+= 1
         self.viewModel = nil
     }
 
@@ -194,6 +203,19 @@ final class EditorAgentMCPTools {
             throw EditorAgentMCPToolError.invalidOperations
         }
         let operations = try rawOperations.map(decodeOperation)
+        let updated = try applySceneOperations(operations, expectedRevision: expectedRevision, document: document, viewModel: viewModel)
+        return try json(["path": updated.relativePath, "previousRevision": currentRevision, "revision": EditorAgentSceneToolService.revision(for: updated.content), "yaml": updated.content, "dirty": updated.isDirty])
+    }
+
+    func applySceneOperations(
+        _ operations: [EditorAgentSceneOperation],
+        expectedRevision: String,
+        document: EditorSceneDocument,
+        viewModel: EditorViewModel
+    ) throws -> EditorSceneDocument {
+        guard !document.isReadOnly else { throw EditorAgentMCPToolError.readOnlyScene(document.relativePath) }
+        let currentRevision = EditorAgentSceneToolService.revision(for: document.content)
+        guard currentRevision == expectedRevision else { throw EditorAgentMCPToolError.staleRevision(expected: expectedRevision, actual: currentRevision) }
         guard let source = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content) else {
             throw EditorAgentMCPToolError.invalidScene(document.relativePath)
         }
@@ -208,7 +230,7 @@ final class EditorAgentMCPTools {
         updated.statusMessage = "Edited by agent"
         updated.errorMessage = nil
         viewModel.workbench.replaceSceneDocument(updated)
-        return try json(["path": updated.relativePath, "previousRevision": currentRevision, "revision": EditorAgentSceneToolService.revision(for: updated.content), "yaml": updated.content, "dirty": updated.isDirty])
+        return updated
     }
 
     private func undoScene(path: String?) throws -> String {
@@ -295,9 +317,13 @@ final class EditorAgentMCPTools {
         }
     }
 
-    private func sceneDocument(path: String?, in viewModel: EditorViewModel) throws -> EditorSceneDocument {
-        let selected = path.map { path in viewModel.workbench.openDocuments.first { $0.relativePath == path } } ?? viewModel.workbench.activeDocument
-        guard case let .scene(document)? = selected else { throw EditorAgentMCPToolError.sceneNotOpen(path ?? "active") }
+    func sceneDocument(path: String?, in viewModel: EditorViewModel) throws -> EditorSceneDocument {
+        if let active = viewModel.workbench.activeSceneDocument, path == nil || active.relativePath == path {
+            return active
+        }
+        guard let path, case let .scene(document)? = viewModel.workbench.openDocuments.first(where: { $0.relativePath == path }) else {
+            throw EditorAgentMCPToolError.sceneNotOpen(path ?? "active")
+        }
         return document
     }
 

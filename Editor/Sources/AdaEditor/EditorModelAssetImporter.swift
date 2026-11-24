@@ -65,7 +65,7 @@ enum EditorModelAssetImporter {
         ((document.buffers ?? []) + (document.images ?? [])).compactMap(\.uri).filter { !$0.hasPrefix("data:") }
     }
 
-    private static func uniqueURL(_ name: String, in destination: URL, fileManager: FileManager) -> URL {
+    static func uniqueURL(_ name: String, in destination: URL, fileManager: FileManager = .default) -> URL {
         let input = URL(fileURLWithPath: name)
         var candidate = destination.appendingPathComponent(name)
         var suffix = 2
@@ -75,6 +75,14 @@ enum EditorModelAssetImporter {
             suffix += 1
         }
         return candidate
+    }
+
+    /// Publishes the exact bytes validated by the importer without replacing an existing asset.
+    static func publishValidatedGLB(_ bytes: Data, at target: URL) throws {
+        let staging = target.deletingLastPathComponent().appendingPathComponent(".model-import-\(UUID().uuidString).tmp")
+        try bytes.write(to: staging, options: .withoutOverwriting)
+        defer { try? FileManager.default.removeItem(at: staging) }
+        try FileManager.default.moveItem(at: staging, to: target)
     }
 
     private static func jsonData(at url: URL) throws -> Data {
