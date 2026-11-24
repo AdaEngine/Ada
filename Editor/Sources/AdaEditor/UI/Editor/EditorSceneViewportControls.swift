@@ -12,6 +12,8 @@ struct EditorSceneViewportControls: View {
     var showsEditingTools = true
     var showsPlayback = true
     var inline = false
+    var csgSnap: Bool?
+    var onToggleCSGSnap: (() -> Void)?
 
     @Environment(\.theme) private var theme
     private var compact: Bool { AdaEngineStyleLayoutSpec.usesCompactWorkspace }
@@ -98,6 +100,9 @@ struct EditorSceneViewportControls: View {
                 }
                 modeButton(.twoD)
                 modeButton(.threeD)
+                if let csgSnap, let onToggleCSGSnap, displayMode == .threeD {
+                    pillButton("CSG Grid Snap", symbol: "\u{E3EC}", active: csgSnap, action: onToggleCSGSnap)
+                }
                 if showsPlayback {
                     divider
                     pillButton(

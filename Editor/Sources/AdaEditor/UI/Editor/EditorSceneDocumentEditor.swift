@@ -59,7 +59,7 @@ struct EditorSceneDocumentEditor: View {
                     onEntitySelected: onEntitySelected,
                     onPlay: onPlay,
                     onStop: onStop,
-                    onDocumentChanged: { workbench.replaceSceneDocument($0) },
+                    onDocumentChanged: { workbench.applySceneViewportEdit($0) },
                     onTerrainToolSelected: onTerrainToolSelected,
                     annotationAgent: annotationAgent,
                     onAnnotationAdded: onAnnotationAdded,

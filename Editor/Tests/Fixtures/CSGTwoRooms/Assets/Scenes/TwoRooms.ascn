@@ -1,0 +1,183 @@
+format: ada.scene
+schemaVersion: 1
+engineVersion: 1.0.0
+scene:
+  id: csg-two-rooms
+  name: Two Rooms
+entities:
+- id: camera
+  name: Camera
+  enabled: true
+  components:
+    AdaRender.Camera:
+      projection: perspective
+      fieldOfViewDegrees: 65
+      isActive: true
+    AdaTransform.Transform:
+      rotation:
+      - 0.16560865
+      - -0.26681049
+      - 0.0465966
+      - 0.94826931
+      scale:
+      - 1
+      - 1
+      - 1
+      position:
+      - 5.5
+      - 5
+      - -9
+- id: sun
+  name: Sun
+  enabled: true
+  components:
+    AdaTransform.Transform:
+      scale:
+      - 1
+      - 1
+      - 1
+      position:
+      - 0
+      - 9
+      - 0
+      rotation:
+      - -4e-1
+      - -2e-1
+      - 0
+      - -8.944e-1
+    AdaScene.DirectionalLightComponent:
+      intensity: 3
+      radiance:
+      - 1
+      - 9.7e-1
+      - 9e-1
+      castShadows: true
+- id: level
+  name: Level Geometry
+  enabled: true
+  components:
+    AdaStudio.CSGGroup:
+      version: 1
+    AdaTransform.Transform:
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      position:
+      - 0
+      - 0
+      - 0
+      scale:
+      - 1
+      - 1
+      - 1
+- id: rear
+  name: Back Wall
+  enabled: true
+  parent: level
+  components:
+    AdaStudio.CSGBox:
+      operation: union
+    AdaTransform.Transform:
+      scale:
+      - 1.03e+1
+      - 3.1e+0
+      - 3e-1
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      position:
+      - 0
+      - 1.45e+0
+      - 3
+- id: left
+  name: Side Wall
+  enabled: true
+  parent: level
+  components:
+    AdaTransform.Transform:
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      scale:
+      - 3e-1
+      - 3.1e+0
+      - 6.2e+0
+      position:
+      - -5
+      - 1.45e+0
+      - 0
+    AdaStudio.CSGBox:
+      operation: union
+- id: wall
+  name: Partition
+  enabled: true
+  parent: level
+  components:
+    AdaTransform.Transform:
+      position:
+      - 0
+      - 1.45e+0
+      - 0
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      scale:
+      - 4e-1
+      - 3.1e+0
+      - 6
+    AdaStudio.CSGBox:
+      operation: union
+- id: door
+  name: Doorway
+  enabled: true
+  parent: level
+  components:
+    AdaTransform.Transform:
+      scale:
+      - 1.2e+0
+      - 2.06e+0
+      - 1.7e+0
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+      position:
+      - 0
+      - 0.97
+      - 0
+    AdaStudio.CSGBox:
+      operation: subtract
+- id: floor
+  name: Floor
+  enabled: true
+  parent: level
+  components:
+    AdaTransform.Transform:
+      scale:
+      - 1.04e+1
+      - 2.5e-1
+      - 6.4e+0
+      position:
+      - 0
+      - -1.25e-1
+      - 0
+      rotation:
+      - 0
+      - 0
+      - 0
+      - 1
+    AdaStudio.CSGBox:
+      operation: union
+editor:
+  selectedEntity: door
+  expandedEntities:
+  - level

@@ -6,13 +6,13 @@ import Observation
 extension EditorWorkbenchViewModel {
     func prepareSceneDocument(id: String) {
         sceneDecodeTasks.removeValue(forKey: id)?.cancel()
-        guard let document = sceneDocument(id: id), document.isLoading else { return }
+        guard let document = sceneDocument(id: id), document.isLoading else {
+            return
+        }
         let content = document.content
         sceneDecodeTasks[id] = Task { @MainActor [weak self] in
             let result: Result<EditorSceneModel, Error>
-            do { result = .success(try await Self.decodeSceneDocument(content)) }
-            catch is CancellationError { return }
-            catch { result = .failure(error) }
+            do { result = .success(try await Self.decodeSceneDocument(content)) } catch is CancellationError { return } catch { result = .failure(error) }
             guard !Task.isCancelled, let self, let index = self.openDocuments.firstIndex(where: { $0.id == id }),
                   case var .scene(current) = self.openDocuments[index], current.isLoading, current.content == content else { return }
             current.isLoading = false
@@ -33,7 +33,7 @@ extension EditorWorkbenchViewModel {
     }
 
     @concurrent
-    private nonisolated static func decodeSceneDocument(_ content: String) async throws -> EditorSceneModel {
+    nonisolated private static func decodeSceneDocument(_ content: String) async throws -> EditorSceneModel {
         try Task.checkCancellation()
         let stall = PerformanceStallProbe.begin()
         let model = try EditorSceneModel.decode(from: content)
@@ -120,7 +120,9 @@ extension EditorWorkbenchViewModel {
         guard let activeDocument, activeDocument.isDirty else {
             return false
         }
-        if case let .asset(asset) = activeDocument, (asset.kind == .animationLibrary || asset.kind == .animationModifiers) { return false }
+        if case let .asset(asset) = activeDocument, (asset.kind == .animationLibrary || asset.kind == .animationModifiers) {
+            return false
+        }
 
         return saveDocument(activeDocument)
     }
@@ -158,10 +160,17 @@ extension EditorWorkbenchViewModel {
         case let .text(document):
             return saveTextDocument(id: document.id)
         case let .asset(document):
-            if document.kind == .animationLibrary { return (try? animationService?.open(document.relativePath))?.save() ?? false }
+            if document.kind == .animationLibrary {
+                return (try? animationService?.open(document.relativePath))?.save() ?? false
+            }
             if document.kind == .animationModifiers {
-                do { let draft = try animationService?.openModifiers(document.relativePath); try draft?.save(expectedRevision: draft?.revision ?? ""); return draft != nil }
-                catch { return false }
+                do {
+                    let draft = try animationService?.openModifiers(document.relativePath)
+                    try draft?.save(expectedRevision: draft?.revision ?? "")
+                    return draft != nil
+                } catch {
+                    return false
+                }
             }
             return document.kind == .shaderGraph && shaderGraphModel(for: document).save()
         case .git:
@@ -171,7 +180,9 @@ extension EditorWorkbenchViewModel {
 
     func appendSceneLine(documentID: String) {
         updateSceneDocument(id: documentID) { document in
-            guard !document.isLoading else { return }
+            guard !document.isLoading else {
+                return
+            }
             guard !document.isReadOnly else {
                 document.statusMessage = "Edit blocked: file is read-only"
                 return
@@ -277,6 +288,16 @@ extension EditorWorkbenchViewModel {
         return didSave
     }
 
+    func applySceneViewportEdit(_ document: EditorSceneDocument) {
+        var document = document
+        // Selection can autosave while the viewport still holds the previous document.
+        if let previous = document.lastSavedContent, let saved = sceneDocument(id: document.id)?.lastSavedContent,
+            previous != saved, EditorSceneModel.onlyEditorStateChanged(from: previous, to: saved) {
+            document.lastSavedContent = saved
+        }
+        replaceSceneDocument(document)
+    }
+
     func replaceSceneDocument(_ document: EditorSceneDocument) {
         guard let index = openDocuments.firstIndex(where: { $0.id == document.id }) else {
             return
@@ -330,7 +351,9 @@ extension EditorWorkbenchViewModel {
                 var model = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content) else { return }
             let previous = model.editor
             update(&model)
-            guard previous != model.editor else { return }
+            guard previous != model.editor else {
+                return
+            }
             do {
                 document.content = try model.encodedYAML(updatingEditorStateIn: document.content)
                 document.sceneModel = model
@@ -369,7 +392,13 @@ extension EditorWorkbenchViewModel {
         template: EditorSceneEntityTemplate
     ) {
         updateSceneModelDocument(id: documentID, status: "\(template.title) added") { model in
-            _ = model.addEntity(template: template, parentID: parentID)
+            let entity = model.addEntity(template: template, parentID: parentID)
+            if template == .csgGroup {
+                _ = model.renameEntity(entity.id, to: L10n.text("CSG Group"))
+                if let box = model.csgBoxes(in: entity.id).first {
+                    _ = model.renameEntity(box.id, to: L10n.text("CSG Box"))
+                }
+            }
         }
         entityPickerRequest = nil
     }
@@ -482,7 +511,9 @@ extension EditorWorkbenchViewModel {
 
     func updateSceneLine(documentID: String, lineIndex: Int, value: String) {
         updateSceneDocument(id: documentID) { document in
-            guard !document.isLoading else { return }
+            guard !document.isLoading else {
+                return
+            }
             guard !document.isReadOnly else {
                 document.statusMessage = "Edit blocked: file is read-only"
                 return
@@ -504,7 +535,9 @@ extension EditorWorkbenchViewModel {
 
     func updateSceneModelDocument(id documentID: String, status: String, update: (inout EditorSceneModel) -> Void) {
         updateSceneDocument(id: documentID) { document in
-            guard !document.isLoading else { return }
+            guard !document.isLoading else {
+                return
+            }
             guard !document.isReadOnly else {
                 document.statusMessage = "Edit blocked: file is read-only"
                 return

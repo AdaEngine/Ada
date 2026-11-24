@@ -1,3 +1,4 @@
+import AdaEngine
 import Foundation
 
 extension EditorSceneModel {
@@ -124,12 +125,20 @@ extension EditorSceneModel {
         guard
             entityID != parentID,
             !isRootEntity(entityID),
-            entities.contains(where: { $0.id == entityID }),
-            entities.contains(where: { $0.id == parentID })
+            let source = entities.first(where: { $0.id == entityID }),
+            let target = entities.first(where: { $0.id == parentID }),
+            target.components[EditorCSGScene.boxType] == nil
         else {
             return false
         }
-        return !Set(subtreeEntityIDs(rootedAt: entityID)).contains(parentID)
+        guard !Set(subtreeEntityIDs(rootedAt: entityID)).contains(parentID) else {
+            return false
+        }
+        if source.components[EditorCSGScene.boxType] != nil {
+            return target.components[EditorCSGScene.groupType] != nil
+                && (source.parent == parentID || csgBoxes(in: parentID).count < CSGGroupSource.maximumBoxes)
+        }
+        return true
     }
 
     mutating func reparentEntity(_ entityID: String, to parentID: String) -> Bool {
@@ -180,6 +189,14 @@ extension EditorSceneModel {
         rootName: String
     ) -> EditorSceneEntity? {
         let sourceIDs = Set(sourceEntities.map(\.id))
+        let parent = entities.first { $0.id == parentID }
+        guard parent?.components[EditorCSGScene.boxType] == nil else {
+            return nil
+        }
+        if sourceEntities.first(where: { $0.id == rootEntityID })?.components[EditorCSGScene.boxType] != nil {
+            guard let parent, parent.components[EditorCSGScene.groupType] != nil,
+                csgBoxes(in: parent.id).count < CSGGroupSource.maximumBoxes else { return nil }
+        }
         guard
             sourceIDs.count == sourceEntities.count,
             sourceIDs.contains(rootEntityID),

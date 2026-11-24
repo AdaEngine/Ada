@@ -75,9 +75,23 @@ struct EditorInspectorSidebar: View {
                                         componentEditor(component)
                                     }
                                 }
-                                addComponentPicker
+                                if selectedEntity.csg?.selectedBoxID == nil {
+                                    addComponentPicker
+                                }
                             }
-                            if !selectedEntity.scriptableObjects.isEmpty || !selectedEntity.addableScriptableObjects.isEmpty {
+                            if let csg = selectedEntity.csg {
+                                inspectorSection("CSG Group") {
+                                    EditorCSGInspector(
+                                        selection: csg,
+                                        status: viewModel.csgPreview?.status[csg.groupID],
+                                        edit: { viewModel.editCSG?($0) },
+                                        isReadOnly: viewModel.csgReadOnly || viewModel.csgPreview == nil,
+                                        textureReferences: viewModel.csgTextureReferences
+                                    )
+                                }
+                            }
+                            if selectedEntity.csg?.selectedBoxID == nil,
+                               !selectedEntity.scriptableObjects.isEmpty || !selectedEntity.addableScriptableObjects.isEmpty {
                                 inspectorSection("SCRIPTABLE OBJECTS") {
                                     ForEach(selectedEntity.scriptableObjects, id: \.identifier) { object in
                                         scriptableObjectEditor(object)

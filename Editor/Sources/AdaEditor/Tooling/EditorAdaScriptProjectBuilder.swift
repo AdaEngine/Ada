@@ -25,6 +25,8 @@ struct EditorAdaScriptProjectBuildArtifact: Sendable {
     let scenePlayRuntime: EditorScenePlayRuntime
     let sources: [AdaScriptSource]
     let window: AdaProjectRuntimeWindow
+    var csgProducts: [EditorCSGScene.Product] = []
+    var sceneSourceURL: URL?
 
     func assetDirectories() throws -> ProjectDirectories {
         let source = assetsDirectory.deletingLastPathComponent()
@@ -156,7 +158,8 @@ struct EditorAdaScriptProjectBuilder {
             sceneModel: preparedEntry.sceneModel,
             scenePlayRuntime: scriptableObjectSupport.playRuntime,
             sources: sources,
-            window: project.runtime.window
+            window: project.runtime.window,
+            sceneSourceURL: preparedEntry.entry.scene.map { projectURL.appendingPathComponent($0) }
         )
     }
 
@@ -267,9 +270,15 @@ enum EditorProjectStorageIdentity {
         for explicit in [project.project.bundleIdentifier, project.project.id].compactMap({ $0 }) {
             try ProjectDirectories.validateStorageIdentifier(explicit)
         }
-        if let identifier = project.project.bundleIdentifier ?? project.project.id { return identifier }
-        guard nativeFallback, let name = project.project.name, !name.isEmpty else { return nil }
-        if (try? ProjectDirectories.validateStorageIdentifier(name)) != nil { return name }
+        if let identifier = project.project.bundleIdentifier ?? project.project.id {
+            return identifier
+        }
+        guard nativeFallback, let name = project.project.name, !name.isEmpty else {
+            return nil
+        }
+        if (try? ProjectDirectories.validateStorageIdentifier(name)) != nil {
+            return name
+        }
         // Legacy display names may contain spaces or slashes; do not turn them into path components.
         var hash: UInt64 = 14695981039346656037
         for byte in name.utf8 { hash = (hash ^ UInt64(byte)) &* 1099511628211 }

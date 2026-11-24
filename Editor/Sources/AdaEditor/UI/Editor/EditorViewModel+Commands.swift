@@ -389,7 +389,7 @@ extension EditorViewModel {
         workspaceTask = Task { [weak self] in
             let outcome =
                 await Task.detached(priority: .userInitiated) {
-                    Self.prepareAdaScriptProject(
+                    await Self.prepareAdaScriptProject(
                         settings,
                         at: projectURL,
                         destination: destination
@@ -428,7 +428,7 @@ extension EditorViewModel {
         _ settings: AdaProject,
         at projectURL: URL,
         destination: AdaProjectRunDestination
-    ) -> EditorAdaScriptProjectBuildOutcome {
+    ) async -> EditorAdaScriptProjectBuildOutcome {
         let fileManager = FileManager()
         do {
             try ProjectSystem.validateRunCompatibility(
@@ -437,13 +437,13 @@ extension EditorViewModel {
                 destination: destination,
                 fileManager: fileManager
             )
-            return .success(
-                try EditorAdaScriptProjectBuilder(fileManager: fileManager)
-                    .prepare(
-                        project: settings,
-                        at: projectURL
-                    )
-            )
+            var artifact = try EditorAdaScriptProjectBuilder(fileManager: fileManager).prepare(project: settings, at: projectURL)
+            if let model = artifact.sceneModel, model.requiresCSGPreparation {
+                artifact.csgProducts = try await EditorCSGScene.prepare(
+                    model, sourceURL: artifact.sceneSourceURL, resourceRootURL: artifact.assetsDirectory
+                )
+            }
+            return .success(artifact)
         } catch let error as ProjectSystemError {
             return .projectFailure(error)
         } catch let error as EditorAdaScriptProjectBuildError {
@@ -611,6 +611,9 @@ extension EditorViewModel {
     }
 
     func runActiveSceneInEditor(tracking run: EditorTrackedScenePlay?) {
+        guard csgPlayPreparation == nil else {
+            return
+        }
         guard !movieMaker.isBusy else {
             return
         }
@@ -626,11 +629,47 @@ extension EditorViewModel {
             return
         }
 
-        guard document.sceneModel != nil || EditorSceneFileLoader.model(from: document.content) != nil else {
+        guard let model = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content) else {
             failPlayMode("Unable to play \(document.title): scene document is invalid.")
             return
         }
 
+        guard model.requiresCSGPreparation else {
+            startScenePlay(document, tracking: run)
+            return
+        }
+        let source = document.absolutePath.map { URL(fileURLWithPath: $0) }
+        let assets = projectAssetsURL
+        workspaceStatus = .running(L10n.text("CSG Rebuilding"))
+        csgPlayPreparation = Task { [weak self] in
+            guard let self else {
+                return
+            }
+            defer { self.csgPlayPreparation = nil }
+            do {
+                let products = try await EditorCSGScene.prepare(model, sourceURL: source, resourceRootURL: assets)
+                try Task.checkCancellation()
+                guard let current = self.sceneDocumentForPlay(), current.id == document.id,
+                    current.content == document.content else {
+                    self.failPlayMode(L10n.text("Scene changed while preparing CSG. Start Play again."))
+                    return
+                }
+                var prepared = current
+                prepared.csgPlayProducts = products
+                self.startScenePlay(prepared, tracking: run)
+            } catch is CancellationError {
+                self.workspaceStatus = .ready
+            } catch let error as EditorCSGScene.Failure {
+                switch error {
+                case let .invalidGroup(name): self.failPlayMode(L10n.text("Invalid CSG geometry in ‘\(name)’."))
+                }
+            } catch {
+                self.failPlayMode(error.localizedDescription)
+            }
+        }
+    }
+
+    private func startScenePlay(_ document: EditorSceneDocument, tracking run: EditorTrackedScenePlay?) {
         workbench.open(.scene(document))
         toolbar.sceneName = URL(fileURLWithPath: document.title).deletingPathExtension().lastPathComponent
         trackedScenePlay = run
@@ -644,6 +683,10 @@ extension EditorViewModel {
     }
 
     func stopFromToolbar() {
+        if let csgPlayPreparation {
+            csgPlayPreparation.cancel()
+            return
+        }
         if movieMaker.isBusy {
             movieMaker.stop()
             return

@@ -287,6 +287,7 @@ enum AdaEditorMaterialSymbolFont {
         0xE40A,
         0xE429,
         0xE48F,
+        0xE53B,
         0xE55B,
         0xE564,
         0xE5CA,
@@ -334,12 +335,14 @@ enum AdaEditorMaterialSymbolFont {
         0xE925,
         0xE949,
         0xE97A,
+        0xE9C9,
         0xEA23,
         0xEAD5,
         0xEB82,
         0xEB8E,
         0xEF42,
         0xF1C4,
+        0xF20E,
         0xF720,
     ]
 

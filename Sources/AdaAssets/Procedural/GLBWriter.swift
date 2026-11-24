@@ -11,13 +11,22 @@ public struct ProceduralMaterial: Sendable, Equatable {
     public var metallic: Float
     public var roughness: Float
     public var emissive: SIMD3<Float>
+    public var baseColorPNG: Data?
 
-    public init(name: String, baseColor: SIMD4<Float> = [0.8, 0.8, 0.8, 1], metallic: Float = 0, roughness: Float = 0.6, emissive: SIMD3<Float> = .zero) {
+    public init(
+        name: String,
+        baseColor: SIMD4<Float> = [0.8, 0.8, 0.8, 1],
+        metallic: Float = 0,
+        roughness: Float = 0.6,
+        emissive: SIMD3<Float> = .zero,
+        baseColorPNG: Data? = nil
+    ) {
         self.name = name
         self.baseColor = baseColor
         self.metallic = metallic
         self.roughness = roughness
         self.emissive = emissive
+        self.baseColorPNG = baseColorPNG
     }
 }
 
@@ -115,13 +124,18 @@ public struct GLBWriter: Sendable {
             for value in values { data.append(contentsOf: withUnsafeBytes(of: value.bitPattern.littleEndian) { Array($0) }) }
             return append(data, count: values.count / components, componentType: 5126, type: type, target: target, bounds: bounds ? values : nil, components: components)
         }
-        func append(_ data: Data, count: Int, componentType: Int, type: String, target: Int? = nil, bounds: [Float]? = nil, components: Int = 1) -> Int {
+        func appendBufferView(_ data: Data, target: Int? = nil) -> Int {
             while binary.count % 4 != 0 { binary.append(0) }
             var view: [String: Any] = ["buffer": 0, "byteOffset": binary.count, "byteLength": data.count]
             if let target { view["target"] = target }
             bufferViews.append(view)
             binary.append(data)
-            var accessor: [String: Any] = ["bufferView": bufferViews.count - 1, "componentType": componentType, "count": count, "type": type]
+            return bufferViews.count - 1
+        }
+
+        func append(_ data: Data, count: Int, componentType: Int, type: String, target: Int? = nil, bounds: [Float]? = nil, components: Int = 1) -> Int {
+            let view = appendBufferView(data, target: target)
+            var accessor: [String: Any] = ["bufferView": view, "componentType": componentType, "count": count, "type": type]
             if let bounds {
                 var low = Array(bounds[0..<components]), high = low
                 for start in stride(from: components, to: bounds.count, by: components) {
@@ -189,15 +203,26 @@ public struct GLBWriter: Sendable {
         }
         for (parent, list) in children { nodes[parent]["children"] = list }
 
+        var images: [[String: Any]] = []
+        var textureIndices: [Data: Int] = [:]
         let materials = model.materials.map { material -> [String: Any] in
-            var json: [String: Any] = [
-                "name": material.name,
-                "pbrMetallicRoughness": [
-                    "baseColorFactor": doubles(material.baseColor),
-                    "metallicFactor": Double(material.metallic),
-                    "roughnessFactor": Double(material.roughness),
-                ] as [String: Any],
+            var pbr: [String: Any] = [
+                "baseColorFactor": doubles(material.baseColor),
+                "metallicFactor": Double(material.metallic),
+                "roughnessFactor": Double(material.roughness),
             ]
+            if let png = material.baseColorPNG {
+                let index: Int
+                if let existing = textureIndices[png] {
+                    index = existing
+                } else {
+                    index = images.count
+                    images.append(["bufferView": appendBufferView(png), "mimeType": "image/png"])
+                    textureIndices[png] = index
+                }
+                pbr["baseColorTexture"] = ["index": index]
+            }
+            var json: [String: Any] = ["name": material.name, "pbrMetallicRoughness": pbr]
             if material.emissive != .zero { json["emissiveFactor"] = doubles(material.emissive) }
             return json
         }
@@ -209,6 +234,11 @@ public struct GLBWriter: Sendable {
             "meshes": meshes,
             "materials": materials,
         ]
+        if !images.isEmpty {
+            document["images"] = images
+            document["textures"] = images.indices.map { ["source": $0, "sampler": 0] }
+            document["samplers"] = [["minFilter": 9729, "magFilter": 9729, "wrapS": 10497, "wrapT": 10497]]
+        }
         if !model.skins.isEmpty {
             document["skins"] = model.skins.map { skin -> [String: Any] in
                 let matrices = addAccessor(skin.inverseBindMatrices.flatMap { matrix in (0..<16).map { matrix[$0] } }, components: 16, type: "MAT4")

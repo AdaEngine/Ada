@@ -16,7 +16,9 @@ extension EditorSceneViewportModel {
     // Once a scene frame is displayed, pointer input must use its geometry,
     // including a frame that deliberately contains no transform handles.
     func interactionGizmo() -> EditorTransformGizmo? {
-        guard let presentedGizmo else { return transformGizmo() }
+        guard let presentedGizmo else {
+            return transformGizmo()
+        }
         guard presentedGizmo.selection == selectedEditorID, presentedGizmo.tool == activeTool,
               presentedGizmo.mode == displayMode, !isPerspectiveTransitionActive else { return nil }
         return presentedGizmo.geometry
@@ -35,7 +37,9 @@ extension EditorSceneViewportModel {
             let entity = sceneModel?.entities.first(where: { $0.id == selectedEditorID }), entity.enabled,
             let payload = entity.components[EditorBuiltInComponentType.transform],
             let transform = try? EditorComponentPayloadDecoder.decode(Transform.self, payload: payload) as? Transform,
-            let parent = entity.parent.map({ gizmoWorldMatrix(for: $0) }) ?? .some(.identity)
+            let parent = entity.parent.map({
+                gizmoWorldMatrix(for: $0, respectingTransformGaps: entity.components[EditorCSGScene.boxType] != nil)
+            }) ?? .some(.identity)
         else {
             return nil
         }
@@ -51,12 +55,17 @@ extension EditorSceneViewportModel {
     }
 
     func gizmoWorldMatrix(for editorID: String) -> Transform3D? {
+        gizmoWorldMatrix(for: editorID, respectingTransformGaps: false)
+    }
+
+    func gizmoWorldMatrix(for editorID: String, respectingTransformGaps: Bool) -> Transform3D? {
         guard let model = sceneModel else {
             return nil
         }
         var currentID: String? = editorID
         var visited: Set<String> = []
         var result = Transform3D.identity
+        var inheritsTransform = true
         while let id = currentID {
             guard
                 visited.insert(id).inserted,
@@ -64,9 +73,13 @@ extension EditorSceneViewportModel {
             else {
                 return nil
             }
-            if let payload = entity.components[EditorBuiltInComponentType.transform],
-                let transform = try? EditorComponentPayloadDecoder.decode(Transform.self, payload: payload) as? Transform {
-                result = transform.matrix * result
+            if inheritsTransform {
+                if let payload = entity.components[EditorBuiltInComponentType.transform],
+                    let transform = try? EditorComponentPayloadDecoder.decode(Transform.self, payload: payload) as? Transform {
+                    result = transform.matrix * result
+                } else if respectingTransformGaps {
+                    inheritsTransform = false
+                }
             }
             currentID = entity.parent
         }

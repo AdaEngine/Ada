@@ -63,6 +63,7 @@ final class EditorSceneViewportModel {
                 }
                 return MarkerPosition(id: entity.id, position: position)
             } ?? []
+            csgPreview.refresh(sceneModel, viewport: self)
         }
     }
     private struct MarkerPosition {
@@ -71,7 +72,7 @@ final class EditorSceneViewportModel {
     }
     private var markerPositions: [MarkerPosition] = []
     private var sceneSourceURL: URL?
-    private var sceneResourceRootURL: URL?
+    private(set) var sceneResourceRootURL: URL?
     var terrainSourceContext: (application: AppWorlds, assetsRoot: URL)? {
         guard let application = sceneApplication, let root = sceneResourceRootURL ?? sceneSourceURL?.deletingLastPathComponent() else {
             return nil
@@ -84,6 +85,22 @@ final class EditorSceneViewportModel {
     }
     var showsEntityMarkers = false
     let terrainEditing = EditorTerrainEditingState()
+    let csgPreview = EditorCSGPreview()
+    private(set) var csgTargets: [String: EditorCSGScene.PreviewTarget] = [:]
+
+    func csgEntity(for id: String) -> Entity? {
+        if let target = csgTargets[id], let entity = world?.getEntityByID(target.entityID) {
+            return entity
+        }
+        return runtimeEntity(for: id)
+    }
+    func withCSGWorldAccess(_ operation: @MainActor () throws -> Void) async throws {
+        if let sceneApplication {
+            try await sceneApplication.withWorldAccess(operation)
+        } else {
+            try operation()
+        }
+    }
     private(set) var activeTool: EditorSceneViewportTool = .translate
     private(set) var isAnnotating = false
     var annotationEntityIDs: [String] = []
@@ -154,6 +171,10 @@ final class EditorSceneViewportModel {
     ) -> EditorSceneRuntimeLoadResult? {
         let contentChanged = self.sceneContent != sceneContent
         let contextChanged = sceneSourceURL != sourceURL || sceneResourceRootURL != resourceRootURL
+        if contextChanged {
+            csgPreview.clear()
+            csgTargets = [:]
+        }
         self.sceneSourceURL = sourceURL
         self.sceneResourceRootURL = resourceRootURL
         self.scriptableObjectCatalog = scriptableObjectCatalog
@@ -227,6 +248,8 @@ final class EditorSceneViewportModel {
         }
         depthGridEntityIDs.removeAll()
         world = nil
+        csgPreview.clear()
+        csgTargets.removeAll()
         terrainEditing.meshPoseQueue.cancel()
         sceneApplication = nil
         presentedGizmo = nil
@@ -258,6 +281,9 @@ final class EditorSceneViewportModel {
         self.world = world
         self.entitiesByEditorID = loadResult.entitiesByEditorID
         self.editorIDsByEntityID = loadResult.editorIDsByEntityID
+        csgTargets = loadResult.csgTargets
+        csgPreview.refresh(sceneModel, viewport: self)
+        csgPreview.restore(in: self)
         refreshSceneEnvironmentCamera(in: world)
         cameraEntityID = isImmersive ? nil : findCameraEntity(in: world)?.id
         if !isImmersive { applyCamera() }
@@ -475,6 +501,9 @@ final class EditorSceneViewportModel {
     private func finishSceneRuntime(_ result: EditorSceneRuntimeLoadResult, in world: World) {
         entitiesByEditorID = result.entitiesByEditorID
         editorIDsByEntityID = result.editorIDsByEntityID
+        csgTargets = result.csgTargets
+        csgPreview.refresh(sceneModel, viewport: self)
+        csgPreview.restore(in: self)
         refreshSceneEnvironmentCamera(in: world)
         cameraEntityID = isImmersive ? nil : findCameraEntity(in: world)?.id
         if !isImmersive { applyCamera() }
@@ -662,6 +691,7 @@ final class EditorSceneViewportModel {
             guard let matrix = gizmoWorldMatrix(for: id), let point = project(matrix.origin, viewProjection: viewProjection, size: size) else { continue }
             drawViewportMarker(at: point, radius: 10, color: theme.editorColors.blue, in: &context)
         }
+        drawSelectedCSGBox(in: &context, viewProjection: viewProjection, size: size, theme: theme)
         let gizmo = transformGizmo(size: size)
         gizmo?.draw(in: &context, highlighted: activeGizmoHandle ?? hoveredGizmoHandle)
         return gizmo
@@ -930,7 +960,17 @@ extension EditorSceneViewportModel {
         guard var drag = transformDrag else {
             return false
         }
-        let transform = drag.interaction.updated(at: gizmoPosition(position, size: drag.interaction.gizmo.size))
+        var transform = drag.interaction.updated(at: gizmoPosition(position, size: drag.interaction.gizmo.size))
+        if csgPreview.snapsToGrid, drag.interaction.gizmo.tool == .translate,
+            sceneModel?.entities.contains(where: { $0.id == drag.editorID && $0.components[EditorCSGScene.boxType] != nil }) == true {
+            let start = drag.interaction.transform.position
+            let position = transform.position
+            transform.position = Vector3(
+                position.x == start.x ? start.x : (position.x * 4).rounded() / 4,
+                position.y == start.y ? start.y : (position.y * 4).rounded() / 4,
+                position.z == start.z ? start.z : (position.z * 4).rounded() / 4
+            )
+        }
         transformDrag = drag
         var payload = drag.startPayload
         if transform != drag.interaction.transform {
@@ -1502,7 +1542,7 @@ extension EditorSceneViewportModel {
             ray: ray,
             world: world,
             authoredEntities: entitiesByEditorID,
-            editorIDs: editorIDsByEntityID,
+            editorIDs: editorIDsByEntityID.merging(csgPreview.pickingIDs(in: self), uniquingKeysWith: { first, _ in first }),
             cameraID: cameraEntityID
         )
     }
@@ -1542,9 +1582,12 @@ extension EditorSceneViewportModel {
 
         let transformFields = transformFields(from: entity)
         let componentNames = entity.components.keys
-            .filter { $0 != EditorBuiltInComponentType.scriptableComponents }
+            .filter {
+                $0 != EditorBuiltInComponentType.scriptableComponents && !EditorCSGScene.isAuthoringComponent($0)
+            }
             .sorted()
-        let components = componentNames.map { componentSection(typeName: $0, payload: entity.components[$0] ?? [:]) }
+        let isCSGBox = entity.components[EditorCSGScene.boxType] != nil
+        let components = componentNames.map { componentSection(typeName: $0, payload: entity.components[$0] ?? [:], isCSGBox: isCSGBox) }
         let addableComponents = EditorComponentRegistry.addableDescriptors(for: entity)
             .map {
                 EditorInspectorSidebarViewModel.AddableComponent(
@@ -1570,7 +1613,8 @@ extension EditorSceneViewportModel {
             gizmo: gizmo,
             hasExplicitGizmo: entity.components[EditorSceneYAMLDocument.editorGizmoComponentName] != nil,
             hasJoinedDescendant: !meshTerrainBoundDescendants(of: editorID, in: model).isEmpty,
-            locomotion: locomotionInspectorState(for: entity)
+            locomotion: locomotionInspectorState(for: entity),
+            csg: EditorCSGInspectorSelection(model: model, selected: entity)
         )
     }
 
@@ -1644,7 +1688,9 @@ extension EditorSceneViewportModel {
         }
     }
 
-    private func componentSection(typeName: String, payload: EditorComponentPayload) -> EditorInspectorSidebarViewModel.ComponentSection {
+    private func componentSection(
+        typeName: String, payload: EditorComponentPayload, isCSGBox: Bool
+    ) -> EditorInspectorSidebarViewModel.ComponentSection {
         let payload =
             [EditorBuiltInComponentType.physicsBody2D, EditorBuiltInComponentType.physicsBody3D].contains(typeName)
             ? EditorComponentRegistry.resolvedPhysicsPayload(payload, is3D: typeName == EditorBuiltInComponentType.physicsBody3D) : payload
@@ -1673,11 +1719,13 @@ extension EditorSceneViewportModel {
             typeName: typeName,
             displayName: descriptor.displayName,
             fields: (descriptor.fields + graphFields)
-                .filter { typeName != EditorBuiltInComponentType.sprite || EditorSpriteLayoutFields.isVisible($0, in: payload) }.map {
-                    EditorInspectorSidebarViewModel.ComponentField(
+                .filter { typeName != EditorBuiltInComponentType.sprite || EditorSpriteLayoutFields.isVisible($0, in: payload) }.map { field in
+                    var displayed = field
+                    if isCSGBox, typeName == EditorBuiltInComponentType.transform, field.key == "scale" { displayed.label = "CSG Size" }
+                    return EditorInspectorSidebarViewModel.ComponentField(
                         typeName: typeName,
-                        field: $0,
-                        value: $0.displayValue(in: payload)
+                        field: displayed,
+                        value: field.displayValue(in: payload)
                     )
                 },
             canRemove: typeName != EditorBuiltInComponentType.transform

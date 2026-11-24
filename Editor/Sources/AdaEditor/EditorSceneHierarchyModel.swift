@@ -1,5 +1,21 @@
+import AdaEngine
 import AdaUtils
 import Foundation
+
+enum EditorSceneHierarchyCSGKind: Equatable, Sendable {
+    case group
+    case operand(CSGShape)
+
+    init?(entity: EditorSceneEntity) {
+        if entity.components[EditorCSGScene.groupType] != nil {
+            self = .group
+        } else if entity.components[EditorCSGScene.boxType] != nil, let shape = EditorCSGScene.shape(of: entity) {
+            self = .operand(shape)
+        } else {
+            return nil
+        }
+    }
+}
 
 struct EditorSceneHierarchyItem: Equatable, Identifiable, Sendable {
     var id: String
@@ -9,6 +25,7 @@ struct EditorSceneHierarchyItem: Equatable, Identifiable, Sendable {
     var isSelected: Bool
     var isExpanded: Bool
     var hasChildren: Bool
+    var csgKind: EditorSceneHierarchyCSGKind?
     var componentNames: [String]
     var resources: [EditorSceneHierarchyResource]
 }
@@ -95,6 +112,7 @@ extension EditorSceneHierarchyModel {
                 isSelected: entity.id == selectedEntityID,
                 isExpanded: isExpanded,
                 hasChildren: !children.isEmpty,
+                csgKind: EditorSceneHierarchyCSGKind(entity: entity),
                 componentNames: entity.components.keys.sorted().map(shortComponentName),
                 resources: includesResources ? resources(from: entity) : []
             )
@@ -227,8 +245,13 @@ extension EditorSceneHierarchyModel {
                 )
             }
         case let .object(values):
-            appendResources(in: values, componentName: componentName, resourceKey: resourceKey,
-                seen: &seen, resources: &resources)
+            appendResources(
+                in: values,
+                componentName: componentName,
+                resourceKey: resourceKey,
+                seen: &seen,
+                resources: &resources
+            )
         case .bool,
             .double,
             .int,

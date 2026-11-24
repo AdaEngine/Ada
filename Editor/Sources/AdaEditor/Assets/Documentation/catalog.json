@@ -195,6 +195,23 @@
       },
       {
         "kind": "heading",
+        "text": "Build levels with CSG",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use the CSG level building guide to create editable walls, floors and\nopenings in a 3D scene.",
+        "level": 0,
+        "links": [
+          {
+            "title": "CSG level building guide",
+            "destination": "CSG"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
         "text": "Build and run",
         "level": 2,
         "links": []
@@ -3463,6 +3480,104 @@
       {
         "kind": "text",
         "text": "Native Windows is exercised during development. Other platform acceptance and full\nportable export validation remain separate checks; local editor tests do not prove\nthose platforms. Three-dimensional manual paint storage and volumetric curvature\nrules are not yet equivalent to the heightfield paint channels.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "CSG",
+    "title": "Build a level with CSG",
+    "section": "Editor",
+    "source": "Editor/Documentation/CSG.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Constructive solid geometry (CSG) lets you build walls, floors and openings\nfrom editable boxes, spheres and cylinders. A group keeps its blocks and their\noperation order in the scene file. You can adjust a doorway after saving and\nreopening the scene.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The scene hierarchy uses separate icons for the CSG group, cube, sphere and\ncylinder, so you can identify each block even after renaming it.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Build two rooms with a doorway",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "To start with the completed example, copy `Editor/Tests/Fixtures/CSGTwoRooms`\nfrom the AdaEngine repository to a writable location and open it as a project\nin Studio.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In Studio's agent chat, use the bundled `ada-csg` skill for instructions on\ncreating, editing and testing CSG groups through the scene tools.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "1\\. Open a 3D scene in desktop Ada Studio. In the scene tree, choose **Add**,\n   then **CSG Group**. Expand the group to see its starting box.\n2\\. Select the starting box and name it **Partition**. In **Transform**, set\n   Size to `0.4, 3, 6` and Position to `0, 1.5, 0`.\n3\\. In **CSG Group**, set **Block shape** to **Cube** and choose **Add Block**.\n   Name it **Doorway**. Set Size to `1, 2.15, 1.5`\n   and Position to `0, 0.97, 0`. Choose **Difference**. The box crosses both\n   faces of the partition and cuts a floor-height opening.\n4\\. Add another box named **Floor** and keep **Union**. Set Size to\n   `10, 0.25, 6` and Position to `0, -0.125, 0`. The floor's top is at Y = 0,\n   flush with the opening.\n5\\. Select **Doorway** to see its outline. Use the viewport's **Move**, **Rotate**\n   and **Scale** tools to adjust the cut. **CSG Grid Snap** snaps movement\n   of blocks to a quarter unit in group coordinates.\n6\\. Try Undo and Redo, then save and reopen the scene. The group and its boxes\n   should still be editable.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use the arrow buttons beside **Add Block** to move the selected operation.\nThe first enabled block is the **Base**. Studio applies each later operation\nfrom top to bottom. **Intersection** keeps the volume shared by the current\nresult and the selected shape. An empty result can be valid.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Add curved shapes and check UVs",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Choose **Sphere** to cut a rounded recess or **Cylinder** to make a round hole.\nThe cylinder stands along Y before rotation. Adjust the cutter with the 3D\ngizmos, then set its operation to **Difference**.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In the group inspector, choose **Checkerboard** under **Texture**. Use\n**UV Repeat** to set how many times the texture repeats over each chart.\nRotate the view to inspect the seams and the inside of the cut. Box faces and\ncylinder caps use planar charts. Spheres and cylinder sides wrap around their\naxes. A cut face uses the cutter's chart, so moving or rotating a cutter moves\nthat chart with it.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Choose a PNG or JPEG from the project's primary assets folder to use your own\ntexture. Each group has one texture. Texture selection and UV repeat are saved\nwith the group and are part of scene history. Play and native export carry the\ngenerated UVs and the selected image. Reopen the scene to refresh its preview\nafter replacing the source image outside Studio.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Play and export",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For an in-editor Play check, add a 3D camera, lighting, and a player character.\nWalk through the opening and into the partition beside it. The opening should\nbe clear and the solid wall should stop the character. Start Play again after\nchanging the group. The collision is static for the duration of the run.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For native AdaScript export, use a 3D project with the **Model 3D** and\n**Physics 3D** runtime plugins enabled. The exporter saves ordinary model\nassets and static triangle collision. The exported player does not need the\nCSG authoring kernel.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "While a group rebuilds, the editor shows the last valid render result. If the\ncurrent result fails, check block dimensions, placement, and the texture before\nstarting Play or exporting. Each group supports up to 128 blocks and is subject\nto a triangle budget. CSG textures can be up to 4,096 pixels per side and\n32 MiB before import.",
         "level": 0,
         "links": []
       }

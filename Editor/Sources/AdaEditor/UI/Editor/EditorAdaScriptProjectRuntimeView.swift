@@ -136,7 +136,12 @@ struct EditorAdaScriptProjectRuntimeView: View {
             app.addPlugin(scriptPlugin)
         }
         if includesEntryScene, let sceneModel = artifact.sceneModel {
-            app.addPlugin(EditorAdaScriptRuntimeEntryPlugin(sceneModel: sceneModel, assetsDirectory: artifact.assetsDirectory))
+            app.addPlugin(EditorAdaScriptRuntimeEntryPlugin(
+                sceneModel: sceneModel,
+                assetsDirectory: artifact.assetsDirectory,
+                sourceURL: artifact.sceneSourceURL,
+                csgProducts: artifact.csgProducts
+            ))
         }
         controls?.attach(world: app.main)
         controls?.attach(
@@ -223,10 +228,11 @@ struct EditorAdaScriptProjectRuntimeView: View {
 struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
     let sceneModel: EditorSceneModel
     let assetsDirectory: URL
-    var sourceURL: URL? = nil
+    var sourceURL: URL?
     var recordsAchievement = true
     var trackedScenePlay: EditorTrackedScenePlay? = nil
     var onInitialSceneLoaded: (@MainActor @Sendable (EditorSceneRuntimeLoadResult) -> Void)? = nil
+    var csgProducts: [EditorCSGScene.Product] = []
 
     func setup(in app: borrowing AppWorlds) {
         guard let navigator = app.main.getResource(SceneNavigator.self) else {
@@ -241,7 +247,10 @@ struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
             return try await MainActor.run {
                 try withExtendedLifetime(prepared) {
                     let scene = Scene(name: prepared.model.scene.name)
-                    let result = EditorSceneFileLoader.load(model: prepared.model, into: scene.world, sourceURL: url, resourceRootURL: assetsDirectory)
+                    var result = EditorSceneFileLoader.load(
+                        model: prepared.model.withoutCSGAuthoring(), into: scene.world, sourceURL: url, resourceRootURL: assetsDirectory
+                    )
+                    EditorCSGScene.install(prepared.csgProducts, in: scene.world, result: &result)
                     guard result.warnings.isEmpty else {
                         throw EditorRuntimeSceneNavigationError.invalidScene(result.warnings.joined(separator: "\n"))
                     }
@@ -250,11 +259,14 @@ struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
             }
         }
         let scene = Scene(name: sceneModel.scene.name)
-        let result = EditorSceneFileLoader.load(model: sceneModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)
+        let runtimeModel = sceneModel.withoutCSGAuthoring()
+        var result = EditorSceneFileLoader.load(model: runtimeModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)
+        EditorCSGScene.install(csgProducts, in: scene.world, result: &result)
         trackedScenePlay?.install(in: scene.world, result: result)
         navigator.installInitialScene(scene, make: {
             let scene = Scene(name: sceneModel.scene.name)
-            _ = EditorSceneFileLoader.load(model: sceneModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)
+            var result = EditorSceneFileLoader.load(model: runtimeModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)
+            EditorCSGScene.install(csgProducts, in: scene.world, result: &result)
             return scene
         })
         onInitialSceneLoaded?(result)

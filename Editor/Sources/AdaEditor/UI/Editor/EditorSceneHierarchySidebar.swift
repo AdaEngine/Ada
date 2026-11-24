@@ -558,10 +558,21 @@ enum EditorSceneHierarchyIcon {
     static let image = "\u{E3F4}"
     static let audio = "\u{EB82}"
     static let scene = "\u{E2C7}"
+    static let csgGroup = "\u{E53B}"
+    static let csgCube = "\u{F720}"
+    static let csgSphere = "\u{E9C9}"
+    static let csgCylinder = "\u{F20E}"
 
-    static let allSymbols = [entity, image, audio, scene]
+    static let allSymbols = [entity, image, audio, scene, csgGroup, csgCube, csgSphere, csgCylinder]
 
     static func symbol(for item: EditorSceneHierarchyItem) -> String {
+        switch item.csgKind {
+        case .some(.group): return csgGroup
+        case .some(.operand(.box)): return csgCube
+        case .some(.operand(.sphere)): return csgSphere
+        case .some(.operand(.cylinder)): return csgCylinder
+        case nil: break
+        }
         let componentNames = item.componentNames.map { $0.lowercased() }
         if componentNames.contains(where: { $0.contains("sceneinstance") }) {
             return scene

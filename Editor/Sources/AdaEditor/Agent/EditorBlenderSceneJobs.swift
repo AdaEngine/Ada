@@ -183,7 +183,7 @@ enum EditorBlenderSceneAction {
             let modelPath = root.appendingPathComponent(asset.path).resolvingSymlinksInPath().standardizedFileURL.path
             var result = Self.placement(job, document: document, reference: asset.reference)
             do {
-                let run = try EditorAgentWorkspaceMCPTools.shared.startTrackedPlay(document: document, entityID: job.entityID, editor: editor)
+                let run = try await EditorAgentWorkspaceMCPTools.shared.startTrackedPlay(document: document, entityID: job.entityID, editor: editor)
                 let runningContent = editor.workbench.activeSceneDocument?.content
                 let capture = try await EditorGameFrameCapture.captureTrackedModel(run, modelPath: modelPath, projectURL: root) {
                     EditorAgentMCPTools.shared.activeViewModel === editor && editor.trackedScenePlay == run && editor.playModeState.isPlaying &&

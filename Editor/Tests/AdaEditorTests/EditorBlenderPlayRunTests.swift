@@ -8,6 +8,33 @@ import Testing
 @MainActor
 @Suite("Blender model Play evidence", .serialized)
 struct EditorBlenderPlayRunTests {
+    @Test(.enabled(if: CSGGroupSource.isAvailable))
+    func trackedPlayWaitsForCSGScenePreparation() async throws {
+        var model = EditorSceneModel.default(projectName: "Tracked CSG")
+        let group = model.addEntity(template: .csgGroup, parentID: nil)
+        let content = try model.encodedYAML()
+        let document = EditorSceneDocument(
+            id: "tracked-csg",
+            title: "Main.ascn",
+            relativePath: "Assets/Main.ascn",
+            content: content,
+            lastSavedContent: content,
+            sceneModel: model,
+            isDirty: false,
+            loadSummary: EditorSceneFileLoader.summary(from: content)
+        )
+        let editor = EditorViewModel(project: nil)
+        editor.workbench.open(.scene(document))
+        defer {
+            editor.csgPlayPreparation?.cancel()
+            editor.stopPlayMode()
+        }
+        let run = try await EditorAgentWorkspaceMCPTools.shared.startTrackedPlay(document: document, entityID: group.id, editor: editor)
+        #expect(editor.trackedScenePlay == run)
+        #expect(editor.playModeState.isPlaying)
+        #expect(editor.workbench.activeSceneDocument?.csgPlayProducts.map(\.groupID) == [group.id])
+    }
+
     @Test func exactRunAndModelReferenceAreRequired() throws {
         let run = EditorTrackedScenePlay(id: UUID(), sceneDocumentID: "scene", entityID: "job-entity", sceneRevision: "revision")
         let otherRun = EditorTrackedScenePlay(id: UUID(), sceneDocumentID: "scene", entityID: "job-entity", sceneRevision: "revision")

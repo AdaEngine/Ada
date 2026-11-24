@@ -126,9 +126,13 @@ extension EditorViewModel {
     }
 
     nonisolated static func absoluteFilePath(from path: String) -> String? {
-        if path.hasPrefix("/") { return path }
+        if path.hasPrefix("/") {
+            return path
+        }
         #if os(Windows)
-            if path.hasPrefix("\\\\") { return path }
+            if path.hasPrefix("\\\\") {
+                return path
+            }
             let prefix = Array(path.utf8.prefix(3))
             guard prefix.count == 3, prefix[1] == 58,
                 prefix[2] == 47 || prefix[2] == 92,
@@ -173,7 +177,9 @@ extension EditorViewModel {
         fileManager: FileManager,
         items: inout [EditorProjectSidebarViewModel.Item]
     ) {
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled else {
+            return
+        }
         let url = entry.url
         let isDirectory = entry.isDirectory
         let isSymbolicLink = entry.isSymbolicLink
@@ -217,7 +223,9 @@ extension EditorViewModel {
     }
 
     nonisolated private static func projectTreeEntries(at directory: URL, fileManager: FileManager) -> [EditorProjectTreeEntry] {
-        guard !Task.isCancelled else { return [] }
+        guard !Task.isCancelled else {
+            return []
+        }
         let urls = (try? fileManager.contentsOfDirectory(
             at: directory, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey], options: []
         )) ?? []
@@ -225,10 +233,16 @@ extension EditorViewModel {
         // Snapshot each entry once instead of issuing two queries per comparison.
         return urls.filter { !shouldSkipProjectTreeURL($0) }.map { url in
             let values = try? url.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
-            return EditorProjectTreeEntry(url: url, name: url.lastPathComponent,
-                                          isDirectory: values?.isDirectory == true, isSymbolicLink: values?.isSymbolicLink == true)
+            return EditorProjectTreeEntry(
+                url: url,
+                name: url.lastPathComponent,
+                isDirectory: values?.isDirectory == true,
+                isSymbolicLink: values?.isSymbolicLink == true
+            )
         }.sorted { lhs, rhs in
-            if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }
+            if lhs.isDirectory != rhs.isDirectory {
+                return lhs.isDirectory
+            }
             return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
         }
     }
@@ -241,7 +255,9 @@ extension EditorViewModel {
         if SceneDocumentFormat.isSceneFile(url) {
             return .scene
         }
-        if url.pathExtension.lowercased() == "shadergraph" { return .genericAsset }
+        if url.pathExtension.lowercased() == "shadergraph" {
+            return .genericAsset
+        }
 
         if isImageAsset(url) {
             return .image
@@ -251,7 +267,8 @@ extension EditorViewModel {
             return .audio
         }
 
-        if url.pathExtension.lowercased() == "tileset" || EditorModelResource.extensions.contains(url.pathExtension.lowercased()) || EditorSpineResource.extensions.contains(url.pathExtension.lowercased()) {
+        let fileExtension = url.pathExtension.lowercased()
+        if fileExtension == "tileset" || EditorModelResource.extensions.contains(fileExtension) || EditorSpineResource.extensions.contains(fileExtension) {
             return .genericAsset
         }
 
@@ -286,8 +303,12 @@ extension EditorViewModel {
         for kind: EditorProjectFileKind,
         fileExtension: String
     ) -> EditorAssetPreviewKind {
-        if fileExtension == "shadergraph" { return .shaderGraph }
-        if EditorSpineResource.extensions.contains(fileExtension.lowercased()) { return .spine2D }
+        if fileExtension == "shadergraph" {
+            return .shaderGraph
+        }
+        if EditorSpineResource.extensions.contains(fileExtension.lowercased()) {
+            return .spine2D
+        }
         if EditorModelResource.extensions.contains(fileExtension.lowercased()) {
             return .model3D
         }
@@ -306,8 +327,12 @@ extension EditorViewModel {
         if fileExtension == "spriteanim" {
             return .spriteAnimation
         }
-        if fileExtension == "animlib" { return .animationLibrary }
-        if fileExtension == "animmod" { return .animationModifiers }
+        if fileExtension == "animlib" {
+            return .animationLibrary
+        }
+        if fileExtension == "animmod" {
+            return .animationModifiers
+        }
         switch kind {
         case .image:
             return .image
@@ -430,6 +455,7 @@ extension EditorViewModel {
 
     func syncInspectorTextureAssets() {
         inspectorSidebar.textureAssets = Self.textureAssets(from: projectSidebar.items)
+        inspectorSidebar.csgTextureReferences = Self.csgTextures(from: inspectorSidebar.textureAssets, assetsDirectory: projectAssetsURL)
         inspectorSidebar.tileMapAssets = Self.tileMapAssets(from: projectSidebar.items)
         inspectorSidebar.particleEffectAssets = Self.particleEffectAssets(from: projectSidebar.items)
         inspectorSidebar.spriteAnimationAssets = Self.spriteAnimationAssets(from: projectSidebar.items)
@@ -444,6 +470,25 @@ extension EditorViewModel {
         inspectorSidebar.sceneAssets = Self.sceneAssets(from: projectSidebar.items)
         inspectorSidebar.uiSourcePaths = Self.uiSourcePaths(from: projectSidebar.items)
         inspectorSidebar.uiSceneFiles = Self.uiSceneFiles(from: projectSidebar.items)
+    }
+
+    static func csgTextures(
+        from items: [EditorInspectorSidebarViewModel.TextureAsset],
+        assetsDirectory: URL?
+    ) -> [String] {
+        guard let root = assetsDirectory?.resolvingSymlinksInPath().standardizedFileURL.path else {
+            return []
+        }
+        let prefix = root + "/"
+        let references = items.compactMap { item -> String? in
+            let path = URL(fileURLWithPath: item.absolutePath).resolvingSymlinksInPath().standardizedFileURL.path
+            guard path.hasPrefix(prefix) else {
+                return nil
+            }
+            let reference = "@res://" + String(path.dropFirst(prefix.count))
+            return EditorCSGScene.supportsTexture(reference) ? reference : nil
+        }
+        return Set(references).sorted()
     }
 
     static func assetsDirectoryURL(for projectURL: URL, fileManager: FileManager) -> URL {
