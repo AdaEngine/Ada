@@ -607,6 +607,10 @@ extension EditorViewModel {
     }
 
     func runActiveSceneInEditor() {
+        runActiveSceneInEditor(tracking: nil)
+    }
+
+    func runActiveSceneInEditor(tracking run: EditorTrackedScenePlay?) {
         guard !movieMaker.isBusy else {
             return
         }
@@ -629,6 +633,7 @@ extension EditorViewModel {
 
         workbench.open(.scene(document))
         toolbar.sceneName = URL(fileURLWithPath: document.title).deletingPathExtension().lastPathComponent
+        trackedScenePlay = run
         playModeState = .playing(sceneDocumentID: document.id, title: document.title)
         workspaceStatus = .running("Play \(document.title)")
         appendOutput("Playing \(document.relativePath)")
@@ -665,6 +670,7 @@ extension EditorViewModel {
         }
 
         playModeState = .editing
+        trackedScenePlay = nil
         workspaceStatus = .ready
         appendOutput("Stopped Play Mode")
     }

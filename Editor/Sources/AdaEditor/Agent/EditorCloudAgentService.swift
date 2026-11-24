@@ -5,6 +5,9 @@ struct EditorCloudAgentTool: Sendable {
     var definition: EditorCloudValue
     var readOnly: Bool
     var invoke: @Sendable (EditorCloudValue) async throws -> String
+    var validate: (@Sendable (EditorCloudValue) throws -> Void)? = nil
+    var approvalTarget: (@Sendable (EditorCloudValue) -> String?)? = nil
+    var approvalDetails: (@Sendable (EditorCloudValue) throws -> String?)? = nil
 }
 
 /// The native tool loop uses the same server wallet and model as browser Studio.
@@ -20,7 +23,7 @@ actor EditorCloudAgentService: EditorAgentServicing {
     init(
         host: EditorCloudToolCatalog.Host = .desktop,
         connectionFactory: @escaping ConnectionFactory = { try await EditorCloudAccount.shared.hostedAIGenerator() },
-        toolsFactory: @escaping ToolsFactory = { url in try await MainActor.run { try EditorCloudToolHost(projectURL: url).tools() } }
+        toolsFactory: @escaping ToolsFactory = { url in try await MainActor.run { try EditorCloudAgentService.defaultTools(projectURL: url) } }
     ) {
         self.host = host
         self.connectionFactory = connectionFactory
@@ -61,6 +64,28 @@ actor EditorCloudAgentService: EditorAgentServicing {
         let key = error.localizedDescription
         return .providerFailure(await MainActor.run { L10n.tr(key) })
     }
+
+    @MainActor private static func defaultTools(projectURL: URL) throws -> [EditorCloudAgentTool] {
+        let native = try EditorCloudToolHost(projectURL: projectURL).tools()
+        #if os(macOS) || os(Windows)
+        let root = projectURL.resolvingSymlinksInPath().standardizedFileURL
+        let workspaceGeneration = EditorAgentMCPTools.shared.workspaceGeneration
+        let isCurrentProject: @Sendable () async -> Bool = {
+            await EditorAgentMCPTools.shared.isCurrentWorkspace(root, generation: workspaceGeneration)
+        }
+        let mayInvoke: @Sendable () async -> Bool = {
+            await EditorAgentMCPTools.shared.allowsExternalInvocations
+        }
+        #if os(Windows)
+        let preset = EditorBlenderMCPSettings.shared.tools(projectURL: root, isCurrentProject: isCurrentProject, mayInvoke: mayInvoke)
+        #else
+        let preset: [EditorCloudAgentTool] = []
+        #endif
+        return native + EditorLocalMCPSettings.shared.cloudTools(preset: preset, isCurrentProject: isCurrentProject, mayInvoke: mayInvoke)
+        #else
+        return native
+        #endif
+    }
     private func run(
         _ request: EditorAgentRunRequest, onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
         onProjectFileChanged: @escaping @Sendable (String) async -> Void
@@ -70,9 +95,21 @@ actor EditorCloudAgentService: EditorAgentServicing {
         }
         let connection = try await connectionFactory()
         let planning = [.ask, .plan].contains(request.mode)
-        let selection = try connection.toolContract == Int64(EditorCloudToolCatalog.currentVersion)
-            ? EditorCloudToolCatalog.load().selection(host: host, planning: planning) : nil
-        let tools = try await toolsFactory(request.projectURL).filter {
+        let availableTools = try await toolsFactory(request.projectURL)
+        let hasExternalTools = host == .desktop && availableTools.contains { $0.name.hasPrefix("editor_external_") }
+        let baseVersion = EditorCloudToolCatalog.currentVersion
+        let externalVersion = EditorCloudToolCatalog.externalVersion
+        let version: Int?
+        if host == .desktop, connection.toolContract == Int64(externalVersion) || (hasExternalTools && connection.supportsExternalTools) {
+            version = externalVersion
+        } else {
+            version = connection.toolContract == Int64(baseVersion) ? baseVersion : nil
+        }
+        let selection = try version.map {
+            try EditorCloudToolCatalog.load(version: $0, hasExternalTools: hasExternalTools).selection(host: host, planning: planning)
+        }
+        let tools = availableTools.filter {
+            if $0.name.hasPrefix("editor_external_") { return version == externalVersion && hasExternalTools }
             if selection != nil {
                 return true
             }
@@ -102,8 +139,8 @@ actor EditorCloudAgentService: EditorAgentServicing {
                 "billingMode": "ada", "mode": planning ? "plan" : "build", "tools": .array(definitions),
                 "messages": .array(messages + [["role": "user", "content": .string("Current request: " + String(request.prompt.prefix(4000)))]]),
             ]
-            if selection != nil {
-                input["toolContract"] = .integer(Int64(EditorCloudToolCatalog.currentVersion))
+            if let version {
+                input["toolContract"] = .integer(Int64(version))
                 input["toolHost"] = .string(host.rawValue)
             }
             guard try JSONEncoder().encode(input).count <= 180_000 else {
@@ -141,31 +178,44 @@ actor EditorCloudAgentService: EditorAgentServicing {
                     guard let tool = bindings[action?.legacyName ?? name] else {
                         throw EditorAIError.invalidResponse
                     }
+                    let resolvedArguments = try action?.legacyArguments() ?? .object(arguments)
+                    try tool.validate?(resolvedArguments)
                     let needsApproval = action?.approval ?? !tool.readOnly
-                    let target = action?.target ?? arguments["path"]?.string ?? arguments["destination"]?.string
+                    let target = tool.approvalTarget?(resolvedArguments) ?? action?.target ?? arguments["path"]?.string ?? arguments["destination"]?.string
                     if let action {
                         toolEvent.toolCall?.title = [action.key, target].compactMap { $0 }.joined(separator: " ")
                     }
                     await onEvent(toolEvent)
+                    try Task.checkCancellation()
                     if needsApproval {
                         let details = [action?.key ?? name, request.project.project.name ?? request.projectURL.lastPathComponent, target ?? ""]
                         let permissionSummary = details.joined(separator: "\n")
+                        let inputDetails = try tool.approvalDetails?(resolvedArguments)
                         guard request.project.ai.agent.permissionMode != .deny,
-                            await permission(session: request.session.id, toolID: id, name: permissionSummary, onEvent: onEvent)
+                            await permission(session: request.session.id, toolID: id, name: permissionSummary, inputDetails: inputDetails, onEvent: onEvent)
                         else {
                             throw EditorAgentServiceError.providerFailure("The user declined this project change.")
                         }
                     }
                     try Task.checkCancellation()
-                    let result = try await tool.invoke(action?.legacyArguments() ?? .object(arguments))
+                    let result = try await tool.invoke(resolvedArguments)
                     output = try action?.result(result, host: host) ?? result
                     toolEvent.toolCall?.status = .completed
-                    let changedPath = action?.target ?? arguments["path"]?.string ?? (name == "editor_web_download" ? arguments["destination"]?.string : nil)
+                    let changedPath: String?
+                    if action?.key == "editor_external/invoke" {
+                        let external = resolvedArguments["tool"].string?.hasPrefix("blender.") == true
+                            ? try? JSONDecoder().decode(EditorCloudValue.self, from: Data(result.utf8)) : nil
+                        changedPath = external?["artifact"].string ?? external?["assetPath"].string
+                    } else {
+                        changedPath = action?.target ?? arguments["path"]?.string ?? (name == "editor_web_download" ? arguments["destination"]?.string : nil)
+                    }
                     if needsApproval, let path = changedPath {
                         await onProjectFileChanged(path)
                     }
                 } catch is CancellationError { throw CancellationError() } catch {
-                    output = "Tool failed: " + error.localizedDescription
+                    let details = error.localizedDescription
+                    let message = name == "editor_external" ? await MainActor.run { L10n.tr(details) } : details
+                    output = "Tool failed: " + message
                     toolEvent.toolCall?.status = .failed
                 }
                 toolEvent.toolCall?.content = [.init(kind: .text, text: String(output.prefix(32_000)))]
@@ -176,7 +226,7 @@ actor EditorCloudAgentService: EditorAgentServicing {
         throw EditorAgentServiceError.providerFailure("The agent reached its step limit. Continue from the saved project.")
     }
     private func permission(
-        session: String, toolID: String, name: String,
+        session: String, toolID: String, name: String, inputDetails: String?,
         onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void
     ) async -> Bool {
         let id = UUID().uuidString
@@ -184,10 +234,16 @@ actor EditorCloudAgentService: EditorAgentServicing {
             kind: .permission,
             permission: .init(
                 id: id, summary: name, toolCallID: toolID,
-                options: [.init(id: "allow", name: "Allow once", kind: "allow_once"), .init(id: "deny", name: "Reject", kind: "reject_once")], state: .pending, selectedOptionID: nil))
-        return await withCheckedContinuation { continuation in
-            permissions[id] = (session, continuation)
-            Task { await onEvent(event) }
+                options: [.init(id: "allow", name: "Allow once", kind: "allow_once"), .init(id: "deny", name: "Reject", kind: "reject_once")],
+                state: .pending, selectedOptionID: nil, inputDetails: inputDetails))
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                guard !Task.isCancelled else { continuation.resume(returning: false); return }
+                permissions[id] = (session, continuation)
+                Task { await onEvent(event) }
+            }
+        } onCancel: {
+            Task { await self.resolvePermission(requestID: id, optionID: nil) }
         }
     }
     func resolvePermission(requestID: String, optionID: String?) async {

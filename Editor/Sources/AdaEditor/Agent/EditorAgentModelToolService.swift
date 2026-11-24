@@ -24,7 +24,7 @@ final class EditorAgentModelToolService {
             editor.model.generate accepts AdaScript geometry, explicitly placed joints, rigid/two-joint weights
             and linear joint translation/rotation clips; no Swift compiler or JIT at recipe execution
             """,
-            "unavailable": ["Blender execution", "automatic organic mesh generation", "automatic rig inference", "visual imported rig/keyframe editing", "Draco/Meshopt/KTX2 decoding"],
+            "unavailable": ["direct Blender Python", "automatic organic mesh generation", "automatic rig inference", "visual imported rig/keyframe editing", "Draco/Meshopt/KTX2 decoding"],
         ]
     }
 
@@ -49,8 +49,8 @@ final class EditorAgentModelToolService {
         return try inspect(url)
     }
 
-    private func inspect(_ url: URL, importing: Bool = false) throws -> [String: Any] {
-        let data = try boundedData(url)
+    private func inspect(_ url: URL, importing: Bool = false, bytes: Data? = nil) throws -> [String: Any] {
+        let data = try bytes ?? boundedData(url)
         let root = try document(data, at: url)
         let dependencies = try preflight(root, at: url, modelBytes: data.count, importing: importing)
         let imported = try NativeGLTFLoader().load(data: data, baseURL: url.deletingLastPathComponent())
@@ -354,3 +354,83 @@ final class EditorAgentModelToolService {
         init(_ message: String) { errorDescription = message }
     }
 }
+
+#if os(Windows)
+extension EditorAgentModelToolService {
+    func importBlenderJob(_ job: inout EditorBlenderSceneJob, scene: String, destination: String) throws -> EditorCloudValue {
+        let source = try job.exportURL(in: projectURL)
+        if job.assetPath != nil, FileManager.default.fileExists(atPath: try reservedBlenderAsset(job).path) {
+            let asset = try importedBlenderAsset(job)
+            removeStagedExport(source, matching: job)
+            return blenderImportResult(job, path: asset.path, reference: asset.reference)
+        }
+        guard EditorBlenderMCPExport.isDirect(source, directory: false) else { throw EditorBlenderSceneJob.Failure.assetChanged }
+        let bytes = try boundedData(source)
+        guard job.matches(bytes) else { throw EditorBlenderSceneJob.Failure.assetChanged }
+        try EditorModelAssetImporter.requireSelfContainedGLB(bytes)
+        _ = try inspect(source, importing: true, bytes: bytes)
+
+        if job.assetPath == nil {
+            let directory = try blenderAssetDirectory(destination, create: true)
+            let name = String(job.name.filter { $0.isLetter || $0.isNumber || " -_".contains($0) })
+                .trimmingCharacters(in: .whitespaces)
+            let fileName = (name.isEmpty ? "Blender Model" : name) + ".glb"
+            let target = EditorModelAssetImporter.uniqueURL(fileName, in: directory)
+            job.scene = scene
+            job.destination = destination
+            job.assetPath = relative(target)
+            try job.save(in: projectURL)
+        }
+        let target = try reservedBlenderAsset(job)
+        try EditorModelAssetImporter.publishValidatedGLB(bytes, at: target)
+        let asset = try importedBlenderAsset(job)
+        removeStagedExport(source, matching: job)
+        return blenderImportResult(job, path: asset.path, reference: asset.reference)
+    }
+
+    func importedBlenderAsset(_ job: EditorBlenderSceneJob) throws -> (path: String, reference: String) {
+        let asset = try reservedBlenderAsset(job)
+        guard EditorBlenderMCPExport.isDirect(asset, directory: false), job.matches(try boundedData(asset)) else {
+            throw EditorBlenderSceneJob.Failure.assetChanged
+        }
+        let assetReference = reference(asset)
+        guard !assetReference.isEmpty else { throw EditorBlenderSceneJob.Failure.assetChanged }
+        return (relative(asset), assetReference)
+    }
+
+    private func blenderImportResult(_ job: EditorBlenderSceneJob, path: String, reference: String) -> EditorCloudValue {
+        ["job": .string(job.id), "stage": "imported", "scene": .string(job.scene ?? ""),
+         "assetPath": .string(path), "assetReference": .string(reference)]
+    }
+
+    private func reservedBlenderAsset(_ job: EditorBlenderSceneJob) throws -> URL {
+        guard let path = job.assetPath, let destination = job.destination,
+              let components = EditorBlenderSceneAction.relativeComponents(path), let name = components.last,
+              name.hasSuffix(".glb"), components.dropLast().joined(separator: "/") == destination else {
+            throw EditorBlenderSceneJob.Failure.missingExport
+        }
+        return try blenderAssetDirectory(destination, create: false).appendingPathComponent(name)
+    }
+
+    private func blenderAssetDirectory(_ path: String, create: Bool) throws -> URL {
+        let project = try ProjectSystem.loadProject(at: projectURL)
+        guard let components = EditorBlenderSceneAction.relativeComponents(path),
+              let assets = EditorBlenderSceneAction.relativeComponents(project.paths.assets ?? "Assets"), components.starts(with: assets) else {
+            throw EditorBlenderSceneJob.Failure.parameters
+        }
+        var directory = projectURL
+        for component in components {
+            directory = directory.appendingPathComponent(component, isDirectory: true)
+            if create { try EditorBlenderMCPExport.ensureDirectory(directory) }
+            guard EditorBlenderMCPExport.isDirect(directory, directory: true) else { throw EditorBlenderSceneJob.Failure.assetChanged }
+        }
+        return directory
+    }
+
+    private func removeStagedExport(_ source: URL, matching job: EditorBlenderSceneJob) {
+        if EditorBlenderMCPExport.isDirect(source, directory: false), let bytes = try? boundedData(source), job.matches(bytes) {
+            EditorBlenderMCPExport.removeDirectFile(source)
+        }
+    }
+}
+#endif

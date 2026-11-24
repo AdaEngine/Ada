@@ -2,6 +2,7 @@ import Foundation
 
 struct EditorCloudToolCatalog: Decodable, Sendable {
     static let currentVersion = 2
+    static let externalVersion = 3
 
     enum Host: String, Sendable {
         case desktop, mobile
@@ -35,7 +36,12 @@ struct EditorCloudToolCatalog: Decodable, Sendable {
         let arguments: [String: EditorCloudValue]
 
         var target: String? {
-            arguments["destination"]?.string ?? arguments["previewPath"]?.string ?? arguments["scenePath"]?.string ?? arguments["path"]?.string
+            if key == "editor_external/invoke", let tool = arguments["tool"]?.string {
+                let input = arguments["input"]
+                return [tool, input?["name"].string, input?["scene"].string, input?["destination"].string, input?["job"].string]
+                    .compactMap { $0 }.joined(separator: " · ")
+            }
+            return arguments["destination"]?.string ?? arguments["previewPath"]?.string ?? arguments["scenePath"]?.string ?? arguments["path"]?.string
         }
 
         func legacyArguments() throws -> EditorCloudValue {
@@ -179,13 +185,21 @@ struct EditorCloudToolCatalog: Decodable, Sendable {
     let version: Int
     let families: [Family]
 
-    static func load() throws -> Self {
-        guard let url = Bundle.editor.url(forResource: "AdaAIToolContract", withExtension: "json", subdirectory: "Assets") else {
+    private static func read(_ resource: String, version: Int) throws -> Self {
+        guard let url = Bundle.editor.url(forResource: resource, withExtension: "json", subdirectory: "Assets") else {
             throw EditorAIError.invalidResponse
         }
         let catalog = try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
-        guard catalog.version == currentVersion else { throw EditorAIError.invalidResponse }
+        guard catalog.version == version else { throw EditorAIError.invalidResponse }
         return catalog
+    }
+
+    static func load(version: Int = currentVersion, hasExternalTools: Bool = false) throws -> Self {
+        let base = try read("AdaAIToolContract", version: currentVersion)
+        guard version == externalVersion else { return base }
+        guard hasExternalTools else { return Self(version: externalVersion, families: base.families) }
+        let addition = try read("AdaAIExternalToolContract", version: externalVersion)
+        return Self(version: externalVersion, families: base.families + addition.families)
     }
 
     func selection(host: Host, planning: Bool) -> Selection {

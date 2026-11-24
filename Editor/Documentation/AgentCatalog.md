@@ -71,6 +71,8 @@ saved yet. Subsequent projects cannot override the global selection; project met
 ## Built-in game building workflow
 
 For the hosted agent, see [Ada AI tools and permissions](CloudAI.md#working-with-project-tools).
+To add your own tools, see [connect a local MCP server](CloudAI.md#connect-a-local-mcp-server).
+On Windows, see [connect Blender MCP to Ada AI](CloudAI.md#export-a-model-from-blender-on-windows).
 
 `ada-game-builder` is bundled with Studio for desktop and mobile agents. Every
 desktop prompt advertises discovered workflows; mobile prompts advertise the

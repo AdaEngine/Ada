@@ -225,6 +225,7 @@ struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
     let assetsDirectory: URL
     var sourceURL: URL? = nil
     var recordsAchievement = true
+    var trackedScenePlay: EditorTrackedScenePlay? = nil
     var onInitialSceneLoaded: (@MainActor @Sendable (EditorSceneRuntimeLoadResult) -> Void)? = nil
 
     func setup(in app: borrowing AppWorlds) {
@@ -250,6 +251,7 @@ struct EditorAdaScriptRuntimeEntryPlugin: Plugin {
         }
         let scene = Scene(name: sceneModel.scene.name)
         let result = EditorSceneFileLoader.load(model: sceneModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)
+        trackedScenePlay?.install(in: scene.world, result: result)
         navigator.installInitialScene(scene, make: {
             let scene = Scene(name: sceneModel.scene.name)
             _ = EditorSceneFileLoader.load(model: sceneModel, into: scene.world, sourceURL: sourceURL, resourceRootURL: assetsDirectory)

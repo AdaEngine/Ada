@@ -4,6 +4,7 @@ typealias EditorCloudAITransport = @Sendable (EditorCloudValue, @escaping @Senda
 
 struct EditorCloudAIConnection: Sendable {
     let toolContract: Int64?
+    var supportsExternalTools = false
     let generate: EditorCloudAITransport
 }
 

@@ -564,7 +564,8 @@ final class EditorCloudAccount: NSObject {
         guard balance.allowance > 0 else { throw CloudError.message("Cloud Pro includes 500 AI credits per month. Subscribe to use Ada AI.") }
         guard balance.available > 0 else { throw CloudError.message("Your AI credits are used up. They renew with your monthly Cloud Pro allowance.") }
         guard sessionRevision == revision else { throw EditorAIError.sessionChanged }
-        return EditorCloudAIConnection(toolContract: provider["toolContract"].int) { [weak self] input, receive in
+        let supportsExternalTools = provider["toolContracts"].array.contains(.integer(Int64(EditorCloudToolCatalog.externalVersion)))
+        return EditorCloudAIConnection(toolContract: provider["toolContract"].int, supportsExternalTools: supportsExternalTools) { [weak self] input, receive in
             guard let self else { throw EditorAIError.sessionChanged }
             try await self.generateHostedAI(input, revision: revision, receive: receive)
         }

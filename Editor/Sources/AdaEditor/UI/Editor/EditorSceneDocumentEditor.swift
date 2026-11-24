@@ -10,6 +10,7 @@ struct EditorSceneDocumentEditor: View {
     let uiCatalog: UICatalog
     let inspectorViewModel: EditorInspectorSidebarViewModel
     let playModeState: EditorPlayModeState
+    var trackedScenePlay: EditorTrackedScenePlay? = nil
     let playRuntime: EditorScenePlayRuntime?
     let onEntitySelected: (() -> Void)?
     var onTerrainToolSelected: (() -> Void)?
@@ -53,6 +54,7 @@ struct EditorSceneDocumentEditor: View {
                     uiCatalog: uiCatalog,
                     inspectorViewModel: inspectorViewModel,
                     playModeState: playModeState,
+                    trackedScenePlay: trackedScenePlay,
                     playRuntime: playRuntime,
                     onEntitySelected: onEntitySelected,
                     onPlay: onPlay,

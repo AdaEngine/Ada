@@ -1,0 +1,41 @@
+{
+  "version": 3,
+  "families": [
+    {
+      "name": "editor_external",
+      "description": "Use selected local MCP tools in desktop Studio. List tools and describe the required input before invoking a tool in Build mode.",
+      "actions": [
+        {
+          "name": "list",
+          "description": "List the selected and connected local tools.",
+          "bindings": {"desktop": "editor_external_list"},
+          "plan": true,
+          "approval": false,
+          "schema": {"type": "object", "additionalProperties": false}
+        },
+        {
+          "name": "describe",
+          "description": "Read the supported input schema for a selected local tool.",
+          "bindings": {"desktop": "editor_external_describe"},
+          "plan": true,
+          "approval": false,
+          "schema": {
+            "type": "object", "additionalProperties": false, "required": ["tool"],
+            "properties": {"tool": {"type": "string", "minLength": 1, "maxLength": 128}}
+          }
+        },
+        {
+          "name": "invoke",
+          "description": "Invoke a selected local tool with its described input after user approval.",
+          "bindings": {"desktop": "editor_external_invoke"},
+          "plan": false,
+          "approval": true,
+          "schema": {
+            "type": "object", "additionalProperties": false, "required": ["tool", "input"],
+            "properties": {"tool": {"type": "string", "minLength": 1, "maxLength": 128}, "input": {"type": "object"}}
+          }
+        }
+      ]
+    }
+  ]
+}

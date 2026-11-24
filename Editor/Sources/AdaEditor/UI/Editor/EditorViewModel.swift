@@ -90,6 +90,7 @@ final class EditorViewModel {
     var projectSettingsStatusMessage = ""
     var selectedTestFilter: String
     var playModeState: EditorPlayModeState
+    var trackedScenePlay: EditorTrackedScenePlay?
     var isNewFileDialogPresented = false
     #if os(Windows)
         let kimodoInstaller = EditorKimodoInstallModel()

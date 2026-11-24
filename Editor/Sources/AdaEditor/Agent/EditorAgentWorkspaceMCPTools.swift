@@ -213,6 +213,35 @@ final class EditorAgentWorkspaceMCPTools {
         return try json(["accepted": true, "status": viewModel.workspaceStatus.title, "playMode": String(describing: viewModel.playModeState)])
     }
 
+    #if os(Windows)
+    func startTrackedPlay(document: EditorSceneDocument, entityID: String, editor: EditorViewModel) throws -> EditorTrackedScenePlay {
+        guard editor.workspaceTask == nil else {
+            throw EditorBlenderSceneJob.Failure.playBusy
+        }
+        if editor.playModeState.isPlaying {
+            if let run = editor.trackedScenePlay, run.matches(document), run.entityID == entityID {
+                editor.selectWorkbenchDocument(id: document.id)
+                if editor.interface.mode == .agent { editor.interface.showsArtifact = true }
+                return run
+            }
+            throw EditorBlenderSceneJob.Failure.playBusy
+        }
+        if document.isDirty, !editor.workbench.saveSceneDocument(id: document.id) {
+            throw EditorWorkspaceMCPError.documentSaveFailed
+        }
+        editor.selectWorkbenchDocument(id: document.id)
+        guard let saved = editor.workbench.activeSceneDocument, saved.id == document.id else {
+            throw EditorBlenderSceneJob.Failure.playChanged
+        }
+        let run = EditorTrackedScenePlay(id: UUID(), sceneDocumentID: document.id, entityID: entityID,
+                                        sceneRevision: EditorAgentSceneToolService.revision(for: saved.content))
+        editor.runActiveSceneInEditor(tracking: run)
+        guard editor.trackedScenePlay == run, editor.playModeState.isPlaying else { throw EditorBlenderSceneJob.Failure.playChanged }
+        if editor.interface.mode == .agent { editor.interface.showsArtifact = true }
+        return run
+    }
+    #endif
+
     private func stopTask() throws -> String {
         let viewModel = try requireViewModel()
         guard
