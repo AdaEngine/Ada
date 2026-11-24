@@ -802,11 +802,18 @@ extension EditorComponentRegistry {
 
 enum EditorComponentPayloadDecoder {
     static func decode(_ type: Decodable.Type, payload: EditorComponentPayload) throws -> Any {
+        try DynamicDecodableValue.decode(type, from: normalizedData(payload))
+    }
+
+    static func decodeValue<T: Decodable>(_ type: T.Type, payload: EditorComponentPayload) throws -> T {
+        try JSONDecoder().decode(type, from: normalizedData(payload))
+    }
+
+    private static func normalizedData(_ payload: EditorComponentPayload) throws -> Data {
         let object = payload.reduce(into: [String: Any]()) { result, item in
             result[item.key] = normalizedComponentValue(item.value.jsonCompatibleValue, key: item.key)
         }
-        let data = try JSONSerialization.data(withJSONObject: object, options: [])
-        return try DynamicDecodableValue.decode(type, from: data)
+        return try JSONSerialization.data(withJSONObject: object, options: [])
     }
 
     private static func normalizedComponentValue(_ value: Any, key: String) -> Any {

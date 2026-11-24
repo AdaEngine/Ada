@@ -15,6 +15,7 @@ struct EditorSceneRuntimeLoadResult: Equatable, Sendable {
     var warnings: [String]
     var entitiesByEditorID: [String: Entity.ID]
     var editorIDsByEntityID: [Entity.ID: String]
+    var csgTargets: [String: EditorCSGScene.PreviewTarget] = [:]
 
     static let empty = Self(entityCount: 0, warnings: [], entitiesByEditorID: [:], editorIDsByEntityID: [:])
 }
@@ -344,6 +345,10 @@ enum EditorSceneFileLoader {
         }
 
         func instantiateEntity(_ sceneEntity: EditorSceneEntity) {
+            if loadsScriptableObjects, sceneEntity.components[EditorCSGScene.boxType] != nil {
+                entityCount -= 1
+                return
+            }
             let entity = world.spawn(sceneEntity.name)
             entity.isActive = sceneEntity.enabled
             let runtimeEditorID = "\(idPrefix)\(sceneEntity.id)"
@@ -353,6 +358,8 @@ enum EditorSceneFileLoader {
             editorIDsByRuntimeEntityID[entity.id] = runtimeEditorID
 
             for (componentName, componentPayload) in sceneEntity.components {
+                if EditorCSGScene.isAuthoringComponent(componentName) { continue }
+                if sceneEntity.components[EditorCSGScene.boxType] != nil, componentName != EditorBuiltInComponentType.transform { continue }
                 if componentName == EditorBuiltInComponentType.scriptableComponents, !loadsScriptableObjects {
                     continue
                 }
@@ -484,6 +491,9 @@ enum EditorSceneFileLoader {
             }
 
             for (editorEntityID, clips) in Dictionary(grouping: sceneModel.animations ?? [], by: \.targetEntityID) {
+                if loadsScriptableObjects, sceneModel.entities.contains(where: { $0.id == editorEntityID && $0.components[EditorCSGScene.boxType] != nil }) {
+                    continue
+                }
                 guard let entity = entitiesByEditorID[editorEntityID] else {
                     warnings.append("Missing animation target \(editorEntityID)")
                     continue
@@ -520,11 +530,19 @@ enum EditorSceneFileLoader {
                 editorIDsByRuntimeEntityID[runtimeID] = editorID
             }
 
+            var csgTargets = nested.csgTargets
+            for entity in sceneModel.entities where entity.components[EditorCSGScene.groupType] != nil {
+                if let runtime = entitiesByEditorID[entity.id] {
+                    let source = try? sceneModel.csgSource(entity, resourceRootURL: resourceRootURL)
+                    csgTargets[idPrefix + entity.id] = .init(entityID: runtime.id, source: source)
+                }
+            }
             return EditorSceneRuntimeLoadResult(
                 entityCount: entityCount,
                 warnings: warnings,
                 entitiesByEditorID: runtimeEntityIDsByEditorID,
-                editorIDsByEntityID: editorIDsByRuntimeEntityID
+                editorIDsByEntityID: editorIDsByRuntimeEntityID,
+                csgTargets: csgTargets
             )
         }
     }
@@ -588,6 +606,7 @@ enum EditorSceneFileLoader {
                 )
                 result.entityCount += nested.entityCount
                 result.warnings.append(contentsOf: nested.warnings.map { "\(reference): \($0)" })
+                result.csgTargets.merge(nested.csgTargets, uniquingKeysWith: { first, _ in first })
                 for runtimeEntityID in nested.editorIDsByEntityID.keys {
                     result.editorIDsByEntityID[runtimeEntityID] = runtimeEditorID
                 }
@@ -618,7 +637,9 @@ enum EditorSceneFileLoader {
             url = sourceURL.deletingLastPathComponent().appendingPathComponent(reference)
         }
         let resolved = url.resolvingSymlinksInPath().standardizedFileURL
-        guard resolved.pathExtension == fileExtension else { return nil }
+        guard resolved.pathExtension == fileExtension else {
+            return nil
+        }
         if reference.hasPrefix("@res://") || fileExtension == "particles" || fileExtension == "animlib" || fileExtension == "animmod", let root {
             let rootPath = root.resolvingSymlinksInPath().standardizedFileURL.path
             guard resolved.path.hasPrefix(rootPath + "/") else {
@@ -670,6 +691,7 @@ private struct NestedSceneResult {
     var entityCount = 0
     var warnings: [String] = []
     var editorIDsByEntityID: [Entity.ID: String] = [:]
+    var csgTargets: [String: EditorCSGScene.PreviewTarget] = [:]
 }
 
 extension EditorSceneRuntimeLoadResult {

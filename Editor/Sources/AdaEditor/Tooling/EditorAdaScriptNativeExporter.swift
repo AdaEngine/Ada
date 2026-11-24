@@ -114,23 +114,33 @@ actor EditorAdaScriptNativeExporter {
             try await run(
                 EditorHostTools.executable("python3", windowsName: "python.exe"),
                 [tool.path] + inputPaths + ["--module", "ada_game", "--output", native.appendingPathComponent("ada_game.c").path, "--gravity", hostCompiler.path],
-                at: stage, environment: options.buildEnvironment, log: log
+                at: stage,
+                environment: options.buildEnvironment,
+                log: log
             )
             let inspection = stage.appendingPathComponent("ada_game-inspection.dll")
             try await run(
                 EditorHostTools.executable("clang"),
                 ["-std=c11", "-shared", native.appendingPathComponent("ada_game.c").path, "-I", native.path, "-Wl,/EXPORT:ada_game_get_module", "-o", inspection.path],
-                at: stage, environment: options.buildEnvironment, log: log
+                at: stage,
+                environment: options.buildEnvironment,
+                log: log
             )
             #else
             try await run(
-                "/usr/bin/python3", [tool.path] + inputPaths + ["--module", "ada_game", "--output", archive.path],
-                at: stage, environment: options.buildEnvironment, log: log
+                "/usr/bin/python3",
+                [tool.path] + inputPaths + ["--module", "ada_game", "--output", archive.path],
+                at: stage,
+                environment: options.buildEnvironment,
+                log: log
             )
             let inspection = stage.appendingPathComponent("libada_game-inspection.dylib")
             try await run(
-                "/usr/bin/clang", ["-std=c11", "-dynamiclib", native.appendingPathComponent("ada_game.c").path, "-I", native.path, "-o", inspection.path],
-                at: stage, environment: options.buildEnvironment, log: log
+                "/usr/bin/clang",
+                ["-std=c11", "-dynamiclib", native.appendingPathComponent("ada_game.c").path, "-I", native.path, "-o", inspection.path],
+                at: stage,
+                environment: options.buildEnvironment,
+                log: log
             )
             #endif
             try await Self.validateMetadata(at: inspection, project: project, sources: sources)
@@ -143,13 +153,18 @@ actor EditorAdaScriptNativeExporter {
                 encoding: .utf8
             )
         }
-        try await Self.convertScenes(at: assets, originalRoot: originalAssets, sources: sources)
+        let usesCSG = try await Self.convertScenes(at: assets, originalRoot: originalAssets, sources: sources)
         try Self.convertShaderGraphs(at: assets, originalRoot: originalAssets)
         try JSONEncoder().encode(project.inputActions).write(to: assets.appendingPathComponent("input-actions.json"))
         try JSONEncoder().encode(project).write(to: stage.appendingPathComponent("project.json"))
         let plugins = try EditorAdaScriptRuntimePluginResolver.resolve(project.runtime.plugins)
+        if usesCSG, !plugins.contains(.model3D) || !plugins.contains(.physics3D) {
+            let message = await L10n.text("CSG export requires the Model 3D and Physics 3D runtime plugins.")
+            throw EditorPreviewBuildFailure(message: message)
+        }
         try Self.manifest(options: options, interpreted: interpreted).write(to: stage.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
-        try Self.player(project: project, sources: sources, plugins: plugins, destination: options.destination, interpreted: interpreted).write(to: player.appendingPathComponent("Game.swift"), atomically: true, encoding: .utf8)
+        let gameSource = try Self.player(project: project, sources: sources, plugins: plugins, destination: options.destination, interpreted: interpreted)
+        try gameSource.write(to: player.appendingPathComponent("Game.swift"), atomically: true, encoding: .utf8)
         let scriptDirectory = stage.appendingPathComponent("script")
         try FileManager.default.createDirectory(at: scriptDirectory, withIntermediateDirectories: true)
         let script = scriptDirectory.appendingPathComponent("build_and_run.sh")
@@ -178,10 +193,20 @@ actor EditorAdaScriptNativeExporter {
             guard let configuration = options.androidConfiguration else {
                 throw EditorPreviewBuildFailure(message: "Android toolchain configuration is missing.")
             }
-            _ = try await EditorAndroidProjectExporter.buildAPK(at: stage, product: "AdaNativeGame", applicationID: options.androidApplicationID,
-                label: project.project.displayName ?? project.project.name ?? "AdaScript Game", engineRoot: options.engineRoot,
-                configuration: configuration, abi: options.androidABI, scratch: options.scratchDirectory ?? stage.appendingPathComponent("build-android"),
-                buildConfiguration: options.configuration.rawValue, signingKey: options.androidSigningKey, runner: runner, log: log)
+            _ = try await EditorAndroidProjectExporter.buildAPK(
+                at: stage,
+                product: "AdaNativeGame",
+                applicationID: options.androidApplicationID,
+                label: project.project.displayName ?? project.project.name ?? "AdaScript Game",
+                engineRoot: options.engineRoot,
+                configuration: configuration,
+                abi: options.androidABI,
+                scratch: options.scratchDirectory ?? stage.appendingPathComponent("build-android"),
+                buildConfiguration: options.configuration.rawValue,
+                signingKey: options.androidSigningKey,
+                runner: runner,
+                log: log
+            )
         } else if options.destination == .macOS {
             let scratch = options.scratchDirectory ?? stage.appendingPathComponent("build-native")
             try await run(
@@ -209,11 +234,18 @@ actor EditorAdaScriptNativeExporter {
         } else {
             #if os(Windows)
             let command = EditorWindowsBuildWorker.webCommand(
-                package: stage, output: stage.appendingPathComponent("web"), product: "AdaNativeGame",
-                engineRoot: options.engineRoot, gravityRoot: options.gravityRoot,
-                swift: options.swiftExecutable, sdk: options.swiftSDK,
-                configuration: options.configuration.rawValue, serve: false,
-                scratch: options.scratchDirectory, environment: options.buildEnvironment)
+                package: stage,
+                output: stage.appendingPathComponent("web"),
+                product: "AdaNativeGame",
+                engineRoot: options.engineRoot,
+                gravityRoot: options.gravityRoot,
+                swift: options.swiftExecutable,
+                sdk: options.swiftSDK,
+                configuration: options.configuration.rawValue,
+                serve: false,
+                scratch: options.scratchDirectory,
+                environment: options.buildEnvironment
+            )
             let result = await runner.run(command, output: log)
             try Task.checkCancellation()
             guard result.succeeded else { throw EditorPreviewBuildFailure(message: result.combinedOutput) }
@@ -224,14 +256,18 @@ actor EditorAdaScriptNativeExporter {
             webEnv["PATH"] = URL(fileURLWithPath: options.swiftExecutable).deletingLastPathComponent().path + ":" + (ProcessInfo.processInfo.environment["PATH"] ?? "/usr/bin:/bin")
             var arguments = ["package", "--disable-sandbox"]
             if let hostScratch = options.hostScratchDirectory { arguments += ["--scratch-path", hostScratch.path] }
-            arguments += ["--allow-writing-to-package-directory", "--allow-network-connections", "all", "export-web", "--product", "AdaNativeGame", "--output", stage.appendingPathComponent("web").path]
+            arguments += [
+                "--allow-writing-to-package-directory", "--allow-network-connections", "all",
+                "export-web", "--product", "AdaNativeGame", "--output", stage.appendingPathComponent("web").path
+            ]
             if let wasmScratch = options.scratchDirectory { arguments += ["--scratch-path", wasmScratch.path] }
             arguments += ["--swift-sdk", options.swiftSDK]
             arguments += [options.configuration == .debug ? "--debug" : "--release"]
             try await run(options.swiftExecutable, arguments, at: stage, environment: webEnv, log: log)
             #endif
         }
-        try Data("{\"version\":1,\"destination\":\"\(options.destination.rawValue)\",\"runtime\":\"\(interpreted ? "interpreted" : "aot")\"}".utf8).write(to: stage.appendingPathComponent("ada-native-export.json"))
+        let exportMetadata = "{\"version\":1,\"destination\":\"\(options.destination.rawValue)\",\"runtime\":\"\(interpreted ? "interpreted" : "aot")\"}"
+        try Data(exportMetadata.utf8).write(to: stage.appendingPathComponent("ada-native-export.json"))
         try Task.checkCancellation()
         // Build paths are absolute in Bundle.module: ship a relative resource
         // fallback in the player and preserve the generated package for rebuilding.
@@ -273,7 +309,9 @@ actor EditorAdaScriptNativeExporter {
     }
 
     private static func rejectLegacyShaders(in directory: URL) throws {
-        guard let files = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isDirectoryKey]) else { return }
+        guard let files = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.isDirectoryKey]) else {
+            return
+        }
         let legacyExtensions: Set<String> = ["glsl", "vert", "frag", "comp", "geom", "tesc", "tese"]
         let legacyDirective = #"(?m)^\s*#\s*(?:version\b|pragma\s+stage\b)"#
         for case let file as URL in files {
@@ -312,7 +350,7 @@ actor EditorAdaScriptNativeExporter {
     }
 
     @MainActor
-    private static func convertScenes(at assets: URL, originalRoot: URL, sources: [AdaScriptSource]) throws {
+    static func convertScenes(at assets: URL, originalRoot: URL, sources: [AdaScriptSource]) async throws -> Bool {
         if unsafe RenderEngine.shared == nil {
             // CLI exports decode textured components without starting Studio's render world.
             let previousBackend = unsafe RenderEngine.configurations.preferredBackend
@@ -323,15 +361,37 @@ actor EditorAdaScriptNativeExporter {
         EditorComponentRegistry.registerBuiltIns()
         let schemas = try AdaScriptSchemaParser.parse(sources: sources).filter { $0.kind == .component }
         let nativeNames = Set(schemas.flatMap { [$0.name, $0.id] + $0.aliases })
-        guard let files = FileManager.default.enumerator(at: assets, includingPropertiesForKeys: [.isRegularFileKey]) else { return }
-        for case let url as URL in files where url.pathExtension == "ascn" {
+        guard let files = FileManager.default.enumerator(at: assets, includingPropertiesForKeys: [.isRegularFileKey]) else {
+            return false
+        }
+        let scenes = try files.compactMap { file -> (staged: URL, original: URL, model: EditorSceneModel)? in
+            guard let url = file as? URL, url.pathExtension == "ascn" else {
+                return nil
+            }
+            let original = originalRoot.appendingPathComponent(String(url.path.dropFirst(assets.path.count + 1)))
             let model = try EditorSceneModel.decode(from: String(contentsOf: url, encoding: .utf8))
+            return (url, original, model)
+        }
+        // Resolve original reference paths against the same staged snapshot being exported.
+        let stagedScenes = Dictionary(
+            scenes.map { ($0.original.resolvingSymlinksInPath().standardizedFileURL, $0.model) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        for (_, original, model) in scenes where model.entities.contains(where: { $0.components[EditorBuiltInComponentType.sceneInstance] != nil }) {
+            _ = try await EditorCSGScene.prepare(
+                model, sourceURL: original, resourceRootURL: originalRoot, stagedScenes: stagedScenes, textureRootURL: assets
+            )
+        }
+        var usesCSG = false
+        for (url, originalSceneURL, authored) in scenes {
+            let products = try await EditorCSGScene.prepare(authored, stagedScenes: [:], textureRootURL: assets)
+            usesCSG = usesCSG || !products.isEmpty
+            let model = authored.withoutCSGAuthoring()
             let animations = Dictionary(grouping: model.animations ?? [], by: \.targetEntityID)
             guard Set(animations.keys).isSubset(of: Set(model.entities.map(\.id))) else {
                 throw EditorPreviewBuildFailure(message: "Animation references a missing scene entity in \(url.lastPathComponent).")
             }
-            let originalSceneURL = originalRoot.appendingPathComponent(String(url.path.dropFirst(assets.path.count + 1)))
-            let items = try model.entities.map { item in
+            var items = try model.entities.map { item in
                 var values: [String: Data] = [:]
                 for (name, originalPayload) in item.components {
                     let payload = try EditorSceneFileLoader.resolvedComponentPayload(typeName: name, payload: originalPayload, sourceURL: originalSceneURL, resourceRootURL: originalRoot)
@@ -407,7 +467,33 @@ actor EditorAdaScriptNativeExporter {
                 }
                 return AdaScriptNativeSceneDocument.Item(id: item.id, name: item.name, enabled: item.enabled, parent: item.parent, components: values, animationClips: clips)
             }
+            items += try await bakeCSG(products, at: assets)
             try JSONEncoder().encode(AdaScriptNativeSceneDocument(name: model.scene.name, entities: items)).write(to: url, options: .atomic)
+        }
+        return usesCSG
+    }
+
+    @concurrent
+    private static func bakeCSG(_ products: [EditorCSGScene.Product], at assets: URL) async throws -> [AdaScriptNativeSceneDocument.Item] {
+        guard !products.isEmpty else {
+            return []
+        }
+        let folder = assets.appendingPathComponent("NativeCSG", isDirectory: true)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let encoder = JSONEncoder()
+        let transform = try encoder.encode(Transform())
+        return try products.map { product -> AdaScriptNativeSceneDocument.Item in
+            try Task.checkCancellation()
+            let baseID = UUID().uuidString
+            let filename = baseID + ".glb"
+            try product.surface.modelData().write(to: folder.appendingPathComponent(filename), options: .atomic)
+            let model = try encoder.encode(Model3DSource(source: "@res://NativeCSG/" + filename))
+            let shape = try encoder.encode(StaticTriangleMesh3DSource(surface: product.surface.surface))
+            return .init(id: baseID, name: "CSG Geometry", enabled: true, parent: product.groupID, components: [
+                EditorBuiltInComponentType.transform: transform,
+                EditorBuiltInComponentType.model3DSource: model,
+                String(reflecting: StaticTriangleMesh3DSource.self): shape,
+            ])
         }
     }
 
@@ -415,8 +501,12 @@ actor EditorAdaScriptNativeExporter {
         if let string = value as? String, string.hasPrefix(originalRoot.path + "/") {
             return "@res://" + String(string.dropFirst(originalRoot.path.count + 1))
         }
-        if let values = value as? [Any] { return values.map { detachReferences($0, originalRoot: originalRoot) } }
-        if let values = value as? [String: Any] { return values.mapValues { detachReferences($0, originalRoot: originalRoot) } }
+        if let values = value as? [Any] {
+            return values.map { detachReferences($0, originalRoot: originalRoot) }
+        }
+        if let values = value as? [String: Any] {
+            return values.mapValues { detachReferences($0, originalRoot: originalRoot) }
+        }
         return value
     }
 
@@ -441,7 +531,12 @@ actor EditorAdaScriptNativeExporter {
             : ".executable(name: \"AdaNativeGame\", targets: [\"AdaNativeGame\"])"
         let targetKind = options.destination == .android ? "target" : "executableTarget"
         let nativeTarget = interpreted ? "" : """
-        .target(name: "GameplayNative", dependencies: [.product(name: "CGravity", package: "gravity-lang")], exclude: ["libada_game.a", "ada_game.h", "ada_game.sources.json"], publicHeadersPath: "include"),
+        .target(
+            name: "GameplayNative",
+            dependencies: [.product(name: "CGravity", package: "gravity-lang")],
+            exclude: ["libada_game.a", "ada_game.h", "ada_game.sources.json"],
+            publicHeadersPath: "include"
+        ),
         """
         let nativeDependency = interpreted ? "" : "\"GameplayNative\", "
         return """
@@ -482,7 +577,13 @@ actor EditorAdaScriptNativeExporter {
         """
     }
 
-    static func player(project: AdaProject, sources: [AdaScriptSource], plugins: EditorAdaScriptResolvedRuntimePlugins, destination: EditorAdaScriptNativeExportOptions.Destination, interpreted: Bool) throws -> String {
+    static func player(
+        project: AdaProject,
+        sources: [AdaScriptSource],
+        plugins: EditorAdaScriptResolvedRuntimePlugins,
+        destination: EditorAdaScriptNativeExportOptions.Destination,
+        interpreted: Bool
+    ) throws -> String {
         let storageIdentifier = try EditorProjectStorageIdentity.resolve(project, nativeFallback: true)
         let assetsPlugin = storageIdentifier.map {
             "AssetsPlugin(directories: try ProjectDirectories(source: assets.deletingLastPathComponent(), assetsDirectory: assets, storageIdentifier: \(quote($0))))"
@@ -509,8 +610,8 @@ actor EditorAdaScriptNativeExporter {
             : "module: module, name: \(quote(project.runtime.moduleName)), sources: [\(metadata)]"
         let upscalingModifier: String = switch plugins.rendering.upscaling {
         case .none: ""
-        case .disabled?: "\n                    .renderUpscaling(.disabled)"
-        case .spatial?: "\n                    .renderUpscaling(.spatial(renderScale: \(plugins.rendering.renderScale)))"
+        case .disabled: "\n                    .renderUpscaling(.disabled)"
+        case .spatial: "\n                    .renderUpscaling(.spatial(renderScale: \(plugins.rendering.renderScale)))"
         }
         let preloadPaths = plugins.assets.preload.map { path in
             "@res://" + (path.hasPrefix(assetsPrefix) ? String(path.dropFirst(assetsPrefix.count)) : path)
@@ -530,7 +631,9 @@ actor EditorAdaScriptNativeExporter {
             case .tilemap: "app.addPlugin(TileMapPlugin())"
             case .physics2D: "app.addPlugin(Physics2DPlugin(gravity: [\(plugins.physics2DGravity[0]), \(plugins.physics2DGravity[1])]))"
             case .navigation3D: "app.addPlugin(Navigation3DPlugin())"
-            case .physics3D: "app.addPlugin(Physics3DPlugin(gravity: Vector3(\(plugins.physics3D.gravity[0]), \(plugins.physics3D.gravity[1]), \(plugins.physics3D.gravity[2])), subStepCount: \(plugins.physics3D.subStepCount)))"
+            case .physics3D:
+                "app.addPlugin(Physics3DPlugin(gravity: Vector3(\(plugins.physics3D.gravity[0]), \(plugins.physics3D.gravity[1]), \(plugins.physics3D.gravity[2])), "
+                    + "subStepCount: \(plugins.physics3D.subStepCount)))"
             case .model3D: nil
             case .multiplayer: "app.addPlugin(NativeGameNetwork())"
             default: nil
@@ -567,16 +670,22 @@ actor EditorAdaScriptNativeExporter {
                     do {
                         let base = Bundle.main.bundleURL
                         let candidates = ["AdaNativeGame_AdaNativeGame.bundle", "AdaNativeGame_AdaNativeGame.resources"].map { base.appendingPathComponent($0 + "/GameAssets") }
-                        guard let assetURL = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }) ?? gameBundle.resourceURL?.appendingPathComponent("GameAssets") else {
+                        guard let assetURL = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) })
+                            ?? gameBundle.resourceURL?.appendingPathComponent("GameAssets") else {
                             throw AdaScriptError.invalidManifest("Native game assets are missing")
                         }
                         let assets = assetURL.resolvingSymlinksInPath().standardizedFileURL
                         let actions = try JSONDecoder().decode([InputAction].self, from: Data(contentsOf: assets.appendingPathComponent("input-actions.json")))
                         app.addPlugin(TransformPlugin()).addPlugin(InputPlugin(actions: actions)).addPlugin(RenderWorldPlugin()).addPlugin(EventsPlugin()).addPlugin(CameraPlugin())
-                        app.addPlugin(\(assetsPlugin)).addPlugin(VisibilityPlugin()).addPlugin(TextPlugin()).addPlugin(ScenePlugin(includesModel3D: \(plugins.contains(.model3D)))).addPlugin(ScriptableObjectPlugin())
+                        app.addPlugin(\(assetsPlugin)).addPlugin(VisibilityPlugin()).addPlugin(TextPlugin())
+                            .addPlugin(ScenePlugin(includesModel3D: \(plugins.contains(.model3D))))
+                            .addPlugin(ScriptableObjectPlugin())
                         \(pluginCode)
                         \(moduleSetup)
-                        let plugin = try \(pluginType)(\(initializerArguments), startupSystemIdentifier: \(project.runtime.entry.startupSystem.map(quote) ?? "nil")\(interpreted ? "" : ", preloadedAssets: " + preloadExpression))
+                        let plugin = try \(pluginType)(
+                            \(initializerArguments),
+                            startupSystemIdentifier: \(project.runtime.entry.startupSystem.map(quote) ?? "nil")\(interpreted ? "" : ", preloadedAssets: " + preloadExpression)
+                        )
                         app.addPlugin(plugin)
                         app.addPlugin(NativeGameEntry(plugin: plugin, assets: assets))
                         NativeGameLog.write("\(interpreted ? "[AdaScript] Interpreter module loaded" : "[AdaScript AOT] Native module linked")")
@@ -614,10 +723,19 @@ actor EditorAdaScriptNativeExporter {
                     do {
                         if let json = JSObject.global["__adaMultiplayerSession"].string {
                             let session = try JSONDecoder().decode(Session.self, from: Data(json.utf8))
-                            let config = MultiplayerConfiguration(role: session.role, sessionID: SessionID(rawValue: session.sessionID), localPeerID: PeerID(rawValue: session.peerID), compatibility: compatibility)
-                            MultiplayerPlugin(configuration: config, transport: CloudWebSocketTransport(credentials: CloudRelayCredentials(url: session.relayURL, connectionTicket: session.connectionTicket))).setup(in: app)
+                            let config = MultiplayerConfiguration(
+                                role: session.role,
+                                sessionID: SessionID(rawValue: session.sessionID),
+                                localPeerID: PeerID(rawValue: session.peerID),
+                                compatibility: compatibility
+                            )
+                            let credentials = CloudRelayCredentials(url: session.relayURL, connectionTicket: session.connectionTicket)
+                            MultiplayerPlugin(configuration: config, transport: CloudWebSocketTransport(credentials: credentials)).setup(in: app)
                         } else {
-                            MultiplayerPlugin(configuration: MultiplayerConfiguration(role: .host, compatibility: compatibility), transport: InMemoryTransport(hub: InMemoryTransportHub())).setup(in: app)
+                            MultiplayerPlugin(
+                                configuration: MultiplayerConfiguration(role: .host, compatibility: compatibility),
+                                transport: InMemoryTransport(hub: InMemoryTransportHub())
+                            ).setup(in: app)
                         }
                     } catch { NativeGameLog.write("[AdaScript AOT] Multiplayer startup failed: \\(error)") }
                     #else
@@ -640,7 +758,12 @@ actor EditorAdaScriptNativeExporter {
                                 let url = assets.appendingPathComponent(relative).resolvingSymlinksInPath().standardizedFileURL
                                 guard url.path.hasPrefix(assets.path + "/") else { throw AdaScriptError.invalidManifest("Scene path is outside assets") }
                                 let document = try JSONDecoder().decode(AdaScriptNativeSceneDocument.self, from: Data(contentsOf: url))
-                                return try document.makeScene(components: plugin.componentDescriptors, resourceRoot: assets, sourceURL: url, tileMaps: \(interpreted ? "[:]" : "plugin.preloadedTileMaps"))
+                                return try document.makeScene(
+                                    components: plugin.componentDescriptors,
+                                    resourceRoot: assets,
+                                    sourceURL: url,
+                                    tileMaps: \(interpreted ? "[:]" : "plugin.preloadedTileMaps")
+                                )
                             }
                             navigator.setSceneLoader { path in try await load(path) }
                             navigator.installInitialScene(try load(\(quote(scene))), make: { try load(\(quote(scene))) })

@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ada Studio · CSG</title>
+<style>
+  @font-face {
+    font-family: Studio;
+    src: url("../../Sources/AdaText/Assets/Fonts/opensans/OpenSans-Regular.ttf");
+  }
+  @font-face {
+    font-family: Studio;
+    src: url("../../Sources/AdaText/Assets/Fonts/opensans/OpenSans-Semibold.ttf");
+    font-weight: 600;
+  }
+  @font-face {
+    font-family: Symbols;
+    src: url("../../Editor/Sources/AdaEditor/Assets/Fonts/MaterialSymbolsRounded-Regular.ttf");
+  }
+  :root {
+    color-scheme: dark;
+    --background: #1e1f22;
+    --surface: #27292e;
+    --elevated: #18191d;
+    --border: #42464e;
+    --text: #dfe1e5;
+    --muted: #8b919b;
+    --blue: #3574f0;
+    --error: #f19c99;
+    --selection: color-mix(in srgb, var(--blue) 23%, var(--background));
+    --line: color-mix(in srgb, var(--border) 72%, var(--background));
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--text); font: 13px Studio; }
+  button, input, select { font: inherit; color: inherit; }
+  button, input, select, .select-display {
+    min-height: 30px; border: 1px solid var(--border); border-radius: 4px;
+    background: var(--surface);
+  }
+  button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 9px; cursor: default; }
+  button:hover:not(:disabled) { background: #343840; border-color: #606877; }
+  button:active:not(:disabled) { background: #323d52; }
+  :focus-visible { outline: 2px solid #78a7ff; outline-offset: -2px; }
+  button:disabled { opacity: .46; }
+  button[aria-pressed="true"], button.active { background: var(--selection); border-color: var(--blue); }
+  input { min-width: 0; width: 100%; padding: 0 9px; background: var(--elevated); caret-color: white; }
+  select { width: 100%; padding: 0 8px; }
+  .symbol { font: normal 18px/1 Symbols; flex: 0 0 auto; }
+  .muted { color: var(--muted); }
+  .icon-button { width: 30px; padding: 0; }
+  .workspace { height: 100vh; min-height: 580px; display: flex; flex-direction: column; }
+  .titlebar, .panel-head, .toolstrip, .component-title { display: flex; align-items: center; gap: 8px; }
+  .titlebar { min-height: 42px; flex: none; padding: 0 12px; background: var(--elevated); border-bottom: 1px solid var(--line); }
+  .titlebar strong { font-size: 13px; }
+  .titlebar .symbol { color: #7da5f6; }
+  .titlebar .divider { height: 16px; width: 1px; margin: 0 2px; background: var(--border); }
+  .main { flex: 1; min-height: 0; display: grid; grid-template-columns: clamp(176px, 17vw, 238px) minmax(240px, 1fr) clamp(260px, 24vw, 344px); }
+  .panel { min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .tree { border-right: 1px solid var(--border); }
+  .inspector { border-left: 1px solid var(--border); }
+  .panel-head { min-height: 42px; padding: 0 10px; flex: none; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .panel-head strong { flex: 1; font-weight: 600; }
+  .panel-content { min-height: 0; overflow: auto; scrollbar-color: var(--border) var(--background); }
+  .tree .panel-content { padding: 8px 6px; }
+  .tree-row { width: 100%; border-color: transparent; background: transparent; justify-content: flex-start; gap: 7px; padding: 0 7px; text-align: left; }
+  .tree-row[aria-pressed="true"] { border-color: transparent; box-shadow: inset 2px 0 var(--blue); }
+  .tree-row.child { padding-left: 28px; }
+  .tree-row .symbol { color: var(--muted); }
+  .tree-row[aria-pressed="true"] .symbol { color: #89afff; }
+  .tree-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .create { position: relative; }
+  .menu {
+    display: grid; gap: 2px; padding: 4px; min-width: 160px; z-index: 3;
+    background: var(--elevated); border: 1px solid var(--border); border-radius: 5px;
+    box-shadow: 0 6px 18px #0005;
+  }
+  .create .menu { position: absolute; top: calc(100% + 4px); right: 0; }
+  .menu[hidden] { display: none; }
+  .menu button { justify-content: flex-start; border-color: transparent; background: transparent; }
+  .menu button.active { background: var(--selection); }
+  .viewport { position: relative; min-width: 0; overflow: hidden; background: var(--elevated); }
+  .viewport canvas { display: block; width: 100%; height: 100%; }
+  .toolstrip {
+    position: absolute; left: 12px; top: 12px; max-width: calc(100% - 24px); overflow-x: auto;
+    padding: 4px; gap: 4px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface);
+  }
+  .toolstrip .divider { margin: 0 3px; width: 1px; height: 18px; background: var(--border); flex: 0 0 auto; }
+  .toolstrip button { flex: 0 0 auto; }
+  .toolstrip .play .symbol { color: #6ecd7e; }
+  .view-label { position: absolute; left: 13px; bottom: 12px; color: var(--muted); font-size: 12px; }
+  .component-title { padding: 10px 12px; min-height: 41px; background: var(--surface); border-block: 1px solid var(--line); }
+  .identity { padding: 13px 12px; display: grid; gap: 3px; }
+  .identity .node-name { font-weight: 600; font-size: 14px; }
+  .details { padding: 11px 12px 13px; display: grid; gap: 8px; }
+  .field { display: grid; gap: 5px; margin: 0; padding: 0; border: 0; min-width: 0; }
+  legend { margin-bottom: 5px; padding: 0; }
+  .axes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  .axis { display: flex; align-items: center; min-width: 0; border: 1px solid var(--border); border-radius: 4px; background: var(--elevated); }
+  .axis span { font-size: 11px; padding: 3px 4px; margin-left: 3px; border-radius: 3px; }
+  .axis:nth-child(1) span { background: #493032; color: #f0a9a8; }
+  .axis:nth-child(2) span { background: #293d34; color: #a3d2b1; }
+  .axis:nth-child(3) span { background: #273958; color: #a4c4ff; }
+  .axis input { border: 0; background: transparent; padding: 0 4px; font-variant-numeric: tabular-nums; min-height: 28px; }
+  .axis:has([aria-invalid="true"]) { border-color: var(--error); }
+  .field-error { color: var(--error); font-size: 12px; }
+  .operation-list { display: grid; gap: 2px; }
+  .operation-list button { padding: 0 6px; gap: 5px; width: 100%; border-color: transparent; background: transparent; }
+  .operation-list button[aria-pressed="true"] { background: var(--selection); border-color: var(--blue); }
+  .operation-list .tree-label { margin-right: auto; }
+  .operation-list .muted { font-size: 11px; text-align: right; }
+  .order-actions { display: flex; justify-content: flex-end; align-items: center; gap: 5px; flex-wrap: wrap; }
+  .order-actions .add-box { margin-right: auto; }
+  .operation-label { font-weight: 600; color: var(--muted); }
+  .result {
+    display: flex; min-height: 54px; gap: 8px; padding: 9px;
+    border: 1px solid var(--border); border-radius: 4px; background: var(--elevated);
+  }
+  .result strong, .result small { display: block; }
+  .result small { margin-top: 3px; color: var(--muted); font-size: 12px; }
+  .result[data-state="error"] { border-color: var(--error); }
+  .result[data-state="error"] .symbol, .result[data-state="error"] strong { color: var(--error); }
+  .board { max-width: 1160px; margin: 0 auto; padding: 30px; }
+  .board h1 { margin: 0 0 22px; font-size: 21px; font-weight: 600; }
+  .state-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .state-card { border: 1px solid var(--border); background: var(--background); min-width: 0; }
+  .state-card .panel-head { flex-wrap: wrap; }
+  .state-card .details { min-height: 114px; align-content: start; }
+  .select-display { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 0 8px; }
+  @media (max-width: 760px) {
+    .state-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .main { grid-template-columns: minmax(140px, 21vw) minmax(155px, 1fr) minmax(222px, 35vw); }
+    .panel-head, .identity, .component-title, .details { padding-left: 7px; padding-right: 7px; }
+  }
+</style>
+</head>
+<body>
+<main id="preview"></main>
+<script>
+  const params = new URLSearchParams(location.search);
+  const english = params.get('lang') === 'en';
+  document.documentElement.lang = english ? 'en' : 'ru';
+  const t = (en, ru) => english ? en : ru;
+  const glyphs = {
+    cube: 0xe97a, layer: 0xe53b, add: 0xe145, expand: 0xe5cf,
+    up: 0xe5ce, down: 0xe5cf, select: 0xe8b6, move: 0xe89f, rotate: 0xe863, scale: 0xe8ff,
+    grid: 0xe3ec, play: 0xe037, ready: 0xe86c, pending: 0xe863, error: 0xe000,
+    empty: 0xe88e
+  };
+  const icon = name => `<span class="symbol" aria-hidden="true">${String.fromCodePoint(glyphs[name])}</span>`;
+  const iconButton = (name, label, extra = '') =>
+    `<button class="icon-button" aria-label="${label}" title="${label}" ${extra}>${icon(name)}</button>`;
+  const label = {
+    base: t('Base', 'Основа'), union: t('Union', 'Объединение'),
+    cut: t('Difference', 'Вычитание'), intersect: t('Intersection', 'Пересечение'),
+    group: t('CSG Group', 'Группа CSG'), box: t('Add Box', 'Добавить куб'),
+    order: t('Evaluation order', 'Порядок операций'),
+    op: t('Operation', 'Операция'), add: t('Add', 'Добавить'),
+    up: t('Move operation up', 'Поднять операцию'),
+    down: t('Move operation down', 'Опустить операцию')
+  };
+  const results = {
+    ready: [t('Result ready', 'Результат готов'), ''],
+    pending: [t('Rebuilding geometry', 'Пересчёт геометрии'), t('Showing the last valid result.', 'Показан последний корректный результат.')],
+    error: [t('Result unavailable', 'Результат недоступен'), t('Set the box dimensions above zero. Play and export are paused.', 'Задайте размеры куба больше нуля. Запуск и экспорт приостановлены.')],
+    empty: [t('Empty result', 'Пустой результат'), t('The operations leave no solid geometry.', 'Операции не оставили объёмной геометрии.')]
+  };
+  const status = state => {
+    const [title, detail] = results[state];
+    return `<div class="result" role="status" data-state="${state}">${icon(state)}
+      <div><strong>${title}</strong>${detail ? `<small>${detail}</small>` : ''}</div></div>`;
+  };
+  const operationOptions = selected => Object.entries(label).filter(([name]) =>
+    ['union', 'cut', 'intersect'].includes(name)).map(([name, text]) =>
+      `<option value="${name}" ${name === selected ? 'selected' : ''}>${text}</option>`).join('');
+  const panelHeader = content => `<div class="panel-head"><strong>${content}</strong></div>`;
+  const preview = document.querySelector('#preview');
+
+  if (params.get('view') === 'states') {
+    const card = (title, content) => `<section class="state-card">${panelHeader(title)}<div class="details">${content}</div></section>`;
+    preview.innerHTML = `<article class="board"><h1>${t('CSG · Interface states', 'CSG · Состояния интерфейса')}</h1>
+      <div class="state-grid">
+        ${card(t('Scene tree · Add menu', 'Дерево сцены · Меню добавления'),
+          `<div class="menu"><button>${icon('layer')}${label.group}</button></div>`)}
+        ${card(t('Inspector · Operation', 'Инспектор · Операция'),
+          `<div class="select-display">${label.cut}${icon('expand')}</div>
+           <div class="menu">${['union', 'cut', 'intersect'].map(op => `<button class="${op === 'cut' ? 'active' : ''}">${label[op]}</button>`).join('')}</div>`)}
+        ${card(t('Inspector · Base selected', 'Инспектор · Выбрана основа'),
+          `<div class="select-display">${label.base}</div><div class="order-actions">
+            ${iconButton('up', label.up, 'disabled')}${iconButton('down', label.down)}</div>`)}
+        ${card(t('Updating a cut', 'Обновление выреза'), status('pending'))}
+        ${card(t('Invalid box', 'Некорректный куб'), status('error'))}
+        ${card(t('No remaining solid', 'Геометрия полностью вырезана'), status('empty'))}
+      </div></article>`;
+  } else {
+    const state = Object.hasOwn(results, params.get('state')) ? params.get('state') : 'ready';
+    document.body.dataset.state = state;
+    const operands = [
+      { id: 'floor', name: t('Floor', 'Пол'), op: 'union', values: [0, -.15, 0, 0, 0, 0, 10.4, .3, 6.4] },
+      { id: 'rear', name: t('Back wall', 'Задняя стена'), op: 'union', values: [0, 1.5, -3, 0, 0, 0, 10.3, 3, .3] },
+      { id: 'left', name: t('Side wall', 'Боковая стена'), op: 'union', values: [-5, 1.5, 0, 0, 0, 0, .3, 3, 6.2] },
+      { id: 'divider', name: t('Partition', 'Перегородка'), op: 'union', values: [0, 1.5, 0, 0, 0, 0, .42, 3, 6.2] },
+      { id: 'door', name: t('Doorway', 'Дверной проём'), op: 'cut', values: [0, 1, .75, 0, 0, 0, 1.2, 2.1, 1.65] }
+    ];
+    let selected = 'door';
+    const axisFields = (name, values, invalid = false) => `<fieldset class="field"><legend>${name}</legend>
+      <div class="axes">${['X', 'Y', 'Z'].map((axis, i) => `<label class="axis"><span>${axis}</span>
+        <input type="text" inputmode="decimal" aria-label="${name} ${axis}"
+        ${invalid && i === 2 ? 'value="0" aria-invalid="true" aria-describedby="size-error"' : `value="${values[i]}"`}></label>`).join('')}</div>
+      ${invalid ? `<span id="size-error" class="field-error">${t('Size must be above zero.', 'Размер должен быть больше нуля.')}</span>` : ''}</fieldset>`;
+    preview.innerHTML = `<div class="workspace">
+      <header class="titlebar">${icon('cube')}<strong>Ada Studio</strong><span class="divider"></span>
+        <span>${t('Two Rooms.ascn', 'Две комнаты.ascn')}</span></header>
+      <div class="main">
+        <aside class="panel tree" aria-label="${t('Scene', 'Сцена')}">
+          <div class="panel-head"><strong>${t('Scene', 'Сцена')}</strong>
+            <div class="create">
+              ${iconButton('add', label.add, 'id="add" aria-haspopup="true" aria-expanded="false"')}
+              <div class="menu" id="add-menu" hidden><button data-action="group">${icon('layer')}${label.group}</button></div>
+            </div>
+          </div>
+          <div class="panel-content" id="tree-rows"></div>
+        </aside>
+        <section class="viewport" aria-label="${t('3D viewport', '3D-вид')}">
+          <canvas id="scene" aria-label="${t('Two rooms with a cut doorway', 'Две комнаты с вырезанным проёмом')}"></canvas>
+          <div class="toolstrip" aria-label="${t('Viewport tools', 'Инструменты 3D-вида')}">
+            ${iconButton('select', t('Select', 'Выбор'), 'data-tool aria-pressed="false"')}
+            ${iconButton('move', t('Move', 'Перемещение'), 'data-tool aria-pressed="true"')}
+            ${iconButton('rotate', t('Rotate', 'Вращение'), 'data-tool aria-pressed="false"')}
+            ${iconButton('scale', t('Scale', 'Масштаб'), 'data-tool aria-pressed="false"')}
+            <span class="divider"></span>
+            ${iconButton('grid', t('Snap to grid', 'Привязка к сетке'), 'id="snap" aria-pressed="true"')}
+            <button class="active" aria-pressed="true">3D</button>
+            <span class="divider"></span>
+            <button class="play" ${['pending','error'].includes(state) ? 'disabled' : ''}>${icon('play')}${t('Play', 'Запуск')}</button>
+          </div>
+          <span class="view-label" id="grid-label">${t('Grid · 0.25 m', 'Сетка · 0,25 м')}</span>
+        </section>
+        <aside class="panel inspector">
+          ${panelHeader(t('Inspector', 'Инспектор'))}
+          <div class="panel-content" id="inspector-content"></div>
+        </aside>
+      </div></div>`;
+
+    function updatePanels() {
+      const currentIndex = operands.findIndex(operand => operand.id === selected);
+      const current = operands[currentIndex];
+      const groupName = t('Level Geometry', 'Геометрия уровня');
+      document.querySelector('#tree-rows').innerHTML =
+        `<button class="tree-row" data-id="group" aria-pressed="${selected === 'group'}">${icon('expand')}${icon('layer')}<span class="tree-label">${groupName}</span></button>` +
+        operands.map(op => `<button class="tree-row child" data-id="${op.id}" title="${op.name}" aria-pressed="${op.id === selected}">${icon('cube')}<span class="tree-label">${op.name}</span></button>`).join('');
+      document.querySelector('#inspector-content').innerHTML =
+        `<div class="identity"><span class="node-name">${current?.name ?? groupName}</span><span class="muted">
+          ${current ? t('CSG Box', 'Куб CSG') : label.group}</span></div>
+         ${current ? `<div class="component-title">${icon('move')}<strong>${t('Transform', 'Трансформация')}</strong></div>
+          <div class="details">
+           ${axisFields(t('Position', 'Положение'), current.values.slice(0, 3))}
+           ${axisFields(t('Rotation', 'Поворот'), current.values.slice(3, 6))}
+           ${axisFields(t('Size', 'Размер'), current.values.slice(6, 9), state === 'error' && current.id === 'door')}
+          </div>` : ''}
+         <div class="component-title">${icon('layer')}<strong>${label.group}</strong></div>
+         <div class="details">
+           ${current ? `<label class="field">${label.op}
+              ${currentIndex === 0 ? `<span class="select-display">${label.base}</span>` :
+                `<select id="operation">${operationOptions(current.op)}</select>`}</label>` : ''}
+           <span class="operation-label">${label.order}</span>
+           <div class="operation-list">${operands.map((op, i) => `<button data-id="${op.id}" aria-pressed="${op.id === selected}">
+              ${icon('cube')}<span class="tree-label">${op.name}</span><span class="muted">${label[i === 0 ? 'base' : op.op]}</span></button>`).join('')}</div>
+           <div class="order-actions">
+             <button class="add-box" data-action="box">${icon('add')}${label.box}</button>
+             ${iconButton('up', label.up, `data-action="up" ${currentIndex < 1 ? 'disabled' : ''}`)}
+             ${iconButton('down', label.down, `data-action="down" ${currentIndex < 0 || currentIndex === operands.length - 1 ? 'disabled' : ''}`)}
+           </div>
+           ${status(state)}
+         </div>`;
+      draw();
+    }
+
+    const addMenu = document.querySelector('#add-menu');
+    const add = document.querySelector('#add');
+    function showMenu(open) {
+      addMenu.hidden = !open;
+      add.setAttribute('aria-expanded', open);
+      if (open) addMenu.querySelector('button').focus();
+    }
+    function refreshAndFocus(selector) {
+      updatePanels();
+      document.querySelector(selector)?.focus();
+    }
+    preview.addEventListener('click', event => {
+      const button = event.target.closest('button');
+      if (button === add) return showMenu(addMenu.hidden);
+      if (!addMenu.hidden) showMenu(false);
+      if (!button) return;
+      if (button.dataset.id) {
+        selected = button.dataset.id;
+        const panel = button.closest('.tree') ? '#tree-rows' : '.operation-list';
+        refreshAndFocus(`${panel} [data-id="${selected}"]`);
+      }
+      if (button.hasAttribute('data-tool')) {
+        document.querySelectorAll('[data-tool]').forEach(tool => tool.setAttribute('aria-pressed', tool === button));
+      }
+      if (button.id === 'snap') {
+        const active = button.getAttribute('aria-pressed') === 'true';
+        button.setAttribute('aria-pressed', !active);
+        document.querySelector('#grid-label').hidden = active;
+      }
+      const action = button.dataset.action;
+      if (action === 'group') {
+        selected = 'group';
+        refreshAndFocus('#tree-rows [data-id="group"]');
+      }
+      if (action === 'box') {
+        selected = `box-${operands.length}`;
+        operands.push({ id: selected, name: t('Box', 'Куб'), op: 'union', values: [2, .5, 0, 0, 0, 0, 1, 1, 1] });
+        refreshAndFocus(`.operation-list [data-id="${selected}"]`);
+      }
+      if (action === 'up' || action === 'down') {
+        const at = operands.findIndex(op => op.id === selected);
+        const next = at + (action === 'up' ? -1 : 1);
+        [operands[at], operands[next]] = [operands[next], operands[at]];
+        refreshAndFocus(`.operation-list [data-id="${selected}"]`);
+      }
+    });
+    preview.addEventListener('change', event => {
+      if (event.target.id !== 'operation') return;
+      operands.find(op => op.id === selected).op = event.target.value;
+      refreshAndFocus('#operation');
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && !addMenu.hidden) { showMenu(false); add.focus(); }
+    });
+
+    const canvas = document.querySelector('#scene');
+    function draw() {
+      const { width, height } = canvas.getBoundingClientRect();
+      const pixelRatio = devicePixelRatio;
+      canvas.width = Math.round(width * pixelRatio);
+      canvas.height = Math.round(height * pixelRatio);
+      const ctx = canvas.getContext('2d');
+      ctx.scale(pixelRatio, pixelRatio);
+      const scale = Math.min(width / 16, height / 11.2);
+      const project = ([x, y, z]) => [
+        width * .50 + (x * .85 - z * .64) * scale,
+        height * .56 + (x * .28 + z * .38 - y * .91) * scale
+      ];
+      function path(points, stroke, fill, weight = 1) {
+        ctx.beginPath();
+        points.map(project).forEach(([x, y], index) => index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y));
+        if (fill) { ctx.closePath(); ctx.fillStyle = fill; ctx.fill(); }
+        if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = weight; ctx.stroke(); }
+      }
+      const gridExtent = Math.ceil(Math.max(width, height) / scale) + 10;
+      for (let i = -gridExtent; i <= gridExtent; i++) {
+        const color = i % 5 === 0 ? '#363b45' : '#2a2e36';
+        path([[i, -.32, -gridExtent], [i, -.32, gridExtent]], color);
+        path([[-gridExtent, -.32, i], [gridExtent, -.32, i]], color);
+      }
+      function box([a,b,c,d,e,f], colors) {
+        path([[d,b,c],[d,e,c],[d,e,f],[d,b,f]], '#363d48', colors[1]);
+        path([[a,b,f],[d,b,f],[d,e,f],[a,e,f]], '#363d48', colors[2]);
+        path([[a,e,c],[d,e,c],[d,e,f],[a,e,f]], '#424a56', colors[0]);
+      }
+      if (state !== 'empty') {
+        const wall = ['#8e98a7', '#657183', '#788598'];
+        const slab = ['#525e70', '#313c4e', '#424f63'];
+        box([-5.2,-.32,-3.2,5.2,0,3.2], slab);
+        for (let i = -4; i <= 4; i++) path([[i,.005,-3.1],[i,.005,3.1]], '#606b7c');
+        for (let i = -3; i <= 3; i++) path([[-5.1,.005,i],[5.1,.005,i]], '#606b7c');
+        box([-5.15,0,-3.15,5.15,3,-2.85], wall);
+        box([-5.15,0,-2.85,-4.85,3,3.15], wall);
+        box([-.21,0,-2.85,.21,3,-.075], wall);
+        box([-.21,2.05,-.075,.21,3,1.575], wall);
+        box([-.21,0,1.575,.21,3,3.15], wall);
+      }
+      const operand = operands.find(op => op.id === selected);
+      if (!operand) return;
+      const [x,y,z,,, , sx,sy,sz] = operand.values;
+      const a=x-sx/2, b=y-sy/2, c=z-sz/2, d=x+sx/2, e=y+sy/2, f=z+sz/2;
+      ctx.setLineDash([5, 4]);
+      path([[a,b,c],[d,b,c],[d,b,f],[a,b,f],[a,b,c]], '#8db2ff', null, 1.4);
+      ctx.setLineDash([]);
+      path([[a,e,c],[d,e,c],[d,e,f],[a,e,f],[a,e,c]], '#8db2ff', '#3574f01c', 1.6);
+      for (const [px, pz] of [[a,c],[d,c],[d,f],[a,f]]) {
+        path([[px,b,pz],[px,e,pz]], '#8db2ff', null, 1.5);
+      }
+      const from = [x,y,z];
+      for (const [end, color] of [
+        [[x+1.12,y,z], '#f08d8b'], [[x,y+1.32,z], '#78c995'], [[x,y,z+1.12], '#8db2ff']
+      ]) {
+        path([from,end], color, null, 2);
+        const [px,py] = project(end);
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    updatePanels();
+    new ResizeObserver(draw).observe(canvas);
+  }
+</script>
+</body>
+</html>

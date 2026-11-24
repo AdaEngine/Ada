@@ -96,14 +96,22 @@ final class EditorMovieMakerRuntime {
     func prepareScene(in world: World) async throws {
         let diagnostics = (projectView?.diagnostics ?? []) + (scriptPlugin?.diagnostics ?? [])
         if !diagnostics.isEmpty { throw EditorMovieMakerError.runtime(diagnostics.joined(separator: "\n")) }
-        guard !didPrepareScene else { return }
+        guard !didPrepareScene else {
+            return
+        }
         try Task.checkCancellation()
         if let sceneURL, let app {
             preparedScene = try await EditorRuntimeScenePreparation.prepare(at: sceneURL, assetsDirectory: assetsDirectory)
-            guard let preparedScene else { return }
+            guard let preparedScene else {
+                return
+            }
             let entry = EditorAdaScriptRuntimeEntryPlugin(
-                sceneModel: preparedScene.model, assetsDirectory: assetsDirectory, sourceURL: sceneURL,
-                recordsAchievement: false, onInitialSceneLoaded: { [weak self] result in self?.loadWarnings = result.warnings }
+                sceneModel: preparedScene.model,
+                assetsDirectory: assetsDirectory,
+                sourceURL: sceneURL,
+                recordsAchievement: false,
+                onInitialSceneLoaded: { [weak self] result in self?.loadWarnings = result.warnings },
+                csgProducts: preparedScene.csgProducts
             )
             entry.setup(in: app)
             if !loadWarnings.isEmpty { throw EditorMovieMakerError.runtime(loadWarnings.joined(separator: "\n")) }

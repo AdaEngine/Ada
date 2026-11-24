@@ -303,6 +303,24 @@ final class EditorAgentSceneToolService {
     }
 
     private func validateComponent(typeName: String, payload: EditorComponentPayload) throws {
+        if typeName == EditorCSGScene.groupType {
+            guard EditorCSGScene.groupSettings(payload) != nil else {
+                throw EditorAgentSceneToolError.invalidComponent(
+                    typeName: typeName,
+                    message: "Use version 1, optional integer UV repeats from 1 to 64, and an optional checker or project image texture."
+                )
+            }
+            return
+        }
+        if typeName == EditorCSGScene.boxType {
+            guard EditorCSGScene.operandSettings(payload) != nil else {
+                throw EditorAgentSceneToolError.invalidComponent(
+                    typeName: typeName,
+                    message: "Use union, subtract or intersect, and an optional box, sphere or cylinder shape."
+                )
+            }
+            return
+        }
         guard EditorComponentRegistry.descriptor(named: typeName) != nil else {
             throw EditorAgentSceneToolError.componentUnavailable(typeName)
         }
@@ -318,15 +336,28 @@ final class EditorAgentSceneToolService {
     }
 
     private func validateHierarchy(_ model: EditorSceneModel) throws {
-        let ids = Set(model.entities.map(\.id))
-        guard ids.count == model.entities.count else {
-            let duplicate = Dictionary(grouping: model.entities, by: \.id).first { $0.value.count > 1 }?.key ?? "unknown"
-            throw EditorAgentSceneToolError.duplicateEntityID(duplicate)
+        var entitiesByID: [String: EditorSceneEntity] = [:]
+        entitiesByID.reserveCapacity(model.entities.count)
+        for entity in model.entities {
+            guard entitiesByID.updateValue(entity, forKey: entity.id) == nil else {
+                throw EditorAgentSceneToolError.duplicateEntityID(entity.id)
+            }
         }
 
         for entity in model.entities {
-            if let parentID = entity.parent, !ids.contains(parentID) {
+            let parent = entity.parent.flatMap { entitiesByID[$0] }
+            if let parentID = entity.parent, parent == nil {
                 throw EditorAgentSceneToolError.invalidParent(entityID: entity.id, parentID: parentID)
+            }
+            let isCSGBlock = entity.components[EditorCSGScene.boxType] != nil
+            let isCSGGroup = entity.components[EditorCSGScene.groupType] != nil
+            let parentIsCSGBlock = parent?.components[EditorCSGScene.boxType] != nil
+            let parentIsCSGGroup = parent?.components[EditorCSGScene.groupType] != nil
+            if parentIsCSGBlock || (isCSGBlock && (isCSGGroup || !parentIsCSGGroup)) {
+                throw EditorAgentSceneToolError.invalidComponent(
+                    typeName: EditorCSGScene.boxType,
+                    message: "CSG blocks must be leaf entities directly under a CSG group. Check the placement of \(entity.id)."
+                )
             }
             var visited = Set<String>()
             var currentID: String? = entity.id
@@ -334,7 +365,7 @@ final class EditorAgentSceneToolService {
                 guard visited.insert(id).inserted else {
                     throw EditorAgentSceneToolError.hierarchyCycle(entity.id)
                 }
-                currentID = model.entities.first { $0.id == id }?.parent
+                currentID = entitiesByID[id]?.parent
             }
         }
     }

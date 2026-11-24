@@ -103,6 +103,11 @@ height samples with Raise, Lower, Smooth or Flatten. Inspect the triangles with
 the 3D viewport's **Wireframe** mode. See the [Terrain guide](Terrain.md) for a
 worked join, heightfield tools, saved versions, and collision.
 
+## Build levels with CSG
+
+Use the [CSG level building guide](CSG.md) to create editable walls, floors and
+openings in a 3D scene.
+
 ## Build and run
 
 Choose **Build > Build Project** to build the project. **Build > Run** runs the active scene inside the editor when a scene is selected; otherwise it runs the selected target. **Build > Stop** stops the current operation. Build Output and Problems show progress and diagnostics.

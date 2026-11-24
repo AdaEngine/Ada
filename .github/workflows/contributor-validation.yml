@@ -55,6 +55,7 @@ jobs:
         working-directory: AdaEngine
     env:
       ADAENGINE_PACKAGE_PATH: ${{ github.workspace }}/AdaEngine
+      ADAENGINE_GRAVITY_PACKAGE_PATH: ${{ github.workspace }}/AdaEngine/Sources/gravity-lang
       ADA_MCP_LOCAL_PATH: ${{ github.workspace }}/.build-tools/contributor-mcp
     steps:
       - uses: actions/checkout@v4
@@ -95,8 +96,10 @@ jobs:
       - name: Run the actual applicable profile
         run: |
           paths=.build-tools/contribution/ci-paths.json
-          runtime=()
-          if jq -e '
+          recipes=()
+          if jq -e 'any(.[]; test("(^|/)(EditorCSG|CSG)[^/]*(/|[.])"))' "$paths" >/dev/null; then
+            recipes+=(--runtime-command '["bash","script/validate_studio_csg_macos.sh",".build-tools/contribution/swift-build-editor"]')
+          elif jq -e '
             map(select((startswith("Editor/Sources/") or startswith("Sources/") or startswith("Editor/WebUI/"))
                        and (endswith(".md") or contains(".docc/") or startswith("Editor/Sources/AdaEditor/Assets/Documentation/") | not)))
             | length > 0 and all(.[];
@@ -104,9 +107,9 @@ jobs:
               or . == "Editor/Sources/AdaEditor/Tooling/EditorBuildSDK.swift"
               or . == "Editor/Sources/AdaEditor/Tooling/EditorAdaScriptLint.swift")
           ' "$paths" >/dev/null; then
-            runtime+=(--runtime-command '["swift","test","--package-path","Editor","--scratch-path",".build-tools/contribution/swift-build-editor","--skip-build","--filter","EditorDistributionTests|EditorAdaScriptLintTests"]')
+            recipes+=(--runtime-command '["swift","test","--package-path","Editor","--scratch-path",".build-tools/contribution/swift-build-editor","--skip-build","--filter","EditorDistributionTests|EditorAdaScriptLintTests"]')
           fi
-          python script/check_contribution.py check --files-from "$paths" "${runtime[@]}"
+          python script/check_contribution.py check --files-from "$paths" "${recipes[@]}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -115,6 +118,12 @@ jobs:
             AdaEngine/.build-tools/contribution/checks/**/paths.json
             AdaEngine/.build-tools/contribution/checks/**/report.json
             AdaEngine/.build-tools/contribution/checks/**/*.log
+          if-no-files-found: ignore
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: csg-macos-player
+          path: ${{ runner.temp }}/csg-macos/
           if-no-files-found: ignore
 
   gate:

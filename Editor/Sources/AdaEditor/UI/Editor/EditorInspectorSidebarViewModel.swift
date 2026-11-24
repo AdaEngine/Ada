@@ -36,6 +36,7 @@ final class EditorInspectorSidebarViewModel {
         var hasExplicitGizmo: Bool
         var hasJoinedDescendant = false
         var locomotion: EditorLocomotionInspectorState?
+        var csg: EditorCSGInspectorSelection?
     }
 
     struct ComponentSection: Equatable {
@@ -84,6 +85,9 @@ final class EditorInspectorSidebarViewModel {
     var selectedEntity: SelectedEntity?
     var runtimeSelection: EditorPlayInspectionModel.Snapshot?
     var isInspectingPlayMode = false
+    var csgPreview: EditorCSGPreview?
+    var csgReadOnly = false
+    @ObservationIgnored var editCSG: ((EditorCSGEdit) -> Void)?
     private(set) var terrainEditing: EditorTerrainEditingState?
     @ObservationIgnored private var createTerrainAction: (() -> Void)?
     @ObservationIgnored private var detachTerrainAction: ((String) -> Void)?
@@ -92,6 +96,7 @@ final class EditorInspectorSidebarViewModel {
     var componentSearchText = ""
     var scriptableObjectCatalog: [EditorScriptableObjectDescriptor] = []
     var textureAssets: [TextureAsset] = []
+    var csgTextureReferences: [String] = []
     var tileMapAssets: [TextureAsset] = []
     var particleEffectAssets: [TextureAsset] = []
     var spriteAnimationAssets: [TextureAsset] = []
@@ -234,6 +239,8 @@ final class EditorInspectorSidebarViewModel {
         }
 
         sceneViewportActionOwner = nil
+        csgPreview = nil
+        editCSG = nil
         terrainEditing = nil
         createTerrainAction = nil
         detachTerrainAction = nil

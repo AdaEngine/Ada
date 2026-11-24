@@ -25,6 +25,7 @@ struct EditorSceneViewportView: View {
     @State var viewportPresentation = EditorViewportPresentation()
     @State var runtimeWarnings: [String] = []
     @State private var isLoadingScene = false
+    @State private var hasInstancedCSG = false
     @State private var loadingProgress = EditorSceneLoadingProgress()
     @State private var showsBones = false
     @State private var showsEntityMarkers = false
@@ -53,10 +54,10 @@ struct EditorSceneViewportView: View {
         }
         .accessibilityIdentifier("AdaEditor.SceneViewport.\(document.title)")
         .onAppear {
-            selectViewportMode(hasImportedModels ? .threeD : initialDisplayMode)
+            selectViewportMode(has3DGeometry ? .threeD : initialDisplayMode)
             if isAssetPreview { selectTool(.select) }
         }
-        .onChange(of: hasImportedModels) { _, hasModels in
+        .onChange(of: has3DGeometry) { _, hasModels in
             if hasModels { selectViewportMode(.threeD) }
         }
         .onDisappear {
@@ -92,11 +93,15 @@ struct EditorSceneViewportView: View {
         }
     }
 
-    private var hasImportedModels: Bool {
-        document.sceneModel?.entities.contains {
+    private var has3DGeometry: Bool {
+        if hasInstancedCSG {
+            return true
+        }
+        return document.sceneModel?.entities.contains {
             $0.components[EditorBuiltInComponentType.model3DSource] != nil
                 || $0.components[EditorTerrainPayload.typeName] != nil
                 || $0.components[EditorBuiltInComponentType.terrain3DSource] != nil
+                || $0.components[EditorCSGScene.groupType] != nil
         } == true
     }
 
@@ -124,6 +129,7 @@ struct EditorSceneViewportView: View {
                                 onLoadingChanged: { isLoadingScene = $0 },
                                 onLoadingProgress: { loadingProgress = $0 },
                                 onLoaded: { result in
+                                    hasInstancedCSG = !result.csgTargets.isEmpty
                                     if runtimeWarnings != result.warnings { runtimeWarnings = result.warnings }
                                     redrawViewport()
                                     onEditWorldReady?(world)
@@ -266,7 +272,8 @@ struct EditorSceneViewportView: View {
                 if reportsLoad, result.warnings.isEmpty, sourceURL != nil {
                     EditorAchievementBootstrap.center?.record(EditorAchievementRules.playedScene(model, adaScript: playRuntime != nil))
                 }
-            }
+            },
+            csgProducts: document.csgPlayProducts
         ))
     }
 
@@ -562,7 +569,9 @@ struct EditorSceneViewportView: View {
             onStop: { onStop?() },
             showsEditingTools: !isAssetPreview,
             showsPlayback: !isAssetPreview,
-            inline: inline
+            inline: inline,
+            csgSnap: viewportModel.sceneModel?.hasCSG == true && !isAssetPreview ? viewportModel.csgPreview.snapsToGrid : nil,
+            onToggleCSGSnap: { viewportModel.csgPreview.snapsToGrid.toggle() }
         )
     }
 

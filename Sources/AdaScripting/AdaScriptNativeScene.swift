@@ -46,6 +46,7 @@ public struct AdaScriptNativeSceneDocument: Codable, Sendable {
                 guard let data = item.components[key] else { continue }
                 let known = AdaScriptSceneSchemaResolver.resolve(key: key, in: schemas) != nil
                 let engineOwned = RuntimeTypeRegistry.componentType(named: key) != nil
+                    || key == String(reflecting: StaticTriangleMesh3DSource.self)
                 guard known || !engineOwned else { continue }
                 guard let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
                     if known {
@@ -65,6 +66,7 @@ public struct AdaScriptNativeSceneDocument: Codable, Sendable {
         let scene = Scene(name: name)
         for descriptor in native { scene.world.registerRuntimeComponent(descriptor) }
         var entities: [String: Entity] = [:]
+        var staticMeshes: [(Entity, StaticTriangleMesh3DSource)] = []
         for item in items {
             guard entities[item.id] == nil else { throw AdaScriptError.invalidManifest("Duplicate exported scene entity '\(item.id)'") }
             let entity = scene.world.spawn(item.name)
@@ -77,6 +79,8 @@ public struct AdaScriptNativeSceneDocument: Codable, Sendable {
                     guard let engine = unsafe RenderEngine.shared else { throw AdaScriptError.invalidManifest("Primitive meshes require a render device") }
                     let reference = try JSONDecoder().decode(PrimitiveMesh3DSource.self, from: data)
                     entity.components += try reference.makeComponent(renderDevice: engine.renderDevice)
+                } else if name == String(reflecting: StaticTriangleMesh3DSource.self) {
+                    staticMeshes.append((entity, try JSONDecoder().decode(StaticTriangleMesh3DSource.self, from: data)))
                 } else if name == String(reflecting: TileMapComponent.self) {
                     let reference = try JSONDecoder().decode(AdaScriptNativeTileMapReference.self, from: data)
                     let path: String
@@ -134,8 +138,19 @@ public struct AdaScriptNativeSceneDocument: Codable, Sendable {
                 parent.addChild(child)
             }
         }
+        for (entity, mesh) in staticMeshes {
+            guard let body = try mesh.makeBody(for: entity) else {
+                entity.components[Model3DSource.self] = nil
+                continue
+            }
+            scene.world.spawn("Static Triangle Collision") {
+                Transform()
+                body
+            }
+        }
         return scene
     }
+
     @MainActor
     private func expandedEntities(resourceRoot: URL?, sourceURL: URL?, ancestors: Set<URL>) throws -> [Item] {
         var result = entities

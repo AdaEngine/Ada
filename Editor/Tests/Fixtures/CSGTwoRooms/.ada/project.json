@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 3,
+  "project": {
+    "name": "TwoRoomsCSG",
+    "displayName": "CSG Two Rooms",
+    "id": "8ef258dd-071a-48a9-be2b-309dbaa892cd",
+    "bundleIdentifier": "org.adaengine.csgtworooms"
+  },
+  "paths": {
+    "sources": "Sources",
+    "assets": "Assets",
+    "resourceRoots": [
+      "Assets"
+    ]
+  },
+  "build": {
+    "system": "adascript"
+  },
+  "runtime": {
+    "moduleName": "TwoRoomsCSG",
+    "entry": {
+      "scene": "Assets/Scenes/TwoRooms.ascn"
+    },
+    "plugins": {
+      "preset": "game3d",
+      "presetVersion": 1,
+      "enable": [
+        "physics3d"
+      ]
+    }
+  },
+  "editor": {
+    "startupScene": "Assets/Scenes/TwoRooms.ascn"
+  },
+  "inputActions": []
+}

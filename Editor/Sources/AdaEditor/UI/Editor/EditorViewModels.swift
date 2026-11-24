@@ -285,6 +285,7 @@ struct EditorSceneDocument: Equatable, Sendable {
     var isDirty: Bool
     var statusMessage: String?
     var loadSummary: EditorSceneLoadSummary
+    var csgPlayProducts: [EditorCSGScene.Product] = []
 }
 
 struct EditorAssetDocument: Equatable, Sendable {

@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Варианты форм и UV в инспекторе CSG</title>
+<style>
+@font-face{font-family:Studio;src:url("../../Sources/AdaText/Assets/Fonts/opensans/OpenSans-Regular.ttf")}
+*{box-sizing:border-box}body{background:#1e1f22;color:#dfe1e5;font:13px Studio;margin:24px;color-scheme:dark}
+main{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;max-width:740px;margin:auto}
+article{border:1px solid #42464e;border-radius:5px;background:#27292e;padding:14px}
+h1{font-size:15px;margin:0 0 12px;color:#9bb9ff}label{display:block;margin:10px 0 4px}
+button,select{font:inherit;color:inherit;background:#18191d;border:1px solid #42464e;min-height:30px;border-radius:4px;padding:3px 8px}
+select{width:100%}button:hover,select:hover{border-color:#6694f4}button:disabled,select:disabled{opacity:.55}
+ul{list-style:none;padding:0;margin:0}li{display:flex;justify-content:space-between;gap:10px;padding:5px 6px}
+.active{background:#263c63}.muted{color:#a0a6b0}.actions{display:flex;gap:5px}.actions button:first-child{margin-right:auto}
+.menu{margin-top:2px;border:1px solid #42464e;border-radius:4px;background:#18191d;padding:4px}
+.status{margin:11px 0 0;border:1px solid #42464e;border-radius:4px;padding:6px}
+</style>
+<main>
+<article>
+<h1>Группа CSG</h1>
+<label for="operation">Операция</label><select id="operation"><option>Вычитание</option><option>Объединение</option><option>Пересечение</option></select>
+<label>Порядок операций</label><ul><li>Стена <span class="muted">Основа</span></li><li class="active">Цилиндр <span>Вычитание</span></li></ul>
+<label for="shape">Форма блока</label><select id="shape"><option>Куб</option><option>Сфера</option><option selected>Цилиндр</option></select>
+<div class="menu"><ul><li>Куб</li><li>Сфера</li><li class="active">Цилиндр</li></ul></div>
+<div class="actions"><button>Добавить блок</button><button aria-label="Выше">↑</button><button disabled aria-label="Ниже">↓</button></div>
+</article>
+<article>
+<h1>Группа CSG</h1>
+<label>Порядок операций</label><ul><li>Стена <span class="muted">Основа</span></li><li>Цилиндр <span class="muted">Вычитание</span></li><li class="active">Сфера <span>Объединение</span></li></ul>
+<label for="selected">Форма блока</label><select id="selected"><option>Куб</option><option selected>Сфера</option><option>Цилиндр</option></select>
+<div class="actions"><button>Добавить блок</button><button aria-label="Выше">↑</button><button disabled aria-label="Ниже">↓</button></div>
+<label for="material">Текстура</label><select id="material"><option>Однотонная</option><option selected>Шахматная</option><option>Tiles.png</option></select>
+<label for="tiling">Повтор UV</label><select id="tiling"><option>1×</option><option selected>2×</option><option>4×</option><option>8×</option></select>
+<p class="status" role="status">Результат готов</p>
+</article>
+</main>
+</html>

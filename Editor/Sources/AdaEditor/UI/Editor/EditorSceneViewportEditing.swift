@@ -137,6 +137,31 @@ extension EditorSceneViewportView {
                 }
             }
         )
+        inspectorViewModel.csgPreview = viewportModel.csgPreview
+        inspectorViewModel.csgReadOnly = document.isReadOnly
+        inspectorViewModel.editCSG = { [weak viewportModel] edit in
+            if case let .select(id) = edit {
+                viewportModel?.onSelectEntity?(id)
+                return
+            }
+            Self.mutateSceneDocument(document: document, status: "Edited", onDocumentChanged: onDocumentChanged) { model in
+                switch edit {
+                case .select:
+                    break
+                case let .addShape(shape, groupID):
+                    let name = EditorCSGInspector.shapeLabels[shape.rawValue] ?? "CSG Box"
+                    model.addCSGBox(to: groupID, name: L10n.tr(name), shape: shape)
+                case let .moveBox(id, groupID, delta):
+                    model.moveCSGBox(id, in: groupID, by: delta)
+                case let .operation(operation, id):
+                    model.setCSGOperation(operation, for: id)
+                case let .texture(reference, groupID):
+                    model.setCSGTexture(reference, in: groupID)
+                case let .uvRepeats(repeats, groupID):
+                    model.setCSGUVRepeats(repeats, in: groupID)
+                }
+            }
+        }
         if !isAssetPreview {
             inspectorViewModel.setTerrainTools(
                 owner: viewportModel,

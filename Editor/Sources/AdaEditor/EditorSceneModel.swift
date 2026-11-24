@@ -232,8 +232,11 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
     }
 
     mutating func addEntity(name: String, parentID: String?) -> EditorSceneEntity {
-        let resolvedParentID = parentID.flatMap { requestedID in
-            entities.contains(where: { $0.id == requestedID }) ? requestedID : nil
+        let resolvedParentID = parentID.flatMap { requestedID -> String? in
+            guard let parent = entities.first(where: { $0.id == requestedID }) else {
+                return nil
+            }
+            return parent.components[EditorCSGScene.boxType] == nil ? requestedID : parent.parent
         }
         let entity = EditorSceneEntity(
             id: UUID().uuidString,
@@ -264,7 +267,7 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
         let entity = addEntity(name: template.title, parentID: parentID)
         let componentTypes: [String] =
             switch template {
-            case .empty,
+            case .empty, .csgGroup,
                 .scriptable:
                 []
             case .sceneInstance:
@@ -306,7 +309,11 @@ struct EditorSceneModel: Codable, Equatable, Sendable {
         guard let entityIndex = entities.firstIndex(where: { $0.id == entity.id }) else {
             return entity
         }
-        if template == .scriptable {
+        if template == .csgGroup {
+            entities[entityIndex].components[EditorCSGScene.groupType] = ["version": .int(1)]
+            addCSGBox(to: entity.id)
+            selectEntity(entity.id)
+        } else if template == .scriptable {
             entities[entityIndex].components[EditorBuiltInComponentType.scriptableComponents] = ["scripts": .array([])]
         } else if template == .spine2D {
             entities[entityIndex].components[EditorBuiltInComponentType.transform]?["scale"] = .array([.double(0.005), .double(0.005), .double(1)])

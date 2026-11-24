@@ -6,6 +6,7 @@ import Foundation
 /// stay alive through instantiation: the asset cache tracks handle lifetimes.
 struct EditorRuntimeScenePreparation: Sendable {
     let model: EditorSceneModel
+    let csgProducts: [EditorCSGScene.Product]
     private let models: [AssetHandle<ModelAsset3D>]
     private let skeletons: [AssetHandle<SpineSkeleton>]
     private let libraries: [AssetHandle<AnimationLibraryResource>]
@@ -63,7 +64,8 @@ struct EditorRuntimeScenePreparation: Sendable {
         }
         try Task.checkCancellation()
         reportProgress(.init(fraction: 0.95, stage: "installing"))
-        return Self(model: model, models: models, skeletons: skeletons, libraries: libraries, modifiers: modifiers)
+        let csgProducts = try await EditorCSGScene.prepare(model, sourceURL: url, resourceRootURL: assetsDirectory)
+        return Self(model: model, csgProducts: csgProducts, models: models, skeletons: skeletons, libraries: libraries, modifiers: modifiers)
     }
 
     private struct Paths {
@@ -89,8 +91,12 @@ struct EditorRuntimeScenePreparation: Sendable {
                 } else { voxel = nil }
                 paths.models.insert(Model3DSource(source: resolved, voxel: voxel).assetPath)
                 if let path = payload["animationModifiers"]?.stringValue, !path.isEmpty {
-                    guard let modifierURL = EditorSceneFileLoader.resolveTileMapReference(path, relativeTo: url, resourceRootURL: assetsDirectory,
-                                                                                       fileExtension: "animmod") else {
+                    guard let modifierURL = EditorSceneFileLoader.resolveTileMapReference(
+                        path,
+                        relativeTo: url,
+                        resourceRootURL: assetsDirectory,
+                        fileExtension: "animmod"
+                    ) else {
                         throw AssetError.message("Animation modifiers must be inside project assets.")
                     }
                     paths.modifiers.insert(modifierURL.path)
@@ -115,8 +121,11 @@ struct EditorRuntimeScenePreparation: Sendable {
             }
             if let source = entity.components[EditorBuiltInComponentType.sceneInstance]?["scene"]?.stringValue, !source.isEmpty {
                 let nested: URL
-                if source.hasPrefix("@res://") { nested = assetsDirectory.appendingPathComponent(String(source.dropFirst(7))) }
-                else { nested = url.deletingLastPathComponent().appendingPathComponent(source) }
+                if source.hasPrefix("@res://") {
+                    nested = assetsDirectory.appendingPathComponent(String(source.dropFirst(7)))
+                } else {
+                    nested = url.deletingLastPathComponent().appendingPathComponent(source)
+                }
                 let canonical = nested.resolvingSymlinksInPath().standardizedFileURL
                 let root = assetsDirectory.resolvingSymlinksInPath().standardizedFileURL.path
                 guard canonical.path.hasPrefix(root + "/"), canonical.pathExtension == "ascn" else {

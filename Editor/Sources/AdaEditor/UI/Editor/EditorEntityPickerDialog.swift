@@ -95,7 +95,7 @@ struct EditorEntityPickerDialog: View {
 
     private func templateGrid(width: Float, height: Float) -> some View {
         let groups = EditorSceneEntityTemplateGroup.allCases.filter { group in
-            group.templates.contains { $0.matches(search) || L10n.matches(search, keys: [$0.title, $0.detail, $0.group.rawValue]) }
+            group.templates.contains(where: showsTemplate)
         }
         let columns = groupedColumns(groups, width: width)
         return ScrollView(.vertical) {
@@ -150,11 +150,18 @@ struct EditorEntityPickerDialog: View {
                 RectangleShape().fill(theme.editorColors.border.opacity(0.6)).frame(height: 1)
             }
             .frame(height: 22)
-            ForEach(group.templates.filter { $0.matches(search) || L10n.matches(search, keys: [$0.title, $0.detail, $0.group.rawValue]) }, id: \.self) { template in
+            ForEach(group.templates.filter(showsTemplate), id: \.self) { template in
                 templateButton(template)
             }
         }
         .accessibilityIdentifier("AdaEditor.EntityPicker.Group.\(group.rawValue)")
+    }
+
+    private func showsTemplate(_ template: EditorSceneEntityTemplate) -> Bool {
+        guard template != .csgGroup || CSGGroupSource.isAvailable else {
+            return false
+        }
+        return template.matches(search) || L10n.matches(search, keys: [template.title, template.detail, template.group.rawValue])
     }
 
     private func templateButton(_ template: EditorSceneEntityTemplate) -> some View {
@@ -236,6 +243,7 @@ extension EditorSceneEntityTemplate {
         case .empty: "\u{E86F}"
         case .scriptable: "\u{E87B}"
         case .sceneInstance: "\u{F720}"
+        case .csgGroup: "\u{E53B}"
         case .camera2D,
             .camera3D:
             "\u{E3AF}"
