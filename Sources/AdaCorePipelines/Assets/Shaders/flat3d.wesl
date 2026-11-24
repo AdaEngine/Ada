@@ -127,6 +127,15 @@ struct SurfaceLighting3DUniform {
 @group(0) @binding(3) var u_IBLSampler: sampler;
 @group(0) @binding(26) var u_LocalShadowTexture: texture_2d<f32>;
 @group(0) @binding(41) var u_ContactSceneDepth: texture_2d<f32>;
+@if(ADA_DECALS) @group(0) @binding(53) var decalProjection: texture_2d<f32>;
+@if(ADA_DECALS) @group(0) @binding(54) var decalAtlas: texture_2d<f32>;
+@if(ADA_DECALS) @group(0) @binding(55) var decalSampler: sampler;
+
+@if(ADA_DECALS)
+fn decalProjectionTexel(index: u32) -> vec4f {
+    let width = textureDimensions(decalProjection, 0).x;
+    return textureLoad(decalProjection, vec2i(i32(index % width), i32(index / width)), 0);
+}
 
 // Layer textures exist only in the shader variants of materials that have them. They are read with the base color
 // sampler, because the main pass has no free sampler slot.
@@ -153,6 +162,8 @@ struct Flat3DVertex {
     // Roughness, metallic, emissive strength, and emissive light threshold share one interpolator.
     @location(9) material: vec4f,
     @location(10) @interpolate(flat) modelOrientation: f32,
+    @if(ADA_DECALS) @location(11) decalBarycentrics: vec2f,
+    @if(ADA_DECALS) @location(12) @interpolate(flat) decalTriangle: u32,
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -210,7 +221,9 @@ fn flat3d_vertex(
     var localNormal = aNormal;
     var localTangent = aTangent.xyz;
     @if(ADA_MORPH) {
-        let morphed = applyMorph(vertexIndex, localPosition, localNormal, localTangent);
+        @if(ADA_DECALS) let sourceVertex = u32(decalProjectionTexel((vertexIndex / 3u) * 2u + 1u)[vertexIndex % 3u]);
+        @if(!ADA_DECALS) let sourceVertex = vertexIndex;
+        let morphed = applyMorph(sourceVertex, localPosition, localNormal, localTangent);
         localPosition = morphed.position;
         localNormal = morphed.normal;
         localTangent = morphed.tangent;
@@ -247,6 +260,11 @@ fn flat3d_vertex(
     out.shadowFlags = vec4f(aShadowFlags.x, max(0.0, aShadowFlags.y), aShadowFlags.z, aShadowFlags.w);
     out.material = vec4f(clamp(aMaterial.x, 0.04, 1.0), clamp(aMaterial.y, 0.0, 1.0), max(aMaterial.z, 0.0), aMaterial.w);
     out.modelOrientation = orientation;
+    @if(ADA_DECALS) {
+        let corner = vertexIndex % 3u;
+        out.decalTriangle = vertexIndex / 3u;
+        out.decalBarycentrics = vec2f(select(0.0, 1.0, corner == 1u), select(0.0, 1.0, corner == 2u));
+    }
     out.position = view.viewProjection * worldPosition;
     @if(ADA_WIREFRAME) {
         // WebGPU disallows pipeline depth bias on lines. Offset along view depth by a bounded scene distance,
@@ -1306,6 +1324,43 @@ fn ada_material_surface() -> AdaPBRSurface {
     return AdaPBRSurface(baseColor, normal, roughness, metallic, opacity, 1.0, vec3f(0.0));
 }
 
+@if(ADA_DECALS)
+fn applySurfaceDecals(surface: AdaPBRSurface, barycentricDx: vec2f, barycentricDy: vec2f) -> AdaPBRSurface {
+    var result = surface;
+    let range = decalProjectionTexel(Input.decalTriangle * 2u);
+    for (var stamp = 0u; stamp < u32(range.y); stamp += 1u) {
+        let offset = u32(range.x) + stamp * 6u;
+        let origin = decalProjectionTexel(offset).xyz;
+        let first = decalProjectionTexel(offset + 1u).xyz - origin;
+        let second = decalProjectionTexel(offset + 2u).xyz - origin;
+        let point = origin + first * Input.decalBarycentrics.x + second * Input.decalBarycentrics.y;
+        if any(abs(point) > vec3f(1.0)) { continue; }
+        let uvScale = vec2f(0.5, -0.5);
+        let uv = vec2f(0.5) + point.xy * uvScale;
+        let colorRegion = decalProjectionTexel(offset + 3u);
+        let decal = textureSampleLevel(decalAtlas, decalSampler, colorRegion.xy + uv * colorRegion.zw, 0.0);
+        if decal.a <= 0.0 { continue; }
+        result.baseColor = vec4f(mix(result.baseColor.rgb, srgbToLinear(decal.rgb), decal.a), result.baseColor.a);
+        let normalRegion = decalProjectionTexel(offset + 4u);
+        if normalRegion.x >= 0.0 {
+            let tangentNormal = textureSampleLevel(decalAtlas, decalSampler, normalRegion.xy + uv * normalRegion.zw, 0.0).xyz * 2.0 - vec3f(1.0);
+            let dx = (first.xy * barycentricDx.x + second.xy * barycentricDx.y) * uvScale;
+            let dy = (first.xy * barycentricDy.x + second.xy * barycentricDy.y) * uvScale;
+            let decalNormal = cotangentFrame(result.normal, dx, dy) * tangentNormal;
+            if dot(decalNormal, decalNormal) > 0.000001 {
+                let blended = mix(result.normal, normalize(decalNormal), decal.a);
+                if dot(blended, blended) > 0.000001 { result.normal = normalize(blended); }
+            }
+        }
+        let roughnessRegion = decalProjectionTexel(offset + 5u);
+        if roughnessRegion.x >= 0.0 {
+            let roughness = textureSampleLevel(decalAtlas, decalSampler, roughnessRegion.xy + uv * roughnessRegion.zw, 0.0).r;
+            result.roughness = mix(result.roughness, max(0.04, roughness), decal.a);
+        }
+    }
+    return result;
+}
+
 var<private> g_LocalPositionDx: vec3f;
 var<private> g_LocalPositionDy: vec3f;
 
@@ -1322,6 +1377,8 @@ fn flat3d_fragment(input: Flat3DVertex, @builtin(front_facing) frontFacing: bool
     g_UV1Dy = dpdy(input.textureCoordinate1);
     g_LocalPositionDx = dpdx(vec3f(input.textureCoordinate.x, input.viewTangent.w, input.textureCoordinate.y));
     g_LocalPositionDy = dpdy(vec3f(input.textureCoordinate.x, input.viewTangent.w, input.textureCoordinate.y));
+    @if(ADA_DECALS) let decalDx = dpdx(input.decalBarycentrics);
+    @if(ADA_DECALS) let decalDy = dpdy(input.decalBarycentrics);
 
     var out: Flat3DOutput;
     if pbr.u_SurfaceFlags.z > 0.5 {
@@ -1335,7 +1392,8 @@ fn flat3d_fragment(input: Flat3DVertex, @builtin(front_facing) frontFacing: bool
             discard;
         }
     }
-    let surface = ada_material_surface();
+    @if(ADA_DECALS) let surface = applySurfaceDecals(ada_material_surface(), decalDx, decalDy);
+    @if(!ADA_DECALS) let surface = ada_material_surface();
     @if(ADA_WIREFRAME) {
         out.depth = input.position.z;
         out.color = vec4f(0.88, 0.93, 1.0, 1.0);

@@ -102,6 +102,8 @@ for relative in [
     "Tests/AdaEngineTests/Render3DFogTests.swift",
     "Tests/AdaEngineTests/Render3DPostProcessTests.swift",
     "Tests/AdaEngineTests/Render3DColorGradingTests.swift",
+    "Tests/AdaEngineTests/Render3DDecalLifecycleTests.swift",
+    "Tests/AdaEngineTests/Render3DDecalProjectionTests.swift",
     "Tests/AdaEngineTests/ColorCurves3DTests.swift",
     "Tests/AdaEngineTests/Render3DAutoExposureTests.swift",
     "Tests/AdaEngineTests/Render3DDepthOfFieldTests.swift",
@@ -110,6 +112,7 @@ for relative in [
     "Tests/AdaEngineTests/ParticleLighting3DTests.swift",
     "Tests/AdaEngineTests/LocalEnvironmentProbe3DTests.swift",
     "Tests/AdaEngineTests/Render3DHybridReflectionTests.swift",
+    "Tests/AdaSceneTests/Decal3DPlacementTests.swift",
     "Tests/AdaSceneTests/Particle3DTests.swift",
     "Tests/AdaEngineTests/Render3DReflectionTests.swift",
     "Tests/AdaEngineTests/Render3DPerformanceBenchmarkTests.swift",
@@ -135,9 +138,9 @@ shutil.copytree(
     destination / "Sources/AdaCorePipelines/Assets/Shaders",
     dirs_exist_ok=True,
 )
-# Meshlet P0 uses original static garden props through the production glTF loader.
+# Meshlet and decal projection tests load garden fixtures through the production glTF loader.
 garden_fixtures = root / "Tests/AdaEngineTests/Fixtures/SkeletalGardenAssets"
-for name in ["Courtyard", "Bench", "Lantern", "Pedestal"]:
+for name in ["Courtyard", "Bench", "Lantern", "Pedestal", "TwoBoneRibbon"]:
     fixture_destination = sources / "Fixtures/SkeletalGardenAssets"
     fixture_destination.mkdir(parents=True, exist_ok=True)
     shutil.copy2(garden_fixtures / (name + ".glb"), fixture_destination / (name + ".glb"))

@@ -12,7 +12,12 @@ import AdaUtils
 
 /// A component that renders a 3D mesh.
 public struct Mesh3DComponent: Component {
-    public var mesh: Mesh { didSet { extractionRevision = RID() } }
+    public var mesh: Mesh {
+        didSet {
+            extractionRevision = RID()
+            geometryRevision = extractionRevision
+        }
+    }
     public var materials: [Material] {
         didSet {
             extractionRevision = RID()
@@ -25,6 +30,7 @@ public struct Mesh3DComponent: Component {
     // Copies retain their revision; replacing or editing any source field invalidates extraction.
     private(set) var extractionRevision = RID()
     private(set) var materialRevision = RID()
+    private(set) var geometryRevision = RID()
 
     public init(mesh: Mesh, materials: [Material]) {
         self.init(mesh: mesh, materials: materials, castShadows: true, receiveShadows: true)
