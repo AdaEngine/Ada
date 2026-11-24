@@ -6,9 +6,17 @@ enum EditorSettingsPage {
     static let runtimeEntry = "RUNTIME ENTRY"
     static let editorDisplay = "EDITOR DISPLAY"
     static let studioTools = "STUDIO TOOLS"
+    static let blenderMCP = "BLENDER MCP"
+    static let localMCP = "LOCAL MCP SERVERS"
 
     @MainActor static func title(_ page: String) -> String {
-        L10n.tr(EditorBuildPlatform(rawValue: page)?.title ?? page.localizedCapitalized)
+        if page == blenderMCP {
+            return L10n.tr("Blender MCP")
+        }
+        if page == localMCP {
+            return L10n.tr("Local MCP servers")
+        }
+        return L10n.tr(EditorBuildPlatform(rawValue: page)?.title ?? page.localizedCapitalized)
     }
 }
 
@@ -47,7 +55,13 @@ extension EditorSettingsWindowViewModel {
             }
             return pages
         case .agent:
+            #if os(Windows)
+            return ["AGENTS", EditorSettingsPage.localMCP, EditorSettingsPage.blenderMCP, "ACP CONNECTION", "PERMISSIONS", "CONTEXT"]
+            #elseif os(macOS)
+            return ["AGENTS", EditorSettingsPage.localMCP, "ACP CONNECTION", "PERMISSIONS", "CONTEXT"]
+            #else
             return ["AGENTS", "ACP CONNECTION", "PERMISSIONS", "CONTEXT"]
+            #endif
         case .achievements,
             .notifications:
             return []

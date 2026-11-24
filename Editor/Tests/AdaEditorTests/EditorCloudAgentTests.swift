@@ -32,6 +32,55 @@ struct EditorCloudAgentTests {
         var failure = EditorCloudAIStream()
         #expect(throws: (any Error).self) { _ = try failure.event(line: #"data: {"type":"error","message":"secret upstream body"}"#) }
     }
+
+    @Test(arguments: [EditorAgentChatMode.build, .plan, .ask])
+    func hostedBlenderRequiresBuildAndApproval(mode: EditorAgentChatMode) async throws {
+        let executions = Counter()
+        let approvals = Counter()
+        let rounds = Counter()
+        let tool = EditorCloudAgentTool(
+            name: "editor_external_invoke",
+            definition: [:],
+            readOnly: false,
+            invoke: { _ in
+                await executions.increment()
+                return #"{"artifact":"Downloads/Blender/export.glb"}"#
+            }
+        )
+        let service = EditorCloudAgentService(
+            connectionFactory: {
+                EditorCloudAIConnection(toolContract: 3) { input, receive in
+                    let external = input["tools"].array.first { $0["function"]["name"].string == "editor_external" }
+                    let actions = external?["function"]["parameters"]["properties"]["action"]["enum"].array ?? []
+                    #expect(actions.contains("invoke") == (mode == .build))
+                    #expect(input["toolContract"].int == 3)
+                    await rounds.increment()
+                    if await rounds.value == 1 {
+                        let arguments = #"{"action":"invoke","arguments":{"tool":"blender.create_and_export_glb","input":{"name":"Traffic Cone","parts":[]}}}"#
+                        let call: EditorCloudValue = ["id": "export", "function": ["name": "editor_external", "arguments": .string(arguments)]]
+                        try await receive(["type": "tool", "call": call])
+                    } else {
+                        try await receive(["type": "text", "text": "Done"])
+                    }
+                    try await receive(["type": "complete"])
+                }
+            },
+            toolsFactory: { _ in [tool] }
+        )
+        _ = try await service.send(
+            request(mode: mode),
+            onEvent: { event in
+                if let permission = event.permission {
+                    #expect(permission.summary.contains("Traffic Cone"))
+                    await approvals.increment()
+                    await service.resolvePermission(requestID: permission.id, optionID: "allow")
+                }
+            },
+            onProjectFileChanged: { _ in }
+        )
+        #expect(await approvals.value == (mode == .build ? 1 : 0))
+        #expect(await executions.value == (mode == .build ? 1 : 0))
+    }
     @Test func toolExecutionWaitsForPermissionAndUsesAnotherMeteredCall() async throws {
         let gateway = Gateway()
         let count = Counter()

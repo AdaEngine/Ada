@@ -203,16 +203,16 @@ struct EditorAgentEventCard: View {
                     .lineLimit(1)
             }
             ForEach(Array(toolCall.content.enumerated()), id: \.offset) { _, content in
-                toolContentView(content)
+                toolContentView(content, literal: toolCall.title.hasPrefix("editor_external/"))
             }
         }
     }
 
     @ViewBuilder
-    private func toolContentView(_ content: EditorAgentToolContent) -> some View {
+    private func toolContentView(_ content: EditorAgentToolContent, literal: Bool) -> some View {
         switch content.kind {
         case .text:
-            Text(markdown: content.text ?? "")
+            (literal ? Text(verbatim: content.text ?? "") : Text(markdown: content.text ?? ""))
                 .font(.system(size: 12))
                 .foregroundColor(theme.editorColors.muted)
                 .lineLimit(10)
@@ -261,9 +261,21 @@ struct EditorAgentEventCard: View {
                         .foregroundColor(theme.editorColors.muted)
                 }
             }
-            Text(markdown: permission.summary)
+            (permission.inputDetails == nil ? Text(markdown: permission.summary) : Text(verbatim: permission.summary))
                 .font(.system(size: 12))
                 .foregroundColor(theme.editorColors.text)
+            if let input = permission.inputDetails {
+                ScrollView(.vertical, showsIndicators: true) {
+                    Text(verbatim: input)
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.editorColors.text)
+                        .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                }
+                .frame(height: 112)
+                .background(RoundedRectangleShape(cornerRadius: 5).fill(theme.editorColors.surface))
+                .accessibilityIdentifier("AdaEditor.Agent.LocalMCP.InputDetails")
+            }
             if permission.state == .pending, let viewModel {
                 HStack(spacing: 6) {
                     ForEach(permission.options, id: \.id) { option in

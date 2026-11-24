@@ -81,3 +81,4 @@ describes the intended design even when its implementation is still planned.
 | ADR | Status | Implementation | Decision |
 | --- | --- | --- | --- |
 | [ADR-0026](0026-scripted-asset-generation-and-autonomous-studio.md) | Accepted | Implemented (not released) | Sandboxed AdaScript generators for voxel models, GLB models, WAV sounds and PNG sprites, measured audio, the `AudioSource` component, and an autonomous design-plan-build-accept workflow for Studio agents |
+| [ADR-0032](0032-ada-ai-desktop-external-tools.md) | Accepted | Planned | Desktop-managed MCP connections and local tool authorization for hosted Ada AI |

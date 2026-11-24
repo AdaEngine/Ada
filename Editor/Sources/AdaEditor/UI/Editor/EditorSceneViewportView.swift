@@ -8,6 +8,7 @@ struct EditorSceneViewportView: View {
     var uiCatalog: UICatalog = .standard
     let inspectorViewModel: EditorInspectorSidebarViewModel
     let playModeState: EditorPlayModeState
+    var trackedScenePlay: EditorTrackedScenePlay? = nil
     let playRuntime: EditorScenePlayRuntime?
     let onEntitySelected: (() -> Void)?
     let onPlay: (() -> Void)?
@@ -216,6 +217,7 @@ struct EditorSceneViewportView: View {
                             world.getResource(EditorSkeleton3DOverlay.self)?.isEnabled = showsBones && displayMode == .threeD
                         }
                     )
+                    .id(trackedScenePlay?.id)
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     sceneControls(size: geometry.size)
                     playStatusBar
@@ -261,6 +263,7 @@ struct EditorSceneViewportView: View {
             assetsDirectory: assets,
             sourceURL: sourceURL,
             recordsAchievement: false,
+            trackedScenePlay: trackedScenePlay,
             onInitialSceneLoaded: { result in
                 if reportsLoad { runtimeWarnings = result.warnings }
                 if reportsLoad, result.warnings.isEmpty, sourceURL != nil {

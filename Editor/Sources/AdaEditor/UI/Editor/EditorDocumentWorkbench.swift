@@ -11,6 +11,7 @@ struct EditorDocumentWorkbench: View {
                 viewModel: viewModel.workbench,
                 inspectorViewModel: viewModel.inspectorSidebar,
                 playModeState: viewModel.playModeState,
+                trackedScenePlay: viewModel.trackedScenePlay,
                 scenePlayRuntime: viewModel.scenePlayRuntime,
                 sceneResourceRootURL: viewModel.projectAssetsURL,
                 onPlayScene: viewModel.runActiveSceneInEditor,
