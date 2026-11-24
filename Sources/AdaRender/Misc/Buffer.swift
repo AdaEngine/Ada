@@ -56,10 +56,19 @@ public struct BufferMapMode: OptionSet, Sendable {
 }
 
 extension Buffer {
+    /// SAGA vertex and index buffers advance this version on CPU uploads and clear it on GPU writes.
+    package var geometryWriteRevision: UInt64? {
+        #if SAGA_RENDER && canImport(SAGACompiler)
+            (self as? SAGABuffer)?.shadowRasterRevision
+        #else
+            nil
+        #endif
+    }
+
     /// Geometry storage version for the editor's shadow cache. Other buffers use the uncached path.
     package var shadowRasterRevision: UInt64? {
         #if os(macOS) && SAGA_RENDER && canImport(SAGACompiler)
-            (self as? SAGABuffer)?.shadowRasterRevision
+            geometryWriteRevision
         #else
             nil
         #endif

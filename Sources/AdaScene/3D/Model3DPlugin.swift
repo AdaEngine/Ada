@@ -40,6 +40,8 @@ public struct Model3DPlugin: Plugin {
         app.addSystem(CharacterLocomotion3DPlaybackSystem.self, on: .postUpdate)
         app.addSystem(Model3DSourceSystem.self, on: .preUpdate)
         Mesh3DComponent.registerComponent()
+        app.insertResource(Decal3DStorage())
+        app.addSystem(Decal3DCleanupSystem.self, on: .postUpdate)
         Mesh3DInstancesComponent.registerComponent()
         Terrain3D.registerComponent()
         TerrainTile3DComponent.registerComponent()
@@ -211,7 +213,11 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
         let isMotion = world.getResource(ActiveMotion3DPass.self)?.isEnabled == true
         let isContact = world.getResource(ActiveContactDepth3DPass.self)?.isEnabled == true
         let edges = !isMotion && !isContact && world.getResource(Wireframe3DResources.self)?.drawingEdges == true
-        if !isMotion && !isContact, world.getResource(MeshletMap3DResources.self)?.isEnabled == true,
+        let pbrMaterial = item.material as? PBRMaterial
+        let decals = !isMotion && !isContact && !edges && pbrMaterial.map(Decal3D.supports) == true
+            && view.components[RenderViewTarget.self]?.pathTracingSurfaceActive != true
+            ? item.decals.flatMap { $0.source == Decal3DPartKey(part) ? $0 : nil } : nil
+        if decals == nil, !isMotion && !isContact, world.getResource(MeshletMap3DResources.self)?.isEnabled == true,
             let target = view.components[RenderViewTarget.self], let instances = world.getResource(Active3DInstanceBuffers.self)?.instances {
             let map = world.getRefResource(MeshletMap3DResources.self)
             if try map.wrappedValue.draw(item: item, encoder: renderEncoder, device: renderDevice, target: target, instances: instances) {
@@ -220,7 +226,7 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
         }
         let morphed = item.morphBuffer != nil && part.morphTargets != nil
         let hasLightmapUV = part.vertexDescriptor.attributes.containsAttribute(by: MeshDescriptor.textureCoordinates1.id.name)
-        let shadingFeatures = (item.material as? PBRMaterial)?.shaderFeatures ?? []
+        let shadingFeatures = pbrMaterial?.shaderFeatures ?? []
         let configuration = PBR3DConfiguration(
             vertex: part.vertexDescriptor,
             blended: (item.material as? PBRMaterial)?.effectiveAlphaMode == .blend,
@@ -232,6 +238,7 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
                 .union(!isMotion && !isContact && Self.writesPathTracingSurface(view.components[RenderViewTarget.self]) ? .pathTracingSurface : [])
                 .union(!isMotion && !isContact && view.components[RenderViewTarget.self]?.irradianceGridActive == true ? .irradianceGrid : [])
                 .union(edges ? .wireframe : [])
+                .union(decals == nil ? [] : .decals)
         )
         var pipeline: any RenderPipeline
         if isContact {
@@ -276,7 +283,6 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
         guard let materialBuffer = world.getResource(PBR3DUniforms.self)?.buffer(for: item.material) else {
             return
         }
-        let pbrMaterial = item.material as? PBRMaterial
         // The compact motion layout has no texture-presence attribute. Match the main
         // pass's alpha test when the material selects a UV set this part does not have.
         let baseUV = (pbrMaterial?.textureCoordinates.first ?? 0) == 1
@@ -296,6 +302,11 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
         let heightTexture = terrainSurface.map { $0.surface ?? Self.neutralTerrainSurfaceTexture } ?? pbrMaterial?.heightTexture ?? Texture2D.whiteTexture
         // The main shader variant declares exactly the layer textures the material has (see PBRMaterial.shaderFeatures).
         var layerBindings: [RenderResourceSet.Binding] = []
+        if let decals {
+            layerBindings.append(.init(binding: 53, shaderStages: [.vertex, .fragment], resource: .texture(decals.projection)))
+            layerBindings.append(.init(binding: 54, shaderStages: .fragment, resource: .texture(decals.atlas)))
+            layerBindings.append(.init(binding: 55, shaderStages: .fragment, resource: .sampler(decals.atlas.sampler)))
+        }
         if morphed, let morphBuffer = item.morphBuffer, let morphSet = part.morphTargets {
             layerBindings.append(.init(binding: Morph3DUniforms.binding, shaderStages: .vertex, resource: .uniformBuffer(morphBuffer, offset: 0)))
             layerBindings.append(.init(binding: Morph3DUniforms.textureBinding, shaderStages: .vertex, resource: .texture(morphSet.deltaTexture)))
@@ -348,7 +359,7 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
             ),
             index: 0
         )
-        renderEncoder.setVertexBuffer(part.vertexBuffer, offset: 0, slot: 0)
+        renderEncoder.setVertexBuffer(decals?.vertices ?? part.vertexBuffer, offset: 0, slot: 0)
         if usesGraph, let graph = pbrMaterial?.graphMaterial {
             graph.bind(to: renderEncoder, device: renderDevice)
         }
@@ -378,6 +389,10 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
             return
         }
         func drawSurface() {
+            if decals != nil {
+                renderEncoder.draw(type: .triangle, vertexStart: 0, vertexCount: part.indexCount, instanceCount: Int(batchRange.count))
+                return
+            }
             renderEncoder.setIndexBuffer(part.indexBuffer, offset: 0)
             if !isContact, let clusters = item.meshletOverride, !isMotion || clusters.arguments == nil {
                 renderEncoder.setIndexBuffer(clusters.indices, offset: 0)
@@ -402,7 +417,7 @@ public final class Model3DDrawPass: MeshletGeometryDrawPass, @unchecked Sendable
                 instanceCount: Int(batchRange.count)
             )
         }
-        let canGroupDraw = !isMotion && !isContact && normalTexture === Self.flatNormalTexture
+        let canGroupDraw = decals == nil && !isMotion && !isContact && normalTexture === Self.flatNormalTexture
             && pbrMaterial.map {
                 $0.graphMaterial == nil && $0.heightTexture == nil && $0.shaderFeatures.isEmpty && $0.effectiveAlphaMode != .blend
             } == true

@@ -30,6 +30,7 @@ public struct MorphTargetSet: Sendable {
     /// Per target, the longest position delta; an upper bound of how far the target can move any vertex.
     public let maximumDisplacements: [Float]
     public let deltaTexture: Texture2D
+    private let positionDeltas: [[UInt16]]
 
     /// Flags for the shader: bit 0 normals present, bit 1 tangents present.
     public var attributeFlags: Float { Float((hasNormals ? 1 : 0) | (hasTangents ? 2 : 0)) }
@@ -104,6 +105,35 @@ public struct MorphTargetSet: Sendable {
         self.targetNames = targetNames
         self.maximumDisplacements = displacements
         self.deltaTexture = texture
+        self.positionDeltas = positionDeltas.enumerated().map { target, deltas in
+            guard !deltas.isEmpty else {
+                return []
+            }
+            var packed: [UInt16] = []
+            packed.reserveCapacity(vertexCount * 3)
+            for vertex in 0..<vertexCount {
+                let start = (target * vertexCount + vertex) * attributes * 4
+                packed.append(contentsOf: halves[start..<(start + 3)])
+            }
+            return packed
+        }
+    }
+
+    /// Position data as seen by the shader after half-float conversion.
+    package func renderPositionDelta(target: Int, vertex: Int) -> Vector3 {
+        guard positionDeltas.indices.contains(target), (0..<vertexCount).contains(vertex) else {
+            return .zero
+        }
+        let deltas = positionDeltas[target]
+        guard !deltas.isEmpty else {
+            return .zero
+        }
+        let offset = vertex * 3
+        return Vector3(
+            Self.float(fromHalfBits: deltas[offset]),
+            Self.float(fromHalfBits: deltas[offset + 1]),
+            Self.float(fromHalfBits: deltas[offset + 2])
+        )
     }
 
     /// IEEE half-precision bits of a finite float, rounding to nearest and saturating at the largest finite half.

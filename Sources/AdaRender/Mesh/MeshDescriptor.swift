@@ -306,13 +306,13 @@ public extension MeshDescriptor {
 
     /// Get the vertex buffer for the mesh.
     func getVertexBuffer(renderDevice: RenderDevice, binding: Int = 0) -> VertexBuffer {
+        uploadVertices(interleavedVertices(), to: renderDevice, binding: binding)
+    }
+
+    private func interleavedVertices() -> [UInt8] {
         let vertexBufferSize = getVertexBufferSize()
-        let vertexBuffer = renderDevice.createVertexBuffer(
-            length: vertexBufferSize,
-            binding: binding
-        )
         guard vertexBufferSize > 0 else {
-            return vertexBuffer
+            return []
         }
         let vertexCount = buffers[.positions]?.count ?? 0
         var vertexBufferBytes = [UInt8](repeating: 0, count: vertexBufferSize)
@@ -346,14 +346,48 @@ public extension MeshDescriptor {
             }
         }
 
-        unsafe vertexBufferBytes.withUnsafeMutableBytes { vertexBufferContents in
-            guard let baseAddress = vertexBufferContents.baseAddress else {
-                return
-            }
-            unsafe vertexBuffer.setData(baseAddress, byteCount: vertexBufferSize)
-        }
+        return vertexBufferBytes
+    }
 
+    private func uploadVertices(_ bytes: consuming [UInt8], to device: RenderDevice, binding: Int = 0) -> VertexBuffer {
+        let vertexBuffer = device.createVertexBuffer(length: bytes.count, binding: binding)
+        var bytes = bytes
+        unsafe bytes.withUnsafeMutableBytes {
+            if let baseAddress = $0.baseAddress, !$0.isEmpty {
+                unsafe vertexBuffer.setData(baseAddress, byteCount: $0.count)
+            }
+        }
         return vertexBuffer
+    }
+}
+
+extension MeshDescriptor {
+    /// Preserve the existing interleaved layout while giving each triangle corner its own vertex index.
+    package func expandedTriangleVertices(renderDevice: RenderDevice, maximumBytes: Int) -> (any VertexBuffer)? {
+        let sourceCount = buffers[.positions]?.count ?? 0
+        guard primitiveTopology == .triangleList, sourceCount > 0, !indicies.isEmpty,
+            indicies.count.isMultiple(of: 3), indicies.allSatisfy({ Int($0) < sourceCount })
+        else {
+            return nil
+        }
+        let sourceSize = getVertexBufferSize()
+        let stride = sourceSize / sourceCount
+        guard stride > 0, sourceSize <= maximumBytes, indicies.count <= maximumBytes / stride else {
+            return nil
+        }
+        let source = interleavedVertices()
+        var expanded = [UInt8](repeating: 0, count: indicies.count * stride)
+        unsafe source.withUnsafeBytes { from in
+            unsafe expanded.withUnsafeMutableBytes { to in
+                guard let from = from.baseAddress, let to = to.baseAddress else {
+                    return
+                }
+                for (index, sourceIndex) in indicies.enumerated() {
+                    unsafe to.advanced(by: index * stride).copyMemory(from: from.advanced(by: Int(sourceIndex) * stride), byteCount: stride)
+                }
+            }
+        }
+        return uploadVertices(expanded, to: renderDevice)
     }
 }
 

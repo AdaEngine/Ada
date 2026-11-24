@@ -75,6 +75,7 @@ public struct Mesh3DRenderSource: Sendable {
     public var skinningOffset: Int
     /// Morph weight buffers by mesh part (see ``morphKey(model:part:)``); empty for a mesh without morph weights.
     public var morphBuffers: [UInt64: any UniformBuffer]
+    package var decals: [Decal3DPartKey: Decal3DDraw] = [:]
 
     /// The key of a mesh part in ``morphBuffers``.
     public static func morphKey(model: Int, part: Int) -> UInt64 {

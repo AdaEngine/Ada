@@ -71,6 +71,12 @@ extension Mesh {
 
         /// Morph targets of this part, if it has any. Weights are applied by the vertex shader before skinning.
         public var morphTargets: MorphTargetSet?
+        private let descriptorGeometry: Decal3DPartKey
+
+        package var canExpandForDecals: Bool {
+            descriptorGeometry.isTracked && descriptorGeometry == Decal3DPartKey(self)
+                && vertexDescriptor == meshDescriptor.getMeshVertexBufferDescriptor()
+        }
 
         /// Validated derived clusters belonging to this immutable source geometry generation.
         /// Replacing a source buffer/count opts out. In-place geometry edits require rebuilding the part generation.
@@ -115,6 +121,7 @@ extension Mesh {
             self.indexBuffer = indexBuffer
             self.indexCount = indexCount
             self.vertexBuffer = vertexBuffer
+            descriptorGeometry = Decal3DPartKey(vertices: vertexBuffer, indices: indexBuffer, count: indexCount)
             let prepared = meshlets ?? meshDescriptor.meshlets
             let validated = primitiveTopology == .triangleList && indexCount == meshDescriptor.indicies.count
                 && prepared?.matches(positions: meshDescriptor.positions.elements, indices: meshDescriptor.indicies) == true ? prepared : nil

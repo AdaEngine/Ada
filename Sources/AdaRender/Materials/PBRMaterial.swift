@@ -194,6 +194,8 @@ public class PBRMaterial: Material, @unchecked Sendable {
         /// Path-traced views: the ``hybridReflection`` and ``diffuseSurface`` outputs carry emission and base colour
         /// for the tracer's first hit instead of their raster meanings. Always combined with both of them.
         public static let pathTracingSurface = Self(rawValue: 1 << 18)
+        /// The draw has receiver-local surface decals.
+        package static let decals = Self(rawValue: 1 << 19)
 
         /// Every layer, without textures.
         public static let all: ShaderFeatures = [.clearcoat, .sheen, .anisotropy]
@@ -212,6 +214,7 @@ public class PBRMaterial: Material, @unchecked Sendable {
             if contains(.terrain) { macros.append("ADA_TERRAIN") }
             if contains(.wireframe) { macros.append("ADA_WIREFRAME") }
             if contains(.pathTracingSurface) { macros.append("ADA_PATH_TRACING_SURFACE") }
+            if contains(.decals) { macros.append("ADA_DECALS") }
             for texture in PBRLayerTexture.allCases where contains(texture.feature) {
                 macros.append(texture.macro)
             }

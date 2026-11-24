@@ -76,6 +76,7 @@ public struct VisibleMesh3DLists: Resource {
         var descriptor: Int32
         var skin: ObjectIdentifier?
         var morph: ObjectIdentifier?
+        var decalReceiver: Entity.ID?
         var cast: Bool
         var receive: Bool
     }
@@ -250,6 +251,8 @@ public struct VisibleMesh3DLists: Resource {
                         } else {
                             materialKey = .identity(material.rid)
                         }
+                        let decalReceiver = !isShadowPass && !sources[sourceIndex].decals.isEmpty
+                            && sources[sourceIndex].decals[Decal3DPartKey(parts[partIndex])] != nil ? sources[sourceIndex].entity : nil
                         let batchKey = BatchKey(
                             vertex: ObjectIdentifier(parts[partIndex].vertexBuffer),
                             index: ObjectIdentifier(parts[partIndex].indexBuffer),
@@ -258,6 +261,7 @@ public struct VisibleMesh3DLists: Resource {
                             descriptor: Int32(descriptorID),
                             skin: sources[sourceIndex].skinningBuffer.map(ObjectIdentifier.init),
                             morph: sources[sourceIndex].morphBuffers[Mesh3DRenderSource.morphKey(model: modelIndex, part: partIndex)].map(ObjectIdentifier.init),
+                            decalReceiver: decalReceiver,
                             cast: sources[sourceIndex].castShadows,
                             receive: sources[sourceIndex].receiveShadows
                         )
@@ -386,6 +390,10 @@ public struct VisibleMesh3DLists: Resource {
                     )
                 )
                 entry.items[entry.items.count - 1].forceVisible = sources[sourceIndex].forceVisible
+                if !isShadowPass, !sources[sourceIndex].decals.isEmpty {
+                    let part = selectedMesh.models[Int(record.model)].parts[Int(record.part)]
+                    entry.items[entry.items.count - 1].decals = sources[sourceIndex].decals[Decal3DPartKey(part)]
+                }
             }
             if pass < 0 && settings.gpuOcclusion, let item = entry.items.last, let range = item.batchRange {
                 // Automatic LOD submits its own CPU-selected indices against the
@@ -397,7 +405,7 @@ public struct VisibleMesh3DLists: Resource {
                         draw: UInt32(entry.items.count - 1),
                         source: UInt32(instanceIndex),
                         destination: UInt32(range.lowerBound),
-                        forceVisible: sources[sourceIndex].forceVisible || template.blended || part.meshletLOD?.automaticPixelError != nil
+                        forceVisible: sources[sourceIndex].forceVisible || template.blended || item.decals != nil || part.meshletLOD?.automaticPixelError != nil
                     )
                 )
             }
