@@ -89,6 +89,7 @@ final class EditorTerrainEditingState {
 
 extension EditorSceneViewportModel {
     func setTerrainEditing(_ enabled: Bool) {
+        if enabled { decalEditing.setEnabled(false) }
         endTerrainStroke(cancelled: true)
         endTransformDrag(cancelled: true)
         terrainEditing.isEnabled = enabled
@@ -156,7 +157,9 @@ extension EditorSceneViewportModel {
     }
 
     func updateTerrainStroke(deltaTime: Float) -> Bool {
-        if terrainEditing.meshSculptStroke != nil { return updateMeshTerrainSculpt(deltaTime: deltaTime) }
+        if terrainEditing.meshSculptStroke != nil {
+            return updateMeshTerrainSculpt(deltaTime: deltaTime)
+        }
         if terrainEditing.sourceStroke != nil {
             return updateSourceTerrainStroke(deltaTime: deltaTime)
         }

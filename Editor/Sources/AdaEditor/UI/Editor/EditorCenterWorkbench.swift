@@ -5,13 +5,13 @@ struct EditorCenterWorkbench: View {
     let viewModel: EditorWorkbenchViewModel
     let inspectorViewModel: EditorInspectorSidebarViewModel
     let playModeState: EditorPlayModeState
-    var trackedScenePlay: EditorTrackedScenePlay? = nil
+    var trackedScenePlay: EditorTrackedScenePlay?
     let scenePlayRuntime: EditorScenePlayRuntime?
     let sceneResourceRootURL: URL?
     let onPlayScene: (() -> Void)?
     let onStopScene: (() -> Void)?
     let onSceneEntitySelected: (() -> Void)?
-    var onTerrainToolSelected: (() -> Void)?
+    var onSceneInspectorRequested: (() -> Void)?
     let onSourceHover: ((EditorTextDocument, EditorSourceLocation?) -> Void)?
     let onGoToDefinition: ((EditorTextDocument, EditorSourceLocation) -> Void)?
     let onCompletionPosition: ((EditorTextDocument, EditorSourceLocation, String) -> Void)?
@@ -686,7 +686,7 @@ extension EditorCenterWorkbench {
             trackedScenePlay: trackedScenePlay,
             playRuntime: scenePlayRuntime,
             onEntitySelected: onSceneEntitySelected,
-            onTerrainToolSelected: onTerrainToolSelected,
+            onSceneInspectorRequested: onSceneInspectorRequested,
             onPlay: onPlayScene,
             onStop: onStopScene,
             annotationAgent: annotationAgent,

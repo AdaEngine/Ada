@@ -61,6 +61,9 @@ struct EditorInspectorSidebar: View {
                                     .font(.system(size: 11))
                                     .foregroundColor(theme.editorColors.muted)
                             }
+                            if let viewport = viewModel.decalViewport, viewport.decalEditing.enabled || !viewport.decalEditing.entries.isEmpty {
+                                inspectorSection("Decals") { decalInspector(viewport) }
+                            }
                             inspectorSection("COMPONENTS") {
                                 ForEach(selectedEntity.components, id: \.typeName) { component in
                                     if component.typeName == String(reflecting: MeshTerrain3DBinding.self) {
@@ -105,6 +108,9 @@ struct EditorInspectorSidebar: View {
                                 gizmoEditor(selectedEntity)
                             }
                         } else {
+                            if let viewport = viewModel.decalViewport, viewport.decalEditing.enabled {
+                                inspectorSection("Decals") { decalInspector(viewport) }
+                            }
                             inspectorSection("SELECTION") {
                                 Text(L10n.text("Click an entity in the scene or hierarchy to inspect it."))
                                     .font(.system(size: 11))

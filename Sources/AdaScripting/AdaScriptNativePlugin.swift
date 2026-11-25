@@ -3,7 +3,7 @@ import AdaApp
 @_spi(Scripting) import AdaECS
 import AdaInput
 import AdaMultiplayer
-import AdaScene
+@_spi(Scripting) import AdaScene
 import AdaScriptCompilerCore
 import AdaTilemap
 import AdaUtils
@@ -190,6 +190,7 @@ private struct NativeECSSystem: System {
     private let recorder: NativeDiagnostics?
     private let commands: Commands
     private let navigator = Res<SceneNavigator?>()
+    @Res<Decal3DCommands?> private var decalCommands
     private let network: ResMut<AdaScriptNetworkRuntime>?
     private let components: [RuntimeComponentDescriptor]
     private let networkSchemas: [AdaScriptNetworkCommandSchema]
@@ -208,7 +209,7 @@ private struct NativeECSSystem: System {
     }
     var queries: SystemQueries {
         SystemQueries(
-            queries: nativeQueries.map { $0.query as any SystemParameter } + nativeResources.map(\.parameter) + [deltaTime, commands, navigator]
+            queries: nativeQueries.map { $0.query as any SystemParameter } + nativeResources.map(\.parameter) + [deltaTime, commands, navigator, _decalCommands]
                 + (network.map { [$0 as any SystemParameter] } ?? [])
         )
     }
@@ -273,7 +274,14 @@ private struct NativeECSSystem: System {
                     payloads: network?.wrappedValue.commands(named: remote.commandName) ?? [], scope: scope
                 ))
             }
-            let world = NativeWorldHost(scope: scope, commands: commands, navigator: navigator.wrappedValue, components: components, module: module)
+            let world = NativeWorldHost(
+                scope: scope,
+                commands: commands,
+                navigator: navigator.wrappedValue,
+                components: components,
+                module: module,
+                decals: decalCommands
+            )
             let assetHost = NativeAssetsHost(store: assets, scope: scope, asyncRuntime: asyncRuntime)
             let networkHost = NativeNetworkHost(runtime: network, schemas: networkSchemas, module: module, scope: scope)
             let globals: [String: NativeValue] = (asyncRuntime?.globals ?? [:]).merging([

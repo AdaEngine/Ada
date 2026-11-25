@@ -10,10 +10,10 @@ struct EditorSceneDocumentEditor: View {
     let uiCatalog: UICatalog
     let inspectorViewModel: EditorInspectorSidebarViewModel
     let playModeState: EditorPlayModeState
-    var trackedScenePlay: EditorTrackedScenePlay? = nil
+    var trackedScenePlay: EditorTrackedScenePlay?
     let playRuntime: EditorScenePlayRuntime?
     let onEntitySelected: (() -> Void)?
-    var onTerrainToolSelected: (() -> Void)?
+    var onSceneInspectorRequested: (() -> Void)?
     let onPlay: (() -> Void)?
     let onStop: (() -> Void)?
     var annotationAgent: EditorAgentViewModel?
@@ -60,7 +60,7 @@ struct EditorSceneDocumentEditor: View {
                     onPlay: onPlay,
                     onStop: onStop,
                     onDocumentChanged: { workbench.applySceneViewportEdit($0) },
-                    onTerrainToolSelected: onTerrainToolSelected,
+                    onSceneInspectorRequested: onSceneInspectorRequested,
                     annotationAgent: annotationAgent,
                     onAnnotationAdded: onAnnotationAdded,
                     isDocumentActive: isActive

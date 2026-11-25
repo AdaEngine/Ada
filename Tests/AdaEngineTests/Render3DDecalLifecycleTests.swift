@@ -1,16 +1,118 @@
 #if os(macOS) || os(Windows) || os(Linux)
 import AdaAnimation
+@_spi(Internal) import AdaApp
 import AdaAssets
 import AdaCorePipelines
 import AdaECS
 @_spi(Internal) import AdaRender
-@testable import AdaScene
+@_spi(Scripting) @testable import AdaScene
 import AdaTransform
 import AdaUtils
+import Foundation
 import Math
 import Testing
 
 extension Render3DGPUTests.DecalProjection {
+    @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
+    func authoredAndQueuedDecalsComposeInStableOrder() async throws {
+        let scene = try await Render3DDebugViewGPUTests.makeScene()
+        let world = scene.app.main
+        for sphere in scene.sphereEntities { sphere.components[Visibility.self] = .hidden }
+        let assets = FileManager.default.temporaryDirectory.appendingPathComponent("AdaDecals-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: false)
+        defer { try? FileManager.default.removeItem(at: assets) }
+        let red = Image(width: 4, height: 4, color: Color(1, 0, 0, 1))
+        let green = Image(width: 4, height: 4, color: Color(0, 1, 0, 1))
+        try red.writePNG(to: assets.appendingPathComponent("Red.png"))
+        try green.writePNG(to: assets.appendingPathComponent("Green.png"))
+        await scene.app.withExecutionContext {
+            await AssetsManager.setProjectDirectories(ProjectDirectories(source: assets, assetsDirectory: assets))
+        }
+        let owner = world.spawn("Decal order") { Transform(position: [0, 0.65, 0]) }
+        let reference = Model3DSource(source: "@res://Static.glb")
+        owner.components += reference
+        let model = ModelAsset3D(
+            nodes: [.init(name: "Surface", transform: .identity, meshIndex: 0, children: [])],
+            meshes: [.generateCube(renderDevice: scene.device)],
+            materials: [PBRMaterial()],
+            scenes: [[0]],
+            defaultScene: 0
+        )
+        let root = try reference.instantiate(model, in: world, under: owner)
+        let receiver = try #require(root.children.first)
+        #expect(receiver.components[ModelNode3DComponent.self]?.nodeIndex == 0)
+        let localPoint = Vector3(0, 0, -0.5)
+        let point = localPoint + Vector3(0, 0.65, 0)
+        let direction = Vector3(0, 0, -1)
+        let size = Vector3(0.4, 0.4, 0.15)
+        let frame = try #require(Decal3D.Projector.surfaceFrame(point: point, normal: direction))
+        let queue = try #require(world.getResource(Decal3DCommands.self))
+        let place = queue.enqueue(.place(receiver.id, .init(transform: frame, size: size), .init(color: "@res://Red.png")))
+        var outcome: Decal3DCommands.Outcome?
+        for _ in 0..<120 {
+            try await scene.app.update()
+            outcome = queue.takeResult(place)
+            if outcome != nil { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        let result = try #require(outcome)
+        try #require(result.errorCode.isEmpty, "\(result.message)")
+        let localFrame = try #require(Decal3D.Projector.surfaceFrame(point: localPoint, normal: direction))
+        let entry = Decal3DSource.Entry(
+            node: .init(source: reference.source, index: 0, name: "Surface"),
+            localFrame: localFrame,
+            size: size,
+            images: .init(color: "@res://Green.png")
+        )
+        let authored = Decal3DSource(entries: [entry])
+        let data = try JSONEncoder().encode(authored)
+        owner.components += try JSONDecoder().decode(Decal3DSource.self, from: data)
+        for _ in 0..<120 {
+            try await scene.app.update()
+            if world.getResource(Decal3DStorage.self)?.receivers[receiver.id]?.entries.count == 2 { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        try #require(world.getResource(Decal3DStorage.self)?.receivers[receiver.id]?.entries.count == 2)
+        let camera = try #require(scene.camera.components[GlobalViewUniform.self]?.viewProjectionMatrix)
+        let above = try await scene.render(.albedo)
+        #expect(try Self.isRed(at: point, in: above, camera: camera))
+        let removal = queue.enqueue(.remove(receiver.id, result.value))
+        var greenVisible = false
+        for _ in 0..<60 {
+            let below = try await scene.render(.albedo, frames: 1)
+            let pixel = try Self.sample(at: point, image: below, camera: camera)
+            greenVisible = pixel.green > 0.8 && pixel.red < 0.15
+            if greenVisible { break }
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        #expect(greenVisible)
+        #expect(queue.takeResult(removal)?.errorCode.isEmpty == true)
+    }
+
+    @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
+    func persistedLocalProjectorWorksAfterNonuniformParentScaling() async throws {
+        let scene = try await Render3DDebugViewGPUTests.makeScene()
+        let parent = scene.app.main.spawn("Scaled parent") {
+            Transform(scale: [100, 1, 1])
+        }
+        let receiver = scene.app.main.spawn("Rotated receiver") {
+            Mesh3DComponent(mesh: .generateCube(renderDevice: scene.device), materials: [PBRMaterial()])
+            Transform(rotation: Quat.euler([0, .pi / 4, 0]))
+        }
+        parent.addChild(receiver)
+        let localFrame = try #require(Decal3D.Projector.surfaceFrame(point: [0, 0, -0.5], normal: [0, 0, -1]))
+        let entry = Decal3DSource.Entry(localFrame: localFrame, size: [0.3, 0.3, 0.1], images: .init(color: "@res://Red.png"))
+        let handle = try Decal3D.place(
+            on: receiver,
+            projector: entry.projector(),
+            appearance: Self.redSticker,
+            part: nil,
+            replacing: nil,
+            authoredOrder: 0
+        )
+        #expect(Decal3D.contains(handle, on: receiver))
+    }
+
     @Test(.enabled(if: Render3DDebugViewGPUTests.enabled))
     func morphBeforeSkinPlacementAndDrawingAgree() async throws {
         let scene = try await Render3DDebugViewGPUTests.makeScene()

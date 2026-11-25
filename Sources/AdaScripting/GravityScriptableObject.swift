@@ -66,19 +66,29 @@ public final class AdaScriptObjectCatalog {
     }
 
     public init(schemas: [AdaScriptObjectSchema], sources: [AdaScriptSource], communityPolicy: AdaScriptCommunityPolicy? = nil) throws {
-        guard !schemas.isEmpty else { runtime = nil; descriptors = []; return }
+        guard !schemas.isEmpty else {
+            runtime = nil
+            descriptors = []
+            return
+        }
         let runtime = try GravityScriptableModuleRuntime(sources: sources, schemas: schemas, communityPolicy: communityPolicy)
         self.runtime = runtime
         descriptors = try schemas.map { schema in
             let definition = try GravityScriptableDefinition(schema: schema, runtime: runtime)
-            return ScriptableObjectDescriptor(identifier: schema.identifier, version: schema.version, aliases: schema.aliases,
-                declaredAccess: definition.declaredAccess, exportedFields: schema.fields, requiredComponents: definition.requiredComponents,
+            return ScriptableObjectDescriptor(
+                identifier: schema.identifier,
+                version: schema.version,
+                aliases: schema.aliases,
+                declaredAccess: definition.declaredAccess,
+                exportedFields: schema.fields,
+                requiredComponents: definition.requiredComponents,
                 make: { GravityScriptableObject(definition: definition) },
                 decode: { decoder, version in
                     let object = try GravityScriptableObject(definition: definition, payload: GravityScriptablePayload.decode(from: decoder))
                     object.encodedSchemaVersion = version
                     return object
-                })
+                }
+            )
         }
     }
 }
@@ -420,7 +430,9 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
     }
 
     override func ready(context: ScriptableObjectContext) {
-        guard !initializationFailed else { return }
+        guard !initializationFailed else {
+            return
+        }
         do {
             try definition.validateRequiredBindings(context: context)
             let instanceID = try definition.runtime.instantiate(
@@ -442,7 +454,9 @@ private final class GravityScriptableObject: ScriptableObject, @unchecked Sendab
     }
 
     override func update(context: ScriptableObjectContext) {
-        guard !initializationFailed else { return }
+        guard !initializationFailed else {
+            return
+        }
         if instanceID == nil { ready(context: context) }
         call(method: "update", context: context)
     }
@@ -682,6 +696,7 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         try virtualMachine.bindClass(with: AnnotatedGravitySystemContext.self)
         try virtualMachine.bindClass(with: AdaScriptInputBridge.self)
         try virtualMachine.bindClass(with: AnnotatedGravityWorldContext.self)
+        try virtualMachine.bindClass(with: AdaScriptAsyncResult.self)
         try virtualMachine.bindClass(with: AnnotatedGravityCommandsBridge.self)
         try virtualMachine.bindClass(with: AnnotatedGravityQueryBridge.self)
         try virtualMachine.bindClass(with: AnnotatedGravityQueryRow.self)
@@ -719,7 +734,8 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
             }
             .sorted()
         let generatedSource = (factories + getters).joined(separator: "\n")
-        let runtimeSource = (communityPolicy == nil ? "" : "extern var __adaUGCBudget;\n") + (communityPolicy == nil ? AdaScriptStandardLibrary.source : AdaScriptStandardLibrary.communitySource) + "\n"
+        let standardLibrary = communityPolicy == nil ? AdaScriptStandardLibrary.source : AdaScriptStandardLibrary.communitySource
+        let runtimeSource = (communityPolicy == nil ? "" : "extern var __adaUGCBudget;\n") + standardLibrary + "\n"
                 + GravityScriptableAsyncBoundary.source + "\n"
                 + AdaScriptComponentRuntime.prelude(constructors: componentConstructors, authoredSource: module.combinedSource)
                 + AdaScriptNetworkBridge.prelude(commands: networkCommands)
@@ -793,7 +809,9 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         bindings: [ResolvedGravityScriptableBinding]
     ) {
         AdaScriptRuntimeCoordinator.lock.withLock {
-            if communityBudget != nil, !delegate.errors.isEmpty { return }
+            if communityBudget != nil, !delegate.errors.isEmpty {
+                return
+            }
             communityBudget?.reset()
             guard !hasFailed, let instance = instances[instanceID], instance.hasMethod(named: method) else {
                 return
@@ -823,7 +841,9 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         bindings: [ResolvedGravityScriptableBinding]
     ) {
         AdaScriptRuntimeCoordinator.lock.withLock {
-            if communityBudget != nil, !delegate.errors.isEmpty { return }
+            if communityBudget != nil, !delegate.errors.isEmpty {
+                return
+            }
             communityBudget?.reset()
             guard !hasFailed, let instance = instances[instanceID], instance.hasMethod(named: "event") else {
                 return
@@ -851,7 +871,9 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
         fields: [String: ReflectedFieldValue].Keys
     ) -> [String: ReflectedFieldValue] {
         AdaScriptRuntimeCoordinator.lock.withLock {
-            if communityBudget != nil, !delegate.errors.isEmpty { return [:] }
+            if communityBudget != nil, !delegate.errors.isEmpty {
+                return [:]
+            }
             communityBudget?.reset()
             guard !hasFailed, let instance = instances[instanceID] else {
                 return [:]
@@ -863,7 +885,9 @@ private final class GravityScriptableModuleRuntime: @unchecked Sendable {
                 return [:]
             }
             return fields.reduce(into: [:]) { result, field in
-                guard !hasFailed else { return }
+                guard !hasFailed else {
+                    return
+                }
                 guard let getterName = getterNames[field] else {
                     return
                 }

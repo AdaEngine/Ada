@@ -1,5 +1,6 @@
 @_spi(Scripting) import AdaECS
-import AdaScene
+@_spi(Scripting) import AdaScene
+import CGravity
 import Gravity
 
 @GSExportable("AdaWorldContext")
@@ -7,6 +8,7 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
     let commands: AnnotatedGravityCommandsBridge
     private let navigator: SceneNavigator?
     private let reportDiagnostic: @Sendable (String) -> Void
+    private let decals: Decal3DCommands?
     private let dynamicAccess: AnnotatedGravityDynamicAccess?
     private let exclusiveAccess: AnnotatedGravityExclusiveAccess?
     private var isActive = true
@@ -22,6 +24,7 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
         AnnotatedGravityWorldContext(
             commands: commands,
             navigator: world.getResource(SceneNavigator.self),
+            decals: world.getResource(Decal3DCommands.self),
             dynamicAccess: dynamicAccess,
             exclusiveAccess: exclusiveAccess,
             reportDiagnostic: reportDiagnostic
@@ -31,12 +34,14 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
     private init(
         commands: AnnotatedGravityCommandsBridge,
         navigator: SceneNavigator?,
+        decals: Decal3DCommands?,
         dynamicAccess: AnnotatedGravityDynamicAccess?,
         exclusiveAccess: AnnotatedGravityExclusiveAccess?,
         reportDiagnostic: @escaping @Sendable (String) -> Void
     ) {
         self.commands = commands
         self.navigator = navigator
+        self.decals = decals
         self.dynamicAccess = dynamicAccess
         self.exclusiveAccess = exclusiveAccess
         self.reportDiagnostic = reportDiagnostic
@@ -45,39 +50,53 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
     // MARK: @access
 
     func has(_ entity: Int, _ component: String) -> Bool {
-        guard let dynamicAccess = checkedDynamicAccess("has") else { return false }
+        guard let dynamicAccess = checkedDynamicAccess("has") else {
+            return false
+        }
         return dynamicAccess.has(entity, component)
     }
 
     func read(_ entity: Int, _ component: String, _ field: String) -> GSValue? {
-        guard let dynamicAccess = checkedDynamicAccess("read") else { return nil }
+        guard let dynamicAccess = checkedDynamicAccess("read") else {
+            return nil
+        }
         return dynamicAccess.read(entity, component, field)
     }
 
     func write(_ entity: Int, _ component: String, _ field: String, _ value: GSValue) -> Bool {
-        guard let dynamicAccess = checkedDynamicAccess("write") else { return false }
+        guard let dynamicAccess = checkedDynamicAccess("write") else {
+            return false
+        }
         return dynamicAccess.write(entity, component, field, value)
     }
 
     // MARK: @exclusiveWorld
 
     func spawnImmediate(_ components: GSValue) -> Int {
-        guard let exclusiveAccess = checkedExclusiveAccess("spawnImmediate") else { return -1 }
+        guard let exclusiveAccess = checkedExclusiveAccess("spawnImmediate") else {
+            return -1
+        }
         return exclusiveAccess.spawn(components)
     }
 
     func insertImmediate(_ entity: Int, _ component: GSValue) -> Bool {
-        guard let exclusiveAccess = checkedExclusiveAccess("insertImmediate") else { return false }
+        guard let exclusiveAccess = checkedExclusiveAccess("insertImmediate") else {
+            return false
+        }
         return exclusiveAccess.insert(entity, component)
     }
 
     func removeImmediate(_ entity: Int, _ component: String) -> Bool {
-        guard let exclusiveAccess = checkedExclusiveAccess("removeImmediate") else { return false }
+        guard let exclusiveAccess = checkedExclusiveAccess("removeImmediate") else {
+            return false
+        }
         return exclusiveAccess.remove(entity, component)
     }
 
     func despawnImmediate(_ entity: Int) -> Bool {
-        guard let exclusiveAccess = checkedExclusiveAccess("despawnImmediate") else { return false }
+        guard let exclusiveAccess = checkedExclusiveAccess("despawnImmediate") else {
+            return false
+        }
         return exclusiveAccess.despawn(entity)
     }
 
@@ -111,6 +130,40 @@ final class AnnotatedGravityWorldContext: @unchecked Sendable, AdaScriptNonSenda
 
     func setTileOrientation(_ entity: Int, _ layer: Int, _ coordinates: GSValue, _ orientation: Int) -> Bool {
         commands.setTileOrientation(entity, layer, coordinates, orientation)
+    }
+
+    func placeDecal(_ receiver: Int, _ image: String, _ projector: GSValue, _ options: GSValue) -> String {
+        guard isActive else {
+            return ""
+        }
+        let arguments: [AdaScriptDecalArgument] = [.integer(receiver), .string(image), .init(gravity: projector), .init(gravity: options)]
+        return enqueueScriptDecal(AdaScriptDecalArgument.place(arguments), in: decals)
+    }
+
+    func updateDecal(_ receiver: Int, _ handle: String, _ image: String, _ options: GSValue) -> String {
+        guard isActive else {
+            return ""
+        }
+        let arguments: [AdaScriptDecalArgument] = [.integer(receiver), .string(handle), .string(image), .init(gravity: options)]
+        return enqueueScriptDecal(AdaScriptDecalArgument.update(arguments), in: decals)
+    }
+
+    func removeDecal(_ receiver: Int, _ handle: String) -> String {
+        guard isActive else {
+            return ""
+        }
+        return enqueueScriptDecal(AdaScriptDecalArgument.remove([.integer(receiver), .string(handle)]), in: decals)
+    }
+
+    func decalResult(_ request: String) -> Any? {
+        guard isActive else {
+            return nil
+        }
+        if let result = scriptDecalResult(request, in: decals) {
+            return result
+        }
+        // Returning Swift nil through this bridge produces Gravity undefined.
+        return unsafe gravity_value_from_null()
     }
 
     @discardableResult

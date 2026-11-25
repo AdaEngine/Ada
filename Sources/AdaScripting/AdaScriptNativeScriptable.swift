@@ -109,14 +109,14 @@ private struct NativeObjectDefinition: Sendable {
                     continue
                 }
                 values[binding.property] = .host(NativeInputHost(input: input, scope: scope))
-            case .component(_, let id, let fields, let required):
+            case let .component(_, id, fields, required):
                 guard context.scriptingWorld.has(id, in: context.entityID) else {
                     if required && !allowUnavailable { throw AdaScriptError.invalidManifest("Required native component '\(binding.property)' is missing") }
                     values[binding.property] = .null
                     continue
                 }
                 values[binding.property] = .host(NativeAttachedComponent(world: context.scriptingWorld, entity: context.entityID, component: id, fields: fields, scope: scope))
-            case .compiledResource(_, let schema, let optional):
+            case let .compiledResource(_, schema, optional):
                 if context.scriptingWorld.getResource(AdaScriptNativeResources.self)?.values[schema.identifier] == nil {
                     if optional || allowUnavailable {
                         values[binding.property] = .null
@@ -125,7 +125,7 @@ private struct NativeObjectDefinition: Sendable {
                     throw AdaScriptError.invalidManifest("Required native resource '\(schema.name)' is missing")
                 }
                 values[binding.property] = .host(NativeAttachedResource(world: context.scriptingWorld, scope: scope, storage: .compiled(schema)))
-            case .resource(_, let type, let fields, let optional):
+            case let .resource(_, type, fields, optional):
                 if context.scriptingWorld.getResource(named: String(reflecting: type)) == nil {
                     if optional || allowUnavailable {
                         values[binding.property] = .null
@@ -270,18 +270,26 @@ private final class NativeScriptableObject: ScriptableObject, @unchecked Sendabl
                     commands: Commands(entities: world.entities, commandsQueue: world.commandQueue),
                     navigator: world.getResource(SceneNavigator.self),
                     components: definition.components,
-                    module: definition.module
+                    module: definition.module,
+                    decals: world.getResource(Decal3DCommands.self)
                 )
                 let assets = NativeAssetsHost(store: definition.assets, scope: scope, asyncRuntime: asyncRuntime)
                 let contextValue = NativeValue.host(NativeSystemContext(scope: scope, deltaTime: Double(context.deltaTime), entityID: context.entityID, world: worldHost, assets: assets))
                 let args = events.map { [NativeValue.list($0), contextValue] } ?? [contextValue]
                 let bindings = try definition.bind(context: context, scope: scope, allowUnavailable: method == "destroy")
-                let globals = (asyncRuntime?.globals ?? [:]).merging(["Assets": .host(assets), "__adaAssets": .host(assets), "__adaComponentFactory": .host(NativeComponentFactory(scope: scope, components: definition.components))]) { _, host in host }
+                let globals = (asyncRuntime?.globals ?? [:]).merging([
+                    "Assets": .host(assets),
+                    "__adaAssets": .host(assets),
+                    "__adaComponentFactory": .host(NativeComponentFactory(scope: scope, components: definition.components))
+                ]) { _, host in host }
                 if method == "update" {
                     asyncRuntime?.advance(deltaTime: Double(context.deltaTime))
                     asyncRuntime?.resume(receiver: instance, bindings: bindings, globals: globals, recorder: definition.recorder)
                 }
-                guard definition.type.methods.contains(where: { $0.name == method }) else { refresh(); return }
+                guard definition.type.methods.contains(where: { $0.name == method }) else {
+                    refresh()
+                    return
+                }
                 let value = try definition.module.invoke(
                     instance,
                     method: method,
@@ -329,7 +337,9 @@ private final class NativeAttachedComponent: NativeHostObject {
     func call(_ method: String, arguments: [NativeValue]) throws -> NativeValue? {
         try scope.check()
         do {
-            guard let world, let first = arguments.first, case .integer(let raw) = first, let slot = Int(exactly: raw) else { return nil }
+            guard let world, let first = arguments.first, case .integer(let raw) = first, let slot = Int(exactly: raw) else {
+                return nil
+            }
             if method == "shader", arguments.count == 1 {
                 let material = try ShaderGraphScriptComponent.material(world: world, entity: entity, component: component, slot: slot)
                 let handle = ShaderGraphScriptHandle(material: material, writable: true, isActive: { [scope] in scope.isActive })
@@ -373,7 +383,7 @@ private final class NativeAttachedResource: NativeHostObject {
         }
         switch storage {
         case .compiled(let schema): return world.getResource(AdaScriptNativeResources.self)?.values[schema.identifier]?[key]?.nativeValue
-        case .reflected(let type, let fields):
+        case let .reflected(type, fields):
             guard let field = fields[key] else {
                 return nil
             }
@@ -393,7 +403,7 @@ private final class NativeAttachedResource: NativeHostObject {
             resources.values[schema.identifier]?[key] = value
             world.insertResource(resources)
             return true
-        case .reflected(let type, let fields):
+        case let .reflected(type, fields):
             guard let field = fields[key] else {
                 return false
             }

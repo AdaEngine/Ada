@@ -273,7 +273,9 @@ extension Parser {
     }
 
     private func exportGroup(_ annotations: [Annotation]) throws -> [String] {
-        guard let value = annotations.first(where: { $0.name == "export" })?.arguments["group"] else { return [] }
+        guard let value = annotations.first(where: { $0.name == "export" })?.arguments["group"] else {
+            return []
+        }
         guard case let .string(path) = value else { throw error("@export group must be a string") }
         let names = path.split(separator: "/", omittingEmptySubsequences: false)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -283,7 +285,9 @@ extension Parser {
         return names
     }
 
-    private static let deferredWorldMembers: Set<String> = ["commands", "spawn", "setTileOrientation"]
+    private static let deferredWorldMembers: Set<String> = [
+        "commands", "spawn", "setTileOrientation", "placeDecal", "updateDecal", "removeDecal", "decalResult"
+    ]
 
     private mutating func parseSystemBody(
         systemName: String
@@ -844,7 +848,9 @@ extension Parser {
 
     private mutating func skipFunctionDeclaration() throws {
         while !isAtEnd, !check("{"), !check(";") { advance() }
-        if match(";") { return }
+        if match(";") {
+            return
+        }
         try skipDeclarationBody()
     }
 
@@ -892,12 +898,11 @@ extension Parser {
     }
 }
 
-
 extension Parser {
     private static let assignmentOperators: Set<String> = ["+", "-", "*", "/", "%", "&", "|", "^"]
 
     /// Reads how `property` is used inside a system body. See ``AdaScriptQueryUsage`` for the rules.
-    fileprivate func queryUsage(of property: String, in range: Range<Int>) -> AdaScriptQueryUsage {
+    private func queryUsage(of property: String, in range: Range<Int>) -> AdaScriptQueryUsage {
         var reads = Set<String>()
         var writes = Set<String>()
         var isOpaque = false
