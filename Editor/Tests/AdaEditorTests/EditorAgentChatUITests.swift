@@ -265,7 +265,7 @@ struct EditorAgentChatUITests {
         _ = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Event.mobile-turn"))
     }
 
-    private func makeContainer(_ model: EditorAgentViewModel) -> UIContainerView<EditorAgentSidebar> {
+    func makeContainer(_ model: EditorAgentViewModel) -> UIContainerView<EditorAgentSidebar> {
         if unsafe RenderEngine.shared == nil {
             unsafe RenderEngine.configurations.preferredBackend = .headless
             RenderWorldPlugin().setup(in: AppWorlds(main: World(name: "AgentChatUI")))
