@@ -2,8 +2,8 @@
 
 The standalone macOS application includes `Contents/MacOS/adastudio`; the Windows
 distribution includes a console `adastudio.exe` beside `AdaEditor.exe`. Linux
-includes an `adastudio` launcher beside `ada-studio`. These are
-entries into the same native implementation: it dispatches before `AppRuntime` starts
+includes an `adastudio` launcher beside `ada-studio`. Each launcher forwards to
+the installed editor. CLI dispatch happens before `AppRuntime` starts
 and uses the editor's project validator, AdaScript builder and native exporter.
 No window, recent-project update or agent connection is required. The iOS entry
 point, embedded runtime and mobile agent tools retain their existing behavior;

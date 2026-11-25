@@ -118,6 +118,15 @@ def smoke(directory):
             raise RuntimeError(f"Packaged CLI version failed: {cli.stderr.decode(errors='replace')}")
 
 
+def stage_executables(binary_directory, directory):
+    # Preserve Swift's CRT entry point and PE resources, but open as a desktop
+    # application instead of creating an extra console on double-click.
+    run("llvm-objcopy", "--subsystem=windows", binary_directory / "AdaEditor.exe", directory / "AdaEditor.exe")
+    # Use the console subsystem for shell wait semantics without shipping the editor twice.
+    run("clang-cl", "-fuse-ld=lld", "/O2", "/W4", "/WX", "/MT", ROOT / "Editor/scripts/adastudio-launcher.c",
+        f"/Fe{directory / 'adastudio.exe'}", "/link", "/SUBSYSTEM:CONSOLE", cwd=directory.parent)
+
+
 def package(binary_directory, compiler, output, version, smoke_test=True, *, stage_only=False):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,79}", version):
         raise ValueError("Version must be a filename-safe release tag (1–80 characters).")
@@ -133,12 +142,7 @@ def package(binary_directory, compiler, output, version, smoke_test=True, *, sta
     with tempfile.TemporaryDirectory(prefix=".ada-release-", dir=output) as temporary:
         directory = Path(temporary) / name
         directory.mkdir()
-        # Preserve Swift's CRT entry point and PE resources, but open as a desktop
-        # application instead of creating an extra console on double-click.
-        run("llvm-objcopy", "--subsystem=windows", binary_directory / "AdaEditor.exe", directory / "AdaEditor.exe")
-        # A console PE has the same native implementation, but keeps stdout/stderr
-        # and shell wait semantics. CLI dispatch happens before any UI/GPU setup.
-        run("llvm-objcopy", "--subsystem=console", binary_directory / "AdaEditor.exe", directory / "adastudio.exe")
+        stage_executables(binary_directory, directory)
         for resource in binary_directory.glob("*.resources"):
             shutil.copytree(resource, directory / resource.name)
         for required in ["AdaEditor_AdaEditor.resources/Assets", "AdaEngine_AdaRender.resources"]:
