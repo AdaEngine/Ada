@@ -33,9 +33,7 @@ public struct Core3DPlugin: Plugin, DeferredRenderSnapshotPlugin {
     @_spi(AdaEngine)
     public func cachingStudioEditShadows() -> Self {
         var plugin = self
-        #if os(macOS)
         plugin.studioShadowCache = true
-        #endif
         return plugin
     }
 
@@ -74,7 +72,7 @@ public struct Core3DPlugin: Plugin, DeferredRenderSnapshotPlugin {
             .unwrap(message: "Failed to fetch RenderDevice from world")
             .renderDevice
 
-        if studioShadowCache {
+        if studioShadowCache && renderDevice.supportsStudioShadowCache {
             app.insertResource(StudioShadowCache())
         }
 

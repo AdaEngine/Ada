@@ -48,6 +48,7 @@ for relative in [
     "Tests/AdaEngineTests/WESLShadowPipelineTests.swift",
     "Tests/AdaEngineTests/WESLGradientPipelineTests.swift",
     "Tests/AdaEngineTests/WESLUIPipelineTests.swift",
+    "Tests/AdaUITests/UIShapeGeometryTests.swift",
     "Tests/AdaRenderTests/WGSLReflectionTests.swift",
     "Tests/AdaRenderTests/ShaderGraphTests.swift",
     "Tests/AdaRenderTests/ShaderGraphProgramTests.swift",
@@ -147,6 +148,7 @@ for name in ["Courtyard", "Bench", "Lantern", "Pedestal", "TwoBoneRibbon"]:
 # AdaAssets has no package product; AdaScene re-exports it.
 modules = ["AdaAnimation", "AdaApp", "AdaCorePipelines", "AdaECS", "AdaRender", "AdaScene", "AdaSprite", "AdaText", "AdaTilemap", "AdaTransform", "AdaUtils", "Math"]
 dependencies = ',\n'.join('.product(name: ' + json.dumps(module) + ', package: "AdaEngine")' for module in modules)
+dependencies += ',\n.product(name: "AdaUI", package: "AdaEngine", condition: .when(platforms: [.windows]))'
 if pixel_perfect:
     dependencies += ',\n.product(name: "AdaEngine", package: "AdaEngine", condition: .when(platforms: [.macOS]))'
 extra_targets = ""

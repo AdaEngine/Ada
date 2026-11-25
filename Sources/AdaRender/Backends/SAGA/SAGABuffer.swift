@@ -29,6 +29,9 @@
             let bytes: [UInt8]
         }
 
+        // With the queue's 64-item limit, native batches use at most 4 MiB of staging bytes.
+        private static let maximumBatchedNativeWrite = 64 * 1024
+
         let context: SAGAContext
         let slot: ResourceSlot<ResourceID>
         let usage: BufferUsage
@@ -43,7 +46,11 @@
             self.usage = usage
             self.label = label
             self.length = length
+            #if os(Windows)
+            self.tracksShadowInput = tracksShadowInput && (context.shaderOutput == .spirv || context.shaderOutput == .hlsl)
+            #else
             self.tracksShadowInput = tracksShadowInput
+            #endif
             unsafe self.shadow = UnsafeMutableRawPointer.allocate(byteCount: max(length, 1), alignment: 16)
             unsafe self.shadow.initializeMemory(as: UInt8.self, repeating: 0, count: max(length, 1))
             self.slot = context.createBuffer(
@@ -124,31 +131,40 @@
             markShadowInputChanged()
             let bytes = unsafe [UInt8](UnsafeRawBufferPointer(start: shadow + offset, count: byteCount))
             let slot = self.slot
-            // The browser waits for the GPU after each transport submission.
-            // Submit adjacent writes together so those waits don't delay the next draw or presentation.
-            if context.shaderOutput == .msl || context.shaderOutput == .wgsl {
-                context.queue.enqueueAdjacent(Upload(slot: slot, offset: UInt64(offset), bytes: bytes)) { device, uploads in
-                    do {
-                        let commands = try uploads.map {
-                            try BufferCommand.writeBytes(buffer: $0.slot.get(), offset: $0.offset, bytes: $0.bytes)
-                        }
-                        _ = try await device.submitCommands(commands)
-                    } catch {
-                        // Preserve the valid neighbors if one upload was rejected before submission.
-                        var firstFailure: (any Error)?
-                        for upload in uploads {
-                            do {
-                                _ = try await device.writeBuffer(try upload.slot.get(), offset: upload.offset, bytes: upload.bytes)
-                            } catch {
-                                if firstFailure == nil { firstFailure = error }
-                            }
-                        }
-                        if let firstFailure { throw firstFailure }
-                    }
-                }
-            } else {
+            let usesNativeStaging = context.shaderOutput == .spirv || context.shaderOutput == .hlsl
+            if usesNativeStaging, byteCount > Self.maximumBatchedNativeWrite {
                 context.queue.enqueue { device in
                     _ = try await device.writeBuffer(try slot.get(), offset: UInt64(offset), bytes: bytes)
+                }
+                return
+            }
+            // Native backends can use shared staging and one fence for the writes in a submission.
+            // A draw, copy, or resource lifetime operation seals the batch at its queue position.
+            #if os(Windows)
+            let deferUntilBoundary = usesNativeStaging
+            #else
+            let deferUntilBoundary = false
+            #endif
+            context.queue.enqueueAdjacent(
+                Upload(slot: slot, offset: UInt64(offset), bytes: bytes),
+                deferUntilBoundary: deferUntilBoundary
+            ) { device, uploads in
+                do {
+                    let commands = try uploads.map {
+                        try BufferCommand.writeBytes(buffer: $0.slot.get(), offset: $0.offset, bytes: $0.bytes)
+                    }
+                    _ = try await device.submitCommands(commands)
+                } catch {
+                    // Preserve the valid neighbors if one upload was rejected before submission.
+                    var firstFailure: (any Error)?
+                    for upload in uploads {
+                        do {
+                            _ = try await device.writeBuffer(try upload.slot.get(), offset: upload.offset, bytes: upload.bytes)
+                        } catch {
+                            if firstFailure == nil { firstFailure = error }
+                        }
+                    }
+                    if let firstFailure { throw firstFailure }
                 }
             }
         }

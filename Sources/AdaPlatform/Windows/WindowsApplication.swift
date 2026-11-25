@@ -18,6 +18,8 @@
     final class WindowsApplication: Application {
         private var task: Task<Void, Never>?
         private let screenManager: WindowsScreenManager
+        /// Upper target for a foreground mailbox producer. Input can wake the pacing timer early.
+        private static let mailboxFrameDuration: LongTimeInterval = 1.0 / 120.0
         /// `TIMER_ALL_ACCESS`; the macro is not imported into Swift.
         private static let timerAllAccess = DWORD(0x1F0003)
         /// High-resolution timer for frame pacing; `Task.sleep` follows the ~15.6 ms system tick and can stall longer.
@@ -58,6 +60,9 @@
                     }
 
                     try await appWorlds.update()
+                    if let engine = unsafe RenderEngine.shared {
+                        (windowManager as? WindowsWindowManager)?.retrySkippedPresentations(using: engine)
+                    }
                     try await waitForNextFrameIfNeeded(startedAt: frameStartedAt, appWorlds: appWorlds)
                 }
             } catch {
@@ -119,23 +124,33 @@
                 return
             }
 
-            // Dawn's FIFO swapchain already waits for the display. Sleeping
-            // again adds a coarse Windows scheduler tick and can halve FPS.
-            // Keep the timed fallback for headless/hidden windows and fixed caps.
             let frameRequests = appWorlds.getResource(WindowFrameRequests.self)
-            if framePacing.synchronizesWithDisplayRefreshRate,
-               RenderEngine.shared?.type == .webgpu,
-               (windowManager as? WindowsWindowManager)?.hasVisibleRenderWindow(requests: frameRequests) == true {
-                await Task.yield()
-                return
+            let windows = windowManager as? WindowsWindowManager
+            var paceLatestFrameProducer = false
+            if framePacing.synchronizesWithDisplayRefreshRate, let windows, let engine = unsafe RenderEngine.shared {
+                // Only the foreground swapchain paces interactive input.
+                if let id = windows.foregroundRenderWindow(requests: frameRequests),
+                    let mode = await engine.pacePendingWindowPresentation(id) {
+                    guard mode == .synchronizedLatest else {
+                        return
+                    }
+                    // Mailbox can replace a queued frame immediately. Bound the producer in inexpensive scenes.
+                    paceLatestFrameProducer = true
+                }
+                if engine.type == .webgpu, windows.hasVisibleRenderWindow(requests: frameRequests) {
+                    await Task.yield()
+                    return
+                }
             }
 
             // A visible display-synchronized window that skipped this frame (an on-demand window waiting for
             // content) keeps the display's idle cadence. The 60 FPS fallback would add a 16.7 ms gap per skip.
             // Hidden or minimized windows keep the configured fallback limit.
-            let windowVisible = (windowManager as? WindowsWindowManager)?.hasVisibleRenderWindow(requests: nil) == true
+            let windowVisible = windows?.hasVisibleRenderWindow(requests: nil) == true
             let frameDuration: LongTimeInterval
-            if framePacing.synchronizesWithDisplayRefreshRate, windowVisible, let refreshRate = displayRefreshRate() {
+            if paceLatestFrameProducer {
+                frameDuration = Self.mailboxFrameDuration
+            } else if framePacing.synchronizesWithDisplayRefreshRate, windowVisible, let refreshRate = displayRefreshRate() {
                 let range = framePacing.resolvedFrameRateRange(forDisplayMaximumFramesPerSecond: refreshRate, isIdle: true)
                 frameDuration = 1 / LongTimeInterval(max(1, range.upperBound))
             } else {
@@ -161,7 +176,9 @@
         /// The primary display's current refresh rate, re-read at most once per second; nil when unknown.
         private func displayRefreshRate() -> Int? {
             let now = Time.absolute
-            if let cachedRefreshRate, now - cachedRefreshRate.checkedAt < 1 { return cachedRefreshRate.value }
+            if let cachedRefreshRate, now - cachedRefreshRate.checkedAt < 1 {
+                return cachedRefreshRate.value
+            }
             var mode = DEVMODEW()
             mode.dmSize = WORD(MemoryLayout<DEVMODEW>.size)
             let frequency = unsafe EnumDisplaySettingsW(nil, DWORD.max /* ENUM_CURRENT_SETTINGS */, &mode) ? Int(mode.dmDisplayFrequency) : 0
@@ -193,6 +210,36 @@
             }
 
             SetProcessDPIAware()
+        }
+    }
+
+    extension WindowsWindowManager {
+        func foregroundRenderWindow(requests: WindowFrameRequests?) -> WindowID? {
+            guard let window = activeWindow,
+                let systemWindow = window.systemWindow as? WindowsSystemWindow,
+                unsafe systemWindow.hwnd == GetForegroundWindow(),
+                isVisibleRenderWindow(window, requests: requests)
+            else {
+                return nil
+            }
+            return window.id
+        }
+
+        func retrySkippedPresentations(using engine: RenderEngine) {
+            for window in windows where isVisibleRenderWindow(window, requests: nil) {
+                engine.retryWindowPresentationIfNeeded(window.id)
+            }
+        }
+
+        private func isVisibleRenderWindow(_ window: UIWindow, requests: WindowFrameRequests?) -> Bool {
+            // Unknown windows retain continuous rendering, including embedded game runtimes with their own cameras.
+            guard requests?.shouldRender(window.id) != false else {
+                return false
+            }
+            guard window.canDraw, !window.isHidden, let systemWindow = window.systemWindow as? WindowsSystemWindow else {
+                return false
+            }
+            return unsafe IsWindowVisible(systemWindow.hwnd) && !IsIconic(systemWindow.hwnd)
         }
     }
 

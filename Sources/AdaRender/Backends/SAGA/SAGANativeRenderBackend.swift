@@ -2,15 +2,19 @@
 //  SAGANativeRenderBackend.swift
 //  AdaEngine
 //
-//  Native render backend on SAGA's Vulkan runtime.
+//  Native render backend on SAGA's Vulkan and Direct3D 12 runtimes.
 //
 
 #if SAGA_RENDER && SAGA_NATIVE && (os(Windows) || os(Linux) || os(Android)) && canImport(SAGAVulkan) && canImport(SAGACompiler)
     import AdaUtils
     import Foundation
+    import Logging
     import Math
     import SAGA
     import SAGACore
+    #if SAGA_D3D12
+        import SAGAD3D12
+    #endif
     import SAGAShaderIR
     import SAGATypes
     import SAGAVulkan
@@ -26,6 +30,8 @@
             case unsupportedWindow
             case windowlessDevice
             case windowAlreadyRegistered
+            case unknownWindowsRenderer(String)
+            case direct3D12Unavailable
 
             var errorDescription: String? {
                 switch self {
@@ -33,12 +39,61 @@
                 case .unsupportedWindow: "The SAGA renderer received an unsupported native window surface."
                 case .windowlessDevice: "The SAGA device was created for offscreen rendering."
                 case .windowAlreadyRegistered: "A SAGA surface is already registered for this window."
+                case .unknownWindowsRenderer(let value): "Unknown value '\(value)' for ADAENGINE_WINDOWS_RENDERER. Use vulkan or direct3d12."
+                case .direct3D12Unavailable: "This build does not include SAGA Direct3D 12."
+                }
+            }
+        }
+
+        enum WindowsRenderer: String {
+            case vulkan
+            case direct3D12 = "direct3d12"
+
+            static func configured() throws -> Self {
+                guard let requested = ProcessInfo.processInfo.environment["ADAENGINE_WINDOWS_RENDERER"], !requested.isEmpty else {
+                    return .vulkan
+                }
+                guard let renderer = Self(rawValue: requested.lowercased()) else {
+                    throw SetupError.unknownWindowsRenderer(requested)
+                }
+                return renderer
+            }
+        }
+
+        private enum NativeDevice: Sendable {
+            case vulkan(VulkanDevice)
+            #if SAGA_D3D12
+            case direct3D12(D3D12Device)
+            #endif
+
+            func attachSurface(
+                _ target: VulkanSurfaceTarget,
+                prefersLatestFrame: Bool,
+                onPresentationRetryChanged: @escaping @Sendable (Bool) -> Void
+            ) async throws -> (id: UInt32, usesMailbox: Bool) {
+                switch self {
+                case .vulkan(let device):
+                    return try await device.attachSurface(target, prefersLatestFrame: prefersLatestFrame, onPresentationRetryChanged: onPresentationRetryChanged)
+                #if SAGA_D3D12
+                case .direct3D12(let device):
+                    guard case .win32(_, let hwnd) = target else { throw SetupError.unsupportedWindow }
+                    return (try await device.addSurface(windowHandle: hwnd), false)
+                #endif
+                }
+            }
+
+            func removeSurface(_ id: UInt32) async {
+                switch self {
+                case .vulkan(let device): await device.removeSurface(id)
+                #if SAGA_D3D12
+                case .direct3D12(let device): await device.removeSurface(id)
+                #endif
                 }
             }
         }
 
         let context: SAGAContext
-        private let vulkan: VulkanDevice
+        private let native: NativeDevice
         private let device: SAGARenderDevice
         private struct WindowBinding: Sendable {
             let window: SAGAWindow
@@ -52,8 +107,30 @@
 
         /// - Parameter windowless: Disable swapchain support for offscreen tests and tools.
         ///   Defaults to `ADAENGINE_SAGA_WINDOWLESS=1`.
-        init(windowless: Bool = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_WINDOWLESS"] == "1") throws {
+        init(
+            windowless: Bool = ProcessInfo.processInfo.environment["ADAENGINE_SAGA_WINDOWLESS"] == "1",
+            windowsRenderer: WindowsRenderer = .vulkan
+        ) throws {
             #if os(Windows)
+                if windowsRenderer == .direct3D12 {
+                    #if SAGA_D3D12
+                    let backend = windowless ? try D3D12Backend.makeDevice() : try D3D12Backend.makePresentableDevice()
+                    native = .direct3D12(backend)
+                    context = SAGAContext(
+                        capabilities: backend.capabilities,
+                        supportsPresentation: backend.supportsPresentation,
+                        shaderOutput: .hlsl,
+                        supportsPackedVertexIndexBuffers: backend.supportsPackedVertexIndexBuffers,
+                        makeDevice: { try await Device.make(backend: backend) }
+                    )
+                    device = SAGARenderDevice(context: context)
+                    device.windows = self
+                    context.logger.info("Windows renderer: SAGA Direct3D 12 (default hardware adapter)")
+                    return
+                    #else
+                    throw SetupError.direct3D12Unavailable
+                    #endif
+                }
                 // NGX needs extra Vulkan extensions, so DLSS is prepared before the instance and device are created.
                 let dlss = SAGADLSSSession.prepare()
             #endif
@@ -61,7 +138,7 @@
             let backend = windowless
                 ? try VulkanBackend.makeDevice(adapter: adapter)
                 : try VulkanBackend.makePresentableDevice(adapter: adapter)
-            self.vulkan = backend
+            self.native = .vulkan(backend)
             self.context = SAGAContext(
                 capabilities: backend.capabilities,
                 supportsPresentation: backend.supportsPresentation,
@@ -71,6 +148,7 @@
             #if os(Windows)
                 context.dlssSession.withLock { $0 = dlss }
                 dlss.start(on: context)
+                context.logger.info("Windows renderer: SAGA Vulkan (\(adapter.name))")
             #endif
             self.device = SAGARenderDevice(context: context)
             self.device.windows = self
@@ -89,6 +167,7 @@
             let target: VulkanSurfaceTarget
             let lifetime: (any Sendable)?
             let waitsForPresentation: Bool
+            let limitsQueuedPresentations: Bool
             #if os(Windows)
                 guard let nativeSurface = surface as? WindowsSurface else { throw SetupError.unsupportedWindow }
                 target = unsafe .win32(
@@ -97,16 +176,19 @@
                 )
                 lifetime = nil
                 waitsForPresentation = false
+                limitsQueuedPresentations = true
             #elseif os(Linux)
                 guard let nativeSurface = surface as? LinuxXlibRenderSurface else { throw SetupError.unsupportedWindow }
                 target = unsafe .xlib(display: UInt(bitPattern: nativeSurface.xlibDisplay), window: UInt(nativeSurface.xlibWindow))
                 lifetime = nativeSurface.xlibWindowLifetime
                 waitsForPresentation = false
+                limitsQueuedPresentations = false
             #elseif os(Android)
                 guard let nativeSurface = surface as? AndroidNativeWindowRenderSurface else { throw SetupError.unsupportedWindow }
                 target = unsafe .android(window: UInt(bitPattern: nativeSurface.nativeWindow))
                 lifetime = nativeSurface.nativeWindowLifetime
                 waitsForPresentation = true
+                limitsQueuedPresentations = false
             #endif
             let window = SAGAWindow(
                 context: context,
@@ -115,13 +197,23 @@
                 scaleFactor: surface.scaleFactor,
                 pixelFormat: surface.prefferedPixelFormat,
                 surfaceID: nil,
-                waitsForPresentation: waitsForPresentation
+                waitsForPresentation: waitsForPresentation,
+                limitsQueuedPresentations: limitsQueuedPresentations
             )
-            let vulkan = self.vulkan
+            let native = self.native
+            let prefersLatestFrame = context.shaderOutput == .spirv && (unsafe RenderEngine.presentationMode == .synchronizedLatest)
+            let logger = context.logger
             let surfaceSlot = window.surface
             context.queue.enqueue { _ in
                 defer { withExtendedLifetime(lifetime) {} }
-                surfaceSlot.fulfill(try await vulkan.addSurface(target))
+                let surface = try await native.attachSurface(target, prefersLatestFrame: prefersLatestFrame) { [weak window] in
+                    window?.updatePresentationRetry($0)
+                }
+                if prefersLatestFrame {
+                    logger.info("Windows Vulkan presentation: \(surface.usesMailbox ? "mailbox" : "FIFO")")
+                }
+                window.setMailboxPresentation(surface.usesMailbox)
+                surfaceSlot.fulfill(surface.id)
             }
             windows.withLock { $0[windowId] = WindowBinding(window: window, lifetime: lifetime) }
         }
@@ -141,10 +233,10 @@
             guard let binding = windows.withLock({ $0.removeValue(forKey: windowId) }) else {
                 return
             }
-            let vulkan = self.vulkan
+            let native = self.native
             binding.window.retire { id in
                 defer { withExtendedLifetime(binding.lifetime) {} }
-                await vulkan.removeSurface(id)
+                await native.removeSurface(id)
             }
         }
 
@@ -164,6 +256,40 @@
 
         func window(for id: WindowID) -> SAGAWindow? {
             windows.withLock { $0[id]?.window }
+        }
+    }
+    /// Older SDKs attach FIFO surfaces with the original single-argument API.
+    private protocol VulkanWindowSurfaceAPI: Actor {
+        func addSurface(_ target: VulkanSurfaceTarget) throws -> UInt32
+        func addSurface(_ target: VulkanSurfaceTarget, onPresentationRetryChanged: (@Sendable (Bool) -> Void)?) throws -> UInt32
+    }
+
+    extension VulkanDevice: VulkanWindowSurfaceAPI {}
+
+    #if os(Windows) && SAGA_D3D12
+        /// Older Direct3D 12 SDKs support indexed draws with separate vertex and index buffers.
+        private protocol D3D12PackedGeometryAPI: Actor {
+            nonisolated var supportsPackedVertexIndexBuffers: Bool { get }
+        }
+
+        extension D3D12Device: D3D12PackedGeometryAPI {}
+
+        private extension D3D12PackedGeometryAPI {
+            nonisolated var supportsPackedVertexIndexBuffers: Bool { false }
+        }
+    #endif
+
+    private extension VulkanWindowSurfaceAPI {
+        func addSurface(_ target: VulkanSurfaceTarget, onPresentationRetryChanged: (@Sendable (Bool) -> Void)?) throws -> UInt32 {
+            try addSurface(target)
+        }
+
+        func attachSurface(
+            _ target: VulkanSurfaceTarget,
+            prefersLatestFrame: Bool,
+            onPresentationRetryChanged: (@Sendable (Bool) -> Void)?
+        ) throws -> (id: UInt32, usesMailbox: Bool) {
+            (try addSurface(target, onPresentationRetryChanged: onPresentationRetryChanged), false)
         }
     }
 #endif

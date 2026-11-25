@@ -34,6 +34,8 @@ public enum RenderUpscalingMode: Sendable, Equatable {
 /// Presentation pacing is independent of image quality and internal resolution.
 public enum RenderPresentationMode: Sendable, Equatable {
     case synchronized
+    /// Prefer the latest completed frame at refresh. Supported by mailbox-capable Windows Vulkan surfaces.
+    case synchronizedLatest
     case uncapped
 }
 
@@ -78,6 +80,26 @@ public final class RenderEngine: RenderBackend, Sendable {
         false
         #endif
     }
+
+    #if os(Windows)
+        package func retryWindowPresentationIfNeeded(_ id: WindowID) {
+            #if SAGA_RENDER && SAGA_NATIVE && canImport(SAGAVulkan) && canImport(SAGACompiler)
+                (renderBackend as? SAGANativeRenderBackend)?.window(for: id)?.retryPresentationIfNeeded()
+            #endif
+        }
+
+        package func pacePendingWindowPresentation(_ id: WindowID) async -> RenderPresentationMode? {
+            #if SAGA_RENDER && SAGA_NATIVE && canImport(SAGAVulkan) && canImport(SAGACompiler)
+                guard let window = (renderBackend as? SAGANativeRenderBackend)?.window(for: id),
+                    await window.pacePendingPresentation() else {
+                    return nil
+                }
+                return window.presentationMode
+            #else
+                nil
+            #endif
+        }
+    #endif
 
     init(renderBackend: RenderBackend) {
         self.renderBackend = renderBackend
@@ -193,7 +215,11 @@ extension RenderEngine {
             #if SAGA_METAL && canImport(SAGAMetal)
                 renderBackend = try SAGAMetalRenderBackend()
             #elseif SAGA_RENDER && SAGA_NATIVE && (os(Windows) || os(Linux) || os(Android)) && canImport(SAGAVulkan) && canImport(SAGACompiler)
-                renderBackend = try SAGANativeRenderBackend()
+                #if os(Windows)
+                    renderBackend = try SAGANativeRenderBackend(windowsRenderer: .configured())
+                #else
+                    renderBackend = try SAGANativeRenderBackend()
+                #endif
             #elseif METAL
                 throw RenderEngineSetupError.sagaBackendUnavailable
             #else

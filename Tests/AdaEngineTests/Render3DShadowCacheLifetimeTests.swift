@@ -1,7 +1,9 @@
 #if os(macOS) || os(Windows) || os(Linux)
-#if os(macOS) && SAGA_METAL_NATIVE_PASS
+#if os(Windows) || (os(macOS) && SAGA_METAL_NATIVE_PASS)
 import AdaAnimation
 import Foundation
+#endif
+#if os(macOS) && SAGA_METAL_NATIVE_PASS
 import Metal
 #endif
 @_spi(Internal) @testable import AdaApp
@@ -65,7 +67,145 @@ extension Render3DGPUTests {
                 #expect(before != after, "Replacing index storage must invalidate the rendered shadow.")
             }
 
-            #if os(macOS) && SAGA_METAL_NATIVE_PASS
+            #if os(Windows) || (os(macOS) && SAGA_METAL_NATIVE_PASS)
+                @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
+                func staticShadowDigestSurvivesRebuiltDrawBindings() async throws {
+                    let scene = try await Self.fixture()
+                    try await Self.completeFrame(scene)
+                    let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+                    let sources = try #require(world.getResource(ExtractedMesh3DSources.self))
+                    var caster = try #require(sources.meshes.first)
+                    let material = PBRMaterial()
+                    caster.materials = caster.materials.map { _ in material }
+                    caster.previousTransform = caster.transform
+                    var other = caster
+                    other.transform = Transform3D(translation: [2, 0, 3])
+                    other.previousTransform = other.transform
+
+                    var lists = VisibleMesh3DLists()
+                    var firstBindings = PBR3DUniforms()
+                    var rebuiltBindings = PBR3DUniforms()
+                    func digest(_ casters: [Mesh3DRenderSource], materials: inout PBR3DUniforms) -> UInt64 {
+                        lists.prepareShadowCacheLayers(
+                            ShadowCasterLayers3D(casters),
+                            view: scene.camera.id,
+                            pass: 300,
+                            uniform: GlobalViewUniform(),
+                            lightProjection: .identity,
+                            settings: .init(frustumCulling: false, lod: false, distanceCulling: false),
+                            device: scene.device,
+                            materials: &materials,
+                            preparedDigest: nil
+                        ).digest
+                    }
+                    let original = digest([caster, other], materials: &firstBindings)
+                    let rebuilt = digest([caster, other], materials: &rebuiltBindings)
+                    let firstBuffer = try #require(firstBindings.buffer(for: material))
+                    let rebuiltBuffer = try #require(rebuiltBindings.buffer(for: material))
+                    try #require(ObjectIdentifier(firstBuffer) != ObjectIdentifier(rebuiltBuffer))
+                    #expect(original == rebuilt, "Rebuilding GPU material bindings must preserve the static shadow digest.")
+                    #expect(original == digest([other, caster], materials: &rebuiltBindings))
+                    #expect(original != digest([caster], materials: &rebuiltBindings))
+                    other.transform = Transform3D(translation: [3, 0, 3])
+                    other.previousTransform = other.transform
+                    #expect(original != digest([caster, other], materials: &rebuiltBindings))
+                    other.transform = Transform3D(translation: [2, 0, 3])
+                    other.previousTransform = other.transform
+                    material.doubleSided = true
+                    #expect(original != digest([caster, other], materials: &rebuiltBindings))
+                }
+
+                @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
+                func shadowBatchesDistinguishSharedGeometry() async throws {
+                    let scene = try await Self.fixture()
+                    try await Self.completeFrame(scene)
+                    let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+                    let sources = try #require(world.getResource(ExtractedMesh3DSources.self))
+                    var whole = try #require(sources.meshes.first)
+                    whole.materials = whole.materials.map { _ in PBRMaterial() }
+                    var partial = whole
+                    var models = whole.mesh.models
+                    models[0].parts[0].indexCount = 3
+                    partial.mesh = Mesh(models: models)
+
+                    var lists = VisibleMesh3DLists()
+                    var materials = PBR3DUniforms()
+                    lists.prepare(
+                        sources: [whole, partial, whole],
+                        view: scene.camera.id,
+                        pass: 0,
+                        viewMatrix: .identity,
+                        projection: .identity,
+                        cullingProjection: .identity,
+                        settings: .init(frustumCulling: false, lod: false, distanceCulling: false),
+                        device: scene.device,
+                        materials: &materials
+                    )
+                    let items = lists.items(view: scene.camera.id, pass: 0)
+                    try #require(items.count == 2)
+                    let buffers = lists.buffers(view: scene.camera.id, pass: 0)
+                    let instances = try #require(buffers.instances)
+                    let atlas = RenderTexture(size: [32, 32], scaleFactor: 1, format: .rgba_32f)
+                    let depth = RenderTexture(size: [32, 32], scaleFactor: 1, format: .depth_32f_stencil8, usage: [.renderTarget])
+                    let command = scene.device.createCommandQueue().makeCommandBuffer()
+                    let pass = command.beginRenderPass(.init(
+                        colorAttachments: [.init(texture: atlas, operation: .init(loadAction: .clear, storeAction: .store), clearColor: .white)],
+                        depthStencilAttachment: .init(
+                            texture: depth,
+                            depthOperation: .init(loadAction: .clear, storeAction: .dontCare),
+                            stencilOperation: .init(loadAction: .clear, storeAction: .dontCare)
+                        )
+                    ))
+                    let constants = scene.device.createUniformBuffer(DirectionalShadowViewUniform.self, binding: GlobalBufferIndex.viewUniform)
+                    constants.setData(DirectionalShadowViewUniform(viewProjection: .identity))
+                    pass.setVertexBuffer(constants, offset: 0, slot: GlobalBufferIndex.viewUniform)
+                    var palettes = Skinning3DUniforms()
+                    palettes.beginFrame(device: scene.device)
+                    var batches = ShadowBatchEncoder3D(requiresMaterialBuffer: true)
+                    var pipelines = RenderPipelines(configurator: DirectionalShadow3DPipeline())
+                    let encoded = batches.encode(
+                        items: items,
+                        instances: instances,
+                        defaults: buffers.defaults,
+                        pass: pass,
+                        pipelines: &pipelines,
+                        materials: materials,
+                        identityPalette: palettes.identityBuffer,
+                        device: scene.device
+                    )
+                    pass.endRenderPass()
+                    #expect(encoded == 2)
+                    #expect(batches.resolvedStateCount == 2, "Distinct index counts must preserve separate shadow draw states.")
+                }
+
+                @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
+                func staticShadowListTracksOnlyRelevantCameraChanges() async throws {
+                    let scene = try await Self.fixture()
+                    try await Self.completeFrame(scene)
+                    let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+                    let sources = try #require(world.getResource(ExtractedMesh3DSources.self))
+                    var caster = try #require(sources.meshes.first)
+                    caster.materials = caster.materials.map { _ in PBRMaterial() }
+                    caster.previousTransform = caster.transform
+                    try #require(!ShadowCasterLayers3D([caster]).staticCasters.isEmpty)
+                    let moved = GlobalViewUniform(viewMatrix: Transform3D(translation: [1, 0, 0]))
+                    func changesWithCamera(_ source: Mesh3DRenderSource, _ settings: MeshVisibilitySettings3D) -> Bool {
+                        let layers = ShadowCasterLayers3D([source])
+                        return layers.preparationKey(uniform: moved, lightProjection: .identity, settings: settings)
+                            != layers.preparationKey(uniform: GlobalViewUniform(), lightProjection: .identity, settings: settings)
+                    }
+                    caster.maximumDistance = nil
+                    caster.alternatives = []
+                    #expect(!changesWithCamera(caster, .init()))
+                    caster.maximumDistance = 20
+                    #expect(changesWithCamera(caster, .init()))
+                    #expect(!changesWithCamera(caster, .init(distanceCulling: false)))
+                    caster.maximumDistance = nil
+                    caster.alternatives = [caster.mesh]
+                    #expect(changesWithCamera(caster, .init()))
+                    #expect(!changesWithCamera(caster, .init(lod: false)))
+                }
+
                 private struct AnimatedFixture {
                     let scene: MeshletBaselineFixtures.Scene
                     let world: World
@@ -130,6 +270,23 @@ extension Render3DGPUTests {
                     let rowBytes = (size.width * bytesPerPixel + 255) & ~255
                     let byteCount = rowBytes * size.height
                     let staging = device.createBuffer(label: "Shadow cache depth comparison", length: byteCount, options: .storageShared)
+                    #if os(Windows)
+                    let command = device.createCommandQueue().makeCommandBuffer()
+                    let blit = command.beginBlitPass(BlitPassDescriptor())
+                    blit.copyTextureToBuffer(
+                        source: texture,
+                        sourceOrigin: Origin3D(),
+                        sourceMipLevel: 0,
+                        sourceSlice: 0,
+                        sourceSize: Size3D(width: size.width, height: size.height),
+                        destination: staging,
+                        destinationOffset: 0,
+                        destinationBytesPerRow: rowBytes,
+                        destinationBytesPerImage: byteCount
+                    )
+                    blit.endBlitPass()
+                    command.commit()
+                    #else
                     try await MetalInterop.submitSAGAMetalPass(
                         on: device,
                         label: "Read shadow cache test",
@@ -152,6 +309,7 @@ extension Render3DGPUTests {
                         )
                         blit.endEncoding()
                     }
+                    #endif
                     let data = try await staging.readData()
                     return unsafe data.withUnsafeBytes { bytes in
                         (0..<size.height).flatMap { y in
@@ -173,6 +331,18 @@ extension Render3DGPUTests {
                 private static func removeStaticTriangles(_ fixture: AnimatedFixture) async throws {
                     let mesh = try #require(fixture.staticCaster.components[Mesh3DComponent.self]?.mesh)
                     let buffer = try #require(mesh.models.first?.parts.first?.indexBuffer)
+                    #if os(Windows)
+                    let bytes = [UInt8](repeating: 0, count: buffer.length)
+                    let source = try bytes.withUnsafeBytes { raw in
+                        let address = try #require(raw.baseAddress)
+                        return fixture.scene.device.createBuffer(label: "Zero indices", bytes: address, length: raw.count, options: .storageShared)
+                    }
+                    let command = fixture.scene.device.createCommandQueue().makeCommandBuffer()
+                    let blit = command.beginBlitPass(BlitPassDescriptor())
+                    blit.copyBufferToBuffer(source: source, sourceOffset: 0, destination: buffer, destinationOffset: 0, size: buffer.length)
+                    blit.endBlitPass()
+                    command.commit()
+                    #else
                     try await MetalInterop.submitSAGAMetalPass(
                         on: fixture.scene.device,
                         label: "Change static shadow topology",
@@ -183,6 +353,7 @@ extension Render3DGPUTests {
                         blit.fill(buffer: destination, range: 0..<buffer.length, value: 0)
                         blit.endEncoding()
                     }
+                    #endif
                 }
 
                 @Test(.enabled(if: GoldenFrame.activeBackend == .saga))
@@ -246,9 +417,18 @@ extension Render3DGPUTests {
                         }
                         if step == 2 {
                             #expect(projection != previousProjection, "The camera move must change a cascade projection in this frame.")
+                            #if os(Windows)
+                            #expect(writes == previousStaticWrites, "Moving a cascaded camera must draw directly into the output atlas.")
+                            #else
                             #expect(writes > previousStaticWrites, "The new camera projection must rebuild its cascades.")
+                            #endif
                         }
-                        if step == 4 { #expect(!compare(previousSpot, actual.spot), "The light must actually move the local shadow.") }
+                        if step == 4 {
+                            #expect(!compare(previousSpot, actual.spot), "The light must actually move the local shadow.")
+                            #if os(Windows)
+                            #expect(writes > previousStaticWrites, "Two stationary frames must restore static cascade reuse.")
+                            #endif
+                        }
                         if step == 5 {
                             #expect(!compare(previousSun, actual.sun), "The GPU write must actually remove the static caster's shadow.")
                         }

@@ -114,6 +114,9 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
         }
         scratch.cache.retainViews(activeViews)
         scratch.shadowMapCache.retainViews(activeViews)
+        #if os(Windows)
+        scratch.cascadeCameras = scratch.cascadeCameras.filter { activeViews.contains($0.key) }
+        #endif
         scratch.gpuCull.retainViews(activeViews)
         scratch.preparedCascades = scratch.preparedCascades.filter { activeViews.contains($0.key) }
         if activeViews.isEmpty { scratch.cpuCasters = DirectionalShadowCasters3D() }
@@ -140,6 +143,9 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             else {
                 shadow.isEnabled = false
                 scratch.preparedCascades.removeValue(forKey: source.entityId)
+                #if os(Windows)
+                scratch.cascadeCameras.removeValue(forKey: source.entityId)
+                #endif
                 scratch.shadowMapCache.discard(view: source.entityId)
                 return
             }
@@ -159,7 +165,12 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             let far = min(light.shadowDistance, camera.projection.far)
             let cascades: [ShadowCascade3D]
             if count == 1 {
-                let matrix = DirectionalShadow3DMath.makeViewProjection(cameraViewMatrix: viewUniform.viewMatrix, directionToLight: light.directionToLight, shadowDistance: far, shadowMapResolution: tileResolution)
+                let matrix = DirectionalShadow3DMath.makeViewProjection(
+                    cameraViewMatrix: viewUniform.viewMatrix,
+                    directionToLight: light.directionToLight,
+                    shadowDistance: far,
+                    shadowMapResolution: tileResolution
+                )
                 cascades = [.init(viewProjection: matrix, farDepth: far, radius: far / 2, corners: [])]
             } else {
                 cascades = DirectionalShadow3DMath.cascades(
@@ -182,6 +193,7 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
             shadow.blendFraction = finiteRenderValue(settings.blendFraction, fallback: 0.1, range: 0 ... 0.25)
             shadow.isEnabled = true
             if context.world.getResource(StudioShadowCache.self) != nil, ShadowMapCache3D.supports(colorTexture),
+                scratch.shouldCacheCascades(view: source.entityId, matrix: viewUniform.viewMatrix, count: count),
                 scratch.shadowMapCache.isUsable(for: source.entityId) {
                 let layers = ShadowCasterLayers3D(candidates.meshes)
                 if !layers.staticCasters.isEmpty {
@@ -225,8 +237,10 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                 PerformanceStallProbe.mark("DirectionalShadow3D casters cpuSources=\(cpuSources.count) gpuParts=\(gpuParts) gpuClusters=\(gpuClusters)")
             }
             let reconcile = scratch.cpuCasters.update(
-                sources: candidates.meshes, cpuIndices: culled == nil ? nil : registry.cpuSourceIndices,
-                changes: candidates.transformChanges, frame: materialUniforms.frame
+                sources: candidates.meshes,
+                cpuIndices: culled == nil ? nil : registry.cpuSourceIndices,
+                changes: candidates.transformChanges,
+                frame: materialUniforms.frame
             )
             let retained = reconcile != nil
             if reconcile == true { lists.reconcileHistory(sources: cpuSources) }
@@ -259,10 +273,14 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                 let preparationSpan = AdaTrace.startSpan("Render3D.ShadowPrepare")
                 let prepared = sourceRevision.map {
                     DirectionalShadow3DScratch.PreparedCascade(
-                        sourceRevision: $0, cameraView: viewUniform.viewMatrix,
-                        cameraProjection: viewUniform.projectionMatrix, cascadeProjection: cascades[cascadeIndex].viewProjection,
-                        atlasSize: colorTexture.size, frustumCulling: visibility.frustumCulling,
-                        usesLOD: visibility.lod, distanceCulling: visibility.distanceCulling
+                        sourceRevision: $0,
+                        cameraView: viewUniform.viewMatrix,
+                        cameraProjection: viewUniform.projectionMatrix,
+                        cascadeProjection: cascades[cascadeIndex].viewProjection,
+                        atlasSize: colorTexture.size,
+                        frustumCulling: visibility.frustumCulling,
+                        usesLOD: visibility.lod,
+                        distanceCulling: visibility.distanceCulling
                     )
                 }
                 let reuse = prepared != nil && scratch.preparedCascades[source.entityId]?[cascadeIndex] == prepared
@@ -337,9 +355,13 @@ public struct DirectionalShadow3DRenderNode: RenderNode {
                     if let instances = movingBuffers.instances {
                         batches.encode(
                             items: lists.items(view: source.entityId, pass: movingPass),
-                            instances: instances, defaults: movingBuffers.defaults, pass: pass,
-                            pipelines: &_pipelines.wrappedValue, materials: materialUniforms,
-                            identityPalette: skinningUniforms.identityBuffer, device: renderDevice.renderDevice
+                            instances: instances,
+                            defaults: movingBuffers.defaults,
+                            pass: pass,
+                            pipelines: &_pipelines.wrappedValue,
+                            materials: materialUniforms,
+                            identityPalette: skinningUniforms.identityBuffer,
+                            device: renderDevice.renderDevice
                         )
                     }
                 }

@@ -157,6 +157,25 @@ struct RenderQuality3DIntegrationTests {
     }
 
     @Test
+    func uniformRingPreservesChangedBitsWhenWrapping() async throws {
+        try setup()
+        let device = unsafe RenderEngine.shared.renderDevice
+        let view = World().spawn().id
+        let slots = max(1, unsafe RenderEngine.configurations.maxFramesInFlight)
+        var cache = FrameUniformCache3D<Vector4>()
+        for _ in 0..<(2 * slots) {
+            _ = cache.write(.zero, view: view, device: device)
+        }
+        let signBit: UInt32 = 0x8000_0000
+        for _ in 0..<slots {
+            let output = cache.write(Vector4(Float(bitPattern: signBit), 0, 0, 0), view: view, device: device)
+            let buffer = try #require(output.buffer)
+            let data = try await buffer.readData()
+            #expect(data.withUnsafeBytes { $0.loadUnaligned(as: UInt32.self) } == signBit)
+        }
+    }
+
+    @Test
     func cameraUniformRingsNeverShareBuffersAndMetricsIgnoreMissingGPUTimestamps() throws {
         try setup()
         let world = World()

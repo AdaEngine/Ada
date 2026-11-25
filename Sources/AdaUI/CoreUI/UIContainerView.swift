@@ -191,7 +191,8 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
     /// Manages keyboard-driven focus traversal across focusable nodes.
     let focusManager = UIFocusManager()
 
-    func deactivateInput(in subtree: ViewNode) {
+    @discardableResult
+    func deactivateInput(in subtree: ViewNode) -> Bool {
         func belongsToSubtree(_ node: ViewNode?) -> Bool {
             var current = node
             while let node = current {
@@ -202,8 +203,12 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
             }
             return false
         }
-        if belongsToSubtree(focusManager.focusedNode) { focusManager.focus(nil) }
-        if belongsToSubtree(activeMouseEventNode) {
+        let wasFocused = belongsToSubtree(focusManager.focusedNode)
+        let hadMouseCapture = belongsToSubtree(activeMouseEventNode)
+        let hadPinchCapture = belongsToSubtree(activePinchEventNode)
+        let previousTouchCount = activeTouchEventNodes.count
+        if wasFocused { focusManager.focus(nil) }
+        if hadMouseCapture {
             activeMouseEventNode?.onMouseLeave()
             activeMouseEventNode = nil
         }
@@ -212,7 +217,8 @@ public final class UIContainerView<Content: View>: UIView, ViewOwner {
             lastOnMouseEventNode = nil
         }
         activeTouchEventNodes = activeTouchEventNodes.filter { !belongsToSubtree($0.value.value) }
-        if belongsToSubtree(activePinchEventNode) { activePinchEventNode = nil }
+        if hadPinchCapture { activePinchEventNode = nil }
+        return wasFocused || hadMouseCapture || hadPinchCapture || activeTouchEventNodes.count != previousTouchCount
     }
     var hasFocusedInputNode: Bool {
         self.focusManager.focusedNode != nil

@@ -151,6 +151,28 @@ public struct DirectionalShadow3DScratch: Resource, Sendable {
         self.view = BufferData(label: "Directional Shadow View", elements: [])
     }
 
+    #if os(Windows)
+    struct CascadeCamera {
+        var viewMatrix: Transform3D
+        var stationaryFrames: Int
+    }
+    var cascadeCameras: [Entity.ID: CascadeCamera] = [:]
+    #endif
+
+    mutating func shouldCacheCascades(view: Entity.ID, matrix: Transform3D, count: Int) -> Bool {
+        #if os(Windows)
+        // Moving cascades would rebuild and composite the static layer on every frame.
+        // Draw them directly until the camera has settled across two updates.
+        if count > 1 {
+            let previous = cascadeCameras[view]
+            let frames = previous.map { $0.viewMatrix == matrix ? min(2, $0.stationaryFrames + 1) : 0 } ?? 2
+            cascadeCameras[view] = CascadeCamera(viewMatrix: matrix, stationaryFrames: frames)
+            return frames == 2
+        }
+        #endif
+        return true
+    }
+
     mutating func cullCasters(
         camera: Entity.ID,
         views: [GPUShadowCullView],

@@ -60,6 +60,12 @@ let isSAGAMetalEnabled = !isWebExportEnabled && !isAndroidBuildEnabled && !isSAG
 let isSAGAMetalEnabled = false
 #endif
 
+#if os(Windows)
+let isSAGAD3D12Enabled = isSAGANativeEnabled && ProcessInfo.processInfo.environment["ADAENGINE_ENABLE_D3D12"] == "1"
+#else
+let isSAGAD3D12Enabled = false
+#endif
+
 let isSAGAMetalNativePassEnabled = isSAGAMetalEnabled
 
 // Local compiler development can override the checked-in, patched AdaScript runtime.
@@ -318,6 +324,10 @@ if isSAGANativeEnabled {
     }
     swiftSettings.append(.define("SAGA_RENDER", .when(platforms: [.windows, .linux, .android])))
     swiftSettings.append(.define("SAGA_NATIVE", .when(platforms: [.windows, .linux, .android])))
+}
+if isSAGAD3D12Enabled {
+    adaRenderDependencies.append(.product(name: "SAGAD3D12", package: "SAGA", condition: .when(platforms: [.windows])))
+    swiftSettings.append(.define("SAGA_D3D12", .when(platforms: [.windows])))
 }
 if isSAGAMetalEnabled {
     for product in ["SAGA", "SAGACompiler", "SAGAMetal"] {
@@ -1480,7 +1490,7 @@ if let sagaPath = sagaCheckoutPath {
     package.dependencies.append(.package(name: "SAGA", path: sagaPath))
 } else {
     // Metal indexed draw grouping and validated shared upload batches.
-    let sagaRevision = "bcc6896875ee80f6c6f033ce5cdd6d272d21134c"
+    let sagaRevision = "6d062132cce1901a851b0720249360bdf55a9de8"
     package.dependencies.append(.package(
         url: "https://github.com/AdaEngine/SAGA.git",
         revision: sagaRevision

@@ -15,6 +15,8 @@ struct ShadowBatchEncoder3D {
         var material: ObjectIdentifier
         var vertex: ObjectIdentifier
         var index: ObjectIdentifier
+        var indexCount: Int
+        var configuration: Shadow3DConfiguration
         var skin: ObjectIdentifier?
         var morph: ObjectIdentifier?
     }
@@ -120,10 +122,14 @@ struct ShadowBatchEncoder3D {
         device: RenderDevice
     ) -> Int32 where P.Configuration == Shadow3DConfiguration {
         let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
+        let morphed = item.morphBuffer != nil && part.morphTargets != nil
+        let configuration = Shadow3DConfiguration(vertex: part.vertexDescriptor, morph: morphed)
         let key = Key(
             material: ObjectIdentifier(item.material),
             vertex: ObjectIdentifier(part.vertexBuffer),
             index: ObjectIdentifier(part.indexBuffer),
+            indexCount: part.indexCount,
+            configuration: configuration,
             skin: item.skinningBuffer.map { ObjectIdentifier($0) },
             morph: item.morphBuffer.map { ObjectIdentifier($0) }
         )
@@ -139,8 +145,7 @@ struct ShadowBatchEncoder3D {
             states.append(nil)
             return -1
         }
-        let morphed = item.morphBuffer != nil && part.morphTargets != nil
-        let pipeline = pipelines.pipeline(for: Shadow3DConfiguration(vertex: part.vertexDescriptor, morph: morphed), device: device)
+        let pipeline = pipelines.pipeline(for: configuration, device: device)
         var bindings: [RenderResourceSet.Binding] = []
         if let materialBuffer {
             let base = pbr?.baseColorTexture ?? Texture2D.whiteTexture

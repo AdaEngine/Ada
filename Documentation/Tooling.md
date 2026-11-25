@@ -160,6 +160,8 @@ reused scratch cache belongs to another compiler, choose a new `--scratch-path`.
 
 ## Profile Studio with native CPU profilers
 
+See the [Windows Studio performance guide](../Editor/Documentation/WindowsPerformance.md) for measuring displayed frames during editor interactions.
+
 `--profile` builds the release configuration with debug symbols, so sampling
 profilers show Swift function names while timing stays representative:
 

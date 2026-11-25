@@ -186,6 +186,8 @@ public struct UIDrawData: Sendable {
     public var clipRect: Rect?
 
     var geometryLeases: [UIGeometryBufferPool.Lease] = []
+    var shapeGeometry: UIShapeGeometry?
+    var quadGlyphGeometry: UIQuadGlyphGeometry?
 
     public init() {
         self.quadVertexBuffer = BufferData(label: "UI_QuadVertexBuffer", elements: [])
@@ -207,31 +209,37 @@ public struct UIDrawData: Sendable {
     }
 
     public mutating func write(to device: any RenderDevice) {
-        self.quadVertexBuffer.write(to: device)
-        self.quadIndexBuffer.write(to: device)
-        self.gradientVertexBuffer.write(to: device)
-        self.gradientIndexBuffer.write(to: device)
-        self.gradientUniformBuffer.write(to: device)
-        self.shaderEffectVertexBuffer.write(to: device)
-        self.shaderEffectIndexBuffer.write(to: device)
-        self.circleVertexBuffer.write(to: device)
-        self.circleIndexBuffer.write(to: device)
-        self.lineVertexBuffer.write(to: device)
-        self.lineIndexBuffer.write(to: device)
-        self.glyphVertexBuffer.write(to: device)
-        self.glyphIndexBuffer.write(to: device)
-        self.glassVertexBuffer.write(to: device)
-        self.glassIndexBuffer.write(to: device)
+        write(to: device, using: nil)
     }
 
-    mutating func write(to device: any RenderDevice, using pool: UIGeometryBufferPool?) {
-        if let pool {
+    mutating func write(to device: any RenderDevice, using pool: UIGeometryBufferPool?, deferGeometry: Bool = false) {
+        if !deferGeometry, let pool {
             Self.borrowBuffer(for: &quadVertexBuffer, from: pool, device: device, leases: &geometryLeases)
             Self.borrowBuffer(for: &quadIndexBuffer, from: pool, device: device, leases: &geometryLeases)
             Self.borrowBuffer(for: &glyphVertexBuffer, from: pool, device: device, leases: &geometryLeases)
             Self.borrowBuffer(for: &glyphIndexBuffer, from: pool, device: device, leases: &geometryLeases)
         }
-        write(to: device)
+        shapeGeometry = nil
+        quadGlyphGeometry = nil
+        if !deferGeometry {
+            self.quadVertexBuffer.write(to: device)
+            self.quadIndexBuffer.write(to: device)
+            self.glyphVertexBuffer.write(to: device)
+            self.glyphIndexBuffer.write(to: device)
+        }
+        self.gradientVertexBuffer.write(to: device)
+        self.gradientIndexBuffer.write(to: device)
+        self.gradientUniformBuffer.write(to: device)
+        self.shaderEffectVertexBuffer.write(to: device)
+        self.shaderEffectIndexBuffer.write(to: device)
+        if !deferGeometry {
+            self.circleVertexBuffer.write(to: device)
+            self.circleIndexBuffer.write(to: device)
+            self.lineVertexBuffer.write(to: device)
+            self.lineIndexBuffer.write(to: device)
+        }
+        self.glassVertexBuffer.write(to: device)
+        self.glassIndexBuffer.write(to: device)
     }
 
     private static func borrowBuffer<Element>(
@@ -250,6 +258,7 @@ public struct UIDrawData: Sendable {
 
     /// Clears all vertex, index, and texture data while keeping capacity.
     public mutating func clear() {
+        shapeGeometry = nil
         quadVertexBuffer.removeAll()
         quadIndexBuffer.removeAll()
         gradientVertexBuffer.removeAll()
@@ -456,8 +465,14 @@ public struct UIDrawPass: DrawPass {
         renderEncoder.pushDebugName("UI Quad Render")
         defer { renderEncoder.popDebugName() }
 
-        renderEncoder.setVertexBuffer(uiDrawData.quadVertexBuffer, offset: 0, slot: 0)
-        renderEncoder.setIndexBuffer(uiDrawData.quadIndexBuffer, indexFormat: .uInt32)
+        let geometry = uiDrawData.quadGlyphGeometry
+        if let geometry {
+            renderEncoder.setVertexBuffer(geometry.storage, offset: geometry.quadVertices, slot: 0)
+            renderEncoder.setIndexBuffer(geometry.storage, indexFormat: .uInt32)
+        } else {
+            renderEncoder.setVertexBuffer(uiDrawData.quadVertexBuffer, offset: 0, slot: 0)
+            renderEncoder.setIndexBuffer(uiDrawData.quadIndexBuffer, indexFormat: .uInt32)
+        }
 
         for batch in uiDrawData.quadBatches {
             guard uiDrawData.textures.indices.contains(batch.textureIndex) else {
@@ -481,7 +496,7 @@ public struct UIDrawPass: DrawPass {
             )
             renderEncoder.setResourceSet(resourceSet, index: 0)
 
-            let indexBufferOffset = batch.indexOffset * MemoryLayout<UInt32>.stride
+            let indexBufferOffset = (geometry?.quadIndices ?? 0) + batch.indexOffset * MemoryLayout<UInt32>.stride
             renderEncoder.drawIndexed(
                 indexCount: batch.indexCount,
                 indexBufferOffset: indexBufferOffset,
@@ -617,12 +632,17 @@ public struct UIDrawPass: DrawPass {
         renderEncoder.pushDebugName("UI Circle Render")
         defer { renderEncoder.popDebugName() }
 
-        renderEncoder.setVertexBuffer(uiDrawData.circleVertexBuffer, offset: 0, slot: 0)
-        renderEncoder.setIndexBuffer(uiDrawData.circleIndexBuffer, indexFormat: .uInt32)
+        if let shapes = uiDrawData.shapeGeometry {
+            renderEncoder.setVertexBuffer(shapes.storage, offset: shapes.circleVertices, slot: 0)
+            renderEncoder.setIndexBuffer(shapes.storage, indexFormat: .uInt32)
+        } else {
+            renderEncoder.setVertexBuffer(uiDrawData.circleVertexBuffer, offset: 0, slot: 0)
+            renderEncoder.setIndexBuffer(uiDrawData.circleIndexBuffer, indexFormat: .uInt32)
+        }
 
         renderEncoder.drawIndexed(
             indexCount: uiDrawData.circleIndexBuffer.count,
-            indexBufferOffset: 0,
+            indexBufferOffset: uiDrawData.shapeGeometry?.circleIndices ?? 0,
             instanceCount: 1
         )
     }
@@ -634,13 +654,18 @@ public struct UIDrawPass: DrawPass {
         renderEncoder.pushDebugName("UI Line Render")
         defer { renderEncoder.popDebugName() }
 
-        renderEncoder.setVertexBuffer(uiDrawData.lineVertexBuffer, offset: 0, slot: 0)
-        renderEncoder.setIndexBuffer(uiDrawData.lineIndexBuffer, indexFormat: .uInt32)
+        if let shapes = uiDrawData.shapeGeometry {
+            renderEncoder.setVertexBuffer(shapes.storage, offset: shapes.lineVertices, slot: 0)
+            renderEncoder.setIndexBuffer(shapes.storage, indexFormat: .uInt32)
+        } else {
+            renderEncoder.setVertexBuffer(uiDrawData.lineVertexBuffer, offset: 0, slot: 0)
+            renderEncoder.setIndexBuffer(uiDrawData.lineIndexBuffer, indexFormat: .uInt32)
+        }
 
         // Lines are rendered using line primitive type configured in the pipeline
         renderEncoder.drawIndexed(
             indexCount: uiDrawData.lineIndexBuffer.count,
-            indexBufferOffset: 0,
+            indexBufferOffset: uiDrawData.shapeGeometry?.lineIndices ?? 0,
             instanceCount: 1
         )
     }
@@ -652,8 +677,14 @@ public struct UIDrawPass: DrawPass {
         renderEncoder.pushDebugName("UI Glyph Render")
         defer { renderEncoder.popDebugName() }
 
-        renderEncoder.setVertexBuffer(uiDrawData.glyphVertexBuffer, offset: 0, slot: 0)
-        renderEncoder.setIndexBuffer(uiDrawData.glyphIndexBuffer, indexFormat: .uInt32)
+        let geometry = uiDrawData.quadGlyphGeometry
+        if let geometry {
+            renderEncoder.setVertexBuffer(geometry.storage, offset: geometry.glyphVertices, slot: 0)
+            renderEncoder.setIndexBuffer(geometry.storage, indexFormat: .uInt32)
+        } else {
+            renderEncoder.setVertexBuffer(uiDrawData.glyphVertexBuffer, offset: 0, slot: 0)
+            renderEncoder.setIndexBuffer(uiDrawData.glyphIndexBuffer, indexFormat: .uInt32)
+        }
 
         for batch in uiDrawData.glyphBatches {
             guard uiDrawData.fontAtlases.indices.contains(batch.textureIndex) else {
@@ -677,7 +708,7 @@ public struct UIDrawPass: DrawPass {
             )
             renderEncoder.setResourceSet(resourceSet, index: 0)
 
-            let indexBufferOffset = batch.indexOffset * MemoryLayout<UInt32>.stride
+            let indexBufferOffset = (geometry?.glyphIndices ?? 0) + batch.indexOffset * MemoryLayout<UInt32>.stride
             renderEncoder.drawIndexed(
                 indexCount: batch.indexCount,
                 indexBufferOffset: indexBufferOffset,

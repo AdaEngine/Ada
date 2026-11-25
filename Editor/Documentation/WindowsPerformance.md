@@ -27,12 +27,372 @@ The script reads PresentMon's default hybrid CSV. It reports each swapchain
 separately and excludes the first interval, whose previous frame lies outside
 the capture. Present FPS, display FPS, p95/p99, worst intervals and intervals
 above 25 ms are distinct metrics. Missing display/GPU data stays unavailable.
+Record the monitor, refresh rate, DPI, viewport size and PresentMon present mode
+with each run. At 60 Hz, count displayed intervals above 25 ms as missed refreshes
+and check p99 as well as p95. Average FPS can hide isolated missed refreshes.
 Do not add together FPS from multiple Studio windows. The reciprocal of GPU
 busy time is not display FPS. See the official
 [PresentMon console documentation](https://github.com/GameTechDev/PresentMon/blob/main/README-ConsoleApplication.md)
 for metric definitions.
 
+## Hierarchy scrolling on Vulkan
+
+In a matched Release capture, Skeletal Garden was open on an RTX 4070 at
+3840 × 2088 physical pixels with Vulkan FIFO presentation. Both runs received
+360 identical wheel events in Hierarchy. The updated build displayed 87.3 FPS
+and 20.8 ms p99, up from 10.6 FPS and 118.1 ms p99. The slowest measured
+one-second window displayed 76 frames. A separate first pass over uncached rows
+averaged 65.2 FPS, with 60 frames in its slowest one-second window and 27.8 ms
+p99. These are measurements for this scene and window configuration.
+
+Hierarchy retains up to 128 recently hidden rows by entity ID. AdaUI packs the
+quad and glyph vertex and index data into shared GPU uploads, preserving draw
+order and clipping. The two Hierarchy captures matched pixel for pixel at the
+initial and final scroll positions.
+
 ## Windows timing
+
+### SAGA Vulkan buffer uploads
+
+Record a separate run with `ADAENGINE_SAGA_TRACE=1` to inspect the ordered GPU queue.
+Close Studio and relaunch it with redirected stderr before replaying the same interaction.
+Count upload jobs and presentation jobs over the same interaction window. Keep this trace
+disabled during the PresentMon run because logging changes frame timing.
+
+On the Vulkan path, adjacent buffer writes up to 64 KiB each can share one submission.
+An intervening draw, copy, or resource operation preserves its original queue position. The Windows GPU test
+`adjacentBufferUploadsUseOneSubmissionOnEitherSideOfACopy` checks both the submission count
+and the copied and final bytes for overlapping writes.
+
+On an RTX 4070, a Release run of the Skeletal Garden camera orbit at a maximized
+2560 Ãƒâ€” 1392 logical window measured 24.97 displayed FPS, 71.51 ms p95 and 118.06 ms p99
+with the upload, buffer reuse and draw grouping changes. Its longest displayed interval
+was 1,106.59 ms. The earlier run at the same window size measured 11.97 displayed FPS,
+138.91 ms p95 and 159.74 ms p99. The intermediate run started facing slightly differently.
+
+Windows can queue later graphics work while a submitted frame waits for GPU completion.
+Completion callbacks retain submission order and run after the GPU ticket completes.
+Run timing comparisons with `ADAENGINE_SAGA_DEBUG` disabled because that mode waits
+for every submission while collecting device errors.
+
+Three further Release runs with this queue change and the original camera pose measured
+31.50Ã¢â‚¬â€œ31.89 displayed FPS at a 2560 Ãƒâ€” 1032 logical window, 66.69Ã¢â‚¬â€œ66.71 ms p95 and
+83.35Ã¢â‚¬â€œ99.98 ms p99. The longest interval was 100.21 ms. These runs used a 60 Hz display
+and independent flip. The original baseline used a taller window on another display
+with composed flip. Captures are under `.build-tools/windows-studio-frametime`.
+
+A matched Release replay on the 60 Hz display used a 2560 Ãƒâ€” 1032 window, the same
+initial camera pose and hardware-composed independent flip. Displayed FPS rose
+from 12.23 to 27.33. The p95 interval moved from 149.91 to 66.78 ms and p99 from
+166.67 to 100.02 ms. Two additional pairs started at the same pose and display
+size. Across all three pairs, the stock build measured 10.61Ã¢â‚¬â€œ12.23 FPS and the
+updated build 27.33Ã¢â‚¬â€œ28.82 FPS. The stock build used composed flip in two runs.
+The updated build used hardware-composed independent flip in all three. Its p95
+of 66.78Ã¢â‚¬â€œ83.32 ms falls short of the 16.67 ms frame budget for steady 60 FPS.
+
+On the same 60 Hz display, three split-pane drag runs improved from 10.95Ã¢â‚¬â€œ11.20 to
+29.35Ã¢â‚¬â€œ30.57 displayed FPS. The p95 interval moved from about 283 ms to 167Ã¢â‚¬â€œ183 ms.
+Three code scrolling runs in HordeSystem.ada measured 22.70Ã¢â‚¬â€œ22.91 FPS before and
+22.09Ã¢â‚¬â€œ22.49 after, with p95 near 66.67 ms in both builds.
+
+### Camera orbit and presentation
+
+To diagnose an orbit hitch, capture the same motion twice. Use PresentMon with
+tracing disabled for the display intervals, then use Studio's CPU profiler for
+render graph and scheduler timings. The profiler's render nodes measure CPU
+command encoding. GPU busy time comes from the PresentMon capture.
+
+In a Skeletal Garden CPU capture, the median 3D render graph took 5.18 ms.
+Directional and local shadow encoding accounted for 1.89 ms and 1.38 ms of
+that time, respectively. The Vulkan adapter rendered the existing shadow,
+geometry and post-processing passes at the scene's configured quality.
+
+The Vulkan backend now shares identical image views and immutable descriptor
+sets within each submission. A present can be queued as soon as the copy to the
+swapchain is submitted. Its semaphore orders the copy before display, and the
+copy fence still protects the source texture and the recycled command pool.
+
+Measure input response separately from display FPS. A window can keep presenting
+at the monitor's refresh rate while showing scene textures rendered from older
+camera positions. Use native right-button drags and time the first matching
+viewport pixel change. Repeat several times on the same display and report the
+sample count, median and worst delay. Screen sampling and rendering can affect
+each other, so keep this run separate from the clean PresentMon run.
+
+The Skeletal Garden input probe used a maximized 2560 Ãƒâ€” 1032 logical window on
+the 60 Hz display. It moved the mouse through Win32 and sampled a viewport patch
+until the scene changed. Across 14 movements per build, median response fell from
+230.62 ms to 153.71 ms when the window queue was bounded. A one-frame scene queue
+reduced it to 69.03 ms, with 84.51 ms for the slowest sample. That configuration
+displayed about 52 FPS in two clean PresentMon runs. In the separate continuous
+mouse probe the viewport changed about 20 times per second. The measurements
+motivated keeping an additional scene frame in flight while eliminating early
+UI redraw requests from camera orbit events.
+
+With the two-frame scene queue and the redraw change, the input probe measured
+88.01 ms and 118.04 ms median response in two runs of 14 movements. The worst
+movement in the first run took 326.47 ms. The worst in the second took 139.03 ms.
+The continuous pixel probe saw about 48 viewport changes per second, compared
+with about four in the previous Release. In two clean PresentMon runs with
+approximately 96 native mouse movements per second, the new build displayed
+52.12Ã¢â‚¬â€œ52.62 FPS. Display p95 and p99 were about 33.35 ms. GPU busy p95 was
+7.44Ã¢â‚¬â€œ8.06 ms. A separate trace measured 51.43 submitted scene frames per
+second. Its largest interval between pass submissions was the 11.09 ms median
+from window upscale to the next directional shadow pass, which spans window
+presentation and preparation of the next frame. The orbit remains below the
+steady 60 Hz target at this load.
+Both builds were also captured from the same stationary camera at 2560 Ãƒâ€” 1032.
+The screenshots show matching geometry, shadows and lighting. The robots were
+captured at different animation phases. The raw captures are under
+`.build-tools/windows-studio-frametime/phase3-*`.
+
+Windows Vulkan keeps up to two outstanding presents per window. The app can
+prepare one frame while its previous frame finishes. The foreground window can
+pace the update loop through its FIFO swapchain. Hidden windows and skipped
+frames use the timer, and other windows never wait to acquire a swapchain image.
+A skipped acquire can retry the latest backbuffer on the next visible update.
+The Windows editor viewport allows two outstanding scene renders. It keeps
+applying camera input while the GPU finishes that frame, then renders the latest
+camera pose as soon as another target is available.
+Camera orbit updates prepare companion overlays for the matching scene frame.
+They request a window redraw when that frame is published.
+
+### Camera inspector during orbit
+
+An expanded camera inspector contains many fields below the visible scroll
+area. Studio skips recording those rows while they are offscreen and reuses
+the drawing groups of visible rows when their contents are unchanged. The
+fields stay mounted and can still be reached by scrolling.
+
+To reproduce this workload, select the scene's authored camera and keep its
+inspector and Environment 3D component expanded. Set **Debug View** to **None**
+to measure the normal scene, then orbit with the right mouse button. Keep the
+same viewport dimensions and authored rendering settings for each capture.
+
+On Windows Vulkan with an RTX 4070, two paired Release captures used the same
+camera selection, scene and 1575 × 912 viewport. Displayed frame rate rose from
+12.5 to 33.1 FPS in the first pair and from 15.0 to 43.6 FPS in the second. The
+99th-percentile display interval fell from 100.1 to 50.0 ms and from 100.0 to
+33.4 ms respectively. The median gap between the recorded submissions for the
+scene's 2D pass and Studio's 2D pass fell from 47.0 to 9.7 ms in separate traces.
+The scene uses its normal lighting with the Light Count debug view turned off.
+
+The lower inspector fields remained reachable by scrolling. A native smoke test
+focused the Vignette Radius input and verified that it appeared again after
+collapsing and re-expanding its group. A separate 14-sample mouse-to-screen
+capture measured a median of 131 ms using the first detected change in a viewport
+patch. The measured frame rate and latency leave room for further work.
+
+To trace a single movement, launch Studio with `ADAENGINE_VIEWPORT_LATENCY_TRACE=1`.
+Match the viewport's `update`, `callback`, `complete` and `publish` records by
+texture identity and time. The pool reuses textures. Pair the records within the
+same frame before comparing them with the native input and presentation trace.
+Run the frame-rate capture separately with tracing disabled.
+
+One full frame of delay came from camera transform propagation. Orbit updated
+the preview camera's local transform during pre-update. The camera system read
+its previous world transform, which the transform system refreshed in post-update.
+The root preview camera now supplies the new world transform to that frame's
+camera system and overlay snapshot.
+
+In an instrumented run, 13 movements could be matched through the window
+submission to the first changed viewport pixel. Median elapsed time was 101 ms.
+
+| Interval | Median |
+| --- | ---: |
+| Injected mouse move to viewport input handler | 12.4 ms |
+| Input handler to updated camera snapshot | 4.5 ms |
+| Camera snapshot to GPU completion callback | 23.4 ms |
+| Callback to delivery on the main actor | <0.1 ms |
+| Main actor delivery to publication of the completed texture | 5.7 ms |
+| Publication to sampling the texture for the window | 6.0 ms |
+| Sampling to queuing the window present | 0.3 ms |
+| Queuing to acceptance by SAGA | 2.7 ms |
+| SAGA acceptance to present ticket retirement | 7.7 ms |
+| Ticket retirement to first changed pixel in desktop capture | 39.1 ms |
+
+The last interval includes desktop composition and screen sampling. Measuring
+physical display response requires an optical measurement. The individual
+medians come from separate intervals and need not add up to the end-to-end median.
+
+Windows Vulkan can reuse static shadow tiles while editing a scene. Animated
+casters still draw into their own layer and the renderer combines both layers
+at the authored atlas resolution. Orbit invalidates a static list when its light
+projection changes or when a caster's LOD or distance limit depends on the
+camera. Play mode uses the scene's normal renderer. A Vulkan regression compares
+the directional and spot shadow maps and the composed image against a full
+redraw on the first frame after camera, pose, light, topology and atlas changes.
+
+The Windows editor asks SAGA for the latest completed Vulkan frame at each
+display refresh. With the matching SAGA checkout, Studio uses FIFO Latest Ready
+when the device and Win32 surface support it. SAGA checks both the KHR and EXT
+forms of the extension. Other drivers use mailbox when available, then FIFO.
+In mailbox mode Studio targets at most 120 updates per second while waiting for
+the next frame. Input can wake the timer early.
+The native game player keeps its existing presentation policy.
+Source builds need the matching SAGA checkout, selected with
+`ADAENGINE_SAGA_PACKAGE_PATH`. The Windows distribution includes it in `BuildSDK/SAGA`.
+The older pinned SAGA release uses FIFO.
+
+Windows Desktop Duplication provides the update timestamp for the first desktop
+frame whose viewport pixels reflect an injected mouse move. In a 14-movement FIFO
+trace, the median time to that desktop update was 98.9 ms. The median from the
+camera snapshot to the render callback was 22.9 ms. A further 34.0 ms elapsed
+from retirement of the window submission to the changed desktop image.
+In an experimental mailbox capture, the corresponding end-to-end median was
+50.4 ms. These measurements end at the desktop image and exclude monitor scanout.
+
+When profiling AdaUI shape uploads, record both the interval between calls to
+Present and the interval between displayed frames. In four matched Release
+runs (original, packed buffers, packed buffers, original), the camera followed
+the same orbit in Skeletal Garden with its inspector expanded and Light Count
+off. On the RTX 4070 and a 60 Hz display, packing line and circle geometry cut
+SAGA command-list submissions from 67.76 to 44.67 per Present in separate
+instrumented captures. The p99 interval between Presents was 17.05 ms before and
+17.12 ms after. The p99 interval between displayed frames was 32.59 ms before
+and 33.57 ms after. PresentMon reported `Composed: Copy with GPU GDI` in all
+four runs. Use the reported presentation mode when comparing captures across
+machines or display configurations.
+
+With the same packed buffers, switching the test build to FIFO produced
+`Hardware Composed: Independent Flip` on that display. Two orbit captures gave
+display p99 values of 16.72 and 16.76 ms. The longer capture had five intervals
+over 25 ms among 3,594. In separate tests with 14 mouse movements per mode, the
+median time from injected movement to the first desktop frame with a detectable
+change in the sampled viewport region rose from 61.6 ms with mailbox to 99.4 ms
+with FIFO. Measure both pacing and input response
+when evaluating a change to the Studio presentation policy.
+
+To locate the FIFO input delay, match each injected movement to its viewport
+texture by the `receive`, `update`, `callback`, `complete`, and `publish`
+records. In separate traced runs, the median time after publication until a
+detectable viewport change rose from 17.6 ms with mailbox to 66.2 ms with FIFO.
+This interval includes drawing the viewport texture into the window, queuing
+the window for presentation, and desktop output.
+
+Requesting at least three swapchain images with FIFO Latest Ready reduced median
+mouse-to-desktop delay from 100.3 to 66.1 ms in an untraced repeat using 14
+movements per mode.
+On the RTX 4070, a separate minute-long orbit yielded a 16.81 ms display p99
+with four missed refresh intervals, compared with 16.78 ms and zero misses for
+plain FIFO. A run during a parallel Swift build reached 33.34 ms p99, with the
+long intervals concentrated around the build. Close compiler and profiler jobs
+when comparing the two modes. Repeat after display changes. With only the 60 Hz
+display connected, plain FIFO ran at 58.26–58.43 FPS and FIFO Latest Ready ran at
+57.40–59.60 FPS. The pooled display p99 was 33.34 ms for both modes. Median
+mouse-to-desktop delay was 132.5 ms with FIFO and 66.2 ms with FIFO Latest Ready
+in separate 14-movement tests on that configuration. A native API capture
+confirmed that Vulkan created the FIFO Latest Ready swapchain with three images.
+
+For a moving multi-cascade camera, the Windows Vulkan editor draws directional
+shadows directly into the output atlas. The two-layer cache would rebuild its
+static tiles and composite them again on almost every orbit frame. After two
+stationary frames the editor resumes static tile reuse. Local light shadows keep
+their independent cache throughout the orbit.
+
+Four captures of the same release, Skeletal Garden scene, and expanded camera
+inspector on the RTX 4070 produced 59.96, 57.76, 59.43, and 59.83 displayed
+FPS over 30 measured seconds each. The second capture had 67 refresh intervals
+longer than 25 ms. Its 99th-percentile display interval was 33.35 ms, versus
+16.79, 16.85, and 16.80 ms in the other runs. The monitor refreshed at 60 Hz.
+The final installed release had a 66.1 ms median from native mouse movement to
+the first changed desktop image, across 14 movements with Light Count off.
+
+During a 20-second orbit measured with Windows Performance Recorder, Studio
+missed 59 refreshes. PresentMon recorded 57.05 displayed FPS, a 33.36 ms 99th-percentile
+display interval, and 7.37 ms of GPU busy time at the 95th percentile. For
+frames with a missed refresh, the median interval between presents was 19.8 ms
+and the GPU was busy for 6.6 ms. For frames that met the refresh, the respective
+medians were 16.6 and 6.3 ms. In the
+aligned scheduler sample, 47 displayed frames missed a refresh. Across Studio
+threads, the median number of observed transitions from ready to running in the
+corresponding CPU intervals was 495, versus 466 for frames that met the refresh.
+The longest observed ready-to-running delay in the missed group was 0.26 ms.
+
+About 11,770 of 56,914 Studio CPU samples in the aligned interval included the
+Swift dispatch worker-pool monitor calling Windows `GetThreadWaitChain`. That
+monitor counts runnable workers. Other sampled work included Vulkan fence waits,
+draw validation and command recording. ETW reported dropped events, and background
+build and antivirus processes were active. Use these samples to locate CPU costs.
+Use an uninstrumented PresentMon run to judge delivered frame rate.
+
+Three subsequent 30-second captures of the installed build with WPR off
+delivered 57.10, 55.46, and 56.67 FPS while other Swift builds were active.
+All three had a 33.35–33.36 ms 99th-percentile display interval.
+
+### Test the Direct3D 12 backend
+
+An opt-in Windows development build can use SAGA's Direct3D 12 runtime. Build against a
+SAGA checkout with `D3D12Backend.makePresentableDevice` and multi-target rendering support.
+The packager verifies and bundles the paired `dxcompiler.dll` and `dxil.dll` libraries.
+
+```powershell
+$env:ADAENGINE_SAGA_PACKAGE_PATH = 'C:\src\SAGA'
+$env:ADAENGINE_ENABLE_D3D12 = '1'
+python ada_tool.py install studio --destination .build-tools/ada-studio-d3d12 --no-shortcut
+$env:ADAENGINE_WINDOWS_RENDERER = 'direct3d12'
+& .build-tools/ada-studio-d3d12/AdaEditor.exe
+```
+
+The startup log reports the selected renderer. Set `ADAENGINE_WINDOWS_RENDERER=vulkan` for
+a comparison using the same build, project, window, and input scenario. Standard Windows
+launches still select Vulkan. Explicit Direct3D 12 selection reports initialization errors
+if device creation or DXC setup fails.
+
+Wait until the scene loading panel closes before timing an interaction. For scenes
+loaded asynchronously, Studio keeps that panel visible until it publishes a viewport
+frame prepared with the installed scene. This prevents the sky and grid from briefly
+appearing alone between entity installation and the first completed scene frame.
+
+Direct3D 12 batches adjacent small uploads while keeping their order relative to draws,
+copies, reads, and resource destruction. Allocating a fresh buffer can happen before
+those writes are submitted without sealing the batch. Studio limits outstanding window presentations
+and uses its static shadow cache. AdaUI can share storage for line and circle vertices
+and indices when the selected SAGA runtime reports support for those combined bindings.
+SAGA reuses command allocators, command lists, and upload memory after their GPU fences
+retire. Its Direct3D 12 command queue admits command lists and DXGI presentations in order
+while keeping resource retirement and readback tied to completion. Recorded draws reuse
+matching attachment descriptors and sampled-resource tables inside a command list.
+
+On the RTX 4070, Studio loaded and rendered Skeletal Garden through Direct3D 12.
+Three Release camera orbit runs on the 60 Hz display measured 6.06Ã¢â‚¬â€œ6.76 displayed FPS
+and 199.99Ã¢â‚¬â€œ233.33 ms p95. This backend remains opt-in while the 3D frame time and
+compatibility checks are still open.
+
+A later paired Release capture used the same 60 Hz monitor, camera pose, open camera
+inspector, 1575 by 882 render area, and disabled Light Count view. Displayed FPS went
+from 7.57 to 27.48. The 99th-percentile display interval fell from 152.83 to 50.03 ms.
+In separate 14-movement captures, the median delay to a changed desktop image fell
+from 380.79 to 130.99 ms. The present mode changed from composed flip to hardware
+composed independent flip. The new run's GPU busy p99 was 15.05 ms, and PresentMon
+reported a median 23.22 ms of GPU idle time within a frame's GPU work interval.
+
+SAGA now reuses a standard-size shader-visible descriptor page when it resets a
+completed Direct3D 12 command list. Recording skips repeated graphics state bindings
+and restores the graphics pipeline after a compute command changes it. Texture
+creation provides Direct3D 12 with preferred clear values for render attachments.
+Each render pass continues to use its requested clear value.
+
+The next paired Release capture used 32 seconds of the same native orbit replay on
+the RTX 4070, the open camera inspector, a 1575 by 882 render area, and Light Count off.
+Displayed FPS rose from 29.01 to 48.39 and the p99 display interval fell from 50.02 to
+33.36 ms. Both runs used hardware composed independent flip. In 14 mouse movements
+per build, the median time to the first detected pixel change fell from 166.15 to
+100.19 ms. Pixel changes were sampled in a fixed viewport region using BitBlt.
+The intermediate descriptor and graphics-state build reached 40.79 FPS and recorded
+88.38 ms median input latency in its capture. The final build's p99 GPU busy time
+was 9.18 ms. The 60 Hz frame budget remains 16.67 ms.
+
+Direct3D 12 uses implicit transitions for eligible reads of buffers and
+single-subresource color textures. The command recorder tracks the promoted
+state and still records a barrier before changing a promoted read to a write.
+Depth, stencil, and multi-subresource textures use explicit barriers.
+
+In a later paired orbit on the same monitor, the prior build displayed 40.72 FPS
+and the build with implicit reads displayed 43.64 FPS. The share of display intervals
+longer than 25 ms fell from 47.1% to 37.3%. The p99 display interval remained around
+33.4 ms. Separate desktop-duplication measurements on 14 mouse movements per build
+gave median input delays of 83.30 and 81.92 ms.
 
 ### Text selection
 
@@ -101,7 +461,7 @@ of 8.20 ms. This diagnostic capture includes tracing overhead and is not display
 FPS. Its summary is `.build-tools/performance/viewport-sync-baseline-cpu.json`.
 
 A subsequent foreground baseline used the default camera at `(0, 6, -10)`,
-the maximized 2560×1032 client, a 1675×852 viewport, and a repeated right-button
+the maximized 2560Ãƒâ€”1032 client, a 1675Ãƒâ€”852 viewport, and a repeated right-button
 rotation through the normal Main-world input path. With no compiler or detailed
 profiler running, a 10-second PresentMon capture measured 40.81 ms mean displayed
 interval, 65.83 ms p95 and 72.44 ms p99 (24.51 displayed FPS). The matched input
@@ -205,12 +565,12 @@ Present p99 was 21.89 ms. The capture did not establish continuous rapid pointer
 motion; use the burst regression for the bounded input-work comparison above.
 Capture and environment metadata: `.build-tools/performance/hover-release-editor.*`.
 The locally staged Release executable is `.build-tools/hover-release-studio/AdaEditor.exe`.
-Later spot checks showed 27–28 ms on the overlay while background CPU activity
+Later spot checks showed 27Ã¢â‚¬â€œ28 ms on the overlay while background CPU activity
 was present. The bounded capture is not a guarantee of sustained 60 FPS.
 
 Scene selection previously passed complete terrain payloads through Yams' Codable
 sequence encoder. A Windows debugger capture during a Skeletal Garden viewport click
-located the stall in `EditorSceneViewportModel.selectEntity` → `encodedYAML` →
+located the stall in `EditorSceneViewportModel.selectEntity` Ã¢â€ â€™ `encodedYAML` Ã¢â€ â€™
 `Node.Sequence.replaceSubrange`, while encoding a 4225-element payload array.
 `EditorSceneValue` now constructs collection nodes in bulk. Viewport document updates
 reuse the parsed model instead of decoding the same YAML twice, and selection/foldout
@@ -235,9 +595,9 @@ This also lets Studio follow monitors with refresh rates above 60 Hz.
 2026-10-15: Windows 11 Pro 10.0.26200, Swift 6.3.1, Ryzen 9 7900X,
 32 GB RAM, NVIDIA RTX 4070, D3D12/WebGPU. Native `EnumDisplayDevicesW` /
 `EnumDisplaySettingsW(ENUM_CURRENT_SETTINGS)` report the attached primary display
-as 2560×1080 at 144 Hz. CIM's video-controller inventory instead reported stale
+as 2560Ãƒâ€”1080 at 144 Hz. CIM's video-controller inventory instead reported stale
 60/143 Hz adapter modes; do not use that inventory as the active monitor rate.
-Editor captures use the primary display, a maximized 2560×1032 client and the
+Editor captures use the primary display, a maximized 2560Ãƒâ€”1032 client and the
 existing My_Gam scene with one root entity.
 
 The baseline at commit `9188df5c`, before timing changes, recorded 32.58 present
@@ -326,7 +686,7 @@ working set. Its limit is now 8192, with a bounded FIFO ring that evicts one ent
 on overflow rather than discarding unrelated bindings. Cached owners remain
 retained to prevent resource identity reuse; eviction releases them. The cache
 tests include capacity overflow, failed creation, ring wraparound, independent
-copies and a 539 × 3 × 3 binding working set.
+copies and a 539 Ãƒâ€” 3 Ãƒâ€” 3 binding working set.
 
 The main 3D pass also uses a per-camera ring of view-uniform buffers. Inline
 camera bytes allocated a fresh WebGPU buffer on every pass, changing the resource
@@ -393,7 +753,7 @@ prevent a clean full-suite run. These limitations are separate from the focused
 GPU and UI results.
 
 The first native build of these changes measured 51.89 displayed FPS in the
-maximized 2560 × 1032 editor and 61.60 displayed FPS in the 1100 × 800 game
+maximized 2560 Ãƒâ€” 1032 editor and 61.60 displayed FPS in the 1100 Ãƒâ€” 800 game
 window, with the editor inactive. Each PresentMon capture lasted 30 seconds;
 tracing was disabled and no compiler ran. Present p99 was 22.02 ms and 18.99 ms,
 respectively (`stability-editor-after.csv`, `stability-game-after.csv`). Restoring
@@ -464,7 +824,7 @@ compiler or detailed CPU recording ran during this capture.
 That measurement followed closing an orphaned blank launcher window. Opening a
 project while Studio was unfocused left `activeWindow` empty, so the launcher's
 close call had no target. Keeping that extra window open measured roughly
-17–18 FPS in the overlay; closing it restored roughly 60 FPS. Project opening now
+17Ã¢â‚¬â€œ18 FPS in the overlay; closing it restored roughly 60 FPS. Project opening now
 falls back to the previous primary window when there is no active window.
 
 An extended native run also produced a Swift trap in the AdaScript bridge. The
@@ -488,9 +848,9 @@ The final packaged build automatically closed the unfocused launcher and was
 exercised again in the native game window, including jumping. Its clean
 30-second capture measured 59.63 displayed FPS, 19.47 ms present p99 and
 23.97 ms display p99 (`animation-stability-game.csv`). Private committed memory
-was 1.602–1.603 GB during the capture; no compiler or tracing session was active.
-The game window was 1100 × 800, with the maximized editor inactive.
-The subsequent 120-second memory sample stayed within 1.604–1.608 GB of private
+was 1.602Ã¢â‚¬â€œ1.603 GB during the capture; no compiler or tracing session was active.
+The game window was 1100 Ãƒâ€” 800, with the maximized editor inactive.
+The subsequent 120-second memory sample stayed within 1.604Ã¢â‚¬â€œ1.608 GB of private
 committed memory (24 samples, five-second intervals). The final process remained
 alive and the native game remained running after these checks.
 

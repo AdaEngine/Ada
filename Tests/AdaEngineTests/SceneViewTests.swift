@@ -1,6 +1,6 @@
-import Testing
-@_spi(Internal) import AdaRender
 @testable import AdaEngine
+@_spi(Internal) import AdaRender
+import Testing
 
 @MainActor
 struct SceneViewTests {
@@ -107,13 +107,46 @@ struct SceneViewTests {
     }
 
     @Test
-    func pendingRenderTarget_isNotSubmittedAgain() async throws {
+    func contentCameraMotionReachesFramePresentationInSameUpdate() async throws {
+        let transform = Transform(position: [3, 2, 1])
+        var previewCamera: Entity?
+        var capturedPose: GlobalTransform?
+        let coordinator = SceneViewCoordinator(
+            make: { app in
+                app.addPlugin(TransformPlugin())
+                app.addPlugin(CameraPlugin())
+            },
+            updateContent: { world, _ in
+                previewCamera = world.getEntities().first { $0.name == "SceneView_Camera" }
+                if let previewCamera { previewCamera.components += transform }
+            },
+            prepareFramePresentation: {
+                capturedPose = previewCamera?.components[GlobalTransform.self]
+                return {}
+            }
+        )
+        defer { coordinator.shutdown() }
+        coordinator.bootstrapIfNeeded()
+        for _ in 0..<500 where coordinator.appWorlds == nil { await Task.yield() }
+        _ = try #require(coordinator.appWorlds)
+        coordinator.updateSize(SizeInt(width: 16, height: 16), scaleFactor: 1)
+        coordinator.tick(0.016)
+        for _ in 0..<5000 where coordinator.standaloneTickInFlight { await Task.yield() }
+        #expect(capturedPose?.matrix == transform.matrix)
+        let uniform = try #require(previewCamera?.components[GlobalViewUniform.self])
+        #expect(uniform.viewMatrix == transform.matrix.inverse)
+    }
+
+    @Test(arguments: [nil as Int?, 1, 2])
+    func pendingRenderTarget_isNotSubmittedAgain(maximumPendingFrames: Int?) async throws {
         unsafe RenderEngine.configurations.preferredBackend = .headless
 
         let coordinator = SceneViewCoordinator(
             make: { _ in },
-            updateContent: { _, _ in }
+            updateContent: { _, _ in },
+            maximumPendingFrames: maximumPendingFrames
         )
+        defer { coordinator.shutdown() }
 
         coordinator.bootstrapIfNeeded()
         for _ in 0..<500 {
@@ -126,9 +159,10 @@ struct SceneViewTests {
         let appWorlds = try #require(coordinator.appWorlds)
         coordinator.updateSize(SizeInt(width: 16, height: 16), scaleFactor: 1)
 
-        let poolSize = SceneViewCoordinator.renderTexturePoolSize
+        let capacity = maximumPendingFrames ?? SceneViewCoordinator.renderTexturePoolSize
         var submittedTargets = Set<ObjectIdentifier>()
-        for _ in 0..<poolSize {
+        var oldestTarget: RenderTexture?
+        for _ in 0..<capacity {
             coordinator.tick(0.016)
             for _ in 0..<5000 where coordinator.standaloneTickInFlight { await Task.yield() }
             let camera = try #require(sceneViewCamera(in: appWorlds.main))
@@ -136,17 +170,28 @@ struct SceneViewTests {
                 Issue.record("SceneView camera must render into a texture.")
                 break
             }
-            submittedTargets.insert(ObjectIdentifier(handle.asset))
+            let target = try #require(handle.asset)
+            if oldestTarget == nil { oldestTarget = target }
+            submittedTargets.insert(ObjectIdentifier(target))
             #expect(camera.isActive)
         }
 
-        #expect(submittedTargets.count == poolSize)
+        #expect(submittedTargets.count == capacity)
 
         coordinator.tick(0.016)
         for _ in 0..<5000 where coordinator.standaloneTickInFlight { await Task.yield() }
         let exhaustedCamera = try #require(sceneViewCamera(in: appWorlds.main))
         #expect(!exhaustedCamera.isActive)
-        coordinator.shutdown()
+
+        if maximumPendingFrames != nil {
+            try #require(oldestTarget).notifyRenderCompleted()
+            for _ in 0..<50 { await Task.yield() }
+            coordinator.tick(0.016)
+            for _ in 0..<5000 where coordinator.standaloneTickInFlight { await Task.yield() }
+            let resumedCamera = try #require(sceneViewCamera(in: appWorlds.main))
+            #expect(resumedCamera.isActive)
+            #expect(coordinator.completedFrameTexture === oldestTarget)
+        }
     }
 
     @Test
@@ -233,12 +278,16 @@ struct SceneViewTests {
         // Completion can be out of order. Publish only the newest contiguous
         // completed frame and its matching snapshot, at a UI tick boundary.
         let thirdCamera = try #require(sceneViewCamera(in: appWorlds.main))
-        guard case let .texture(thirdHandle) = thirdCamera.renderTarget else { return }
+        guard case let .texture(thirdHandle) = thirdCamera.renderTarget else {
+            return
+        }
         let thirdTarget = try #require(thirdHandle.asset)
         coordinator.tick(0.016)
         for _ in 0..<5000 where coordinator.standaloneTickInFlight { await Task.yield() }
         let fourthCamera = try #require(sceneViewCamera(in: appWorlds.main))
-        guard case let .texture(fourthHandle) = fourthCamera.renderTarget else { return }
+        guard case let .texture(fourthHandle) = fourthCamera.renderTarget else {
+            return
+        }
         let fourthTarget = try #require(fourthHandle.asset)
         #expect(thirdTarget !== fourthTarget)
         fourthTarget.notifyRenderCompleted()
