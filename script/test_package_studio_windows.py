@@ -1,4 +1,5 @@
 """Exercise Windows packaging with real PE files and an isolated runtime PATH."""
+import hashlib
 import importlib.util
 import os
 from pathlib import Path
@@ -6,6 +7,8 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
+import zipfile
 
 spec = importlib.util.spec_from_file_location("package_studio", Path(__file__).with_name("package_studio_windows.py"))
 packaging = importlib.util.module_from_spec(spec)
@@ -30,6 +33,33 @@ class WindowsPackagingTests(unittest.TestCase):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 packaging.package(Path("missing"), Path("missing"), Path("missing"), version)
 
+    def test_stage_dxc_checks_the_archive_and_preserves_paired_x64_binaries_and_notices(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            staging = root / "staged"
+            staging.mkdir()
+            archive = root / ".build-tools" / packaging.DXC_ARCHIVE
+            archive.parent.mkdir()
+            binaries = {"dxcompiler.dll": b"x64-compiler", "dxil.dll": b"x64-validator"}
+            notices = ("LICENCE-MIT.txt", "LICENSE-LLVM.txt", "LICENSE-MS.txt")
+            with zipfile.ZipFile(archive, "w") as bundle:
+                for name, content in binaries.items():
+                    bundle.writestr(f"bin/x64/{name}", content)
+                    bundle.writestr(f"bin/arm64/{name}", b"arm64")
+                for name in notices:
+                    bundle.writestr(name, name)
+            expected_digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+            with patch.object(packaging, "ROOT", root), patch.object(packaging, "DXC_SHA256", expected_digest):
+                packaging.stage_dxc(staging)
+                for name, expected in binaries.items():
+                    self.assertEqual((staging / name).read_bytes(), expected)
+                for name in notices:
+                    destination = staging / "ThirdPartyNotices" / "DirectXShaderCompiler" / name
+                    self.assertEqual(destination.read_text(encoding="utf-8"), name)
+                archive.write_bytes(b"corrupt")
+                with self.assertRaisesRegex(RuntimeError, "unexpected SHA-256"):
+                    packaging.stage_dxc(staging)
+
     @unittest.skipUnless(os.name == "nt", "PE imports and runtime loading require Windows")
     def test_pe_import_closure_runs_after_relocation_without_system_dll_copies(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -37,9 +67,11 @@ class WindowsPackagingTests(unittest.TestCase):
             staged = root / "Original"
             staged.mkdir()
             executable = staged / "python.exe"
-            packaging.run("llvm-objcopy", "--subsystem=windows", sys.executable, executable)
+            # A venv interpreter is a redirector which needs pyvenv.cfg, not a standalone PE fixture.
+            python = Path(sys.base_prefix) / "python.exe"
+            packaging.run("llvm-objcopy", "--subsystem=windows", python, executable)
             self.assertIn("IMAGE_SUBSYSTEM_WINDOWS_GUI", packaging.run("llvm-readobj", "--file-headers", executable))
-            packaging.bundle_dependencies(staged, [executable], [Path(sys.executable).parent])
+            packaging.bundle_dependencies(staged, [executable], [python.parent])
             self.assertFalse((staged / "KERNEL32.dll").exists())
             self.assertFalse((staged / "USER32.dll").exists())
             self.assertTrue(any(staged.glob("python3*.dll")))
