@@ -29,6 +29,9 @@ enum AdaApplicationEntry {
         #endif
         #if os(macOS) || os(Windows) || os(Linux)
             if EditorCLI.isInvocation(CommandLine.arguments) {
+                #if os(Windows)
+                    EditorCLIWindowsInterrupt.attachToParentConsole()
+                #endif
                 let code = await EditorCLI.run(arguments: CommandLine.arguments)
                 Foundation.exit(code)
             }

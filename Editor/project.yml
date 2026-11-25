@@ -204,6 +204,7 @@ targets:
           - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaUI.bundle
           - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaA2UI.bundle
           - $(BUILT_PRODUCTS_DIR)/AdaEngine_AdaSpine.bundle
+          - $(SRCROOT)/scripts/adastudio-launcher.c
         # CodeSign must run after staging replaces the executable and resources.
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(EXECUTABLE_PATH)
@@ -247,8 +248,14 @@ targets:
           /usr/bin/ditto "${source_a2ui_resources}" "${destination_a2ui_resources}"
           /usr/bin/ditto "${source_spine_resources}" "${destination_spine_resources}"
           cli_binary="${TARGET_BUILD_DIR}/${CONTENTS_FOLDER_PATH}/MacOS/adastudio"
-          /usr/bin/ditto "${destination_binary}" "${cli_binary}"
-          /bin/chmod +x "${cli_binary}"
+          cli_archs=()
+          for arch in ${=ARCHS}; do
+            cli_archs+=(-arch "$arch")
+          done
+          /usr/bin/xcrun --sdk macosx clang "${cli_archs[@]}" -isysroot "${SDKROOT}" \
+            -mmacosx-version-min="${MACOSX_DEPLOYMENT_TARGET}" -Os -Wall -Wextra -Werror \
+            "-DADA_STUDIO_EXECUTABLE=\"${EXECUTABLE_NAME}\"" \
+            "${SRCROOT}/scripts/adastudio-launcher.c" -o "${cli_binary}"
           /usr/bin/python3 "${SRCROOT}/scripts/stage-build-sdk.py" \
             --engine-root "${SRCROOT}/.." \
             --output "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/BuildSDK"
