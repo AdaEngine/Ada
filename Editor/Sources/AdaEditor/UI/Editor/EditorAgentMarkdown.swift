@@ -8,7 +8,9 @@ final class EditorAgentMarkdownCache {
     private var blocks: [TextMarkdownBlock] = []
 
     func document(_ text: String) -> [TextMarkdownBlock] {
-        guard source != text else { return blocks }
+        guard source != text else {
+            return blocks
+        }
         blocks = TextMarkdownBlock.parse(text, reusing: blocks)
         source = text
         return blocks
@@ -67,20 +69,24 @@ private struct EditorAgentMarkdownBlocks: View {
         case let .quote(children):
             HStack(alignment: .top, spacing: 10) {
                 RectangleShape().fill(theme.editorColors.blue.opacity(0.5)).frame(width: 3)
-                AnyView(EditorAgentMarkdownBlocks(blocks: children, fontSize: fontSize))
+                AnyView(Self(blocks: children, fontSize: fontSize))
             }
             .accessibilityIdentifier("AdaEditor.Agent.Markdown.Quote")
         case let .table(header, rows):
+            let tableRows = [header] + rows
+            let columnCount = header.count
             ScrollView(.horizontal, showsIndicators: true) {
-                EditorAgentMarkdownTableLayout(columns: max(1, header.count)) {
-                    ForEach(Array(([header] + rows).enumerated()), id: \.offset) { rowIndex, row in
-                        ForEach(Array(header.indices), id: \.self) { column in
-                            styledText(column < row.count ? row[column] : AttributedText(""))
-                                .padding(8)
-                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                                .background(rowIndex == 0 ? theme.editorColors.surface : .clear)
-                                .overlay { RectangleShape().stroke(theme.editorColors.border, lineWidth: 1) }
-                        }
+                EditorAgentMarkdownTableLayout(columns: max(1, columnCount)) {
+                    // Give the layout one subview per cell in row-major order.
+                    ForEach(0..<(tableRows.count * columnCount), id: \.self) { index in
+                        let rowIndex = index / columnCount
+                        let column = index % columnCount
+                        let row = tableRows[rowIndex]
+                        styledText(column < row.count ? row[column] : AttributedText(""))
+                            .padding(8)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                            .background(rowIndex == 0 ? theme.editorColors.surface : .clear)
+                            .overlay { RectangleShape().stroke(theme.editorColors.border, lineWidth: 1) }
                     }
                 }
             }
