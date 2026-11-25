@@ -213,7 +213,8 @@ struct EditorAgentTranscriptTests {
     @Test("Markdown code, quotes and tables lay out inside a narrow transcript")
     func markdownBlocks() async throws {
         let model = makeModel()
-        model.activeSession?.events = [message("markdown", text: """
+        let longToken = String(repeating: "unbrokenIdentifier", count: 5)
+        let markdown = """
         # Заголовок
 
         - **Готово**
@@ -221,7 +222,7 @@ struct EditorAgentTranscriptTests {
 
         ```swift
         let literal = "**literal**"
-        let longLine = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
+        let longLine = "\(longToken)"
         ```
 
         > Цитата
@@ -229,7 +230,8 @@ struct EditorAgentTranscriptTests {
         | Имя | Описание |
         | --- | --- |
         | Куб | Очень длинное описание, которое должно переноситься на несколько строк без обрезания текста |
-        """)]
+        """
+        model.activeSession?.events = [message("markdown", text: markdown)]
         let container = makeContainer(model)
         container.frame.size.width = 300
         container.bounds.size = container.frame.size
@@ -241,6 +243,53 @@ struct EditorAgentTranscriptTests {
         }
         let table = try container.uiNode(matching: .accessibilityIdentifier("AdaEditor.Agent.Markdown.Table")).absoluteFrame
         #expect(table.height > 90)
+    }
+
+    @Test("Markdown table cells align in columns, wrap within rows and scroll horizontally")
+    func multicolumnMarkdownTable() async throws {
+        let notes = "A long note stays inside the last column and leaves enough room for the entire next row."
+        let markdown = """
+        | Component | Value | Notes |
+        | --- | --- | --- |
+        | Health | 100 | \(notes) |
+        | Speed | 6 | Units |
+        """
+        let container = makeContainer(EditorAgentTranscript(events: [message("table", text: markdown)], sessionID: "markdown-table"))
+        container.frame.size.width = 600
+        container.bounds.size = container.frame.size
+        await settle(container)
+
+        func cell(_ label: String) throws -> TextViewNode {
+            let nodes = container.viewTree.rootNode.uiCollectNodes { ($0 as? TextViewNode)?.selectableText == label }
+            return try #require(nodes.first as? TextViewNode, "Cell \(label) is present")
+        }
+
+        let headers = try ["Component", "Value", "Notes"].map { try cell($0).uiRenderedAbsoluteFrame() }
+        let firstRow = try ["Health", "100", notes].map { try cell($0).uiRenderedAbsoluteFrame() }
+        let secondRow = try ["Speed", "6", "Units"].map { try cell($0).uiRenderedAbsoluteFrame() }
+        for column in headers.indices {
+            #expect(abs(headers[column].minX - firstRow[column].minX) < 0.5)
+            #expect(abs(headers[column].minX - secondRow[column].minX) < 0.5)
+        }
+        for row in [headers, firstRow, secondRow] {
+            #expect(abs(row[0].minY - row[2].minY) < 0.5)
+            #expect(row[0].maxX < row[1].minX && row[1].maxX < row[2].minX)
+        }
+        #expect(firstRow[0].minY > headers[2].maxY)
+        #expect(firstRow[2].height > firstRow[0].height)
+        #expect(secondRow[0].minY >= firstRow[2].maxY)
+
+        container.frame.size.width = 300
+        container.bounds.size = container.frame.size
+        await settle(container)
+        let lastCell = try cell("Units")
+        let before = lastCell.uiRenderedAbsoluteFrame()
+        #expect(before.minX > 300)
+        _ = try container.uiScrollToNode(matching: .runtimeID(lastCell.uiRuntimeID))
+        await settle(container)
+        let after = try cell("Units").uiRenderedAbsoluteFrame()
+        #expect(after.minX >= 0 && after.maxX <= 300)
+        #expect(abs(before.minY - after.minY) < 0.5)
     }
 
     @Test("A standalone transcript presents its initial history")
