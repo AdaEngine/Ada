@@ -421,7 +421,7 @@ public final class ModelAsset3D: Asset, @unchecked Sendable {
         } else {
             entity.components[Transform.self] = Transform(matrix: node.transform)
         }
-        if animationRig != nil {
+        if animationRig != nil || node.meshIndex != nil {
             entity.components[ModelNode3DComponent.self] = ModelNode3DComponent(modelRoot: modelRoot.id, nodeIndex: nodeIndex)
         }
 

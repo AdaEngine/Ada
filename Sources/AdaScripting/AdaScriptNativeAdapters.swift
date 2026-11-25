@@ -4,7 +4,7 @@ import AdaAssets
 import AdaInput
 import AdaMultiplayer
 import AdaRender
-import AdaScene
+@_spi(Scripting) import AdaScene
 import AdaScriptCompilerCore
 import AdaTilemap
 import AdaUtils
@@ -41,12 +41,21 @@ final class NativeWorldHost: NativeHostObject {
     private let scope: NativeCallbackScope
     private let commands: Commands
     private let navigator: SceneNavigator?
+    private let decals: Decal3DCommands?
     private let components: [RuntimeComponentDescriptor]
     private let module: NativeModule
-    init(scope: NativeCallbackScope, commands: Commands, navigator: SceneNavigator?, components: [RuntimeComponentDescriptor], module: NativeModule) {
+    init(
+        scope: NativeCallbackScope,
+        commands: Commands,
+        navigator: SceneNavigator?,
+        components: [RuntimeComponentDescriptor],
+        module: NativeModule,
+        decals: Decal3DCommands? = nil
+    ) {
         self.scope = scope
         self.commands = commands
         self.navigator = navigator
+        self.decals = decals
         self.components = components
         self.module = module
     }
@@ -57,6 +66,20 @@ final class NativeWorldHost: NativeHostObject {
     func call(_ method: String, arguments: [NativeValue]) throws -> NativeValue? {
         try scope.check()
         switch method {
+        case "placeDecal":
+            return .string(enqueueScriptDecal(AdaScriptDecalArgument.place(arguments.map { .init(native: $0) }), in: decals))
+        case "updateDecal":
+            return .string(enqueueScriptDecal(AdaScriptDecalArgument.update(arguments.map { .init(native: $0) }), in: decals))
+        case "removeDecal":
+            return .string(enqueueScriptDecal(AdaScriptDecalArgument.remove(arguments.map { .init(native: $0) }), in: decals))
+        case "decalResult":
+            guard arguments.count == 1, case let .string(request) = arguments[0] else {
+                return nil
+            }
+            if let result = scriptDecalResult(request, in: decals) {
+                return .host(NativeAsyncResultHost(result))
+            }
+            return .null
         case "setTileOrientation":
             guard arguments.count == 4, case let .list(coordinates) = arguments[2], coordinates.count == 2 else {
                 return nil
@@ -119,13 +142,19 @@ final class NativeWorldHost: NativeHostObject {
             }
             return .boolean(true)
         case "sceneLoadingProgress":
-            guard arguments.isEmpty else { return nil }
+            guard arguments.isEmpty else {
+                return nil
+            }
             return .double(navigator?.loadingProgress.fraction ?? 0)
         case "sceneLoadingStage":
-            guard arguments.isEmpty else { return nil }
+            guard arguments.isEmpty else {
+                return nil
+            }
             return .string(navigator?.loadingProgress.stage ?? "idle")
         case "sceneLoadingError":
-            guard arguments.isEmpty else { return nil }
+            guard arguments.isEmpty else {
+                return nil
+            }
             return .string(navigator?.lastError ?? "")
         case "changeScene":
             guard arguments.count == 1, case .string(let path) = arguments[0], let navigator else {
@@ -222,7 +251,9 @@ final class NativeAssetStore: @unchecked Sendable {
         let resolved = typeName.map { AssetsManager.getAssetType(named: $0) } ?? AssetsManager.inferAssetType(at: path)
         guard let type = resolved else { throw AdaScriptError.invalidManifest("Unknown asset type for '\(path)'") }
         let key = String(reflecting: type) + "\u{0}" + path
-        if lock.withLock({ handles[key] != nil }) { return path }
+        if lock.withLock({ handles[key] != nil }) {
+            return path
+        }
         let handle = try await AssetsManager.loadErased(type, at: path)
         try Task.checkCancellation()
         if let texture = handle.untypedAsset as? Texture2D { ShaderGraphRuntimeLibrary.registerTexture(texture, at: path) }
@@ -273,7 +304,9 @@ final class NativeAssetsHost: NativeHostObject {
         }
         if method == "begin", arguments.count == 1, case .list(let values) = arguments[0] {
             let strings = values.compactMap { if case .string(let value) = $0 { value } else { nil } }
-            guard strings.count == values.count, let name = strings.first else { return nil }
+            guard strings.count == values.count, let name = strings.first else {
+                return nil
+            }
             let operation = AdaScriptAsyncOperation()
             operation.cancellationIsAdvisory = name == "saveAsync"
             let store = self.store
@@ -422,7 +455,9 @@ final class NativeComponentFactory: NativeHostObject {
             supplied = found
         }
         let values = try args.enumerated().map { index, value -> ReflectedFieldValue? in
-            if let supplied, !supplied.contains(index) { return nil }
+            if let supplied, !supplied.contains(index) {
+                return nil
+            }
             if case .null = value {
                 return supplied == nil ? nil : .null
             }

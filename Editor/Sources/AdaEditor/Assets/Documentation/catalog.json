@@ -124,6 +124,23 @@
       },
       {
         "kind": "heading",
+        "text": "Place a 3D decal",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Use **Decals** in the 3D viewport toolbar to put a project image on a wall or\nan imported model. The Inspector holds the saved decals for each object.\nSee 3D Decals\nfor placement, editing and supported surfaces.",
+        "level": 0,
+        "links": [
+          {
+            "title": "3D Decals",
+            "destination": "Decals"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
         "text": "Edit bone animation",
         "level": 2,
         "links": []
@@ -1103,12 +1120,16 @@
       },
       {
         "kind": "text",
-        "text": "• AdaScript ECS\n• AdaScript Diagnostics and Performance\n• Testing AdaScript",
+        "text": "• AdaScript ECS\n• Add 3D decals during gameplay\n• AdaScript Diagnostics and Performance\n• Testing AdaScript",
         "level": 0,
         "links": [
           {
             "title": "AdaScript ECS",
             "destination": "AdaScriptECS"
+          },
+          {
+            "title": "Add 3D decals during gameplay",
+            "destination": "AdaScriptDecals"
           },
           {
             "title": "AdaScript Diagnostics and Performance",
@@ -3925,6 +3946,30 @@
       },
       {
         "kind": "heading",
+        "text": "Place a decal in Ada Studio",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open a 3D scene in the desktop editor and select **Decals** in the viewport\ntoolbar. In the Inspector, choose a project image and select **Place decal**.\nPoint at an opaque mesh, then click the surface to apply the image.\nPress Escape to exit placement. Select **Done** to close the tool.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Select the receiving object and choose a decal in its Inspector list.\nChange its image, width, height, depth, rotation or priority. Use **Move**\nto choose a new spot on the same object. **Delete** removes the selected\ndecal. Undo and Redo work with scene history. Save the scene to keep the\ndecals when reopening it, playing it or exporting it for a native target.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Studio places decals on primitives and static or rigid meshes of imported\nmodels. Skinned and morphed receivers are available through the gameplay APIs\nbelow. The visual tool uses native SAGA raster rendering.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
         "text": "Stamp a moving car",
         "level": 2,
         "links": []
@@ -3979,7 +4024,7 @@
       },
       {
         "kind": "text",
-        "text": "Keep the returned handle to update or remove a decal from the same entity.\nA larger priority draws on top of smaller priorities. Equal priorities\ndraw in creation order.",
+        "text": "Keep the returned handle to update or remove a decal from the same entity.\nA larger priority draws on top of smaller priorities. Equal priorities\ndraw in creation order. Saved scene decals draw before gameplay decals of\nthe same priority, including when a scene image finishes loading later.",
         "level": 0,
         "links": []
       },
@@ -4003,7 +4048,7 @@
       },
       {
         "kind": "text",
-        "text": "Decals use the native SAGA raster path and standard opaque PBR materials\non indexed triangle meshes. Browser WebGPU and headless backends return\n`unsupportedBackend`. Decal rendering is available in the raster view.\nPlacement is through Swift during scene setup or gameplay.",
+        "text": "Decals use the native SAGA raster path and standard opaque PBR materials\non indexed triangle meshes. Browser WebGPU and headless backends return\n`unsupportedBackend`. Decal rendering is available in the raster view.\nSwift and AdaScript can also place decals during scene setup or gameplay.",
         "level": 0,
         "links": []
       },
@@ -6981,6 +7026,86 @@
             "destination": "AdaScriptAnnotations"
           }
         ]
+      }
+    ]
+  },
+  {
+    "id": "AdaScriptDecals",
+    "title": "Add 3D decals during gameplay",
+    "section": "AdaScript",
+    "source": "Sources/AdaScripting/AdaScripting.docc/AdaScriptDecals.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Use a decal to put a sticker, scuff or paint mark on the surface of a 3D\nobject. Place it on the entity that holds the opaque indexed PBR mesh.\nFor an animated model, pass its skinned mesh entity. A new decal samples\nthe current evaluated pose, then follows the surface as it moves.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Place and check a decal",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Pass a project image path, a world-space center and outward normal, and\nthe projector width, height and depth in world units. Group the three\nvectors as `[point, normal, size]`. The image's alpha\nchannel controls coverage. The final argument is a list of optional\nsettings. Pass an empty list for an upright image with priority zero.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "This example stamps a wall facing positive Z at the world origin. Tag\nthe wall with a component called Wall and import Paint.png into the\nproject's Textures directory.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "@component(id: \"example.wall\")\nstruct Wall { @export var enabled = true; }\n\n@system(id: \"example.paint-wall\")\nclass PaintWall {\n    @query(Wall) var walls;\n    var request = \"\";\n    var handle = \"\";\n    var finished = false;\n\n    func update(context) {\n        if (finished) { return; }\n        if (request != \"\") {\n            var result = context.world.decalResult(request);\n            if (result == null) { return; }\n            if (result.isSuccess()) {\n                handle = result.value();\n            } else {\n                print(result.errorCode(), result.message());\n            }\n            finished = true;\n            return;\n        }\n        for (var wall in walls) {\n            request = context.world.placeDecal(\n                wall.id, \"@res://Textures/Paint.png\",\n                [[0, 0, 0], [0, 0, 1], [0.5, 0.5, 0.1]], []\n            );\n            break;\n        }\n    }\n}",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A request token identifies a queued operation. Poll it on a later\ncallback with decalResult. The call returns null while the operation is\npending and consumes the result when it finishes. Save the handle from a\nsuccessful placement before submitting another operation. A missing image,\nunsupported receiver, missed projection or full queue produces an error\nresult. Check it with isSuccess(), errorCode() and message().",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Change or remove the decal",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In a callback with the same world and mesh entity, call:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "var change = context.world.updateDecal(wall.id, handle, \"@res://Textures/Scuff.png\", [1]);\nvar removal = context.world.removeDecal(wall.id, handle);",
+        "language": "ada",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Poll each request as above. Updating changes the appearance of the same\nfootprint. The update settings are priority, normal-map path and\nroughness-map path. Placement settings begin with rotation in degrees,\nfollowed by those same three appearance settings. Use null for a skipped\nsetting before another value. Larger priorities draw over smaller ones.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A decal handle belongs to its world and receiver. Removing the receiver\nor replacing its mesh invalidates the handle. The renderer allows up to\neight decals per receiving mesh, including any placed in Studio.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The interpreted and native compiled script paths use the same native\nSAGA raster renderer. Browser WebGPU and headless runtimes cannot place\nthese decals. Path-traced views do not display them.",
+        "level": 0,
+        "links": []
       }
     ]
   },

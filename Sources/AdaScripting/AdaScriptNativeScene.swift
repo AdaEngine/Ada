@@ -79,6 +79,8 @@ public struct AdaScriptNativeSceneDocument: Codable, Sendable {
                     guard let engine = unsafe RenderEngine.shared else { throw AdaScriptError.invalidManifest("Primitive meshes require a render device") }
                     let reference = try JSONDecoder().decode(PrimitiveMesh3DSource.self, from: data)
                     entity.components += try reference.makeComponent(renderDevice: engine.renderDevice)
+                } else if name == String(reflecting: Decal3DSource.self) {
+                    entity.components += try JSONDecoder().decode(Decal3DSource.self, from: data)
                 } else if name == String(reflecting: StaticTriangleMesh3DSource.self) {
                     staticMeshes.append((entity, try JSONDecoder().decode(StaticTriangleMesh3DSource.self, from: data)))
                 } else if name == String(reflecting: TileMapComponent.self) {

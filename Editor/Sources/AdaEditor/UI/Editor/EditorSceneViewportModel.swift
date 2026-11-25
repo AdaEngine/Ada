@@ -63,6 +63,7 @@ final class EditorSceneViewportModel {
                 }
                 return MarkerPosition(id: entity.id, position: position)
             } ?? []
+            decalEditing.sync(ownerID: selectedEditorID, model: sceneModel)
             csgPreview.refresh(sceneModel, viewport: self)
         }
     }
@@ -71,7 +72,7 @@ final class EditorSceneViewportModel {
         let position: Vector3
     }
     private var markerPositions: [MarkerPosition] = []
-    private var sceneSourceURL: URL?
+    private(set) var sceneSourceURL: URL?
     private(set) var sceneResourceRootURL: URL?
     var terrainSourceContext: (application: AppWorlds, assetsRoot: URL)? {
         guard let application = sceneApplication, let root = sceneResourceRootURL ?? sceneSourceURL?.deletingLastPathComponent() else {
@@ -81,10 +82,14 @@ final class EditorSceneViewportModel {
     }
     private var scriptableObjectCatalog: [EditorScriptableObjectDescriptor] = []
     var selectedEditorID: String? {
-        didSet { if selectedEditorID != oldValue, terrainEditing.isEnabled { refreshTerrainSourceControls() } }
+        didSet {
+            decalEditing.sync(ownerID: selectedEditorID, model: sceneModel)
+            if selectedEditorID != oldValue, terrainEditing.isEnabled { refreshTerrainSourceControls() }
+        }
     }
     var showsEntityMarkers = false
     let terrainEditing = EditorTerrainEditingState()
+    let decalEditing = EditorDecalEditing()
     let csgPreview = EditorCSGPreview()
     private(set) var csgTargets: [String: EditorCSGScene.PreviewTarget] = [:]
 
@@ -228,6 +233,7 @@ final class EditorSceneViewportModel {
     }
 
     func disconnect() {
+        decalEditing.setEnabled(false)
         endTransformDrag(cancelled: true)
         endSpatialTransform(cancelled: true)
         terrainEditing.meshControlsTask?.cancel()
@@ -567,7 +573,10 @@ final class EditorSceneViewportModel {
             return
         }
         endTransformDrag(cancelled: true)
-        if enabled { setTerrainEditing(false) }
+        if enabled {
+            decalEditing.setEnabled(false)
+            setTerrainEditing(false)
+        }
         hoveredGizmoHandle = nil
         isAnnotating = enabled
     }
@@ -667,6 +676,7 @@ final class EditorSceneViewportModel {
     func drawGizmos(in context: inout UIGraphicsContext, size: Size, theme: Theme) -> EditorTransformGizmo? {
         let camera = cameraState(for: size)
         let viewProjection = camera.projection.makeClipView() * camera.transform.matrix.inverse
+        drawDecalGuide(in: &context, viewProjection: viewProjection, size: size, theme: theme)
         if let world {
             for icon in EditorGizmoOverlayModel.icons(in: world, editorIDsByEntityID: editorIDsByEntityID) {
                 guard let point = project(icon.position, viewProjection: viewProjection, size: size) else {
@@ -786,6 +796,16 @@ extension EditorSceneViewportModel {
     func handleKeyEvent(_ event: KeyEvent) -> Bool {
         switch event.status {
         case .down:
+            if decalEditing.isPlacing {
+                if event.keyCode == .escape {
+                    decalEditing.cancel()
+                    return true
+                }
+                if event.keyCode == .enter {
+                    decalEditing.commit(self)
+                    return true
+                }
+            }
             if event.keyCode == .escape, isAnnotating {
                 setAnnotationMode(false)
                 onCancelAnnotation?()
@@ -822,6 +842,10 @@ extension EditorSceneViewportModel {
     func handleMouseEvent(_ event: MouseEvent) -> Bool {
         if event.button == .scrollWheel {
             return terrainEditing.stroke != nil || terrainEditing.sourceStroke != nil || transformDrag != nil || handleScroll(event)
+        }
+        if decalEditing.isPlacing, displayMode == .threeD, !isThreeDRotating, !pressedKeys.contains(.space),
+           event.button == .none || event.button == .left {
+            return decalEditing.updatePointer(event, viewport: self)
         }
         if event.phase == .began, event.button == .right { endTerrainStroke() }
         if terrainEditing.usesBrush, displayMode == .threeD, !isThreeDRotating, event.button != .right,
@@ -1551,6 +1575,68 @@ extension EditorSceneViewportModel {
             .editorID
     }
 
+    func decalSurface(at screenPoint: Point) -> EditorMeshPicking.DecalHit? {
+        guard let world, Decal3D.isSupported else {
+            return nil
+        }
+        let state = cameraState(for: viewportSize)
+        guard let ray = EditorPicking.ray(
+            point: screenPoint, viewportSize: viewportSize, cameraTransform: state.transform.matrix, projection: state.projection.makeClipView()
+        ) else { return nil }
+        return EditorMeshPicking.decalHit(
+            ray: ray,
+            world: world,
+            authoredEntities: entitiesByEditorID,
+            editorIDs: editorIDsByEntityID.merging(csgPreview.pickingIDs(in: self), uniquingKeysWith: { first, _ in first }),
+            cameraID: cameraEntityID
+        )
+    }
+
+    func withDecalWorldAccess(_ operation: @MainActor () throws -> Void) async throws {
+        guard let sceneApplication else {
+            throw Decal3D.PlacementError.unsupportedBackend
+        }
+        try await sceneApplication.withExecutionContext {
+            try await sceneApplication.withWorldAccess(operation)
+        }
+    }
+
+    func loadDecalImages(_ images: Decal3DImages) async throws -> Decal3D.Appearance {
+        guard let sceneApplication else { throw Decal3D.PlacementError.unsupportedBackend }
+        return try await sceneApplication.withExecutionContext { try await images.load() }
+    }
+
+    func publishDecalEdit(_ content: String) {
+        onDocumentContentChanged?(content)
+        if let sceneModel {
+            onSelectionChanged?(selectedEntityViewModel(editorID: selectedEditorID, model: sceneModel))
+        }
+    }
+
+    func drawDecalGuide(in context: inout UIGraphicsContext, viewProjection: Transform3D, size: Size, theme: Theme) {
+        guard let preview = decalEditing.preview else {
+            return
+        }
+        let half = preview.size * 0.5
+        let roll = Decal3D.Projector.surfaceFrame(point: .zero, normal: Vector3(0, 0, 1), rotationDegrees: preview.rotationDegrees) ?? .identity
+        let frame = preview.frame * roll
+        let points = [
+            Vector3(-half.x, -half.y, 0), Vector3(half.x, -half.y, 0),
+            Vector3(half.x, half.y, 0), Vector3(-half.x, half.y, 0)
+        ].compactMap { point in
+            project((frame * Vector4(point, 1)).xyz, viewProjection: viewProjection, size: size)
+        }
+        guard points.count == 4 else {
+            return
+        }
+        for index in points.indices {
+            context.drawLine(start: points[index], end: points[(index + 1) % 4], lineWidth: 2, color: theme.editorColors.blue)
+        }
+        let top = (points[2] + points[3]) * 0.5
+        let center = (points[0] + points[2]) * 0.5
+        context.drawLine(start: top, end: center, lineWidth: 1, color: theme.editorColors.blue)
+    }
+
     func pick3D(at screenPoint: Point) -> String? {
         guard let world else {
             return nil
@@ -1611,7 +1697,8 @@ extension EditorSceneViewportModel {
         let transformFields = transformFields(from: entity)
         let componentNames = entity.components.keys
             .filter {
-                $0 != EditorBuiltInComponentType.scriptableComponents && !EditorCSGScene.isAuthoringComponent($0)
+                $0 != EditorBuiltInComponentType.scriptableComponents && $0 != EditorDecalEditing.componentType
+                    && !EditorCSGScene.isAuthoringComponent($0)
             }
             .sorted()
         let isCSGBox = entity.components[EditorCSGScene.boxType] != nil

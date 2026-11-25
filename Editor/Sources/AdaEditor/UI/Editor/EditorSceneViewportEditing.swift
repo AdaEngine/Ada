@@ -137,6 +137,7 @@ extension EditorSceneViewportView {
                 }
             }
         )
+        inspectorViewModel.decalViewport = showsDecalTool ? viewportModel : nil
         inspectorViewModel.csgPreview = viewportModel.csgPreview
         inspectorViewModel.csgReadOnly = document.isReadOnly
         inspectorViewModel.editCSG = { [weak viewportModel] edit in

@@ -86,6 +86,7 @@ final class EditorInspectorSidebarViewModel {
     var runtimeSelection: EditorPlayInspectionModel.Snapshot?
     var isInspectingPlayMode = false
     var csgPreview: EditorCSGPreview?
+    var decalViewport: EditorSceneViewportModel?
     var csgReadOnly = false
     @ObservationIgnored var editCSG: ((EditorCSGEdit) -> Void)?
     private(set) var terrainEditing: EditorTerrainEditingState?
@@ -240,6 +241,7 @@ final class EditorInspectorSidebarViewModel {
 
         sceneViewportActionOwner = nil
         csgPreview = nil
+        decalViewport = nil
         editCSG = nil
         terrainEditing = nil
         createTerrainAction = nil

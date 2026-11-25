@@ -20,6 +20,22 @@ public enum Decal3D {
         /// Minimum dot product between the surface normal and the projector's +Z axis.
         public var minimumFacingDot: Float
 
+        /// An upright projection frame at a surface hit, with roll around its outward normal.
+        public static func surfaceFrame(point: Vector3, normal: Vector3, rotationDegrees: Float = 0) -> Transform3D? {
+            let length = normal.length
+            guard length.isFinite, length > 0, point.x.isFinite, point.y.isFinite, point.z.isFinite, rotationDegrees.isFinite else {
+                return nil
+            }
+            let z = normal / length
+            let up = abs(z.dot(.up)) > 0.99 ? Vector3(0, 0, 1) : .up
+            let x = up.cross(z).normalized
+            let y = z.cross(x)
+            let radians = rotationDegrees.truncatingRemainder(dividingBy: 360) * .pi / 180
+            let cosine = Math.cos(radians)
+            let sine = Math.sin(radians)
+            return Transform3D(Vector4(x * cosine + y * sine, 0), Vector4(y * cosine - x * sine, 0), Vector4(z, 0), Vector4(point, 1))
+        }
+
         public init(transform: Transform3D, size: Vector3, minimumFacingDot: Float = 0.25) {
             self.transform = transform
             self.size = size
@@ -64,6 +80,7 @@ public enum Decal3D {
     struct Entry: Sendable {
         let handle: Handle
         var appearance: Appearance
+        var authoredOrder: Int?
         var projections: [Decal3DPartKey: Projection]
     }
 
@@ -95,6 +112,17 @@ public enum Decal3D {
         }
     }
 
+    public static var isSupported: Bool {
+        unsafe RenderEngine.shared?.type == .saga
+    }
+
+    static func contains(_ handle: Handle, on receiver: Entity) -> Bool {
+        guard let mesh = receiver.components[Mesh3DComponent.self],
+              let state = receiver.world?.getResource(Decal3DStorage.self)?.receivers[receiver.id],
+              state.matches(receiver, mesh: mesh) else { return false }
+        return state.entries.contains { $0.handle == handle }
+    }
+
     /// Stamps the mesh in its most recently evaluated pose. For a skinned mesh, call after pose evaluation
     /// when changing the pose and stamping it in the same update. The optional part ID addresses the mesh's parts.
     @discardableResult
@@ -104,12 +132,25 @@ public enum Decal3D {
         appearance: Appearance,
         part partID: Int? = nil
     ) throws(PlacementError) -> Handle {
+        try place(on: receiver, projector: projector, appearance: appearance, part: partID, replacing: nil)
+    }
+
+    static func place(
+        on receiver: Entity,
+        projector: Projector,
+        appearance: Appearance,
+        part partID: Int?,
+        replacing: Handle?,
+        authoredOrder: Int? = nil
+    ) throws(PlacementError) -> Handle {
         guard let engine = unsafe RenderEngine.shared, engine.type == .saga else { throw .unsupportedBackend }
         guard let component = receiver.components[Mesh3DComponent.self], let world = receiver.world,
             let storage = world.getResource(Decal3DStorage.self), receiver.components[MeshTerrain3DSourceMask.self] == nil
         else { throw .unsupportedReceiver }
         let device = engine.renderDevice
-        let projection = try ProjectionFrame(projector, receiverWorld: receiverWorldTransform(receiver))
+        let receiverLocal = authoredOrder != nil
+        let receiverFrame = if receiverLocal { Transform3D.identity } else { try receiverWorldTransform(receiver) }
+        let projection = try ProjectionFrame(projector, receiverWorld: receiverFrame, compareFacingInProjectorSpace: receiverLocal)
         let skin = receiver.components[SkinnedMesh3DComponent.self]?.matrices
         let morphs = receiver.components[MorphWeights3DComponent.self]?.weights ?? []
         let deforms = skin != nil || component.mesh.hasMorphTargets
@@ -124,7 +165,9 @@ public enum Decal3D {
         )
         if state.lodTopology != lodTopology { state.pinToSource() }
         let lods = state.lodTopology == nil ? [] : alternatives
-        guard state.entries.count < Decal3DResources.maximumDecals else { throw .capacityExceeded }
+        let replacement = replacing.flatMap { handle in state.entries.firstIndex { $0.handle == handle } }
+        if replacing != nil, replacement == nil { throw .staleHandle }
+        guard replacement != nil || state.entries.count < Decal3DResources.maximumDecals else { throw .capacityExceeded }
         try Decal3DResources.validate(appearance)
 
         var projections: [Decal3DPartKey: Projection] = [:]
@@ -170,8 +213,13 @@ public enum Decal3D {
         guard supportedPart else { throw .unsupportedReceiver }
         guard !projections.isEmpty else { throw .missesReceiver }
 
-        let handle = Handle()
-        state.entries.append(Entry(handle: handle, appearance: appearance, projections: projections))
+        let handle = replacing ?? Handle()
+        let entry = Entry(handle: handle, appearance: appearance, authoredOrder: authoredOrder, projections: projections)
+        if let replacement {
+            state.entries[replacement] = entry
+        } else {
+            state.entries.append(entry)
+        }
         state.draws = try Decal3DResources.build(state, device: device)
         state.revision = RID()
         world.getRefResource(Decal3DStorage.self).wrappedValue.set(state, for: receiver.id)
@@ -180,19 +228,27 @@ public enum Decal3D {
 
     /// Changes an existing decal's appearance without projecting against a new pose.
     public static func update(_ handle: Handle, on receiver: Entity, appearance: Appearance) throws(PlacementError) {
-        try edit(handle, on: receiver, appearance: appearance)
+        try edit(handle, on: receiver, appearance: appearance, authoredOrder: nil)
+    }
+
+    static func updateAuthored(
+        _ handle: Handle, on receiver: Entity, appearance: Appearance, order: Int
+    ) throws(PlacementError) {
+        try edit(handle, on: receiver, appearance: appearance, authoredOrder: order)
     }
 
     /// Removes a decal and releases the geometry constraint after the last attachment.
     public static func remove(_ handle: Handle, from receiver: Entity) throws(PlacementError) {
-        try edit(handle, on: receiver, appearance: nil)
+        try edit(handle, on: receiver, appearance: nil, authoredOrder: nil)
     }
 
     nonisolated static func supports(_ material: PBRMaterial) -> Bool {
         material.effectiveAlphaMode == .opaque && material.graphMaterial == nil && material.terrainBindings == nil
     }
 
-    private static func edit(_ handle: Handle, on receiver: Entity, appearance: Appearance?) throws(PlacementError) {
+    private static func edit(
+        _ handle: Handle, on receiver: Entity, appearance: Appearance?, authoredOrder: Int?
+    ) throws(PlacementError) {
         guard let component = receiver.components[Mesh3DComponent.self], let world = receiver.world,
             var state = world.getResource(Decal3DStorage.self)?.receivers[receiver.id], state.matches(receiver, mesh: component),
             let index = state.entries.firstIndex(where: { $0.handle == handle }),
@@ -201,6 +257,7 @@ public enum Decal3D {
         if let appearance {
             try Decal3DResources.validate(appearance)
             state.entries[index].appearance = appearance
+            if let authoredOrder { state.entries[index].authoredOrder = authoredOrder }
         } else {
             state.entries.remove(at: index)
         }
@@ -278,8 +335,10 @@ extension Decal3D {
         let normalizedFromWorld: Transform3D
         let facing: Vector3
         let minimumFacingDot: Float
+        let projectorFacingFrame: Transform3D?
+        let projectorOrientation: Float
 
-        init(_ projector: Projector, receiverWorld: Transform3D) throws(PlacementError) {
+        init(_ projector: Projector, receiverWorld: Transform3D, compareFacingInProjectorSpace: Bool) throws(PlacementError) {
             let pose = projector.transform
             let size = projector.size
             guard [pose, receiverWorld].allSatisfy(Self.isAffine),
@@ -287,12 +346,15 @@ extension Decal3D {
                 (0...1).contains(projector.minimumFacingDot)
             else { throw .invalidProjector }
             let scale = Vector3(2 / size.x, 2 / size.y, 2 / size.z)
-            let normalizedFromWorld = Transform3D(scale: scale) * pose.inverse
+            let projectorFromWorld = pose.inverse
+            let normalizedFromWorld = Transform3D(scale: scale) * projectorFromWorld
             let facing = pose.z.xyz.normalized
             guard Self.isAffine(normalizedFromWorld), facing.length > 0 else { throw .invalidProjector }
             self.receiverWorld = receiverWorld
             self.normalizedFromWorld = normalizedFromWorld
-            self.facing = facing
+            self.facing = compareFacingInProjectorSpace ? Vector3(0, 0, 1) : facing
+            projectorFacingFrame = compareFacingInProjectorSpace ? projectorFromWorld : nil
+            projectorOrientation = compareFacingInProjectorSpace && pose.determinant < 0 ? -1 : 1
             minimumFacingDot = projector.minimumFacingDot
         }
 
@@ -354,8 +416,14 @@ extension Decal3D {
             let first = projected[a], second = projected[b], third = projected[c]
             let low = min(min(first, second), third), high = max(max(first, second), third)
             guard low.x <= 1, low.y <= 1, low.z <= 1, high.x >= -1, high.y >= -1, high.z >= -1 else { continue }
-            let normal = (worldPositions[b] - worldPositions[a]).cross(worldPositions[c] - worldPositions[a])
-            guard normal.length > 0, normal.normalized.dot(frame.facing) * orientations[a] >= frame.minimumFacingDot,
+            var firstEdge = worldPositions[b] - worldPositions[a]
+            var secondEdge = worldPositions[c] - worldPositions[a]
+            if let projectorFrame = frame.projectorFacingFrame {
+                firstEdge = (projectorFrame * Vector4(firstEdge, 0)).xyz
+                secondEdge = (projectorFrame * Vector4(secondEdge, 0)).xyz
+            }
+            let normal = firstEdge.cross(secondEdge)
+            guard normal.length > 0, normal.normalized.dot(frame.facing) * orientations[a] * frame.projectorOrientation >= frame.minimumFacingDot,
                 !DecalTriangle3D.clip(first, second, third).isEmpty
             else { continue }
             result[offset / 3] = [first, second, third]

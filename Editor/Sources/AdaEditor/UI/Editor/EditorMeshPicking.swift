@@ -93,7 +93,7 @@ enum EditorMeshPicking {
             if candidate.minimumDistance > nearest { break }
             let distance: Float?
             if let mesh = candidate.mesh, !candidate.usesBounds {
-                distance = intersectionDistance(ray: candidate.ray, mesh: mesh, skin: candidate.skin, maximumDistance: nearest)
+                distance = intersection(ray: candidate.ray, mesh: mesh, skin: candidate.skin, maximumDistance: nearest)?.distance
             } else {
                 // Morph deltas currently live in a GPU texture. Preserve conservative picking for those poses.
                 distance = candidate.minimumDistance
@@ -126,9 +126,67 @@ enum EditorMeshPicking {
         return Float(distance)
     }
 
-    private static func intersectionDistance(ray: Ray, mesh: Mesh, skin: [Transform3D], maximumDistance: Float) -> Float? {
+    struct DecalHit {
+        let editorID: String
+        let matrix: Transform3D
+        let node: Decal3DSource.ModelNode?
+        let point: Vector3
+        let normal: Vector3
+    }
+
+    static func decalHit(
+        ray: Ray, world: World, authoredEntities: [String: Entity.ID], editorIDs: [Entity.ID: String], cameraID: Entity.ID?
+    ) -> DecalHit? {
+        // Include unsupported visible surfaces in the ordinary pick so a decal
+        // cannot stamp a hidden wall through foreground geometry.
+        guard let ownerID = pick(ray: ray, world: world, authoredEntities: authoredEntities, editorIDs: editorIDs, cameraID: cameraID),
+              let entityID = authoredEntities[ownerID], let owner = world.getEntityByID(entityID),
+              owner.components[Terrain3D.self] == nil, owner.components[Terrain3DSource.self] == nil else { return nil }
+        var entities = [owner]
+        var closest: (entity: Entity, matrix: Transform3D, triangle: TriangleHit)?
+        while let entity = entities.popLast() {
+            if entity.id == owner.id || editorIDs[entity.id] == ownerID {
+                entities.append(contentsOf: entity.children)
+                guard let mesh = entity.components[Mesh3DComponent.self],
+                      let matrix = EditorPicking.worldMatrix(for: entity, requiringVisible: true),
+                      let local = EditorPicking.localRay(ray, matrix: matrix),
+                      let hit = intersection(
+                        ray: local,
+                        mesh: mesh.mesh,
+                        skin: entity.components[SkinnedMesh3DComponent.self]?.matrices ?? [],
+                        maximumDistance: closest?.triangle.distance ?? .greatestFiniteMagnitude
+                      ) else { continue }
+                closest = (entity, matrix, hit)
+            }
+        }
+        guard let closest, let mesh = closest.entity.components[Mesh3DComponent.self],
+              closest.entity.components[SkinnedMesh3DComponent.self] == nil, !mesh.mesh.hasMorphTargets,
+              mesh.materials.indices.contains(closest.triangle.part.materialIndex),
+              let material = mesh.materials[closest.triangle.part.materialIndex] as? PBRMaterial,
+              material.effectiveAlphaMode == .opaque, material.graphMaterial == nil,
+              closest.triangle.part.primitiveTopology == .triangleList else { return nil }
+
+        let node: Decal3DSource.ModelNode?
+        if closest.entity.id == owner.id {
+            node = nil
+        } else {
+            guard let binding = closest.entity.components[ModelNode3DComponent.self],
+                  let source = owner.components[Model3DSourceState.self], binding.modelRoot == source.rootEntityID else { return nil }
+            node = .init(source: source.reference.source, index: binding.nodeIndex, name: closest.entity.name)
+        }
+        let normal = (closest.matrix.inverse.transpose * Vector4(closest.triangle.normal, 0)).xyz.normalized
+        return DecalHit(editorID: ownerID, matrix: closest.matrix, node: node, point: ray.origin + ray.direction * closest.triangle.distance, normal: normal)
+    }
+
+    private struct TriangleHit {
+        let distance: Float
+        let part: Mesh.Part
+        let normal: Vector3
+    }
+
+    private static func intersection(ray: Ray, mesh: Mesh, skin: [Transform3D], maximumDistance: Float) -> TriangleHit? {
         var nearest = maximumDistance
-        var hit = false
+        var hit: TriangleHit?
         for model in mesh.models {
             for part in model.parts {
                 let descriptor = part.meshDescriptor
@@ -163,11 +221,12 @@ enum EditorMeshPicking {
                     guard positions.indices.contains(a), positions.indices.contains(b), positions.indices.contains(c),
                         let distance = triangleDistance(ray: ray, a: positions[a], b: positions[b], c: positions[c]), distance <= nearest else { continue }
                     nearest = distance
-                    hit = true
+                    let normal = (positions[b] - positions[a]).cross(positions[c] - positions[a])
+                    hit = TriangleHit(distance: distance, part: part, normal: normal)
                 }
             }
         }
-        return hit ? nearest : nil
+        return hit
     }
 
     nonisolated static func triangleDistance(ray: Ray, a: Vector3, b: Vector3, c: Vector3) -> Float? {

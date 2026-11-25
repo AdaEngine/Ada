@@ -112,8 +112,12 @@ public extension AdaScriptTypeEnvironment {
             property("entityCount", type: .int, detail: "Entity count in the action's scene snapshot; requires editor.documents.read"),
             property("scenePath", type: .string, detail: "Path of the active scene; requires editor.documents.read"),
             property("sceneRevision", type: .string, detail: "Revision of the active scene; requires editor.documents.read"),
-            method("createEntity", parameters: [.string, .float, .float], returning: .bool,
-                   detail: "createEntity(name, x, y) — stage an entity in the action's undoable batch; requires editor.documents.write"),
+            method(
+                "createEntity",
+                parameters: [.string, .float, .float],
+                returning: .bool,
+                detail: "createEntity(name, x, y) — stage an entity in the action's undoable batch; requires editor.documents.write"
+            ),
             method(
                 "addCommand",
                 parameters: [.string, .string, .string, .string],
@@ -159,10 +163,18 @@ public extension AdaScriptTypeEnvironment {
             ),
         ]),
         "$AdaEditorAnimations": members([
-            method("submit", parameters: [.any], returning: .string,
-                   detail: "submit(requestMap) -> job ID; stage an AnimationAuthoringRequest after the callback succeeds. No editor objects enter the VM."),
-            method("poll", parameters: [.string], returning: .any,
-                   detail: "poll(jobID) -> detached Map: status pending/completed/failed; a successful terminal poll consumes the result.")
+            method(
+                "submit",
+                parameters: [.any],
+                returning: .string,
+                detail: "submit(requestMap) -> job ID; stage an AnimationAuthoringRequest after the callback succeeds. No editor objects enter the VM."
+            ),
+            method(
+                "poll",
+                parameters: [.string],
+                returning: .any,
+                detail: "poll(jobID) -> detached Map: status pending/completed/failed; a successful terminal poll consumes the result."
+            )
         ]),
         "$AdaEntity": members([
             property("id", type: .int, detail: "Entity identifier")
@@ -176,6 +188,30 @@ public extension AdaScriptTypeEnvironment {
             property("world", type: .named("$AdaWorldContext"), detail: "Scoped AdaECS world access"),
         ]),
         "$AdaWorldContext": members([
+            method(
+                "placeDecal",
+                parameters: [.int, .string, .list(.list(.float)), .list(.any)],
+                returning: .string,
+                detail: "placeDecal(receiver, image, [point, normal, size], options) — enqueue a native 3D decal"
+            ),
+            method(
+                "updateDecal",
+                parameters: [.int, .string, .string, .list(.any)],
+                returning: .string,
+                detail: "updateDecal(receiver, handle, image, options) — enqueue an appearance replacement"
+            ),
+            method(
+                "removeDecal",
+                parameters: [.int, .string],
+                returning: .string,
+                detail: "removeDecal(receiver, handle) — enqueue removal"
+            ),
+            method(
+                "decalResult",
+                parameters: [.string],
+                returning: .named("DecalResult"),
+                detail: "decalResult(request) — null while pending, then a consumable operation result"
+            ),
             method(
                 "setTileOrientation",
                 parameters: [.int, .int, .list(.int), .int],
@@ -287,6 +323,12 @@ public extension AdaScriptTypeEnvironment {
         "Multiplayer": members([
             method("available", parameters: [], returning: .bool, detail: "available() -> Bool — whether an optional multiplayer resource is bound"),
             method("send", parameters: [.any], returning: .void, detail: "send(command) — send a typed multiplayer command")
+        ]),
+        "DecalResult": members([
+            method("isSuccess", parameters: [], returning: .bool, detail: "Whether the decal operation succeeded"),
+            method("value", parameters: [], returning: .string, detail: "Decal handle returned by placement"),
+            method("errorCode", parameters: [], returning: .string, detail: "Stable decal operation failure code"),
+            method("message", parameters: [], returning: .string, detail: "Diagnostic detail"),
         ]),
         "SaveResult": members([
             method("isSuccess", parameters: [], returning: .bool, detail: "Whether the operation succeeded"),
@@ -404,7 +446,12 @@ public extension AdaScriptTypeEnvironment {
     private static var shaderComponentMembers: [String: AdaScriptMemberType] {
         members([
             method("shader", parameters: [.int], returning: .named("$AdaShaderGraph"), detail: "shader(slot) — callback-scoped graph material; Sprite uses slot 0"),
-            method("assignShader", parameters: [.int, .string], returning: .bool, detail: "assignShader(slot, path) — assign a graph or clear with an empty path; requires query write access"),
+            method(
+                "assignShader",
+                parameters: [.int, .string],
+                returning: .bool,
+                detail: "assignShader(slot, path) — assign a graph or clear with an empty path; requires query write access"
+            ),
         ])
     }
 

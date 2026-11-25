@@ -36,7 +36,12 @@ enum Decal3DResources {
     static func build(_ state: Decal3D.State, device: RenderDevice) throws(Decal3D.PlacementError) -> [Decal3DPartKey: Decal3DDraw] {
         let entries = state.entries.enumerated().sorted {
             let lhs = $0.element.appearance.priority, rhs = $1.element.appearance.priority
-            return lhs == rhs ? $0.offset < $1.offset : lhs < rhs
+            if lhs != rhs {
+                return lhs < rhs
+            }
+            let leftOrder = $0.element.authoredOrder ?? .max
+            let rightOrder = $1.element.authoredOrder ?? .max
+            return leftOrder == rightOrder ? $0.offset < $1.offset : leftOrder < rightOrder
         }.map(\.element)
         var parts: [Decal3DPartKey: Mesh.Part] = [:]
         for entry in entries {

@@ -274,7 +274,7 @@ extension Render3DGPUTests {
             return try sample(at: (receiver * Vector4(local, 1)).xyz, image: image, camera: camera)
         }
 
-        private static func sample(at point: Vector3, image: Image, camera: Transform3D) throws -> Color {
+        static func sample(at point: Vector3, image: Image, camera: Transform3D) throws -> Color {
             let clip = camera * Vector4(point, 1)
             let x = Int((0.5 + 0.5 * clip.x / clip.w) * Float(image.width))
             let y = Int((0.5 - 0.5 * clip.y / clip.w) * Float(image.height))

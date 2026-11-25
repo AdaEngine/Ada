@@ -4,6 +4,23 @@ Use `Decal3D` to stamp an image onto an opaque 3D mesh. The image moves
 with the mesh. A stamp on an animated model deforms with the surface,
 including across a joint, and can be placed while that joint is bent.
 
+## Place a decal in Ada Studio
+
+Open a 3D scene in the desktop editor and select **Decals** in the viewport
+toolbar. In the Inspector, choose a project image and select **Place decal**.
+Point at an opaque mesh, then click the surface to apply the image.
+Press Escape to exit placement. Select **Done** to close the tool.
+
+Select the receiving object and choose a decal in its Inspector list.
+Change its image, width, height, depth, rotation or priority. Use **Move**
+to choose a new spot on the same object. **Delete** removes the selected
+decal. Undo and Redo work with scene history. Save the scene to keep the
+decals when reopening it, playing it or exporting it for a native target.
+
+Studio places decals on primitives and static or rigid meshes of imported
+models. Skinned and morphed receivers are available through the gameplay APIs
+below. The visual tool uses native SAGA raster rendering.
+
 ## Stamp a moving car
 
 Call `Decal3D.place` on the main actor after the receiving entity has
@@ -53,7 +70,8 @@ the receiver uses its source mesh until the decals are removed.
 
 Keep the returned handle to update or remove a decal from the same entity.
 A larger priority draws on top of smaller priorities. Equal priorities
-draw in creation order.
+draw in creation order. Saved scene decals draw before gameplay decals of
+the same priority, including when a scene image finishes loading later.
 
 ```swift
 try Decal3D.update(sticker, on: bodywork, appearance: .init(color: newArtwork, priority: 1))
@@ -70,7 +88,7 @@ the lighting calculation.
 Decals use the native SAGA raster path and standard opaque PBR materials
 on indexed triangle meshes. Browser WebGPU and headless backends return
 `unsupportedBackend`. Decal rendering is available in the raster view.
-Placement is through Swift during scene setup or gameplay.
+Swift and AdaScript can also place decals during scene setup or gameplay.
 
 A receiver can hold eight decals. All active images for a receiver must
 fit a 2048 × 2048 atlas. Placement and expanded mesh storage also have

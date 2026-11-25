@@ -38,4 +38,10 @@ class HostProbe {
         return Assets.save(asset, "@user://copy.nativeasset");
     }
     func stale(context) { return context.world.reloadScene(); }
+    func decals(context) {
+        var pending = context.world.placeDecal(1, "@res://Paint.png", [[0, 0, 0], [0, 0, 1], [1, 1, 1]], []);
+        if (context.world.decalResult(pending) != null) { return "unexpectedCompletedRequest"; }
+        var invalid = context.world.removeDecal(-1, "handle");
+        return context.world.decalResult(invalid).errorCode();
+    }
 }

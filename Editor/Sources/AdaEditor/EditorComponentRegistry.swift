@@ -317,6 +317,7 @@ enum EditorComponentRegistry {
             return
         }
         DisplayLayout.registerRuntimeType()
+        Decal3DSource.registerComponent()
         RuntimeTypeRegistry.registerComponent(ParticleEmitter.self, names: ["ParticleEmitter"])
         RuntimeTypeRegistry.registerComponent(ParticleEmitter3D.self, names: ["ParticleEmitter3D"])
         AssetsManager.registerAssetType(ParticleEffect.self)

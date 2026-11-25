@@ -14,7 +14,7 @@ struct EditorSceneViewportView: View {
     let onPlay: (() -> Void)?
     let onStop: (() -> Void)?
     let onDocumentChanged: (EditorSceneDocument) -> Void
-    var onTerrainToolSelected: (() -> Void)?
+    var onSceneInspectorRequested: (() -> Void)?
     var initialDisplayMode: EditorSceneViewportDisplayMode = .twoD
     var isAssetPreview = false
     var onEditWorldReady: ((World) -> Void)?
@@ -66,7 +66,10 @@ struct EditorSceneViewportView: View {
             inspectorViewModel.clearSceneViewportActions(owner: viewportModel)
         }
         .onChange(of: isDocumentActive) { _, active in
-            if !active { inspectorViewModel.clearSceneViewportActions(owner: viewportModel) }
+            if !active {
+                viewportModel.decalEditing.cancel()
+                inspectorViewModel.clearSceneViewportActions(owner: viewportModel)
+            }
         }
     }
 
@@ -100,6 +103,7 @@ struct EditorSceneViewportView: View {
         }
         return document.sceneModel?.entities.contains {
             $0.components[EditorBuiltInComponentType.model3DSource] != nil
+                || $0.components[EditorBuiltInComponentType.mesh3D] != nil
                 || $0.components[EditorTerrainPayload.typeName] != nil
                 || $0.components[EditorBuiltInComponentType.terrain3DSource] != nil
                 || $0.components[EditorCSGScene.groupType] != nil
@@ -212,6 +216,16 @@ struct EditorSceneViewportView: View {
                         sceneControls(size: geometry.size)
                     }
                     statusBar
+                    if viewportModel.decalEditing.isPlacing {
+                        Text(L10n.tr(viewportModel.decalEditing.message ?? "Click a surface to place the decal."))
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.editorColors.text)
+                            .padding(8)
+                            .background(theme.editorColors.surfaceElevated)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                            .padding(.bottom, 28)
+                            .allowsHitTesting(false)
+                    }
                     if let agent = annotationAgent,
                        (agent.sceneAnnotations.draft?.context.sceneRelativePath == document.relativePath && agent.sceneAnnotations.draft?.editingID == nil)
                         || agent.sceneAnnotations.error != nil {
@@ -444,7 +458,7 @@ struct EditorSceneViewportView: View {
     private func toolbarContents(width: Float) -> some View {
         let compact = width < 540
         let inline = usesInlineSceneControls(width: width)
-        let iconCount = isAssetPreview ? 1 : (annotationAgent == nil ? 4 : 5)
+        let iconCount = (isAssetPreview ? 1 : (annotationAgent == nil ? 4 : 5)) + (showsDecalTool ? 1 : 0)
         let iconWidth = AdaEngineStyleLayoutSpec.usesCompactWorkspace ? 28 : 26
         let modeWidth = compact ? min(174, max(92, width - Float(iconWidth * iconCount + 10))) : 174
         let compactModeLabels = modeWidth < 158 ? [EditorSceneViewportRenderingMode.shadedWireframe.rawValue: "Wireframe overlay"] : [:]
@@ -469,6 +483,23 @@ struct EditorSceneViewportView: View {
             Spacer(minLength: 0)
             if !isAssetPreview {
                 entityMarkerVisibilityButton(compact: compact)
+                if showsDecalTool {
+                    EditorSceneToolbarButton(
+                        title: "Decals",
+                        symbol: "\u{E3F4}",
+                        identifier: "AdaEditor.SceneViewport.Decals",
+                        isSelected: viewportModel.decalEditing.enabled,
+                        compact: compact
+                    ) {
+                        annotationAgent?.sceneAnnotations.stopSelecting()
+                        viewportModel.setAnnotationMode(false)
+                        viewportModel.setTerrainEditing(false)
+                        let enabled = !viewportModel.decalEditing.enabled
+                        viewportModel.decalEditing.setEnabled(enabled)
+                        if enabled { onSceneInspectorRequested?() }
+                        redrawViewport()
+                    }
+                }
                 if let agent = annotationAgent {
                     EditorSceneToolbarButton(
                         title: "Annotate",
@@ -524,6 +555,7 @@ struct EditorSceneViewportView: View {
                                     return
                                 }
                                 viewportModel.renderingMode = mode
+                                if mode == .wireframe { viewportModel.decalEditing.setEnabled(false) }
                                 viewportModel.applyCamera()
                                 redrawViewport()
                             }
@@ -686,9 +718,19 @@ struct EditorSceneViewportView: View {
         (document.loadSummary.warnings + runtimeWarnings).isEmpty ? theme.editorColors.muted : theme.editorColors.purple
     }
 
+    var showsDecalTool: Bool {
+        #if os(Windows) || os(macOS) || os(Linux)
+        displayMode == .threeD && !isAssetPreview && !document.isReadOnly && resourceRootURL != nil
+            && Decal3D.isSupported && viewportModel.renderingMode != .wireframe
+        #else
+        false
+        #endif
+    }
+
     private func selectViewportMode(_ mode: EditorSceneViewportDisplayMode) {
         if mode == .twoD {
             viewportModel.setTerrainEditing(false)
+            viewportModel.decalEditing.setEnabled(false)
         }
         displayMode = mode
         viewportModel.setDisplayMode(mode)

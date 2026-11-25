@@ -55,6 +55,13 @@ fail the bundle import. Repeated imports create another bundle without replacing
 the original. Imported materials are preserved. Imported meshes/rigs remain source
 assets; editable animation clips are stored separately as described below.
 
+## Place a 3D decal
+
+Use **Decals** in the 3D viewport toolbar to put a project image on a wall or
+an imported model. The Inspector holds the saved decals for each object.
+See [3D Decals](../../Sources/AdaEngine/AdaEngine.docc/Articles/3D/Decals.md)
+for placement, editing and supported surfaces.
+
 ## Edit bone animation
 
 On Windows, see [Generate an animation with Kimodo](AnimationAuthoring.md#generate-an-animation-with-kimodo-on-windows)

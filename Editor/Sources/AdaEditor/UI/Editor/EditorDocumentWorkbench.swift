@@ -17,7 +17,7 @@ struct EditorDocumentWorkbench: View {
                 onPlayScene: viewModel.runActiveSceneInEditor,
                 onStopScene: viewModel.stopPlayMode,
                 onSceneEntitySelected: viewModel.presentSceneInspectorForSelection,
-                onTerrainToolSelected: viewModel.presentSceneInspector,
+                onSceneInspectorRequested: viewModel.presentSceneInspector,
                 onSourceHover: { document, position in
                     viewModel.handleSourceHover(document: document, position: position)
                 },

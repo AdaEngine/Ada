@@ -65,7 +65,9 @@ final class NativeAsyncRuntime: NativeHostObject, @unchecked Sendable {
         lock.withLock { operations.removeAll { $0.isDone } }
     }
     func adopt(_ value: NativeValue) throws {
-        guard case .task(let task) = value else { return }
+        guard case .task(let task) = value else {
+            return
+        }
         try lock.withLock {
             guard active, tasks[task.identifier] != nil || tasks.count < 1024 else {
                 throw AdaScriptError.invalidManifest("Native async owner is stopped or its task limit was reached")
@@ -167,9 +169,15 @@ private final class NativeClockOperation: NativePendingOperation, @unchecked Sen
     }
     var isDone: Bool {
         let now = clock.now
-        if lock.withLock({ cancelled }) { return true }
-        if let frame { return now.0 >= frame }
-        if let seconds { return now.1 >= seconds }
+        if lock.withLock({ cancelled }) {
+            return true
+        }
+        if let frame {
+            return now.0 >= frame
+        }
+        if let seconds {
+            return now.1 >= seconds
+        }
         return true
     }
     func cancel() { lock.withLock { cancelled = true } }
@@ -210,7 +218,7 @@ final class NativeOperationHost: NativePendingOperation, @unchecked Sendable {
 
 /// AdaScriptAsyncResult is immutable after publication. This adapter preserves
 /// the same result API used by the VM without executing any VM code.
-private final class NativeAsyncResultHost: NativeSuspensionSafeHostObject, @unchecked Sendable {
+final class NativeAsyncResultHost: NativeSuspensionSafeHostObject, @unchecked Sendable {
     private let result: AdaScriptAsyncResult
     init(_ result: AdaScriptAsyncResult) { self.result = result }
     func call(_ method: String, arguments: [NativeValue]) throws -> NativeValue? {

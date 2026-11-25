@@ -11,6 +11,7 @@ static gravity_aot_value ada_native_hosts_fn_21(gravity_aot_context *, gravity_a
 static gravity_aot_value ada_native_hosts_fn_22(gravity_aot_context *, gravity_aot_value, const gravity_aot_value *, uint32_t);
 static gravity_aot_value ada_native_hosts_fn_23(gravity_aot_context *, gravity_aot_value, const gravity_aot_value *, uint32_t);
 static gravity_aot_value ada_native_hosts_fn_24(gravity_aot_context *, gravity_aot_value, const gravity_aot_value *, uint32_t);
+static gravity_aot_value ada_native_hosts_fn_25(gravity_aot_context *, gravity_aot_value, const gravity_aot_value *, uint32_t);
 static gravity_aot_value ada_native_hosts_fn_0(gravity_aot_context *ctx, const gravity_aot_value *args, uint32_t argc) {
 gravity_aot_value result=gravity_aot_null(); if (!ctx) return result;
 if (ctx->abi_version!=GRAVITY_AOT_ABI_VERSION) { gravity_aot_error(ctx,GRAVITY_AOT_BAD_ABI); return result; }
@@ -605,6 +606,173 @@ ga_exit:
 --ctx->depth;
 return ctx->error?gravity_aot_null():result;
 }
+static gravity_aot_value ada_native_hosts_fn_25(gravity_aot_context *ctx, gravity_aot_value receiver, const gravity_aot_value *args, uint32_t argc) {
+gravity_aot_value result=gravity_aot_null(); if (!ctx) return result;
+if (ctx->abi_version!=GRAVITY_AOT_ABI_VERSION) { gravity_aot_error(ctx,GRAVITY_AOT_BAD_ABI); return result; }
+if (argc!=1 || (argc && !args)) { gravity_aot_error(ctx,GRAVITY_AOT_ARITY); return result; }
+if (ctx->depth>=ctx->max_depth || !gravity_aot_tick(ctx)) { gravity_aot_error(ctx,GRAVITY_AOT_LIMIT); return result; }
+++ctx->depth;
+gravity_aot_value v0=receiver; (void)v0;
+if (receiver.kind!=GRAVITY_AOT_OBJECT || !receiver.object || receiver.object->type!=&ga_ada_native_hosts_types[4]) { gravity_aot_error(ctx,GRAVITY_AOT_TYPE); goto ga_exit; }
+gravity_aot_value v1=gravity_aot_copy(ctx,args[0]); (void)v1;
+if (ctx->error) goto ga_exit;
+{
+gravity_aot_value t2 = v1;
+(void)t2;
+gravity_aot_value t3=gravity_aot_get(ctx,t2,"\167\157\162\154\144");
+if (ctx->error) goto ga_exit;
+gravity_aot_value a5[4]; (void)a5;
+gravity_aot_value t6 = gravity_aot_int((int64_t)UINT64_C(1));
+(void)t6;
+a5[0]=gravity_aot_copy(ctx,t6);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t7 = gravity_aot_string("\100\162\145\163\072\057\057\120\141\151\156\164\056\160\156\147", 16);
+(void)t7;
+a5[1]=gravity_aot_copy(ctx,t7);
+if (ctx->error) goto ga_exit;
+gravity_aot_value a8[3]; (void)a8;
+gravity_aot_value a9[3]; (void)a9;
+gravity_aot_value t10 = gravity_aot_int((int64_t)UINT64_C(0));
+(void)t10;
+a9[0]=gravity_aot_copy(ctx,t10);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t11 = gravity_aot_int((int64_t)UINT64_C(0));
+(void)t11;
+a9[1]=gravity_aot_copy(ctx,t11);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t12 = gravity_aot_int((int64_t)UINT64_C(0));
+(void)t12;
+a9[2]=gravity_aot_copy(ctx,t12);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t9 = gravity_aot_list_new(ctx,a9,3);
+if (ctx->error) goto ga_exit;
+(void)t9;
+a8[0]=gravity_aot_copy(ctx,t9);
+if (ctx->error) goto ga_exit;
+gravity_aot_value a13[3]; (void)a13;
+gravity_aot_value t14 = gravity_aot_int((int64_t)UINT64_C(0));
+(void)t14;
+a13[0]=gravity_aot_copy(ctx,t14);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t15 = gravity_aot_int((int64_t)UINT64_C(0));
+(void)t15;
+a13[1]=gravity_aot_copy(ctx,t15);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t16 = gravity_aot_int((int64_t)UINT64_C(1));
+(void)t16;
+a13[2]=gravity_aot_copy(ctx,t16);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t13 = gravity_aot_list_new(ctx,a13,3);
+if (ctx->error) goto ga_exit;
+(void)t13;
+a8[1]=gravity_aot_copy(ctx,t13);
+if (ctx->error) goto ga_exit;
+gravity_aot_value a17[3]; (void)a17;
+gravity_aot_value t18 = gravity_aot_int((int64_t)UINT64_C(1));
+(void)t18;
+a17[0]=gravity_aot_copy(ctx,t18);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t19 = gravity_aot_int((int64_t)UINT64_C(1));
+(void)t19;
+a17[1]=gravity_aot_copy(ctx,t19);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t20 = gravity_aot_int((int64_t)UINT64_C(1));
+(void)t20;
+a17[2]=gravity_aot_copy(ctx,t20);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t17 = gravity_aot_list_new(ctx,a17,3);
+if (ctx->error) goto ga_exit;
+(void)t17;
+a8[2]=gravity_aot_copy(ctx,t17);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t8 = gravity_aot_list_new(ctx,a8,3);
+if (ctx->error) goto ga_exit;
+(void)t8;
+a5[2]=gravity_aot_copy(ctx,t8);
+if (ctx->error) goto ga_exit;
+gravity_aot_value a21[1]; (void)a21;
+gravity_aot_value t21 = gravity_aot_list_new(ctx,a21,0);
+if (ctx->error) goto ga_exit;
+(void)t21;
+a5[3]=gravity_aot_copy(ctx,t21);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t4=gravity_aot_call(ctx,t3,"\160\154\141\143\145\104\145\143\141\154",a5,4);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t1=t4;
+(void)t1;
+gravity_aot_value v2 = gravity_aot_copy(ctx,t1); (void)v2;
+if (ctx->error) goto ga_exit;
+gravity_aot_value t24 = v1;
+(void)t24;
+gravity_aot_value t25=gravity_aot_get(ctx,t24,"\167\157\162\154\144");
+if (ctx->error) goto ga_exit;
+gravity_aot_value a27[1]; (void)a27;
+gravity_aot_value t28 = v2;
+(void)t28;
+a27[0]=gravity_aot_copy(ctx,t28);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t26=gravity_aot_call(ctx,t25,"\144\145\143\141\154\122\145\163\165\154\164",a27,1);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t23=t26;
+(void)t23;
+gravity_aot_value t29 = gravity_aot_null();
+(void)t29;
+gravity_aot_value t22 = gravity_aot_binary(ctx, 10, t23, t29);
+if (ctx->error) goto ga_exit;
+(void)t22;
+if (gravity_aot_truth(ctx, t22)) {
+{
+gravity_aot_value t30 = gravity_aot_string("\165\156\145\170\160\145\143\164\145\144\103\157\155\160\154\145\164\145\144\122\145\161\165\145\163\164", 26);
+(void)t30;
+result = t30; goto ga_exit;
+}
+}
+if (ctx->error) goto ga_exit;
+gravity_aot_value t32 = v1;
+(void)t32;
+gravity_aot_value t33=gravity_aot_get(ctx,t32,"\167\157\162\154\144");
+if (ctx->error) goto ga_exit;
+gravity_aot_value a35[2]; (void)a35;
+gravity_aot_value t37 = gravity_aot_int((int64_t)UINT64_C(1));
+(void)t37;
+gravity_aot_value t36 = gravity_aot_unary(ctx, 13, t37);
+if (ctx->error) goto ga_exit;
+(void)t36;
+a35[0]=gravity_aot_copy(ctx,t36);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t38 = gravity_aot_string("\150\141\156\144\154\145", 6);
+(void)t38;
+a35[1]=gravity_aot_copy(ctx,t38);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t34=gravity_aot_call(ctx,t33,"\162\145\155\157\166\145\104\145\143\141\154",a35,2);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t31=t34;
+(void)t31;
+gravity_aot_value v3 = gravity_aot_copy(ctx,t31); (void)v3;
+if (ctx->error) goto ga_exit;
+gravity_aot_value t40 = v1;
+(void)t40;
+gravity_aot_value t41=gravity_aot_get(ctx,t40,"\167\157\162\154\144");
+if (ctx->error) goto ga_exit;
+gravity_aot_value a43[1]; (void)a43;
+gravity_aot_value t44 = v3;
+(void)t44;
+a43[0]=gravity_aot_copy(ctx,t44);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t42=gravity_aot_call(ctx,t41,"\144\145\143\141\154\122\145\163\165\154\164",a43,1);
+if (ctx->error) goto ga_exit;
+gravity_aot_value a46[1]; (void)a46;
+gravity_aot_value t45=gravity_aot_call(ctx,t42,"\145\162\162\157\162\103\157\144\145",a46,0);
+if (ctx->error) goto ga_exit;
+gravity_aot_value t39=t45;
+(void)t39;
+result = t39; goto ga_exit;
+}
+goto ga_exit;
+ga_exit:
+--ctx->depth;
+return ctx->error?gravity_aot_null():result;
+}
 static const gravity_aot_parameter ga_params_0[] = {
 {"\170",NULL},
 {"\171",NULL},
@@ -723,6 +891,9 @@ static const gravity_aot_parameter ga_params_23[] = {
 static const gravity_aot_parameter ga_params_24[] = {
 {"\143\157\156\164\145\170\164",NULL},
 };
+static const gravity_aot_parameter ga_params_25[] = {
+{"\143\157\156\164\145\170\164",NULL},
+};
 static const gravity_aot_declaration ga_ada_native_hosts_declarations[] = {
 {"\123\160\162\151\164\145\101\156\143\150\157\162",NULL,NULL,0,0,7,1,0,NULL,2,ga_params_0},
 {"\123\160\162\151\164\145\123\154\151\143\145\102\157\162\144\145\162",NULL,NULL,0,0,8,1,0,NULL,4,ga_params_1},
@@ -749,9 +920,10 @@ static const gravity_aot_declaration ga_ada_native_hosts_declarations[] = {
 {"\154\157\141\144","\110\157\163\164\120\162\157\142\145",NULL,4,0,45,5,0,NULL,1,ga_params_22},
 {"\163\141\166\145","\110\157\163\164\120\162\157\142\145",NULL,4,0,46,5,0,NULL,1,ga_params_23},
 {"\163\164\141\154\145","\110\157\163\164\120\162\157\142\145",NULL,4,0,50,5,0,NULL,1,ga_params_24},
+{"\144\145\143\141\154\163","\110\157\163\164\120\162\157\142\145",NULL,4,0,51,5,0,NULL,1,ga_params_25},
 };
 static const gravity_aot_field ga_fields_0[] = {
-{&ga_ada_native_hosts_declarations[5],{.floating=0x1.4p+2,.kind=GRAVITY_AOT_FLOAT},0,NULL},
+{&ga_ada_native_hosts_declarations[5],{.floating=0x1.4000000000000p+2,.kind=GRAVITY_AOT_FLOAT},0,NULL},
 };
 static const gravity_aot_field ga_fields_1[] = {
 {&ga_ada_native_hosts_declarations[7],{.integer=(int64_t)UINT64_C(0),.kind=1},0,NULL},
@@ -777,13 +949,14 @@ static const gravity_aot_method_export ga_methods_4[] = {
 {"\154\157\141\144",1,ada_native_hosts_fn_22,&ga_ada_native_hosts_declarations[22]},
 {"\163\141\166\145",1,ada_native_hosts_fn_23,&ga_ada_native_hosts_declarations[23]},
 {"\163\164\141\154\145",1,ada_native_hosts_fn_24,&ga_ada_native_hosts_declarations[24]},
+{"\144\145\143\141\154\163",1,ada_native_hosts_fn_25,&ga_ada_native_hosts_declarations[25]},
 };
 static const gravity_aot_class ga_ada_native_hosts_types[5] = {
 {&ga_ada_native_hosts_declarations[4],1,1,0,ga_fields_0,NULL},
 {&ga_ada_native_hosts_declarations[6],1,1,0,ga_fields_1,NULL},
 {&ga_ada_native_hosts_declarations[8],1,4,0,ga_fields_2,NULL},
 {&ga_ada_native_hosts_declarations[13],0,4,2,ga_fields_3,ga_methods_3},
-{&ga_ada_native_hosts_declarations[20],0,0,4,NULL,ga_methods_4},
+{&ga_ada_native_hosts_declarations[20],0,0,5,NULL,ga_methods_4},
 };
 static const gravity_aot_export ga_ada_native_hosts_exports[] = {
 {"\123\160\162\151\164\145\101\156\143\150\157\162",2,ada_native_hosts_fn_0,&ga_ada_native_hosts_declarations[0]},
@@ -792,6 +965,6 @@ static const gravity_aot_export ga_ada_native_hosts_exports[] = {
 {"\101\144\141\123\160\162\151\164\145\111\155\141\147\145\115\157\144\145\124\151\154\145\144",3,ada_native_hosts_fn_3,&ga_ada_native_hosts_declarations[3]},
 };
 const gravity_aot_module *ada_native_hosts_get_module(void) {
-static const gravity_aot_module m={GRAVITY_AOT_ABI_VERSION,4,ga_ada_native_hosts_exports,5,25,ga_ada_native_hosts_types,ga_ada_native_hosts_declarations};
+static const gravity_aot_module m={GRAVITY_AOT_ABI_VERSION,4,ga_ada_native_hosts_exports,5,26,ga_ada_native_hosts_types,ga_ada_native_hosts_declarations};
 return &m;
 }

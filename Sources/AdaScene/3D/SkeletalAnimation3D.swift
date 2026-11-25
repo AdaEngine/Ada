@@ -38,7 +38,7 @@ public struct ModelAnimation3DComponent: Component {
     public init(player: SkeletalAnimationPlayer) { self.player = player }
 }
 
-/// Associates an instantiated node with its model's animation player.
+/// Identifies a mesh or rig node within its instantiated model.
 public struct ModelNode3DComponent: Component {
     public let modelRoot: Entity.ID
     public let nodeIndex: Int
@@ -132,7 +132,9 @@ public struct SkeletalAnimation3DSystem {
         models.batched().forEach { root, animation in
             // Reading this predicate borrows the component. Avoid copying all of a
             // paused player's pose/clip arrays and marking it changed every frame.
-            guard !animation.wrappedValue.canSkipUpdate else { return }
+            guard !animation.wrappedValue.canSkipUpdate else {
+                return
+            }
             var value = animation.wrappedValue
             if value.appliedPlayer != value.player.instanceID { value.lodState = AnimationLOD3DState() }
             if let settings = value.evaluationLOD {
@@ -160,7 +162,9 @@ public struct SkeletalAnimation3DSystem {
             }
             animation.wrappedValue = value
         }
-        guard !pendingPoses.isEmpty else { return }
+        guard !pendingPoses.isEmpty else {
+            return
+        }
         // Process node columns directly; static and paused model hierarchies need no grouping or pose writes.
         nodes.batched().forEach { binding, transform in
             guard let player = pendingPoses[binding.modelRoot], player.poses.indices.contains(binding.nodeIndex),
