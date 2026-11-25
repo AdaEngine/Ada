@@ -185,8 +185,10 @@ struct EditorInspectorSidebar: View {
                     if let index = row.fieldIndex {
                         componentFieldRow(fields[index])
                             .padding(.leading, Float(row.level) * 10)
+                            .drawingGroup(cullingOutsideScrollViewWithOutset: 12)
                     } else {
                         fieldGroupHeader(row, namespace: component.typeName)
+                            .drawingGroup(cullingOutsideScrollViewWithOutset: 12)
                     }
                 }
             }

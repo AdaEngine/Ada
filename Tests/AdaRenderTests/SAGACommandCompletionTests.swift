@@ -1,14 +1,17 @@
-#if SAGA_METAL || SAGA_METAL_NATIVE_PASS
+#if SAGA_METAL || SAGA_METAL_NATIVE_PASS || (os(Windows) && SAGA_NATIVE)
     @testable import AdaRender
     import AdaUtils
     import Math
-    import MetalKit
     import SAGABackend
     import SAGACore
     import SAGAShaderIR
     import SAGATypes
     import Synchronization
     import Testing
+
+    #if os(macOS)
+        import MetalKit
+    #endif
 
     #if SAGA_METAL_NATIVE_PASS && os(macOS)
         import SAGAMetal
@@ -203,6 +206,132 @@
             #expect(context.errorLog.all.isEmpty)
         }
 
+        #if os(Windows)
+            @Test
+            func windowPacingWaitsForTheOlderPresentWithoutBlockingQueueAcceptance() async throws {
+                let capabilities = try DeviceCapabilities(maxBufferSize: 4096, maxTextureDimension2D: 64)
+                let backend = HeldSubmissionBackend(capabilities: capabilities)
+                let context = SAGAContext(
+                    capabilities: capabilities,
+                    supportsPresentation: true,
+                    shaderOutput: .spirv,
+                    debugErrors: false,
+                    makeDevice: { try await Device.make(backend: backend) }
+                )
+                let window = SAGAWindow(
+                    context: context,
+                    windowId: WindowID(),
+                    size: SizeInt(width: 16, height: 16),
+                    scaleFactor: 1,
+                    pixelFormat: .bgra8,
+                    limitsQueuedPresentations: true
+                )
+                let backbuffer = try #require(window.currentBackbuffer())
+                window.present(backbuffer)
+                // A single outstanding present leaves room to prepare the next frame.
+                let first = Task {
+                    await window.pacePendingPresentation()
+                }
+                let bridgeAdvanced = BackendCompletion()
+                context.queue.enqueueCleanup {
+                    #expect(await first.value)
+                    await bridgeAdvanced.finish(.success(()))
+                }
+
+                do {
+                    try await backend.started.wait(timeout: .seconds(2))
+                    try await bridgeAdvanced.wait(timeout: .seconds(2))
+                } catch {
+                    await backend.release.finish(.success(()))
+                    await context.queue.drain()
+                    throw error
+                }
+
+                window.present(backbuffer)
+                #expect(window.currentBackbuffer() == nil)
+                let ready = Mutex(false)
+                let pacingResumed = BackendCompletion()
+                let pacing = Task {
+                    #expect(await window.pacePendingPresentation())
+                    ready.withLock { $0 = true }
+                    await pacingResumed.finish(.success(()))
+                }
+                try? await Task.sleep(for: .milliseconds(50))
+                #expect(window.hasPendingPresentation)
+                #expect(!ready.withLock { $0 })
+
+                // The first native present was skipped after both frames had already been enqueued.
+                window.updatePresentationRetry(true)
+                await backend.release.finish(.success(()))
+                do {
+                    try await pacingResumed.wait(timeout: .seconds(2))
+                    #expect(window.hasPendingPresentation, "Only the first present should have retired")
+                    #expect(window.currentBackbuffer() != nil)
+                } catch {
+                    await backend.releaseSecondPresent.finish(.success(()))
+                    await context.queue.drain()
+                    throw error
+                }
+                window.updatePresentationRetry(false)
+                await backend.releaseSecondPresent.finish(.success(()))
+                await context.queue.drain()
+                await pacing.value
+                #expect(ready.withLock { $0 })
+                #expect(!window.hasPendingPresentation)
+                #expect(context.errorLog.all.isEmpty)
+                window.retryPresentationIfNeeded()
+                await context.queue.drain()
+                #expect(backend.presentationCount == 2, "A newer successful present cancels an older retry")
+
+                // A skipped native acquire must retry even if the UI has consumed its one redraw request.
+                window.updatePresentationRetry(true)
+                window.retryPresentationIfNeeded()
+                await context.queue.drain()
+                #expect(backend.presentationCount == 3)
+                window.retryPresentationIfNeeded()
+                await context.queue.drain()
+                #expect(backend.presentationCount == 3)
+            }
+
+            @Test(arguments: [false, true])
+            func renderCompletionDoesNotBlockLaterWindowsCommands(emptyFence: Bool) async throws {
+                let capabilities = try DeviceCapabilities(maxBufferSize: 4096, maxTextureDimension2D: 64)
+                let backend = HeldSubmissionBackend(capabilities: capabilities)
+                let context = SAGAContext(
+                    capabilities: capabilities,
+                    supportsPresentation: false,
+                    shaderOutput: .spirv,
+                    debugErrors: false,
+                    makeDevice: { try await Device.make(backend: backend) }
+                )
+                let slot = context.createBuffer(.init(size: 4, usage: .copyDestination))
+                let commands = SAGACommandBuffer(context: context)
+                commands.append { .writeBytes(buffer: try slot.get(), offset: 0, bytes: [1, 2, 3, 4]) }
+                let fence = emptyFence ? SAGACommandBuffer(context: context) : commands
+                let outcomes = Mutex<[Bool]>([])
+                fence.addCompletedHandler { outcomes.withLock { $0.append(backend.isRetired) } }
+                commands.commit()
+                if emptyFence { fence.commit() }
+
+                let bridgeAdvanced = BackendCompletion()
+                context.queue.enqueueCleanup { await bridgeAdvanced.finish(.success(())) }
+
+                do {
+                    try await backend.started.wait(timeout: .seconds(2))
+                    try await bridgeAdvanced.wait(timeout: .seconds(1))
+                    #expect(outcomes.withLock { $0 }.isEmpty)
+                } catch {
+                    await backend.release.finish(.success(()))
+                    await context.queue.drain()
+                    throw error
+                }
+                await backend.release.finish(.success(()))
+                await context.queue.drain()
+                #expect(outcomes.withLock { $0 } == [true])
+                #expect(context.errorLog.all.isEmpty)
+            }
+        #endif
+
         @Test
         func retainedResourcesDoNotDelayQueueAcceptance() async throws {
             let capabilities = try DeviceCapabilities(maxBufferSize: 4096, maxTextureDimension2D: 64)
@@ -259,13 +388,17 @@
         }
     }
 
-    private final class HeldSubmissionBackend: CommandBackendDevice {
+    private final class HeldSubmissionBackend: PresentationBackendDevice {
         let capabilities: DeviceCapabilities
+        let supportsPresentation = true
         let started = BackendCompletion()
         let release = BackendCompletion()
+        let releaseSecondPresent = BackendCompletion()
         private let retired = Mutex(false)
+        private let presentations = Mutex(0)
 
         var isRetired: Bool { retired.withLock { $0 } }
+        var presentationCount: Int { presentations.withLock { $0 } }
 
         init(capabilities: DeviceCapabilities) {
             self.capabilities = capabilities
@@ -274,6 +407,23 @@
         func allocateBuffer(id: ResourceID, descriptor: BufferDescriptor) async throws {}
         func destroyBuffer(id: ResourceID) async {}
         func submit(_ submission: Submission) async throws {}
+        func allocateTexture(id: ResourceID, descriptor: SAGATypes.TextureDescriptor) async throws {}
+        func destroyTexture(id: ResourceID) async {}
+        func allocateRenderPipeline(_ pipeline: SAGATypes.RenderPipeline, vertex: RenderStageArtifact, fragment: RenderStageArtifact) async throws {}
+        func destroyRenderPipeline(id: ResourceID) async {}
+
+        func present(_ submission: Submission, source: ResourceID) async throws {
+            let first = presentations.withLock { count in
+                count += 1
+                return count == 1
+            }
+            if first {
+                await started.finish(.success(()))
+                try await release.wait(timeout: .seconds(5))
+            } else {
+                try await releaseSecondPresent.wait(timeout: .seconds(5))
+            }
+        }
 
         func submitCommands(_ submission: Submission, commands: [BufferCommand]) async throws -> [[UInt32]] {
             await started.finish(.success(()))

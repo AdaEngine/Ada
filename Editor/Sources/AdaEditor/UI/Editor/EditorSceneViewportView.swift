@@ -8,7 +8,7 @@ struct EditorSceneViewportView: View {
     var uiCatalog: UICatalog = .standard
     let inspectorViewModel: EditorInspectorSidebarViewModel
     let playModeState: EditorPlayModeState
-    var trackedScenePlay: EditorTrackedScenePlay? = nil
+    var trackedScenePlay: EditorTrackedScenePlay?
     let playRuntime: EditorScenePlayRuntime?
     let onEntitySelected: (() -> Void)?
     let onPlay: (() -> Void)?
@@ -127,6 +127,7 @@ struct EditorSceneViewportView: View {
                             viewportModel.loadSceneWorld(
                                 world,
                                 application: app,
+                                waitsForLoadedSceneFrame: true,
                                 onLoadingChanged: { isLoadingScene = $0 },
                                 onLoadingProgress: { loadingProgress = $0 },
                                 onLoaded: { result in
@@ -140,10 +141,21 @@ struct EditorSceneViewportView: View {
                         updateContent: { world, deltaTime in
                             world.getResource(EditorSkeleton3DOverlay.self)?.isEnabled = showsBones && displayMode == .threeD
                             var didChangeViewport = false
+                            #if os(Windows)
+                                var needsCameraSnapshot = false
+                            #endif
                             if let input = world.getResource(Input.self) {
                                 for event in input.getInputEvents() {
                                     let handled = viewportModel.handleInput(event)
-                                    if let mouse = event as? MouseEvent { workbenchInspection?.observedInput(mouse) }
+                                    if let mouse = event as? MouseEvent {
+                                        workbenchInspection?.observedInput(mouse)
+                                        #if os(Windows)
+                                            if handled, viewportModel.isCameraOrbiting, mouse.phase == .changed, mouse.button != .scrollWheel {
+                                                needsCameraSnapshot = true
+                                                continue
+                                            }
+                                        #endif
+                                    }
                                     didChangeViewport = didChangeViewport || handled
                                 }
                             }
@@ -153,11 +165,39 @@ struct EditorSceneViewportView: View {
                             if didChangeViewport {
                                 redrawViewport()
                             }
+                            #if os(Windows)
+                                if needsCameraSnapshot && !didChangeViewport {
+                                    viewportPresentation.refresh(viewportModel: viewportModel)
+                                }
+                            #endif
                         }
                     )
                     .onPrepareFramePresentation {
-                        viewportPresentation.prepareFrame(viewportModel: viewportModel, theme: viewportPresentation.annotationTheme)
+                        let publish = viewportPresentation.prepareFrame(viewportModel: viewportModel, theme: viewportPresentation.annotationTheme)
+                        let finishLoading = viewportModel.prepareLoadedScenePresentation()
+                        #if os(Windows)
+                            return {
+                                let generation = viewportPresentation.presentedAnnotations?.generation
+                                publish()
+                                finishLoading?()
+                                // Redraw the companion geometry only when its scene frame is ready to display.
+                                if generation != viewportPresentation.presentedAnnotations?.generation {
+                                    viewProxy.setNeedsDisplay()
+                                }
+                            }
+                        #else
+                            guard let finishLoading else {
+                                return publish
+                            }
+                            return {
+                                publish()
+                                finishLoading()
+                            }
+                        #endif
                     }
+                    #if os(Windows)
+                        .maximumPendingFrames(2)
+                    #endif
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .accessibilityIdentifier("AdaEditor.SceneViewport.Surface")
 

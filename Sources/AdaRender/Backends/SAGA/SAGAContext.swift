@@ -34,6 +34,7 @@
         let visibilityPipelines = Mutex<SAGAVisibilityPipelines?>(nil)
         #endif
         let supportsPresentation: Bool
+        let supportsPackedVertexIndexBuffers: Bool
         #if SAGA_NATIVE && os(Windows) && canImport(SAGAVulkan)
         /// The DLSS runtime of this context's Vulkan device, set by the native backend.
         let dlssSession = Mutex<SAGADLSSSession?>(nil)
@@ -56,6 +57,7 @@
             capabilities: DeviceCapabilities,
             supportsPresentation: Bool,
             shaderOutput: ShaderOutputFormat,
+            supportsPackedVertexIndexBuffers: Bool = false,
             debugErrors: Bool = SAGAContext.debugFromEnvironment,
             makeDevice: @escaping @Sendable () async throws -> Device
         ) {
@@ -66,6 +68,7 @@
             }
             self.capabilities = capabilities
             self.supportsPresentation = supportsPresentation
+            self.supportsPackedVertexIndexBuffers = supportsPackedVertexIndexBuffers
             self.shaderOutput = shaderOutput
             let errorLog = self.errorLog
             self.queue = OrderedGPUWorkQueue<Device>(
@@ -80,8 +83,13 @@
         /// Creates a SAGA buffer without blocking and returns the slot its id is written to.
         func createBuffer(_ descriptor: BufferDescriptor) -> ResourceSlot<ResourceID> {
             let slot = ResourceSlot<ResourceID>()
-            queue.enqueue { device in
+            let allocate: OrderedGPUWorkQueue<Device>.Work = { device in
                 slot.fulfill(try await device.createBuffer(descriptor))
+            }
+            if shaderOutput == .hlsl {
+                queue.enqueueBufferAllocation(allocate)
+            } else {
+                queue.enqueue(allocate)
             }
             return slot
         }

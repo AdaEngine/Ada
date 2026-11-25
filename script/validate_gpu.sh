@@ -39,6 +39,7 @@ ada_validation_filter="$ada_validation_filter|SAGAVisibilityProcessorTests"
 ada_validation_filter="$ada_validation_filter|MeshBufferTests|TextShaderRenderingTests"
 ada_validation_filter="$ada_validation_filter|Foveated3DRenderingTests"
 ada_validation_filter="$ada_validation_filter|PixelPerfectMetalTests"
+ada_validation_filter="$ada_validation_filter|UIShapeGeometryTests"
 ada_validation_override="${ADAENGINE_GPU_TEST_FILTER:-}"
 ada_validation_filter="${ada_validation_override:-$ada_validation_filter}"
 if [[ "${OS:-}" == "Windows_NT" ]]; then

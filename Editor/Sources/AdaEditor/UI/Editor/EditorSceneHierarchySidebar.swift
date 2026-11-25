@@ -89,6 +89,7 @@ struct EditorSceneHierarchySidebar: View {
                             LazyVStack(items, id: \.id, alignment: .leading, spacing: 0, estimatedRowHeight: rowHeight, rowHeight: { _ in rowHeight }) { item in
                                 hierarchyRow(item, items: items, sceneModel: sceneModel)
                             }
+                            .retainingOffscreenRows(upTo: 128)
                             .padding(.horizontal, compactChrome ? 0 : 8)
                             .padding(.bottom, 8)
                             if items.isEmpty && !searchText.isEmpty {

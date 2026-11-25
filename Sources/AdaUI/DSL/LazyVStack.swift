@@ -8,6 +8,7 @@
 import AdaInput
 import AdaUtils
 import Math
+import OrderedCollections
 
 /// A vertical stack that builds only rows near the visible scroll viewport.
 @MainActor @preconcurrency
@@ -24,6 +25,7 @@ public struct LazyVStack<Data: RandomAccessCollection, ID: Hashable, Row: View>:
     let overscan: Int
     let reuseRowsWithStableIDs: Bool
     let row: (Data.Element) -> Row
+    private(set) var offscreenRowLimit = 0
 
     /// Creates a lazy vertical stack.
     /// - Parameter reuseRowsWithStableIDs: Set this to `true` only when an item's ID changes whenever its rendered row content changes.
@@ -55,6 +57,15 @@ public struct LazyVStack<Data: RandomAccessCollection, ID: Hashable, Row: View>:
         let node = LazyVStackNode(content: self)
         node.updateEnvironment(context.environment)
         return node
+    }
+
+    /// Retains up to `limit` recently scrolled-off rows for reuse by the same item ID.
+    /// A content update discards these detached rows so their inputs and actions stay current.
+    @_spi(AdaEngine)
+    public func retainingOffscreenRows(upTo limit: Int) -> Self {
+        var stack = self
+        stack.offscreenRowLimit = max(0, limit)
+        return stack
     }
 }
 
@@ -104,6 +115,8 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
     private var overscan: Int
     private var reuseRowsWithStableIDs: Bool
     private var row: (Data.Element) -> Row
+    private var offscreenRowLimit: Int
+    private var offscreenRows: OrderedDictionary<AnyHashable, ViewNode> = [:]
     private var itemIDs: [AnyHashable]
     private var measuredHeights: [AnyHashable: Float] = [:]
     private var providedHeights: [AnyHashable: Float] = [:]
@@ -122,6 +135,7 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         self.overscan = content.overscan
         self.reuseRowsWithStableIDs = content.reuseRowsWithStableIDs
         self.row = content.row
+        self.offscreenRowLimit = content.offscreenRowLimit
         self.itemIDs = content.items.map(content.idProvider)
         self.providedHeights = Self.providedHeights(for: content)
         super.init(content: content, nodes: [])
@@ -137,6 +151,8 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         let previousEnvironmentVersion = environment.version
         let previouslyReusedRowsWithStableIDs = reuseRowsWithStableIDs
 
+        offscreenRows.removeAll(keepingCapacity: true)
+        self.offscreenRowLimit = other.offscreenRowLimit
         self.environmentTransform = other.environmentTransform
         self.setContent(other.content)
         self.items = other.items
@@ -163,9 +179,20 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
     }
 
     override func updateViewOwner(_ owner: ViewOwner) {
+        if self.owner !== owner {
+            offscreenRows.removeAll(keepingCapacity: true)
+        }
         super.updateViewOwner(owner)
         for node in nodes {
             node.updateViewOwner(owner)
+        }
+    }
+
+    override func updateEnvironment(_ environment: EnvironmentValues) {
+        let previousVersion = self.environment.version
+        super.updateEnvironment(environment)
+        if self.environment.version != previousVersion {
+            offscreenRows.removeAll(keepingCapacity: true)
         }
     }
 
@@ -184,7 +211,7 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         let range = visibleRange()
         if itemIndices.count != itemIDs.count || nodes.count != range.count
             || !zip(range, nodes).allSatisfy({ itemIDs[$0.0] == nodeIdentity($0.1) }) {
-            rebuildVisibleRows(in: range, updateExistingRows: false)
+            rebuildVisibleRows(in: range, updateExistingRows: false, isViewportUpdate: true)
         }
 
         let width = frame.width
@@ -359,9 +386,11 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
         performLayout()
     }
 
-    private func rebuildVisibleRows(in range: Range<Int>, updateExistingRows: Bool) {
+    private func rebuildVisibleRows(in range: Range<Int>, updateExistingRows: Bool, isViewportUpdate: Bool = false) {
         let oldNodes = nodes
+        let canCacheRows = isViewportUpdate && offscreenRowLimit > 0 && itemIndices.count == itemIDs.count
         var oldNodesByID: [AnyHashable: ViewNode] = [:]
+        oldNodesByID.reserveCapacity(oldNodes.count)
         for node in oldNodes {
             if let id = nodeIdentity(node) {
                 oldNodesByID[id] = node
@@ -373,22 +402,24 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
 
         for index in range {
             let id = itemIDs[index]
+            let oldNode = oldNodesByID.removeValue(forKey: id)
+            if isViewportUpdate, let oldNode {
+                newNodes.append(oldNode)
+                continue
+            }
             let resolvedNode: ViewNode
 
-            if let oldNode = oldNodesByID.removeValue(forKey: id) {
-                if updateExistingRows {
-                    let newNode = makeRowNode(at: index, id: id)
-                    if newNode.canUpdate(oldNode) {
-                        oldNode.update(from: newNode)
-                        resolvedNode = oldNode
-                    } else {
-                        resolvedNode = newNode
-                    }
-                } else {
+            if let oldNode, updateExistingRows {
+                let newNode = makeRowNode(at: index, id: id)
+                if newNode.canUpdate(oldNode) {
+                    oldNode.update(from: newNode)
                     resolvedNode = oldNode
+                } else {
+                    detachRow(oldNode)
+                    resolvedNode = newNode
                 }
             } else {
-                resolvedNode = makeRowNode(at: index, id: id)
+                resolvedNode = oldNode ?? offscreenRows.removeValue(forKey: id) ?? makeRowNode(at: index, id: id)
             }
 
             resolvedNode.parent = self
@@ -400,11 +431,28 @@ final class LazyVStackNode<Data: RandomAccessCollection, ID: Hashable, Row: View
             newNodes.append(resolvedNode)
         }
 
-        for oldNode in oldNodesByID.values {
-            oldNode.parent = nil
+        for oldNode in oldNodes {
+            guard let id = nodeIdentity(oldNode), oldNodesByID[id] === oldNode else {
+                continue
+            }
+            let canReuseRow = detachRow(oldNode)
+            if canCacheRows, canReuseRow {
+                offscreenRows[id] = oldNode
+            }
+        }
+
+        if offscreenRows.count > offscreenRowLimit {
+            offscreenRows.removeFirst(offscreenRows.count - offscreenRowLimit)
         }
 
         nodes = newNodes
+    }
+
+    @discardableResult
+    private func detachRow(_ node: ViewNode) -> Bool {
+        let hadActiveInput = offscreenRowLimit > 0 && owner?.deactivateInput(in: node) == true
+        node.parent = nil
+        return !hadActiveInput
     }
 
     private func makeRowNode(at index: Int, id: AnyHashable) -> ViewNode {

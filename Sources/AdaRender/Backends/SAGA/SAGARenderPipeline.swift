@@ -50,8 +50,8 @@
     final class SAGARenderPipeline: RenderPipeline, @unchecked Sendable {
         let descriptor: RenderPipelineDescriptor
         let slot = ResourceSlot<SAGATypes.RenderPipeline>()
-        /// Maps AdaRender vertex buffer indices to the dense slots of the SAGA pipeline.
-        let vertexBufferSlots: [Int: UInt32]
+        /// AdaRender vertex buffer indices in the dense slot order used by the SAGA pipeline.
+        let vertexBufferSlots: [Int]
         let context: SAGAContext
         /// Debug aid: whether unbound declared resources were already reported.
         var reportedMissingBindings = false
@@ -59,6 +59,7 @@
         /// Resources the shader stages declare; the encoder binds only these.
         let uniformSlots: Set<ComputeBindingSlot>
         let storageSlots: Set<ComputeBindingSlot>
+        let writableStorageSlots: Set<ComputeBindingSlot>
         let textureSlots: Set<ComputeBindingSlot>
         let accelerationStructureSlots: Set<ComputeBindingSlot>
         let samplerSlots: Set<ComputeBindingSlot>
@@ -93,7 +94,7 @@
             self.context = context
             self.descriptor = descriptor
             let active = descriptor.vertexDescriptor.activeBufferIndices
-            self.vertexBufferSlots = Dictionary(uniqueKeysWithValues: active.enumerated().map { ($0.element, UInt32($0.offset)) })
+            self.vertexBufferSlots = active
 
             let vertexStage: RenderStageArtifact
             #if SAGA_METAL_NATIVE_PASS
@@ -117,6 +118,9 @@
             }
             self.uniformSlots = Set(stages.flatMap { $0.uniformBindings.map { slot($0.binding) } })
             self.storageSlots = Set(stages.flatMap { $0.storageBindings.map { slot($0.binding) } })
+            self.writableStorageSlots = Set(stages.flatMap { stage in
+                stage.storageBindings.compactMap { $0.isReadOnly ? nil : slot($0.binding) }
+            })
             self.textureSlots = Set(stages.flatMap { $0.sampledTextures.map { slot($0.binding) } })
             self.accelerationStructureSlots = Set(stages.flatMap { $0.accelerationStructures.map { slot($0.binding) } })
             self.samplerSlots = Set(stages.flatMap { $0.samplerBindings.map { slot($0.binding) } })

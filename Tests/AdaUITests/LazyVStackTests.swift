@@ -414,6 +414,28 @@ struct LazyVStackTests {
         lazyNode.updateEnvironment(lazyNode.environment)
         #expect(counter.updateCounts.isEmpty)
     }
+
+    @Test
+    func scrollingDoesNotResendLayoutPropertiesToRowsThatStayMounted() throws {
+        let counter = LazyVStackEnvironmentUpdateCounter()
+        let tester = ViewTester {
+            ScrollView(.vertical) {
+                LazyVStack(Array(0..<100), id: \.self, spacing: 0, rowHeight: { _ in 24 }, overscan: 0) { item in
+                    LazyVStackEnvironmentCountingRow(id: item, counter: counter)
+                }
+            }
+        }.setSize(Size(width: 120, height: 120)).performLayout()
+
+        let root = tester.containerView.viewTree.rootNode
+        let scroll = try #require(firstScrollView(in: root))
+        let retainedRow = try #require(root.findNodeById(AnyHashable(4)))
+        counter.reset()
+        scroll.scrollToViewNodeIfFoundIt(2, anchor: .top)
+
+        #expect(root.findNodeById(AnyHashable(4)) === retainedRow)
+        #expect(root.findNodeById(AnyHashable(7)) != nil)
+        #expect(counter.layoutUpdateCounts[4] == nil)
+    }
 }
 
 @MainActor
@@ -444,6 +466,7 @@ private func firstScrollView(in node: ViewNode) -> ScrollViewNode? {
 @MainActor
 private final class LazyVStackEnvironmentUpdateCounter {
     var updateCounts: [Int: Int] = [:]
+    var layoutUpdateCounts: [Int: Int] = [:]
 
     func record(rowID: Int) {
         updateCounts[rowID, default: 0] += 1
@@ -451,6 +474,7 @@ private final class LazyVStackEnvironmentUpdateCounter {
 
     func reset() {
         updateCounts.removeAll()
+        layoutUpdateCounts.removeAll()
     }
 }
 
@@ -552,6 +576,11 @@ private final class LazyVStackEnvironmentCountingRowNode: ViewNode {
         if environment.version != previousVersion {
             counter.record(rowID: rowID)
         }
+    }
+
+    override func updateLayoutProperties(_ props: LayoutProperties) {
+        counter.layoutUpdateCounts[rowID, default: 0] += 1
+        super.updateLayoutProperties(props)
     }
 
     override func sizeThatFits(_ proposal: ProposedViewSize) -> Size {

@@ -969,7 +969,9 @@ protocol ViewOwner: AnyObject {
 
     func enqueueLifecycleAction(_ action: @escaping @MainActor () -> Void)
 
-    func deactivateInput(in subtree: ViewNode)
+    /// Returns whether the subtree had focus or an active pointer capture.
+    @discardableResult
+    func deactivateInput(in subtree: ViewNode) -> Bool
 
     func requestFocus(for node: ViewNode)
 }

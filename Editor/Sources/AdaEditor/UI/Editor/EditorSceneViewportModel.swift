@@ -128,6 +128,8 @@ final class EditorSceneViewportModel {
     private var presentationPauseTask: Task<Void, Never>?
     private var isPresentationActive = true
     private var sceneLoadGeneration = 0
+    private var waitsForLoadedSceneFrame = false
+    private var loadedSceneAwaitingPresentation: Int?
     private var onSceneLoadingChanged: ((Bool) -> Void)?
     private var onSceneLoadingProgress: ((EditorSceneLoadingProgress) -> Void)?
     private var onSceneLoaded: ((EditorSceneRuntimeLoadResult) -> Void)?
@@ -235,6 +237,7 @@ final class EditorSceneViewportModel {
         presentationPauseTask = nil
         endTerrainStroke(cancelled: true)
         sceneLoadGeneration += 1
+        loadedSceneAwaitingPresentation = nil
         sceneLoadTask?.cancel()
         sceneLoadTask = nil
         onSceneLoadingChanged = nil
@@ -299,6 +302,7 @@ final class EditorSceneViewportModel {
         let previousLoad = sceneLoadTask
         previousLoad?.cancel()
         sceneLoadGeneration += 1
+        loadedSceneAwaitingPresentation = nil
         let generation = sceneLoadGeneration
         let needsAssets = model.entities.contains {
             $0.components[EditorBuiltInComponentType.model3DSource] != nil
@@ -355,7 +359,11 @@ final class EditorSceneViewportModel {
                     return
                 }
                 self.sceneLoadTask = nil
-                self.onSceneLoadingChanged?(false)
+                if self.waitsForLoadedSceneFrame {
+                    self.loadedSceneAwaitingPresentation = generation
+                } else {
+                    self.onSceneLoadingChanged?(false)
+                }
                 self.refreshLocomotionInspector()
                 self.onSceneLoaded?(result)
             } catch is CancellationError {
@@ -377,17 +385,33 @@ final class EditorSceneViewportModel {
     func loadSceneWorld(
         _ world: World,
         application: AppWorlds? = nil,
+        waitsForLoadedSceneFrame: Bool = false,
         onLoadingChanged: @escaping (Bool) -> Void,
         onLoadingProgress: @escaping (EditorSceneLoadingProgress) -> Void = { _ in },
         onLoaded: @escaping (EditorSceneRuntimeLoadResult) -> Void
     ) {
         self.world = world
         sceneApplication = application
+        self.waitsForLoadedSceneFrame = waitsForLoadedSceneFrame
         updatePresentationPause()
         onSceneLoadingChanged = onLoadingChanged
         onSceneLoadingProgress = onLoadingProgress
         onSceneLoaded = onLoaded
         _ = reloadSceneRuntimeIfReady()
+    }
+
+    /// Captures readiness for the scene used by this frame. Older in-flight frames may still be published.
+    func prepareLoadedScenePresentation() -> (@MainActor () -> Void)? {
+        guard let generation = loadedSceneAwaitingPresentation else {
+            return nil
+        }
+        return { [weak self] in
+            guard let self, self.loadedSceneAwaitingPresentation == generation else {
+                return
+            }
+            self.loadedSceneAwaitingPresentation = nil
+            self.onSceneLoadingChanged?(false)
+        }
     }
 
     private func reportSceneLoadingProgress(_ progress: EditorSceneLoadingProgress, generation: Int) {
@@ -601,6 +625,10 @@ final class EditorSceneViewportModel {
 
     var isPerspectiveTransitionActive: Bool {
         displayMode == .threeD ? perspectiveBlend < 1 : perspectiveBlend > 0
+    }
+
+    var isCameraOrbiting: Bool {
+        displayMode == .threeD && isThreeDRotating && transformDrag == nil
     }
 
     func handleInput(_ event: any InputEvent) -> Bool {

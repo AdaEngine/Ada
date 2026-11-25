@@ -11,10 +11,42 @@ import re
 import shutil
 import subprocess
 import tempfile
-from urllib.request import HTTPSHandler, OpenerDirector, ProxyHandler
+from urllib.request import HTTPErrorProcessor, HTTPRedirectHandler, HTTPSHandler, OpenerDirector, ProxyHandler
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+DXC_ARCHIVE = "dxc_2026_09_29.zip"
+DXC_RELEASE = "https://github.com/microsoft/DirectXShaderCompiler/releases/download/v1.9.2609/"
+DXC_SHA256 = "ad31b1fc8443175d204f77a611fdb3ef2ec42759bdc2f1167368de24a4a7e7f1"
+
+
+def stage_dxc(directory):
+    """Keep the Direct3D shader compiler and its matching validator beside Studio."""
+    cache = ROOT / ".build-tools" / DXC_ARCHIVE
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    if not cache.is_file():
+        with tempfile.TemporaryDirectory(prefix="ada-dxc-", dir=cache.parent) as temporary:
+            download = Path(temporary) / DXC_ARCHIVE
+            client = OpenerDirector()
+            client.add_handler(ProxyHandler())
+            client.add_handler(HTTPSHandler())
+            client.add_handler(HTTPRedirectHandler())
+            client.add_handler(HTTPErrorProcessor())
+            with client.open(DXC_RELEASE + DXC_ARCHIVE, timeout=60) as response, download.open("wb") as stream:
+                shutil.copyfileobj(response, stream)
+            if hashlib.sha256(download.read_bytes()).hexdigest() != DXC_SHA256:
+                raise RuntimeError("DirectX Shader Compiler archive has an unexpected SHA-256 digest")
+            download.replace(cache)
+    if hashlib.sha256(cache.read_bytes()).hexdigest() != DXC_SHA256:
+        raise RuntimeError(f"DirectX Shader Compiler archive has an unexpected SHA-256 digest: {cache}")
+
+    notices = directory / "ThirdPartyNotices" / "DirectXShaderCompiler"
+    notices.mkdir(parents=True, exist_ok=True)
+    with zipfile.ZipFile(cache) as archive:
+        for name in ["dxcompiler.dll", "dxil.dll"]:
+            (directory / name).write_bytes(archive.read(f"bin/x64/{name}"))
+        for name in ["LICENCE-MIT.txt", "LICENSE-LLVM.txt", "LICENSE-MS.txt"]:
+            (notices / name).write_bytes(archive.read(name))
 
 
 def run(*args, **kwargs):
@@ -126,6 +158,8 @@ def package(binary_directory, compiler, output, version, smoke_test=True, *, sta
                     shutil.copy2(library, directory)
         lore_sdk = Path(run("python", ROOT / "script/ensure_windows_lore.py"))
         search = [binary_directory, lore_sdk] + runtime + [Path(path) for path in os.environ.get("PATH", "").split(os.pathsep) if path]
+        if os.environ.get("ADAENGINE_ENABLE_D3D12") == "1":
+            stage_dxc(directory)
         binaries = list(directory.glob("*.dll")) + [directory / "AdaEditor.exe", directory / "adastudio.exe", directory / "BuildSDK/AdaScript/gravity.exe"]
         bundle_dependencies(directory, binaries, search)
         for helper in [directory / "BuildSDK/AdaScript/gravity.exe"]:

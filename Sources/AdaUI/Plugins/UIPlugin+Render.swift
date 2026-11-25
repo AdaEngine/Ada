@@ -204,6 +204,8 @@ public struct UIRenderTesselationSystem {
         removeStaleRenderItems()
 
         let tessellator = UITessellator()
+        let device = renderDevice.renderDevice
+        let packGeometry = device.supportsPackedUIShapeBuffers
         let transientBuffers = renderDevice.renderDevice is RenderDeviceWithCommandCompletion
             ? geometryBufferPool
             : nil
@@ -215,7 +217,18 @@ public struct UIRenderTesselationSystem {
             let windowId = graphicsContext.windowId
             rebuiltWindowIds.insert(windowId)
             var rootState = DrawBuildState(transientBuffers: transientBuffers)
+            rootState.deferGeometry = packGeometry
             var layerStack: [ActiveLayer] = []
+            var pending: [UIDrawData] = []
+            var layersAwaitingGeometry: [(ActiveLayer, Range<Int>)] = []
+
+            func emit(_ items: [UIDrawData]) {
+                if packGeometry {
+                    pending.append(contentsOf: items)
+                } else {
+                    appendRenderItems(items, sortKey: &sortKey, context: graphicsContext)
+                }
+            }
 
             for command in graphicsContext.getDrawCommands() {
                 switch command {
@@ -230,14 +243,14 @@ public struct UIRenderTesselationSystem {
                     // Flush current state to preserve draw order.
                     if layerStack.isEmpty {
                         flushStateIfNeeded(&rootState, renderDevice: renderDevice.renderDevice).map { rootState.drawDataItems.append($0) }
-                        appendRenderItems(rootState.drawDataItems, sortKey: &sortKey, context: graphicsContext)
+                        emit(rootState.drawDataItems)
                         rootState.drawDataItems.removeAll(keepingCapacity: true)
                     } else if layerStack[layerStack.count - 1].mode == .building {
                         flushStateIfNeeded(&layerStack[layerStack.count - 1].state, renderDevice: renderDevice.renderDevice)
                             .map {
                                 layerStack[layerStack.count - 1].state.drawDataItems.append($0)
                             }
-                        appendRenderItems(layerStack[layerStack.count - 1].state.drawDataItems, sortKey: &sortKey, context: graphicsContext)
+                        emit(layerStack[layerStack.count - 1].state.drawDataItems)
                         layerStack[layerStack.count - 1].state.drawDataItems.removeAll(keepingCapacity: true)
                     }
 
@@ -249,7 +262,7 @@ public struct UIRenderTesselationSystem {
                         cached.cacheable,
                         cached.clipRect == inheritedState.currentClipRect,
                         cached.clipPolygons == inheritedState.currentClipPolygons {
-                        appendRenderItems(cached.drawDataItems, sortKey: &sortKey, context: graphicsContext)
+                        emit(cached.drawDataItems)
                         layerStack.append(ActiveLayer(id: id, version: version, mode: .skipping, cacheable: cacheable, state: inheritedState))
                     } else {
                         inheritedState.transientBuffers = canUseLayerCache ? nil : transientBuffers
@@ -270,9 +283,16 @@ public struct UIRenderTesselationSystem {
                         break
                     case .building:
                         flushStateIfNeeded(&layer.state, renderDevice: renderDevice.renderDevice).map { layer.state.drawDataItems.append($0) }
-                        appendRenderItems(layer.state.drawDataItems, sortKey: &sortKey, context: graphicsContext)
-
-                        cacheLayer(layer, windowId: windowId)
+                        if packGeometry && layer.cacheable {
+                            // A retained leaf owns its storage independently of this window rebuild.
+                            UIShapeGeometry.upload(&layer.state.drawDataItems, device: device, pool: nil)
+                            let start = pending.count
+                            emit(layer.state.drawDataItems)
+                            layersAwaitingGeometry.append((layer, start..<pending.count))
+                        } else {
+                            emit(layer.state.drawDataItems)
+                            cacheLayer(layer, windowId: windowId)
+                        }
                     }
 
                 default:
@@ -304,7 +324,16 @@ public struct UIRenderTesselationSystem {
                 renderDevice: renderDevice.renderDevice
             )
             .map { rootState.drawDataItems.append($0) }
-            appendRenderItems(rootState.drawDataItems, sortKey: &sortKey, context: graphicsContext)
+            emit(rootState.drawDataItems)
+            if packGeometry {
+                UIShapeGeometry.upload(&pending, device: device, pool: transientBuffers)
+                UIQuadGlyphGeometry.upload(&pending, device: device, pool: transientBuffers)
+                for (var layer, range) in layersAwaitingGeometry {
+                    layer.state.drawDataItems = Array(pending[range])
+                    cacheLayer(layer, windowId: windowId)
+                }
+                appendRenderItems(pending, sortKey: &sortKey, context: graphicsContext)
+            }
         }
 
         if !layerDrawCache.entries.isEmpty {
@@ -364,6 +393,7 @@ public struct UIRenderTesselationSystem {
         var preparedGlyphClip: UITessellator.PreparedGlyphClip?
         var clipPolygonStack: [[[Vector2]]?] = []
         var transientBuffers: UIGeometryBufferPool?
+        var deferGeometry = false
 
         init(
             currentClipRect: Rect? = nil,
@@ -450,7 +480,7 @@ public struct UIRenderTesselationSystem {
         if let clip = flushed.clipRect, clip.width <= 0 || clip.height <= 0 {
             return nil
         }
-        flushed.write(to: renderDevice, using: transientBuffers)
+        flushed.write(to: renderDevice, using: transientBuffers, deferGeometry: state.deferGeometry)
         return flushed
     }
 

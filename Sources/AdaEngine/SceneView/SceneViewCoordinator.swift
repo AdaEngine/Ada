@@ -15,10 +15,20 @@ import AdaCorePipelines
 import AdaTransform
 import AdaUI
 import AdaUtils
+import Foundation
 import Math
 
 @MainActor
 final class SceneViewCoordinator: OffscreenViewportDelegate {
+    nonisolated private static let tracesInput = ProcessInfo.processInfo.environment["ADAENGINE_VIEWPORT_LATENCY_TRACE"] == "1"
+
+    private func traceInput(_ stage: String, texture: RenderTexture?) {
+        guard Self.tracesInput else {
+            return
+        }
+        print("[viewport-latency]", Time.absolute, stage, texture.map { String(describing: ObjectIdentifier($0)) } ?? "-")
+    }
+
     private(set) var appWorlds: AppWorlds?
     private var cameraEntity: Entity?
     private let useSceneCameras: Bool
@@ -47,6 +57,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
 
     private let hostSubworldName: AppWorldName
     private let pipelinedRendering: Bool
+    private let maximumPendingFrames: Int?
     private var currentSize: SizeInt = .zero
     private var scaleFactor: Float = 1
     private var pendingResize: (size: SizeInt, scaleFactor: Float, readyAt: ContinuousClock.Instant)?
@@ -86,10 +97,12 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         prepareFramePresentation: (@MainActor () -> (@MainActor () -> Void))? = nil,
         frameCaptureLabel: String? = nil,
         pipelinedRendering: Bool = false,
+        maximumPendingFrames: Int? = nil,
         joinsHostSession: Bool = true,
         resizeClock: @escaping () -> ContinuousClock.Instant = { .now }
     ) {
         self.pipelinedRendering = pipelinedRendering
+        self.maximumPendingFrames = maximumPendingFrames
         self.joinsHostSession = joinsHostSession
         self.resizeClock = resizeClock
         self.frameCaptureLabel = frameCaptureLabel
@@ -119,7 +132,9 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
 
     /// Names of cameras that contribute to the frame. A display camera mirroring an authored one is included.
     var activeCameraNames: [String] {
-        guard let appWorlds else { return [] }
+        guard let appWorlds else {
+            return []
+        }
         return appWorlds.main.getEntities()
             .filter { $0.components[Camera.self]?.isActive == true }
             .map(\.name)
@@ -229,7 +244,9 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     func tick(_ deltaTime: AdaUtils.TimeInterval) {
-        guard isRenderingEnabled else { return }
+        guard isRenderingEnabled else {
+            return
+        }
         applyPendingSizeIfReady()
         // GPU completion may arrive between UI extraction and submission. Only
         // swap the displayed texture and its companion UI at the next UI tick.
@@ -240,7 +257,9 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         }
         // A standalone update may suspend during startup, asset loading or rendering.
         // Retargeting before it finishes reserves textures for frames that were never submitted.
-        guard isHostedSubworld || !standaloneTickInFlight else { return }
+        guard isHostedSubworld || !standaloneTickInFlight else {
+            return
+        }
         contentDeltaTime = deltaTime
         ageRetiredDisplayTargets()
         prepareNextRenderTarget()
@@ -251,7 +270,9 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     func setRenderingEnabled(_ enabled: Bool) {
-        guard enabled != isRenderingEnabled else { return }
+        guard enabled != isRenderingEnabled else {
+            return
+        }
         isRenderingEnabled = enabled
         appWorlds?.isHostedUpdateSuspended = !enabled
     }
@@ -267,6 +288,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         input.wrappedValue.attachPointerDriver(UIWindowManager.shared)
         // Parse on the next preUpdate. Flushing during an in-flight async frame
         // lets its postUpdate cleanup discard the event before input systems see it.
+        if event is MouseEvent { traceInput("receive", texture: nil) }
         input.wrappedValue.receiveEvent(event)
     }
 
@@ -292,7 +314,13 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             return
         }
         // Run after input parsing and before camera preparation in preUpdate.
+        let previousPose = cameraEntity?.components[Transform.self]
         updateContentClosure(world, contentDeltaTime)
+        // CameraSystem reads the world transform in preUpdate. Normal transform propagation runs in postUpdate.
+        if let cameraEntity, cameraEntity.components[RelationshipComponent.self]?.parent == nil,
+            let transform = cameraEntity.components[Transform.self], transform != previousPose {
+            cameraEntity.components += GlobalTransform(matrix: transform.matrix)
+        }
         // Target eligibility is decided before simulation. Capture companion UI only
         // after this frame's input has updated the scene and its camera.
         guard let targetRenderTexture,
@@ -300,6 +328,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             !pendingDisplayTargets[index].isPresentationPrepared else {
             return
         }
+        traceInput("update", texture: targetRenderTexture)
         pendingDisplayTargets[index].isPresentationPrepared = true
         pendingDisplayTargets[index].present = prepareFramePresentation?()
     }
@@ -455,6 +484,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
                     debugLabel: "SceneView_RenderTarget_\(index)"
                 )
                 texture.renderCompletedHandler = { [weak self] texture in
+                    if Self.tracesInput { print("[viewport-latency]", Time.absolute, "callback", ObjectIdentifier(texture)) }
                     Task { @MainActor in
                         self?.completeRenderTexture(texture)
                     }
@@ -510,6 +540,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             }
         }
         if didPublish {
+            traceInput("publish", texture: frontRenderTexture)
             completedFrameCount += 1
             present?()
             if let renderTexture = renderTexture as? Texture2DProxy,
@@ -532,6 +563,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             return
         }
 
+        traceInput("complete", texture: texture)
         pendingDisplayTargets[index].isCompleted = true
     }
 
@@ -556,6 +588,10 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     }
 
     private func prepareNextRenderTarget() {
+        if let maximumPendingFrames, pendingDisplayTargets.count >= maximumPendingFrames {
+            suspendCameraRendering()
+            return
+        }
         if let targetRenderTexture,
             !isDisplayUnavailable(targetRenderTexture) {
             makeCameraRenderTargetReady(targetRenderTexture)
@@ -668,7 +704,9 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         let target = ContentUpdateTarget(coordinator: self)
         app.insertResource(target)
         app.addSystem(ContentUpdateSystem.self, on: .preUpdate)
-        guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else { return }
+        guard let renderWorld = app.getSubworldBuilder(by: .renderWorld) else {
+            return
+        }
         renderWorld.insertResource(target)
         if pipelinedRendering {
             renderWorld.insertResource(RenderPipelining(isEnabled: true))

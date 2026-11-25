@@ -47,6 +47,7 @@ public struct SceneView<Placeholder: View>: View {
     private var prepareFramePresentation: (@MainActor () -> (@MainActor () -> Void))?
     private var frameCaptureLabel: String?
     private var pipelinedRendering = false
+    private var maximumPendingFrames: Int?
 
     /// Makes completed frames of this scene readable through ``SceneViewFrameRegistry``.
     ///
@@ -67,6 +68,14 @@ public struct SceneView<Placeholder: View>: View {
     public func pipelinedRendering(_ isEnabled: Bool = true) -> Self {
         var view = self
         view.pipelinedRendering = isEnabled
+        return view
+    }
+
+    /// Limits how far scene rendering can run ahead of the visible texture. Simulation continues while that work retires.
+    @_spi(AdaEngine)
+    public func maximumPendingFrames(_ count: Int) -> Self {
+        var view = self
+        view.maximumPendingFrames = max(1, count)
         return view
     }
 
@@ -119,7 +128,7 @@ public struct SceneView<Placeholder: View>: View {
 
     public var body: some View {
         OffscreenViewportContainer(
-            delegateFactory: { [make, updateContent, onFrameRendered, useSceneCameras, prepareFramePresentation, frameCaptureLabel, pipelinedRendering] in
+            delegateFactory: { [make, updateContent, onFrameRendered, useSceneCameras, prepareFramePresentation, frameCaptureLabel, pipelinedRendering, maximumPendingFrames] in
                 SceneViewCoordinator(
                     useSceneCameras: useSceneCameras,
                     make: make,
@@ -127,7 +136,8 @@ public struct SceneView<Placeholder: View>: View {
                     onFrameRendered: onFrameRendered,
                     prepareFramePresentation: prepareFramePresentation,
                     frameCaptureLabel: frameCaptureLabel,
-                    pipelinedRendering: pipelinedRendering
+                    pipelinedRendering: pipelinedRendering,
+                    maximumPendingFrames: maximumPendingFrames
                 )
             },
             contentBuilder: { [placeholder, isInteractive, updatesWhenWindowInactive] delegate in

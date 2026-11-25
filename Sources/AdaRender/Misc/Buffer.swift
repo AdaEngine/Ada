@@ -67,7 +67,7 @@ extension Buffer {
 
     /// Geometry storage version for the editor's shadow cache. Other buffers use the uncached path.
     package var shadowRasterRevision: UInt64? {
-        #if os(macOS) && SAGA_RENDER && canImport(SAGACompiler)
+        #if (os(macOS) || os(Windows)) && SAGA_RENDER && canImport(SAGACompiler)
             geometryWriteRevision
         #else
             nil
@@ -75,7 +75,7 @@ extension Buffer {
     }
 
     package var hasUntrackedShadowWrites: Bool {
-        #if os(macOS) && SAGA_RENDER && canImport(SAGACompiler)
+        #if (os(macOS) || os(Windows)) && SAGA_RENDER && canImport(SAGACompiler)
             (self as? SAGABuffer)?.hasUntrackedShadowWrites ?? false
         #else
             false

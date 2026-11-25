@@ -8,6 +8,9 @@
 import AdaUtils
 import Foundation
 import Math
+#if os(Windows) && SAGA_RENDER && canImport(SAGACompiler)
+import SAGAShaderIR
+#endif
 
 public enum TriangleFillMode {
     case fill
@@ -173,6 +176,36 @@ public protocol Drawable: AnyObject, Sendable {
 package protocol RenderDeviceWithCommandCompletion {}
 
 extension RenderDevice {
+    package var usesWindowsNativeSAGA: Bool {
+        #if os(Windows) && SAGA_RENDER && SAGA_NATIVE && canImport(SAGACompiler)
+        guard let output = (self as? SAGARenderDevice)?.context.shaderOutput else {
+            return false
+        }
+        return output == .spirv || output == .hlsl
+        #else
+        false
+        #endif
+    }
+
+    package var supportsStudioShadowCache: Bool {
+        #if os(macOS)
+        true
+        #else
+        usesWindowsNativeSAGA
+        #endif
+    }
+
+    package var supportsPackedUIShapeBuffers: Bool {
+        #if os(Windows) && SAGA_RENDER && SAGA_NATIVE && canImport(SAGACompiler)
+        guard let context = (self as? SAGARenderDevice)?.context else {
+            return false
+        }
+        return context.shaderOutput == .spirv || context.supportsPackedVertexIndexBuffers
+        #else
+        false
+        #endif
+    }
+
     public var supportsFloat32TextureFiltering: Bool { true }
     public var supportsInstancedVertexInputs: Bool { false }
     public func readImage(from texture: Texture) async throws -> Image? {

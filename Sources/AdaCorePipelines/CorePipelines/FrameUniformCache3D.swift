@@ -23,10 +23,20 @@ package struct FrameUniformCache3D<Value: Sendable>: Sendable {
 
     package mutating func write(_ value: Value, view: Entity.ID, pass: Int = 0, device: RenderDevice) -> BufferData<Value> {
         let key = Key(view: view, pass: pass)
-        var entry = entries[key] ?? Entry(buffers: (0..<frames).map { _ in BufferData(elements: [value]) }, index: 0)
+        var entry = entries.removeValue(forKey: key) ?? Entry(buffers: (0..<frames).map { _ in BufferData(elements: [value]) }, index: 0)
         entry.index = (entry.index + 1) % frames
-        entry.buffers[entry.index].elements[0] = value
-        entry.buffers[entry.index].write(to: device)
+        // Keep rotating even when the constants are identical. The previous slot may
+        // still be sampled by the GPU. Each slot holds only uniforms read by shaders.
+        let slot = entry.index
+        let alreadyUploaded = entry.buffers[slot].buffer != nil && withUnsafeBytes(of: value) { requested in
+            entry.buffers[slot].elements.withUnsafeBytes { stored in
+                stored.prefix(requested.count).elementsEqual(requested)
+            }
+        }
+        if !alreadyUploaded {
+            entry.buffers[slot].elements[0] = value
+            entry.buffers[slot].write(to: device)
+        }
         let output = entry.buffers[entry.index]
         entries[key] = entry
         return output

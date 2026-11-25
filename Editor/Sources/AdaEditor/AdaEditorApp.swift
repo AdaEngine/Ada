@@ -57,6 +57,9 @@ enum AdaApplicationEntry {
                 return
             }
         #endif
+        #if os(Windows)
+            unsafe RenderEngine.presentationMode = .synchronizedLatest
+        #endif
         try await AppRuntime.run(AdaEditorApp())
     }
 }

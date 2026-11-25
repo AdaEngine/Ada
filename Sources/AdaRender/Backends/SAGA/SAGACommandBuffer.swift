@@ -11,11 +11,11 @@
     import Math
     import SAGA
     import SAGACore
+    import SAGAShaderIR
     import SAGATypes
     import Synchronization
     #if SAGA_METAL_NATIVE_PASS
     @_spi(IndexedDrawGrouping) import SAGAMetal
-    import SAGAShaderIR
     #endif
 
     /// Builds one SAGA command when the device queue runs, after earlier resource work resolved its slots.
@@ -113,78 +113,106 @@
             let resources = retainedResources
             let hasCompletionHandlers = !completed.isEmpty || !timing.isEmpty
             let debugErrors = context.debugErrors
+            let usesDirect3D12 = context.shaderOutput == .hlsl
+            let queue = context.queue
+            #if os(Windows)
+                let retireOffQueue = hasCompletionHandlers && !debugErrors
+            #else
+                let retireOffQueue = false
+            #endif
             let submissionLabel = label ?? "-"
             completedHandlers = []
             timingHandlers = []
             retainedResources = []
-            let notifyCompletion: @Sendable () -> Void = {
+            let finish: @Sendable (Bool) -> Void = { success in
+                reportResult(success)
                 timing.forEach { $0(nil) }
                 completed.forEach { $0() }
+                withExtendedLifetime(resources) {}
             }
-            let notifyUnavailable: @Sendable () -> Void = {
-                reportResult(false)
-                notifyCompletion()
-            }
+            let notifyUnavailable: @Sendable () -> Void = { finish(false) }
             let unavailable = hasCompletionHandlers || !observers.isEmpty ? notifyUnavailable : nil
-            context.queue.enqueue(onUnavailable: unavailable) { device in
-                var reportsFailureOnExit = !observers.isEmpty
+            queue.enqueue(onUnavailable: unavailable) { device in
+                var completedHere = true
+                var succeeded = false
                 defer {
-                    if reportsFailureOnExit { reportResult(false) }
-                    notifyCompletion()
-                    withExtendedLifetime(resources) {}
-                }
-                guard !builders.isEmpty else {
-                    if hasCompletionHandlers || !observers.isEmpty {
-                        // Even an empty frame fence must retire after earlier device work.
-                        let fence = try await device.submitResourceUse([])
-                        try await fence.wait()
-                        reportsFailureOnExit = false
-                        reportResult(true)
-                    }
-                    return
-                }
-                let commands = try builders.map { try $0() }
-                let ticket: CommandTicket
-                do {
-                    #if SAGA_METAL_NATIVE_PASS
-                    if !groupableDraws.isEmpty {
-                        ticket = try await MetalIndexedDrawGrouping.$commands.withValue(groupableDraws) {
-                            try await device.submitCommands(commands)
+                    if completedHere {
+                        if retireOffQueue {
+                            let result = succeeded
+                            queue.enqueueRetirement { finish(result) }
+                        } else {
+                            finish(succeeded)
                         }
-                    } else {
-                        ticket = try await device.submitCommands(commands)
                     }
-                    #else
-                    ticket = try await device.submitCommands(commands)
-                    #endif
-                    if Self.tracesSubmission {
-                        print("ADA-SAGA\t\(Date().timeIntervalSince1970)\t\(ticket.sequence)\t\(submissionLabel)")
-                    }
-                } catch {
-                    if debugErrors {
-                        print("[SAGA] submit failed with \(error): \(commands.count) commands")
-                        for command in commands.prefix(6) { print("[SAGA]   \(String(String(describing: command).prefix(700)))") }
-                    }
-                    throw error
                 }
-                if hasCompletionHandlers || debugErrors {
-                    try await ticket.wait()
-                    reportsFailureOnExit = false
-                    reportResult(true)
+                let wait: @Sendable () async throws -> Void
+                if builders.isEmpty {
+                    guard hasCompletionHandlers || !observers.isEmpty else {
+                        return
+                    }
+                    // Even an empty frame fence must retire after earlier device work.
+                    if usesDirect3D12 {
+                        let fence = try await device.submitCommands([])
+                        wait = { _ = try await fence.wait() }
+                    } else {
+                        let fence = try await device.submitResourceUse([])
+                        wait = { try await fence.wait() }
+                    }
+                } else {
+                    let commands = try builders.map { try $0() }
+                    let ticket: CommandTicket
+                    do {
+                        #if SAGA_METAL_NATIVE_PASS
+                        if !groupableDraws.isEmpty {
+                            ticket = try await MetalIndexedDrawGrouping.$commands.withValue(groupableDraws) {
+                                try await device.submitCommands(commands)
+                            }
+                        } else {
+                            ticket = try await device.submitCommands(commands)
+                        }
+                        #else
+                        ticket = try await device.submitCommands(commands)
+                        #endif
+                        if Self.tracesSubmission {
+                            print("ADA-SAGA\t\(Date().timeIntervalSince1970)\t\(ticket.sequence)\t\(submissionLabel)")
+                        }
+                    } catch {
+                        if debugErrors {
+                            print("[SAGA] submit failed with \(error): \(commands.count) commands")
+                            for command in commands.prefix(6) { print("[SAGA]   \(String(String(describing: command).prefix(700)))") }
+                        }
+                        throw error
+                    }
+                    wait = { _ = try await ticket.wait() }
+                }
+
+                if retireOffQueue {
+                    completedHere = false
+                    queue.enqueueRetirement {
+                        do {
+                            try await wait()
+                            finish(true)
+                        } catch {
+                            finish(false)
+                            throw error
+                        }
+                    }
+                } else if hasCompletionHandlers || debugErrors || builders.isEmpty {
+                    try await wait()
+                    succeeded = true
                 } else if !resources.isEmpty || !observers.isEmpty {
                     // Observe retirement off the ordered bridge without delaying later submissions.
-                    reportsFailureOnExit = false
+                    completedHere = false
                     Task {
                         do {
-                            _ = try await ticket.wait()
-                            reportResult(true)
+                            try await wait()
+                            finish(true)
                         } catch {
-                            reportResult(false)
+                            finish(false)
                         }
-                        withExtendedLifetime(resources) {}
                     }
                 }
-                if debugErrors {
+                if debugErrors && !builders.isEmpty {
                     for error in await device.takeUncapturedErrors() {
                         print("[SAGA] device error: \(error)")
                     }
@@ -233,7 +261,7 @@
         let owner: SAGAGPUTexture
     }
 
-    private struct BufferBinding {
+    private struct BufferBinding: Sendable {
         let buffer: SAGABuffer
         let offset: Int
         let size: Int
@@ -469,14 +497,14 @@
                         size: UInt64(index.buffer.length - index.offset)
                     ),
                     vertexBuffers: try state.vertexBindings(),
-                    uniforms: try state.uniformBindings(),
+                    uniforms: try state.bufferBindings(for: state.pipeline.uniformSlots),
                     textures: try state.textureBindings(),
                     samplers: try state.samplerBindings(),
                     depth: target.depth,
                     resolve: target.resolve,
                     additionalColors: target.additionalColors,
                     raster: state.raster,
-                    storageBuffers: try state.storageBindings(),
+                    storageBuffers: try state.bufferBindings(for: state.pipeline.storageSlots),
                     colorStore: target.colorStore
                 )
             }
@@ -496,8 +524,6 @@
                 firstIndex: UInt32(indexBufferOffset / Int(index.format.byteSize)),
                 instances: DrawInstances(count: UInt32(instanceCount), first: UInt32(firstInstance))
             )
-            let indexSlot = index.buffer.slot
-            let indexBinding = (format: index.format, offset: UInt64(index.offset), length: UInt64(index.buffer.length - index.offset))
             #if SAGA_METAL_NATIVE_PASS
             if let indexedDrawGrouping {
                 buffer.recordIndexedDrawGrouping(indexedDrawGrouping, colorCount: colors.count, hasDepthStencil: depth != nil)
@@ -509,21 +535,21 @@
                     target: target.color0,
                     colorLoad: target.colorLoad,
                     indexBuffer: IndexBufferBinding(
-                        buffer: try indexSlot.get(),
-                        format: indexBinding.format,
-                        offset: indexBinding.offset,
-                        size: indexBinding.length
+                        buffer: try index.buffer.slot.get(),
+                        format: index.format,
+                        offset: UInt64(index.offset),
+                        size: UInt64(index.buffer.length - index.offset)
                     ),
                     draw: draw,
                     vertexBuffers: try state.vertexBindings(),
-                    uniforms: try state.uniformBindings(),
+                    uniforms: try state.bufferBindings(for: state.pipeline.uniformSlots),
                     textures: try state.textureBindings(),
                     samplers: try state.samplerBindings(),
                     depth: target.depth,
                     resolve: target.resolve,
                     additionalColors: target.additionalColors,
                     raster: state.raster,
-                    storageBuffers: try state.storageBindings(),
+                    storageBuffers: try state.bufferBindings(for: state.pipeline.storageSlots),
                     colorStore: target.colorStore
                 )
             }
@@ -542,14 +568,14 @@
                     vertexBuffers: try state.vertexBindings(),
                     firstVertex: UInt32(vertexStart),
                     instances: DrawInstances(count: UInt32(instanceCount)),
-                    uniforms: try state.uniformBindings(),
+                    uniforms: try state.bufferBindings(for: state.pipeline.uniformSlots),
                     textures: try state.textureBindings(),
                     samplers: try state.samplerBindings(),
                     depth: target.depth,
                     resolve: target.resolve,
                     additionalColors: target.additionalColors,
                     raster: state.raster,
-                    storageBuffers: try state.storageBindings(),
+                    storageBuffers: try state.bufferBindings(for: state.pipeline.storageSlots),
                     colorStore: target.colorStore
                 )
             }
@@ -594,52 +620,52 @@
         // MARK: Capture
 
         /// Everything a draw reads, frozen at encode time. Resolved to resource ids on the device queue.
-        private struct DrawState: @unchecked Sendable {
+        private struct DrawState: Sendable {
             let pipeline: SAGARenderPipeline
-            let vertex: [(slot: UInt32, buffer: ResourceSlot<ResourceID>, offset: UInt64)]
-            let uniforms: [(ComputeBindingSlot, ResourceSlot<ResourceID>, UInt64, UInt64)]
-            let textures: [(ComputeBindingSlot, ResourceSlot<ResourceID>)]
-            let accelerationStructures: [(ComputeBindingSlot, ResourceSlot<ResourceID>)]
-            let samplers: [(ComputeBindingSlot, ResourceSlot<ResourceID>)]
+            let vertex: [Int: BufferBinding]
+            let uniforms: [ComputeBindingSlot: BufferBinding]
+            let textures: [ComputeBindingSlot: SAGAGPUTexture]
+            let accelerationStructures: [ComputeBindingSlot: SAGAAccelerationStructure]
+            let samplers: [ComputeBindingSlot: SAGASampler]
             let raster: RenderRasterState
-            let retained: [AnyObject]
 
             func vertexBindings() throws -> [VertexBufferBinding] {
-                try vertex.map { VertexBufferBinding(buffer: try $0.buffer.get(), offset: $0.offset, slot: $0.slot) }
-            }
-
-            func uniformBindings() throws -> [ComputeBindingSlot: ComputeBufferBinding] {
-                var result: [ComputeBindingSlot: ComputeBufferBinding] = [:]
-                for (slot, buffer, offset, size) in uniforms where pipeline.uniformSlots.contains(slot) {
-                    result[slot] = ComputeBufferBinding(buffer: try buffer.get(), offset: offset, size: size)
+                try pipeline.vertexBufferSlots.enumerated().compactMap { gpuSlot, engineSlot in
+                    guard let binding = vertex[engineSlot] else {
+                        return nil
+                    }
+                    return VertexBufferBinding(buffer: try binding.buffer.slot.get(), offset: UInt64(binding.offset), slot: UInt32(gpuSlot))
                 }
-                return result
             }
 
-            func storageBindings() throws -> [ComputeBindingSlot: ComputeBufferBinding] {
+            func bufferBindings(for slots: Set<ComputeBindingSlot>) throws -> [ComputeBindingSlot: ComputeBufferBinding] {
                 var result: [ComputeBindingSlot: ComputeBufferBinding] = [:]
-                for (slot, buffer, offset, size) in uniforms where pipeline.storageSlots.contains(slot) {
-                    result[slot] = ComputeBufferBinding(buffer: try buffer.get(), offset: offset, size: size)
+                result.reserveCapacity(slots.count)
+                for slot in slots {
+                    if let binding = uniforms[slot] {
+                        result[slot] = ComputeBufferBinding(buffer: try binding.buffer.slot.get(), offset: UInt64(binding.offset), size: UInt64(binding.size))
+                    }
                 }
                 return result
             }
 
             func textureBindings() throws -> [ComputeBindingSlot: ResourceID] {
                 var result: [ComputeBindingSlot: ResourceID] = [:]
-                for (slot, texture) in textures where pipeline.textureSlots.contains(slot) {
-                    result[slot] = try texture.get()
+                result.reserveCapacity(pipeline.textureSlots.count + pipeline.accelerationStructureSlots.count)
+                for slot in pipeline.textureSlots {
+                    if let texture = textures[slot] { result[slot] = try texture.sampledSlot.get() }
                 }
-                // A render command binds acceleration structures through its texture map, by pipeline slot.
-                for (slot, structure) in accelerationStructures where pipeline.accelerationStructureSlots.contains(slot) {
-                    result[slot] = try structure.get()
+                for slot in pipeline.accelerationStructureSlots {
+                    if let structure = accelerationStructures[slot] { result[slot] = try structure.slot.get() }
                 }
                 return result
             }
 
             func samplerBindings() throws -> [ComputeBindingSlot: ResourceID] {
                 var result: [ComputeBindingSlot: ResourceID] = [:]
-                for (slot, sampler) in samplers where pipeline.samplerSlots.contains(slot) {
-                    result[slot] = try sampler.get()
+                result.reserveCapacity(pipeline.samplerSlots.count)
+                for slot in pipeline.samplerSlots {
+                    if let sampler = samplers[slot] { result[slot] = try sampler.slot.get() }
                 }
                 return result
             }
@@ -649,30 +675,9 @@
             guard let pipeline else {
                 return nil
             }
-            var retained: [AnyObject] = []
-            var vertex: [(slot: UInt32, buffer: ResourceSlot<ResourceID>, offset: UInt64)] = []
-            for (engineSlot, gpuSlot) in pipeline.vertexBufferSlots.sorted(by: { $0.value < $1.value }) {
-                guard let bound = vertexBuffers[engineSlot] else { continue }
-                vertex.append((gpuSlot, bound.buffer.slot, UInt64(bound.offset)))
-                retained.append(bound.buffer)
+            for slot in pipeline.writableStorageSlots {
+                uniforms[slot]?.buffer.excludeFromShadowCache()
             }
-            let uniformList = uniforms.map { slot, bound -> (ComputeBindingSlot, ResourceSlot<ResourceID>, UInt64, UInt64) in
-                retained.append(bound.buffer)
-                return (slot, bound.buffer.slot, UInt64(bound.offset), UInt64(bound.size))
-            }
-            let textureList = textures.map { slot, texture -> (ComputeBindingSlot, ResourceSlot<ResourceID>) in
-                retained.append(texture)
-                return (slot, texture.sampledSlot)
-            }
-            let accelerationList = accelerationStructures.map { slot, structure -> (ComputeBindingSlot, ResourceSlot<ResourceID>) in
-                retained.append(structure)
-                return (slot, structure.slot)
-            }
-            let samplerList = samplers.map { slot, sampler -> (ComputeBindingSlot, ResourceSlot<ResourceID>) in
-                retained.append(sampler)
-                return (slot, sampler.slot)
-            }
-            retained.append(pipeline)
             if buffer.context.debugErrors, !pipeline.reportedMissingBindings {
                 pipeline.reportedMissingBindings = true
                 func names(_ slots: Set<ComputeBindingSlot>) -> String {
@@ -694,13 +699,12 @@
             }
             return DrawState(
                 pipeline: pipeline,
-                vertex: vertex,
-                uniforms: uniformList,
-                textures: textureList,
-                accelerationStructures: accelerationList,
-                samplers: samplerList,
-                raster: drawRaster,
-                retained: retained
+                vertex: vertexBuffers,
+                uniforms: uniforms,
+                textures: textures,
+                accelerationStructures: accelerationStructures,
+                samplers: samplers,
+                raster: drawRaster
             )
         }
 

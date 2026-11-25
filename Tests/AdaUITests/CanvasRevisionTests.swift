@@ -1,4 +1,4 @@
-@_spi(Internal) @testable import AdaUI
+@_spi(AdaEngine) @_spi(Internal) @testable import AdaUI
 import AdaUtils
 import Math
 import Testing
@@ -6,6 +6,36 @@ import Testing
 @MainActor
 @Suite("Synchronous Canvas drawing revisions")
 struct CanvasRevisionTests {
+    @Test
+    func clippedDrawingGroupSkipsDrawingUntilScrolledIntoView() throws {
+        var draws = 0
+        let container = ViewTester {
+            ScrollView {
+                VStack(spacing: 0) {
+                    Color.clear.frame(height: 400)
+                    Canvas { context, size in
+                        draws += 1
+                        context.drawRect(Rect(origin: .zero, size: size), color: .red)
+                    }
+                    .frame(height: 45)
+                    .drawingGroup(cullingOutsideScrollViewWithOutset: 12)
+                    .accessibilityIdentifier("offscreen-field")
+                }
+            }
+        }.setSize(Size(width: 200, height: 100)).performLayout().containerView
+        let selector = UINodeSelector.accessibilityIdentifier("offscreen-field")
+        let originalFrame = try container.uiNode(matching: selector).absoluteFrame
+        #expect(originalFrame.minY >= 400)
+        container.draw(in: container.bounds, with: UIGraphicsContext())
+        #expect(draws == 0)
+
+        _ = try container.uiScrollToNode(matching: selector)
+        container.layoutIfNeeded()
+        container.draw(in: container.bounds, with: UIGraphicsContext())
+        #expect(draws == 1)
+        #expect(try container.uiNode(matching: selector).absoluteFrame.minY < originalFrame.minY)
+    }
+
     @Test("Revision changes refresh retained commands without layout or async observation")
     func revisionRefreshesDrawing() throws {
         var revision: UInt64 = 0

@@ -7,6 +7,9 @@ integration behavior, not a fresh build or benchmark of the extracted PR branch.
 
 ## Camera navigation and annotation presentation
 
+For the Windows Vulkan camera-orbit comparison with an open inspector, see the
+[frame-time and input-latency measurements](WindowsPerformance.md).
+
 SceneView queues completed GPU frames; its annotations must describe the displayed
 texture, rather than the latest navigation state. The viewport now records grid
 and gizmo commands when a scene frame is scheduled and publishes that snapshot

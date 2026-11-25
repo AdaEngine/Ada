@@ -80,8 +80,21 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
     private struct State {
         var continuation: AsyncStream<(Job, String)>.Continuation?
         var adjacentBatch: (any Sendable)?
+        var deferredJob: (Job, String)?
+        var flushScheduled = false
+        var lastRetirement: Task<Void, Never>?
         var pending = 0
         var idleWaiters: [CheckedContinuation<Void, Never>] = []
+
+        mutating func submitDeferredJob() {
+            if let deferredJob { continuation?.yield(deferredJob) }
+            deferredJob = nil
+        }
+
+        mutating func flushDeferredJob() {
+            submitDeferredJob()
+            adjacentBatch = nil
+        }
     }
 
     private let state = Mutex(State())
@@ -132,11 +145,27 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
     }
 
     deinit {
-        state.withLock { $0.continuation?.finish() }
+        state.withLock {
+            $0.flushDeferredJob()
+            $0.continuation?.finish()
+        }
     }
 
     func enqueue(onUnavailable: Cleanup? = nil, _ work: @escaping Work, file: String = #fileID, line: Int = #line) {
         enqueue(.device(work, onUnavailable: onUnavailable), origin: "\(file):\(line)")
+    }
+
+    /// An allocation for a fresh buffer cannot read or modify the buffers in a deferred upload.
+    /// Run it before flushing the upload, so consecutive allocations and writes can share a submission.
+    func enqueueBufferAllocation(_ work: @escaping Work, file: String = #fileID, line: Int = #line) {
+        state.withLock { state in
+            if state.deferredJob == nil {
+                // A batch already yielded by the timer is ahead of this allocation.
+                state.adjacentBatch = nil
+            }
+            state.pending += 1
+            state.continuation?.yield((.device(work, onUnavailable: nil), "\(file):\(line)"))
+        }
     }
 
     /// Runs in queue order without creating or requiring a device.
@@ -144,29 +173,71 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
         enqueue(.cleanup(cleanup), origin: "\(file):\(line)")
     }
 
+    /// Observes an already accepted submission while the bridge continues accepting work.
+    /// Call from the ordered worker. Ordered callbacks inherit the original submission order.
+    func enqueueRetirement(ordered: Bool = true, _ retirement: @escaping Cleanup) {
+        state.withLock { state in
+            let predecessor = ordered ? state.lastRetirement : nil
+            state.pending += 1
+            let task = Task { [weak self] in
+                await predecessor?.value
+                do {
+                    try await retirement()
+                } catch {
+                    self?.onError(error)
+                }
+                self?.finishOne()
+            }
+            if ordered { state.lastRetirement = task }
+        }
+    }
+
     /// Coalesces neighboring items of one type until ordinary work or a size limit seals the batch.
     func enqueueAdjacent<Item: Sendable>(
         _ item: Item,
+        deferUntilBoundary: Bool = false,
         submit: @escaping @Sendable (Context, [Item]) async throws -> Void,
         file: String = #fileID,
         line: Int = #line
     ) {
-        state.withLock { state in
+        let scheduleFlush = state.withLock { state -> Bool in
             if let existing = state.adjacentBatch as? AdjacentBatch<Item>, existing.append(item) {
-                return
+                return false
             }
+            state.flushDeferredJob()
             let batch = AdjacentBatch(item)
             state.adjacentBatch = batch
             state.pending += 1
-            state.continuation?.yield((.device({ context in
+            let job = Job.device({ context in
                 try await submit(context, batch.take())
-            }, onUnavailable: { _ = batch.take() }), "\(file):\(line)"))
+            }, onUnavailable: { _ = batch.take() })
+            let entry = (job, "\(file):\(line)")
+            guard deferUntilBoundary else {
+                state.continuation?.yield(entry)
+                return false
+            }
+            state.deferredJob = entry
+            if state.flushScheduled {
+                return false
+            }
+            state.flushScheduled = true
+            return true
+        }
+        if scheduleFlush {
+            // A following draw, read or drain flushes synchronously. Also deliver isolated writes.
+            Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(2))
+                self?.state.withLock {
+                    $0.flushScheduled = false
+                    $0.submitDeferredJob()
+                }
+            }
         }
     }
 
     private func enqueue(_ job: Job, origin: String) {
         state.withLock { state in
-            state.adjacentBatch = nil
+            state.flushDeferredJob()
             state.pending += 1
             state.continuation?.yield((job, origin))
         }
@@ -176,6 +247,7 @@ final class OrderedGPUWorkQueue<Context: Sendable>: Sendable {
     func drain() async {
         await withCheckedContinuation { waiter in
             let resumeNow = state.withLock { state -> Bool in
+                state.flushDeferredJob()
                 if state.pending == 0 {
                     return true
                 }

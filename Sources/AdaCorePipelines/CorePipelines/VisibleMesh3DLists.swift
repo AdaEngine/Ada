@@ -416,6 +416,45 @@ public struct VisibleMesh3DLists: Resource {
         entries[key] = entry
     }
 
+    /// Fingerprint of a prepared static layer. Its opaque draws write nearest depth, so their order and the
+    /// GPU allocations used for material bindings can change without invalidating the cached shadow.
+    func staticShadowContentDigest(view: Entity.ID, pass: Int, sources: [Mesh3DRenderSource]) -> UInt64? {
+        guard let entry = entries[Key(view: view, pass: pass)], !entry.isDynamic else {
+            return nil
+        }
+        var records: [UInt64] = []
+        records.reserveCapacity(entry.records.count)
+        for record in entry.records {
+            let source = sources[Int(record.source)]
+            let placement = Int(record.instance)
+            let mesh = record.lod == 0 ? source.mesh : source.alternatives[Int(record.lod) - 1]
+            let part = mesh.models[Int(record.model)].parts[Int(record.part)]
+            let material = source.materials[Int(record.material)]
+            let pbr = material as? PBRMaterial
+            var item = FrameDigest3D()
+            item.combine(UInt64(UInt(bitPattern: ObjectIdentifier(part.vertexBuffer))))
+            item.combine(UInt64(UInt(bitPattern: ObjectIdentifier(part.indexBuffer))))
+            item.combine(part.vertexBuffer.shadowRasterRevision ?? 0)
+            item.combine(part.indexBuffer.shadowRasterRevision ?? 0)
+            item.combine(UInt64(part.indexCount))
+            item.combine(UInt64(bitPattern: Int64(part.vertexDescriptor.hashValue)))
+            item.combine(UInt64(bitPattern: Int64(material.rid.hashValue)))
+            item.combine(pbr?.uniformRevision ?? 0)
+            item.combine(UInt64(pbr?.baseColorTexture.map { UInt(bitPattern: ObjectIdentifier($0)) } ?? 0))
+            item.combine(pbr?.baseColorFactor ?? .one)
+            item.combine(Self.transform(source, placement: placement))
+            item.combine(placement >= 0 ? source.instances?[placement].color ?? .one : .one)
+            item.combine(UInt64(source.receiveShadows ? 1 : 0))
+            item.combine(record.fade)
+            records.append(item.value)
+        }
+        records.sort()
+        var content = FrameDigest3D()
+        content.combine(UInt64(records.count))
+        for record in records { content.combine(record) }
+        return content.value
+    }
+
     /// Fingerprint of everything a shadow pass would draw (batches, transforms, alpha inputs), or `nil` when the pass
     /// contains skinned meshes whose pose changes without any visible change here. Equal fingerprints mean an
     /// identical face. Meshes edited in place on Metal also contribute their geometry storage version.
@@ -434,7 +473,9 @@ public struct VisibleMesh3DLists: Resource {
 
     /// A retained shadow list still needs this frame's material bindings.
     func refreshShadowMaterials(view: Entity.ID, pass: Int, device: RenderDevice, materials: inout PBR3DUniforms) -> Bool {
-        guard let entry = entries[Key(view: view, pass: pass)] else { return false }
+        guard let entry = entries[Key(view: view, pass: pass)] else {
+            return false
+        }
         for item in entry.items {
             let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
             materials.write(material: item.material, descriptor: part.vertexDescriptor, device: device)

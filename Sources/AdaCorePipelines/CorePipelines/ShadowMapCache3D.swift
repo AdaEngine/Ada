@@ -5,13 +5,15 @@ import AdaUtils
 import Math
 import Synchronization
 
-/// Render-world marker installed only by Studio's Metal edit preview.
+/// Enables static shadow tiles in a supported Studio edit viewport.
 struct StudioShadowCache: Resource {}
 
 struct ShadowCasterLayers3D {
     var staticCasters: [Mesh3DRenderSource] = []
     var movingCasters: [Mesh3DRenderSource] = []
     private(set) var staticFingerprint: UInt64 = 0
+    private var hasMeshAlternatives = false
+    private var hasDistanceLimits = false
 
     init(_ sources: [Mesh3DRenderSource]) {
         for source in sources where source.castShadows {
@@ -24,6 +26,8 @@ struct ShadowCasterLayers3D {
         var fingerprint = FrameDigest3D()
         fingerprint.combine(ShadowSceneDigest3D.compute(sources: staticCasters, usesLOD: false) ?? 0)
         for source in staticCasters {
+            if !source.alternatives.isEmpty { hasMeshAlternatives = true }
+            if let limit = source.maximumDistance, limit.isFinite && limit > 0 { hasDistanceLimits = true }
             fingerprint.combine(UInt64(bitPattern: Int64(source.entity.hashValue)))
             fingerprint.combine(source.maximumDistance ?? 0)
             fingerprint.combine(source.fadeDistance)
@@ -63,7 +67,9 @@ struct ShadowCasterLayers3D {
         digest.combine(settings.frustumCulling ? UInt64(1) : 0)
         digest.combine(settings.lod ? UInt64(1) : 0)
         digest.combine(settings.distanceCulling ? UInt64(1) : 0)
-        if settings.lod || settings.distanceCulling {
+        // Shadow-frustum culling uses the light projection. Camera motion can change a
+        // static draw list only when a caster has view-dependent LOD or distance limits.
+        if (settings.lod && hasMeshAlternatives) || (settings.distanceCulling && hasDistanceLimits) {
             digest.combine(uniform.viewMatrix)
             digest.combine(uniform.projectionMatrix)
         }
@@ -114,13 +120,7 @@ extension VisibleMesh3DLists {
                 materials: &materials,
                 reconcileMembership: false
             )
-            var digest = FrameDigest3D()
-            digest.combine(shadowDigest(view: view, pass: pass) ?? 0)
-            for item in items(view: view, pass: pass) {
-                let part = item.mesh.models[item.modelIndex].parts[item.partIndex]
-                digest.combine(UInt64(bitPattern: Int64(part.vertexDescriptor.hashValue)))
-            }
-            staticDigest = digest.value
+            staticDigest = staticShadowContentDigest(view: view, pass: pass, sources: layers.staticCasters) ?? 0
         }
         let frustum = MeshVisibilityFrustum3D(viewProjection: lightProjection)
         let mightHaveMovingCasters = layers.movingCasters.contains { source in
