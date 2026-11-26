@@ -21,6 +21,7 @@ extension EditorSceneViewportView {
             resourceRootURL: resourceRootURL,
             scriptableObjectCatalog: inspectorViewModel.scriptableObjectCatalog,
             isHistoryChange: document.statusMessage == "Undo" || document.statusMessage == "Redo",
+            replacesDocument: document.statusMessage == "Reloaded",
             onSelectionChanged: { [weak inspectorViewModel] selection in
                 inspectorViewModel?.selectEntity(selection)
                 if selection != nil {
@@ -214,12 +215,13 @@ extension EditorSceneViewportView {
         onDocumentChanged: (EditorSceneDocument) -> Void,
         update: (inout EditorSceneModel) -> Void
     ) {
-        guard var model = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content) else {
+        guard let previous = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content) else {
             return
         }
 
+        var model = previous
         update(&model)
-        guard let content = try? model.encodedYAML() else {
+        guard let content = try? model.encodedYAML(updatingEntitiesFrom: previous, in: document.content) else {
             return
         }
 
@@ -229,7 +231,7 @@ extension EditorSceneViewportView {
         updatedDocument.isDirty = true
         updatedDocument.statusMessage = status
         updatedDocument.errorMessage = nil
-        updatedDocument.loadSummary = EditorSceneFileLoader.summary(from: content)
+        updatedDocument.loadSummary = EditorSceneLoadSummary(entityCount: model.entities.count, warnings: [])
         onDocumentChanged(updatedDocument)
     }
 }

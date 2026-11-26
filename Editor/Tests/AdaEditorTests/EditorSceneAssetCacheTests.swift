@@ -56,8 +56,14 @@ struct EditorSceneAssetCacheTests {
         let source = try modelFile(in: root)
         let model = sceneModel(source: source.lastPathComponent, count: 2)
         let viewport = EditorSceneViewportModel()
-        viewport.configure(sceneContent: "fixture", model: model, sourceURL: root.appendingPathComponent("Main.ascn"),
-                           resourceRootURL: root, onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
+        viewport.configure(
+            sceneContent: "fixture",
+            model: model,
+            sourceURL: root.appendingPathComponent("Main.ascn"),
+            resourceRootURL: root,
+            onSelectionChanged: { _ in },
+            onDocumentContentChanged: { _ in }
+        )
         let world = World()
         var finished: EditorSceneRuntimeLoadResult?
         viewport.loadSceneWorld(world, onLoadingChanged: { _ in }, onLoaded: { finished = $0 })
@@ -70,8 +76,14 @@ struct EditorSceneAssetCacheTests {
         viewport.disconnect()
 
         let closed = EditorSceneViewportModel()
-        closed.configure(sceneContent: "fixture", model: model, sourceURL: root.appendingPathComponent("Main.ascn"),
-                         resourceRootURL: root, onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
+        closed.configure(
+            sceneContent: "fixture",
+            model: model,
+            sourceURL: root.appendingPathComponent("Main.ascn"),
+            resourceRootURL: root,
+            onSelectionChanged: { _ in },
+            onDocumentContentChanged: { _ in }
+        )
         var staleCallback = false
         let abandoned = World()
         closed.loadSceneWorld(abandoned, onLoadingChanged: { _ in }, onLoaded: { _ in staleCallback = true })
@@ -148,6 +160,86 @@ struct EditorSceneAssetCacheTests {
         viewport.disconnect()
     }
 
+    @Test("Local model preparation keeps ready edits, restores parenting and cancels removed owners")
+    func liveEditAssetPreparation() async throws {
+        let root = try directory()
+        let counter = ImportCounter()
+        GLTFLoaderResolver.shared.setLoader(CountingLoader(counter: counter, delay: true))
+        defer { try? FileManager.default.removeItem(at: root); GLTFLoaderResolver.shared.setLoader(NativeGLTFLoader()) }
+        let source = try modelFile(in: root)
+        let cancelledFile = root.appendingPathComponent("Cancelled.gltf")
+        try FileManager.default.copyItem(at: source, to: cancelledFile)
+        let viewport = EditorSceneViewportModel()
+        let world = World()
+        let application = AppWorlds(main: world)
+        defer { viewport.disconnect() }
+        var loading: [Bool] = []
+        let sceneURL = root.appendingPathComponent("Preview.ascn")
+        var original = sceneModel(source: nil, count: 2)
+        let transform = EditorBuiltInComponentType.transform
+        original.entities[0].components[transform] = EditorComponentRegistry.defaultPayload(for: transform)
+        func configure(_ model: EditorSceneModel, revision: Int, history: Bool = false) {
+            viewport.configure(
+                sceneContent: "revision-\(revision)",
+                model: model,
+                sourceURL: sceneURL,
+                resourceRootURL: root,
+                isHistoryChange: history,
+                onSelectionChanged: { _ in },
+                onDocumentContentChanged: { _ in }
+            )
+        }
+        func waitFor(_ ready: @MainActor () -> Bool) async throws {
+            for _ in 0..<500 where !ready() { try await Task.sleep(for: .milliseconds(4)) }
+            try #require(ready())
+        }
+        configure(original, revision: 0)
+        viewport.loadSceneWorld(world, application: application, onLoadingChanged: { loading.append($0) }, onLoaded: { _ in })
+        let unaffected = try #require(viewport.runtimeEntity(for: "0"))
+        let child = try #require(viewport.runtimeEntity(for: "1"))
+        loading.removeAll()
+
+        var edited = original
+        edited.entities[1].parent = "parent"
+        edited.entities[1].enabled = false
+        edited.entities.append(.init(id: "parent", name: "New model", enabled: true, parent: nil, components: [
+            EditorBuiltInComponentType.model3DSource: ["source": .string(source.lastPathComponent)]
+        ]))
+        configure(edited, revision: 1)
+        try await waitFor { !child.isActive && counter.value.withLock { $0 } == 1 }
+        #expect(child.components[Visibility.self] == .hidden)
+        #expect(viewport.runtimeEntity(for: "parent") == nil)
+        var pose = original.entities[0].components[transform] ?? [:]
+        pose["position"] = .array([.int(4), .int(0), .int(0)])
+        viewport.syncRuntimeTransform(editorID: "0", payload: pose)
+
+        try await waitFor { child.parent != nil }
+        let parent = try #require(viewport.runtimeEntity(for: "parent"))
+        #expect(child.parent === parent)
+        #expect(unaffected.components[Transform.self]?.position.x == 4)
+        #expect(viewport.runtimeEntity(for: "0") === unaffected)
+        #expect(!parent.children.isEmpty)
+        #expect(loading.isEmpty)
+
+        configure(original, revision: 2, history: true)
+        try await waitFor { viewport.runtimeEntity(for: "parent") == nil && child.isActive }
+        #expect(child.parent == nil)
+        #expect(child.components[Visibility.self] == .visible)
+        #expect(world.getResource(EditorSceneAssetCache.self)?.models.isEmpty == true)
+
+        var abandoned = original
+        abandoned.entities.append(.init(id: "cancelled", name: "Cancelled model", enabled: true, parent: nil, components: [
+            EditorBuiltInComponentType.model3DSource: ["source": .string(cancelledFile.lastPathComponent)]
+        ]))
+        configure(abandoned, revision: 3)
+        try await waitFor { counter.value.withLock { $0 } == 2 }
+        configure(original, revision: 4, history: true)
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(viewport.runtimeEntity(for: "cancelled") == nil)
+        #expect(world.getResource(EditorSceneAssetCache.self)?.models.isEmpty == true)
+        #expect(loading.isEmpty)
+    }
+
     @Test("A changed model file is reimported and a broken model does not block the other entities")
     func changedAndBrokenFiles() async throws {
         let root = try directory()
@@ -181,7 +273,8 @@ struct EditorSceneAssetCacheTests {
         let recorder = ResourceProgressRecorder()
         let cache = try await EditorSceneAssetCache.prepare(
             model: sceneModel(source: source.lastPathComponent, count: 5),
-            sourceURL: root.appendingPathComponent("Main.ascn"), resourceRootURL: root,
+            sourceURL: root.appendingPathComponent("Main.ascn"),
+            resourceRootURL: root,
             onProgress: { progress in await recorder.append(progress) }
         )
         #expect(cache.models.count == 1)
@@ -189,6 +282,34 @@ struct EditorSceneAssetCacheTests {
         #expect(recorder.values.last?.completed == 1)
         #expect(recorder.values.allSatisfy { $0.total == 1 && $0.completed <= $0.total })
         #expect(recorder.values.last?.resourceName == source.lastPathComponent)
+    }
+
+    @Test("Preview preparation owns model lightmaps until the models are removed")
+    func preparedModelLightmapOwnership() async throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let source = try modelFile(in: root)
+        let sidecar = root.appendingPathComponent("Baked.lightmaps")
+        let manifest = """
+        {"version":1,"encoding":"diffuse-irradiance-over-pi","modelFile":"\(source.lastPathComponent)","materials":{}}
+        """
+        try manifest.write(to: sidecar, atomically: true, encoding: .utf8)
+        var scene = sceneModel(source: source.lastPathComponent, count: 2)
+        let reference = "@res://\(sidecar.lastPathComponent)"
+        scene.entities[0].components[EditorBuiltInComponentType.model3DSource]?["lightmapSource"] = .string(reference)
+        let url = root.appendingPathComponent("Main.ascn")
+        let lightmapPath = try EditorSceneFileLoader.lightmapPath(reference, relativeTo: url, resourceRootURL: root)
+        let prepared = try await EditorSceneAssetCache.prepare(model: scene, sourceURL: url, resourceRootURL: root)
+        let handle = try #require(prepared.lightmaps[lightmapPath])
+        #expect(handle.asset.modelFile == source.lastPathComponent)
+
+        let world = World()
+        world.insertResource(prepared)
+        let installed = EditorSceneFileLoader.load(model: scene, into: world, sourceURL: url, resourceRootURL: root)
+        #expect(installed.warnings.isEmpty)
+        #expect(world.getResource(EditorSceneAssetCache.self)?.lightmaps.count == 1)
+        _ = EditorSceneFileLoader.load(model: sceneModel(source: nil, count: 1), into: world)
+        #expect(world.getResource(EditorSceneAssetCache.self)?.lightmaps.isEmpty == true)
     }
 
     @Test("Open a selected large scene through the editing viewport", .enabled(if: ProcessInfo.processInfo.environment["ADAEDITOR_PREVIEW_BENCHMARK"] != nil))
@@ -213,8 +334,17 @@ struct EditorSceneAssetCacheTests {
             }
         }
         defer { ticker.cancel() }
-        let item = EditorProjectSidebarViewModel.Item(id: url.path, disclosure: "", icon: "", title: url.lastPathComponent,
-                                                     relativePath: url.lastPathComponent, level: 0, isActive: false, isFolder: false, kind: .scene)
+        let item = EditorProjectSidebarViewModel.Item(
+            id: url.path,
+            disclosure: "",
+            icon: "",
+            title: url.lastPathComponent,
+            relativePath: url.lastPathComponent,
+            level: 0,
+            isActive: false,
+            isFolder: false,
+            kind: .scene
+        )
         let document = EditorViewModel.document(for: item)
         let requested = ContinuousClock.now
         let workbench = EditorWorkbenchViewModel(openDocuments: [document], activeDocumentID: document.id)
@@ -226,8 +356,14 @@ struct EditorSceneAssetCacheTests {
         let decoded = ContinuousClock.now
         let viewport = EditorSceneViewportModel()
         let world = World()
-        viewport.configure(sceneContent: loaded.content, model: model, sourceURL: url, resourceRootURL: assets,
-                           onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
+        viewport.configure(
+            sceneContent: loaded.content,
+            model: model,
+            sourceURL: url,
+            resourceRootURL: assets,
+            onSelectionChanged: { _ in },
+            onDocumentContentChanged: { _ in }
+        )
         defer { viewport.disconnect() }
         let result = await withCheckedContinuation { continuation in
             viewport.loadSceneWorld(world, onLoadingChanged: { _ in }, onLoaded: { continuation.resume(returning: $0) })
@@ -250,7 +386,7 @@ struct EditorSceneAssetCacheTests {
             "scope": "Production file/document/decode and editing viewport load with the headless renderer; GPU presentation is checked separately"
         ]
         let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
-        print(String(decoding: data, as: UTF8.self))
+        print(try #require(String(bytes: data, encoding: .utf8)))
         if let output = ProcessInfo.processInfo.environment["ADAEDITOR_PREVIEW_BENCHMARK_REPORT"] {
             try data.write(to: URL(fileURLWithPath: output))
         }
@@ -280,12 +416,15 @@ struct EditorSceneAssetCacheTests {
     func sceneJSONParity() throws {
         var model = sceneModel(source: nil, count: 2)
         model.entities[0].components["fixture.large-values"] = [
-            "values": .array([.null, .bool(true), .int(-12), .uint(.max), .double(1.25), .string("true"),
-                              .object(["vector": .array([.double(0), .double(-0.25)])])])
+            "values": .array([
+                .null, .bool(true), .int(-12), .uint(.max), .double(1.25), .string("true"),
+                .object(["vector": .array([.double(0), .double(-0.25)])])
+            ])
         ]
         model.entities[1].components["fixture.other"] = ["title": .string("Осень"), "enabled": .bool(false)]
         let data = try JSONEncoder().encode(model)
-        let fast = try EditorSceneModel.decode(from: String(decoding: data, as: UTF8.self))
+        let content = try #require(String(bytes: data, encoding: .utf8))
+        let fast = try EditorSceneModel.decode(from: content)
         let conventional = try JSONDecoder().decode(EditorSceneModel.self, from: data)
         #expect(fast == conventional)
     }
@@ -295,15 +434,29 @@ struct EditorSceneAssetCacheTests {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }
         var model = sceneModel(source: nil, count: 1)
-        model.entities[0].components["fixture.geometry"] = ["vertices": .array((0..<30_000).map {
-            .object(["x": .double(Double($0) * 0.01), "y": .double(0), "z": .double(-0.25)])
-        })]
+        model.entities[0].components["fixture.geometry"] = [
+            "vertices": .array((0..<30_000).map {
+                .object(["x": .double(Double($0) * 0.01), "y": .double(0), "z": .double(-0.25)])
+            })
+        ]
         let url = root.appendingPathComponent("Main.ascn")
         try JSONEncoder().encode(model).write(to: url)
-        let item = EditorProjectSidebarViewModel.Item(id: url.path, disclosure: "", icon: "", title: url.lastPathComponent,
-                                                     relativePath: "Main.ascn", level: 0, isActive: false, isFolder: false, kind: .scene)
+        let item = EditorProjectSidebarViewModel.Item(
+            id: url.path,
+            disclosure: "",
+            icon: "",
+            title: url.lastPathComponent,
+            relativePath: "Main.ascn",
+            level: 0,
+            isActive: false,
+            isFolder: false,
+            kind: .scene
+        )
         let start = ContinuousClock.now
-        guard case let .scene(document) = EditorViewModel.document(for: item) else { Issue.record("Expected a scene document"); return }
+        guard case let .scene(document) = EditorViewModel.document(for: item) else {
+            Issue.record("Expected a scene document")
+            return
+        }
         #expect(start.duration(to: .now) < .milliseconds(500))
         #expect(document.isLoading)
         #expect(document.sceneModel == nil)
@@ -349,8 +502,13 @@ struct EditorSceneAssetCacheTests {
 
     private func sceneModel(source: String?, count: Int) -> EditorSceneModel {
         EditorSceneModel(scene: EditorSceneMetadata(id: "fixture", name: "Preview"), entities: (0..<count).map { index in
-            EditorSceneEntity(id: "\(index)", name: "Owner \(index)", enabled: true, parent: nil,
-                              components: source.map { [EditorBuiltInComponentType.model3DSource: ["source": .string($0)]] } ?? [:])
+            EditorSceneEntity(
+                id: "\(index)",
+                name: "Owner \(index)",
+                enabled: true,
+                parent: nil,
+                components: source.map { [EditorBuiltInComponentType.model3DSource: ["source": .string($0)]] } ?? [:]
+            )
         })
     }
 

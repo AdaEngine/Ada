@@ -137,7 +137,9 @@ final class EditorVRWorkspace {
     }
 
     func stopPlay(id: UUID? = nil) {
-        guard let playSession, id == nil || id == playSession.id else { return }
+        guard let playSession, id == nil || id == playSession.id else {
+            return
+        }
         playSession.runtime.performanceSession.stop()
         playSession.controls.finish()
         self.playSession = nil
@@ -161,8 +163,11 @@ final class EditorVRWorkspace {
                 settingsWindow.selectedPage = page
             }
         } else {
-            settingsWindow = EditorSettingsWindowViewModel(editorViewModel: editor,
-                selectedSection: section, selectedPage: editor.requestedSettingsPage)
+            settingsWindow = EditorSettingsWindowViewModel(
+                editorViewModel: editor,
+                selectedSection: section,
+                selectedPage: editor.requestedSettingsPage
+            )
         }
         editor.requestedSettingsSection = nil
         editor.requestedSettingsPage = nil
@@ -421,9 +426,12 @@ final class EditorVRWorkspace {
             }
             _ = self.viewport.configure(
                 sceneContent: document.content,
+                model: document.sceneModel,
                 sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) },
                 resourceRootURL: self.resourceRootURL,
                 scriptableObjectCatalog: self.inspector.scriptableObjectCatalog,
+                isHistoryChange: document.statusMessage == "Undo" || document.statusMessage == "Redo",
+                replacesDocument: document.statusMessage == "Reloaded",
                 onSelectionChanged: { [weak self] in self?.inspector.selectEntity($0) },
                 onDocumentContentChanged: { [weak self] in self?.publishContent($0) },
                 onTransformChanged: { [weak self] id, payload in self?.inspector.updateLiveTransform(editorID: id, payload: payload) }

@@ -77,15 +77,19 @@ public struct ExctractMesh2DSystem {
     >
     private var query
 
+    @Extract<Query<RelationshipComponent>>
+    private var hierarchy
+
     @ResMut<ExctractedMeshes2D>
     private var extractedMeshes
 
     public init(world _: World) {}
 
     public func update(context _: UpdateContext) {
+        _ = hierarchy.wrappedValue
         extractedMeshes.meshes.removeAll(keepingCapacity: true)
         self.query.wrappedValue.forEach { entity, mesh, transform, globalTransform, visibility in
-            if visibility == .hidden {
+            guard visibility.isVisible(inHierarchyOf: entity) else {
                 return
             }
 

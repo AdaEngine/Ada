@@ -16,6 +16,26 @@ struct EditorSceneRuntimeLoadResult: Equatable, Sendable {
     var entitiesByEditorID: [String: Entity.ID]
     var editorIDsByEntityID: [Entity.ID: String]
     var csgTargets: [String: EditorCSGScene.PreviewTarget] = [:]
+    var identityNamespace = ""
+    var assetPathsByEditorID: [String: Set<String>] = [:]
+    var warningsByEditorID: [String: [String]] = [:]
+
+    mutating func removePreviewEntity(_ id: String, runtimeIDs: Set<Entity.ID>) {
+        entitiesByEditorID[id] = nil
+        for runtimeID in runtimeIDs { editorIDsByEntityID[runtimeID] = nil }
+        csgTargets = csgTargets.filter { !runtimeIDs.contains($0.value.entityID) }
+        assetPathsByEditorID[id] = nil
+        warningsByEditorID[id] = nil
+    }
+
+    mutating func mergePreviewEntity(_ local: Self, id: String, preparationWarning: String?) {
+        entitiesByEditorID.merge(local.entitiesByEditorID, uniquingKeysWith: { _, next in next })
+        editorIDsByEntityID.merge(local.editorIDsByEntityID, uniquingKeysWith: { _, next in next })
+        csgTargets.merge(local.csgTargets, uniquingKeysWith: { _, next in next })
+        assetPathsByEditorID[id] = local.assetPathsByEditorID[id]
+        let failures = local.warnings + (preparationWarning.map { [$0] } ?? [])
+        if !failures.isEmpty { warningsByEditorID[id] = failures }
+    }
 
     static let empty = Self(entityCount: 0, warnings: [], entitiesByEditorID: [:], editorIDsByEntityID: [:])
 }
@@ -96,6 +116,44 @@ enum EditorSceneFileLoader {
     }
 
     @MainActor
+    static func loadPreviewEntity(
+        _ entity: EditorSceneEntity,
+        model: EditorSceneModel,
+        clips: [EditorAnimationClip],
+        in world: World,
+        sourceURL: URL?,
+        resourceRootURL: URL?,
+        loadsPhysicsBodies: Bool,
+        identityNamespace: String,
+        assets: inout EditorSceneAssetCache
+    ) -> EditorSceneRuntimeLoadResult {
+        var scope = model
+        var detached = entity
+        detached.parent = nil
+        scope.entities = [detached]
+        scope.animations = clips
+        let sourceURL = sourceURL?.resolvingSymlinksInPath().standardizedFileURL
+        let state = Instantiation(
+            scope,
+            world: world,
+            loadsScriptableObjects: false,
+            loadsPhysicsBodies: loadsPhysicsBodies,
+            sourceURL: sourceURL,
+            resourceRootURL: resourceRootURL,
+            parentEntity: nil,
+            idPrefix: "",
+            ancestry: sourceURL.map { Set([$0]) } ?? [],
+            assets: assets,
+            identityNamespace: identityNamespace
+        )
+        defer { assets = state.assets }
+        return ShaderGraphResourceScope.$rootPath.withValue(resourceRootURL?.path) {
+            state.instantiateEntity(detached)
+            return state.finish()
+        }
+    }
+
+    @MainActor
     static func resolvedComponentPayload(
         typeName: String, payload: EditorComponentPayload, sourceURL: URL?, resourceRootURL: URL?
     ) throws -> EditorComponentPayload {
@@ -146,6 +204,9 @@ enum EditorSceneFileLoader {
         }
         if typeName == EditorBuiltInComponentType.model3DSource, let reference = payload["source"]?.stringValue, !reference.isEmpty {
             resolvedPayload["source"] = .string(try EditorModelResource.resolve(reference, sourceURL: sourceURL, resourceRootURL: resourceRootURL).path)
+            if let lightmap = payload["lightmapSource"]?.stringValue, !lightmap.isEmpty {
+                resolvedPayload["lightmapSource"] = .string(try lightmapPath(lightmap, relativeTo: sourceURL, resourceRootURL: resourceRootURL))
+            }
             if let path = payload["animationModifiers"]?.stringValue, !path.isEmpty {
                 guard let url = resolveTileMapReference(path, relativeTo: sourceURL, resourceRootURL: resourceRootURL, fileExtension: "animmod") else {
                     throw AssetError.message("Animation modifiers must be an .animmod resource inside project assets.")
@@ -303,9 +364,11 @@ enum EditorSceneFileLoader {
         let parentEntity: Entity?
         let idPrefix: String
         let ancestry: Set<URL>
-        let identityNamespace = UUID().uuidString
+        let identityNamespace: String
         var assets: EditorSceneAssetCache
         var warnings: [String] = []
+        var warningsByEditorID: [String: [String]] = [:]
+        var assetPathsByEditorID: [String: Set<String>] = [:]
         var entityCount: Int
         var entitiesByEditorID: [String: Entity] = [:]
         var runtimeEntityIDsByEditorID: [String: Entity.ID] = [:]
@@ -321,7 +384,8 @@ enum EditorSceneFileLoader {
             parentEntity: Entity?,
             idPrefix: String,
             ancestry: Set<URL>,
-            assets: EditorSceneAssetCache
+            assets: EditorSceneAssetCache,
+            identityNamespace: String = UUID().uuidString
         ) {
             self.sceneModel = sceneModel
             self.world = world
@@ -333,6 +397,7 @@ enum EditorSceneFileLoader {
             self.idPrefix = idPrefix
             self.ancestry = ancestry
             self.assets = assets
+            self.identityNamespace = identityNamespace
             self.entityCount = sceneModel.entities.count
             if world.getResource(UIComponentRuntimeResource.self) == nil {
                 let runtime = UIComponentRuntime(resourceRoot: resourceRootURL ?? sourceURL?.deletingLastPathComponent() ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
@@ -352,6 +417,12 @@ enum EditorSceneFileLoader {
             let entity = world.spawn(sceneEntity.name)
             entity.isActive = sceneEntity.enabled
             let runtimeEditorID = "\(idPrefix)\(sceneEntity.id)"
+            let warningStart = warnings.count
+            defer {
+                if warnings.count > warningStart {
+                    warningsByEditorID[runtimeEditorID, default: []].append(contentsOf: warnings[warningStart...])
+                }
+            }
             entity.components[AnimationSceneIdentity3D.self] = .init(namespace: identityNamespace, id: sceneEntity.id)
             entitiesByEditorID[sceneEntity.id] = entity
             runtimeEntityIDsByEditorID[runtimeEditorID] = entity.id
@@ -426,8 +497,13 @@ enum EditorSceneFileLoader {
                 }
             }
             EditorSceneFileLoader.completeRuntimeBundle(for: entity, in: world)
+            if !loadsScriptableObjects, !sceneEntity.enabled {
+                // Render extractors traverse authored visibility through generated model nodes.
+                world.insert(Visibility.hidden, for: entity.id)
+            }
             #if !WASM
             if let reference = entity.components[SpineSource.self], !reference.source.isEmpty {
+                assetPathsByEditorID[runtimeEditorID, default: []].insert(reference.source)
                 do {
                     let skeleton = try assets.skeleton(at: reference.source)
                     try reference.instantiate(skeleton, on: entity)
@@ -437,6 +513,11 @@ enum EditorSceneFileLoader {
                 }
             }
             if let reference = entity.components[Model3DSource.self], !reference.source.isEmpty {
+                assetPathsByEditorID[runtimeEditorID, default: []].insert(reference.assetPath)
+                assetPathsByEditorID[runtimeEditorID, default: []].formUnion(reference.lod?.sources ?? [])
+                assetPathsByEditorID[runtimeEditorID, default: []].formUnion(reference.animationLibraries)
+                if let modifiers = reference.animationModifiers { assetPathsByEditorID[runtimeEditorID, default: []].insert(modifiers) }
+                if !reference.lightmapSource.isEmpty { assetPathsByEditorID[runtimeEditorID, default: []].insert(reference.lightmapSource) }
                 do {
                     let asset = try assets.model(at: reference.assetPath)
                     let alternatives = try (reference.lod?.sources ?? []).map { source in
@@ -444,7 +525,16 @@ enum EditorSceneFileLoader {
                     }
                     let libraries = try reference.animationLibraries.map { try assets.library(at: $0) }
                     let modifiers = try reference.animationModifiers.map { try assets.modifierStack(at: $0) }
-                    let root = try reference.instantiate(asset, alternatives: alternatives, libraries: libraries, modifiers: modifiers, in: world, under: entity)
+                    let lightmap = try reference.lightmapSource.isEmpty ? nil : assets.lightmap(at: reference.lightmapSource)
+                    let root = try reference.instantiate(
+                        asset,
+                        alternatives: alternatives,
+                        libraries: libraries,
+                        modifiers: modifiers,
+                        preloadedLightmap: lightmap,
+                        in: world,
+                        under: entity
+                    )
                     func registerNodes(_ node: Entity) {
                         entityCount += 1
                         editorIDsByRuntimeEntityID[node.id] = runtimeEditorID
@@ -475,7 +565,7 @@ enum EditorSceneFileLoader {
                 }
 
                 guard let parent = entitiesByEditorID[parentID] else {
-                    warnings.append("Missing parent \(parentID) for entity \(sceneEntity.id)")
+                    warn("Missing parent \(parentID) for entity \(sceneEntity.id)", id: idPrefix + sceneEntity.id)
                     continue
                 }
 
@@ -495,11 +585,11 @@ enum EditorSceneFileLoader {
                     continue
                 }
                 guard let entity = entitiesByEditorID[editorEntityID] else {
-                    warnings.append("Missing animation target \(editorEntityID)")
+                    warn("Missing animation target \(editorEntityID)", id: idPrefix + editorEntityID)
                     continue
                 }
                 guard let transform = world.get(Transform.self, from: entity.id) else {
-                    warnings.append("Animation target \(editorEntityID) has no Transform")
+                    warn("Animation target \(editorEntityID) has no Transform", id: idPrefix + editorEntityID)
                     continue
                 }
                 let runtimeClips = clips.map { $0.makeRuntimeClip(initialTransform: transform) }
@@ -526,6 +616,8 @@ enum EditorSceneFileLoader {
             )
             entityCount += nested.entityCount
             warnings.append(contentsOf: nested.warnings)
+            warningsByEditorID.merge(nested.warningsByEditorID, uniquingKeysWith: +)
+            assetPathsByEditorID.merge(nested.assetPathsByEditorID, uniquingKeysWith: { $0.union($1) })
             for (runtimeID, editorID) in nested.editorIDsByEntityID {
                 editorIDsByRuntimeEntityID[runtimeID] = editorID
             }
@@ -542,8 +634,16 @@ enum EditorSceneFileLoader {
                 warnings: warnings,
                 entitiesByEditorID: runtimeEntityIDsByEditorID,
                 editorIDsByEntityID: editorIDsByRuntimeEntityID,
-                csgTargets: csgTargets
+                csgTargets: csgTargets,
+                identityNamespace: identityNamespace,
+                assetPathsByEditorID: assetPathsByEditorID,
+                warningsByEditorID: warningsByEditorID
             )
+        }
+
+        private func warn(_ message: String, id: String) {
+            warnings.append(message)
+            warningsByEditorID[id, default: []].append(message)
         }
     }
 
@@ -579,19 +679,19 @@ enum EditorSceneFileLoader {
             else {
                 continue
             }
+            let runtimeEditorID = "\(idPrefix)\(sceneEntity.id)"
             guard let nestedURL = resolveSceneReference(reference, relativeTo: sourceURL, resourceRootURL: resourceRootURL) else {
-                result.warnings.append("Unable to resolve nested scene \(reference)")
+                result.warn("Unable to resolve nested scene \(reference)", id: runtimeEditorID)
                 continue
             }
             guard !ancestry.contains(nestedURL) else {
-                result.warnings.append("Nested scene cycle: \(nestedURL.path)")
+                result.warn("Nested scene cycle: \(nestedURL.path)", id: runtimeEditorID)
                 continue
             }
             do {
-                let nestedModel = try EditorSceneModel.decode(from: String(contentsOf: nestedURL, encoding: .utf8))
+                let nestedModel = try assets.preparedScenes[nestedURL] ?? EditorSceneModel.decode(from: String(contentsOf: nestedURL, encoding: .utf8))
                 var nestedAncestry = ancestry
                 nestedAncestry.insert(nestedURL)
-                let runtimeEditorID = "\(idPrefix)\(sceneEntity.id)"
                 let nested = instantiate(
                     nestedModel,
                     in: world,
@@ -605,16 +705,27 @@ enum EditorSceneFileLoader {
                     assets: &assets
                 )
                 result.entityCount += nested.entityCount
-                result.warnings.append(contentsOf: nested.warnings.map { "\(reference): \($0)" })
+                for warning in nested.warnings { result.warn("\(reference): \(warning)", id: runtimeEditorID) }
+                result.assetPathsByEditorID[runtimeEditorID, default: []].formUnion(nested.assetPathsByEditorID.values.joined())
                 result.csgTargets.merge(nested.csgTargets, uniquingKeysWith: { first, _ in first })
                 for runtimeEntityID in nested.editorIDsByEntityID.keys {
                     result.editorIDsByEntityID[runtimeEntityID] = runtimeEditorID
                 }
             } catch {
-                result.warnings.append("Failed to load nested scene \(reference): \(error.localizedDescription)")
+                result.warn("Failed to load nested scene \(reference): \(error.localizedDescription)", id: runtimeEditorID)
             }
         }
         return result
+    }
+
+    static func lightmapPath(_ reference: String, relativeTo sourceURL: URL?, resourceRootURL: URL?) throws -> String {
+        guard reference.hasPrefix("@res://") else {
+            return reference
+        }
+        guard let url = resolveTileMapReference(reference, relativeTo: sourceURL, resourceRootURL: resourceRootURL, fileExtension: "lightmaps") else {
+            throw AssetError.message("Lightmap must be a .lightmaps resource inside project assets.")
+        }
+        return url.path
     }
 
     static func resolveTileMapReference(
@@ -692,6 +803,13 @@ private struct NestedSceneResult {
     var warnings: [String] = []
     var editorIDsByEntityID: [Entity.ID: String] = [:]
     var csgTargets: [String: EditorCSGScene.PreviewTarget] = [:]
+    var warningsByEditorID: [String: [String]] = [:]
+    var assetPathsByEditorID: [String: Set<String>] = [:]
+
+    mutating func warn(_ message: String, id: String) {
+        warnings.append(message)
+        warningsByEditorID[id, default: []].append(message)
+    }
 }
 
 extension EditorSceneRuntimeLoadResult {

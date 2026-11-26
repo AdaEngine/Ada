@@ -4,7 +4,7 @@ import Foundation
 /// Evaluated at document commits and successful runtime loads, never in the frame loop.
 @MainActor
 enum EditorAchievementRules {
-    static func savedScene(_ scene: EditorSceneModel, previous: EditorSceneModel?, source: URL, resourceRoot: URL?) -> [EditorAchievementID: Int] {
+    nonisolated static func savedScene(_ scene: EditorSceneModel, previous: EditorSceneModel?, source: URL, resourceRoot: URL?) -> [EditorAchievementID: Int] {
         var result: [EditorAchievementID: Int] = [.firstScene: 1]
         let entities = scene.entities.filter { $0.id != scene.rootEntityID }
         let childCounts = Dictionary(grouping: scene.entities, by: \.parent).mapValues(\.count)
@@ -132,14 +132,14 @@ enum EditorAchievementRules {
         return result
     }
 
-    static func hasMotion(_ track: EditorAnimationTrack) -> Bool {
+    nonisolated static func hasMotion(_ track: EditorAnimationTrack) -> Bool {
         guard let first = track.keyframes.first else {
             return false
         }
         return track.keyframes.contains { $0.time != first.time && $0.value != first.value }
     }
 
-    private static func nestedDepth(_ scene: EditorSceneModel, source: URL, root: URL?, visited: Set<String>, remaining: Int) -> Int {
+    nonisolated private static func nestedDepth(_ scene: EditorSceneModel, source: URL, root: URL?, visited: Set<String>, remaining: Int) -> Int {
         guard remaining > 0 else {
             return 0
         }
@@ -161,7 +161,7 @@ enum EditorAchievementRules {
         return maximum
     }
 
-    private static func localAsset(_ reference: String, source: URL, root: URL?) -> URL? {
+    nonisolated private static func localAsset(_ reference: String, source: URL, root: URL?) -> URL? {
         guard !reference.isEmpty else {
             return nil
         }

@@ -13,6 +13,13 @@ On macOS, project windows open maximized within the display's usable area.
 
 The Project Navigator shows project files. Select a source file to edit it, or a `.ascn` scene to open the scene viewport. Use the scene hierarchy to select entities and the Inspector to edit their components. Use **File > New File** to create files and **File > Import Assets** to bring assets into the project.
 
+In the editing viewport, use the eye icon in the hierarchy to hide or show
+an object. Drag the object onto another group to move it there, then use
+**Edit > Undo** or **Redo** to revisit the change. You can keep moving the
+viewport camera during these edits. Adding and deleting objects and applying
+Inspector changes also update the open scene. When a new model needs to load,
+keep working in the viewport and look for the model when its resources are ready.
+
 Use **File > Save** to save the active document, or **File > Save All** to save all documents. The Code menu includes tab actions and editor font size controls.
 
 On desktop, drag the divider beside the Project Navigator or Inspector to resize that panel. Drag the divider above the bottom dock to adjust its height. The pointer changes to a resize cursor near a divider. If you drag a panel closed, use its tool strip button to reopen it.

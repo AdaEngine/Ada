@@ -14,8 +14,14 @@ public struct Model3DSourceLOD: Codable, Equatable, Sendable {
     public var skeletonCompatible: Bool
     public var animationLOD: Bool
 
-    public init(sources: [String] = [], screenThresholds: [Float] = [], maximumDistance: Float? = nil,
-                fadeDistance: Float = 5, skeletonCompatible: Bool = false, animationLOD: Bool = false) {
+    public init(
+        sources: [String] = [],
+        screenThresholds: [Float] = [],
+        maximumDistance: Float? = nil,
+        fadeDistance: Float = 5,
+        skeletonCompatible: Bool = false,
+        animationLOD: Bool = false
+    ) {
         self.sources = sources
         self.screenThresholds = screenThresholds
         self.maximumDistance = maximumDistance
@@ -52,10 +58,19 @@ public struct Model3DSource: Codable, Equatable, Sendable {
     public var lightmapSource: String = ""
     public var lightmapIntensity: Float = 1
 
-    public init(source: String = "", animation: String = "", autoplay: Bool = false, repeats: Bool = true,
-                animationGraph: AnimationGraph? = nil, lod: Model3DSourceLOD? = nil, voxel: VoxelImportSettings? = nil,
-                morphWeights: [String: Float] = [:], animationLibraries: [String] = [], animationModifiers: String? = nil,
-                modifierBindings: [String: AnimationIKBinding3D] = [:]) {
+    public init(
+        source: String = "",
+        animation: String = "",
+        autoplay: Bool = false,
+        repeats: Bool = true,
+        animationGraph: AnimationGraph? = nil,
+        lod: Model3DSourceLOD? = nil,
+        voxel: VoxelImportSettings? = nil,
+        morphWeights: [String: Float] = [:],
+        animationLibraries: [String] = [],
+        animationModifiers: String? = nil,
+        modifierBindings: [String: AnimationIKBinding3D] = [:]
+    ) {
         self.animationModifiers = animationModifiers
         self.modifierBindings = modifierBindings
         self.animationLibraries = animationLibraries
@@ -149,8 +164,15 @@ public struct Model3DSource: Codable, Equatable, Sendable {
 
     /// Installs an already loaded asset. An invalid animation fails before creating entities.
     @discardableResult
-    public func instantiate(_ model: ModelAsset3D, alternatives: [ModelAsset3D] = [], libraries: [AnimationLibrary] = [], modifiers: AnimationModifierStack? = nil,
-                            preloadedLightmap: LightmapSet3D? = nil, in world: World, under owner: Entity) throws -> Entity {
+    public func instantiate(
+        _ model: ModelAsset3D,
+        alternatives: [ModelAsset3D] = [],
+        libraries: [AnimationLibrary] = [],
+        modifiers: AnimationModifierStack? = nil,
+        preloadedLightmap: LightmapSet3D? = nil,
+        in world: World,
+        under owner: Entity
+    ) throws -> Entity {
         let clips = try resolvedAnimationClips(importedClips: model.animationClips, rig: model.animationRig, libraries: libraries)
         try validateModifiers(modifiers, rig: model.animationRig)
         if let lod, alternatives.count != lod.sources.count {
@@ -198,6 +220,10 @@ public struct Model3DSource: Codable, Equatable, Sendable {
             }
         }
         let root = model.instantiate(in: world)
+        var attached = false
+        defer {
+            if !attached { world.removeEntity(root, recursively: true) }
+        }
         if !libraries.isEmpty, let rig = model.animationRig {
             root.components[ModelAnimation3DComponent.self] = ModelAnimation3DComponent(player: try SkeletalAnimationPlayer(rig: rig, clips: clips))
         }
@@ -247,15 +273,19 @@ public struct Model3DSource: Codable, Equatable, Sendable {
             root.components[VoxelAnimationPlayback3DComponent.self] = voxelPlayback
         }
         owner.addChild(root)
+        attached = true
         if let lod {
             var pending = root.children
             while let node = pending.popLast() {
                 if let binding = node.components[ModelNode3DComponent.self], model.nodes.indices.contains(binding.nodeIndex),
                     let meshIndex = model.nodes[binding.nodeIndex].meshIndex,
                     alternatives.allSatisfy({ $0.meshes.indices.contains(meshIndex) }) {
-                    var value = MeshLOD3DComponent(alternatives: alternatives.map { $0.meshes[meshIndex] },
-                                                   screenThresholds: lod.screenThresholds, maximumDistance: lod.maximumDistance,
-                                                   fadeDistance: lod.fadeDistance)
+                    var value = MeshLOD3DComponent(
+                        alternatives: alternatives.map { $0.meshes[meshIndex] },
+                        screenThresholds: lod.screenThresholds,
+                        maximumDistance: lod.maximumDistance,
+                        fadeDistance: lod.fadeDistance
+                    )
                     value.skeletonCompatible = lod.skeletonCompatible
                     node.components[MeshLOD3DComponent.self] = value
                 }
@@ -356,8 +386,11 @@ public struct Model3DSourceSystem {
                 var libraries: [AnimationLibrary] = []
                 for path in reference.animationLibraries {
                     let handle: AssetHandle<AnimationLibraryResource>
-                    if let cached = libraryHandles[path] { handle = cached }
-                    else { handle = try await AssetsManager.load(AnimationLibraryResource.self, at: path) }
+                    if let cached = libraryHandles[path] {
+                        handle = cached
+                    } else {
+                        handle = try await AssetsManager.load(AnimationLibraryResource.self, at: path)
+                    }
                     guard let library = handle.asset?.library else { throw AssetError.message("Animation library has not loaded: \(path)") }
                     libraryHandles[path] = handle
                     libraries.append(library)
@@ -365,8 +398,11 @@ public struct Model3DSourceSystem {
                 var modifiers: AnimationModifierStack?
                 if let path = reference.animationModifiers {
                     let handle: AssetHandle<AnimationModifierResource>
-                    if let cached = modifierHandles[path] { handle = cached }
-                    else { handle = try await AssetsManager.load(AnimationModifierResource.self, at: path) }
+                    if let cached = modifierHandles[path] {
+                        handle = cached
+                    } else {
+                        handle = try await AssetsManager.load(AnimationModifierResource.self, at: path)
+                    }
                     guard let stack = handle.asset?.stack else { throw AssetError.message("Animation modifiers have not loaded: \(path)") }
                     modifierHandles[path] = handle
                     modifiers = stack
@@ -403,7 +439,9 @@ public struct Model3DSourceSystem {
     }
 
     private func loadModel(_ path: String) async throws -> ModelAsset3D? {
-        if let handle = modelHandles[path] { return handle.asset }
+        if let handle = modelHandles[path] {
+            return handle.asset
+        }
         let handle = try await AssetsManager.load(ModelAsset3D.self, at: path)
         modelHandles[path] = handle
         return handle.asset

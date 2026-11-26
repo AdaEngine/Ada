@@ -43,7 +43,8 @@ struct TileMapOcclusionCache: Resource {
 // Lighting clears its extraction first. Offscreen walls must still cast shadows into the view.
 @PlainSystem(dependencies: [.after(ExtractLighting2DSystem.self)])
 struct ExtractTileMapOccludersSystem {
-    @Extract<Query<TileMapComponent, GlobalTransform, Visibility>> private var maps
+    @Extract<Query<Entity, TileMapComponent, GlobalTransform, Visibility>> private var maps
+    @Extract<Query<RelationshipComponent>> private var hierarchy
     @ResMut<ExtractedLighting2D> private var lighting
     @ResMut<TileMapOcclusionCache> private var cache
 
@@ -53,10 +54,11 @@ struct ExtractTileMapOccludersSystem {
     }
 
     func update(context _: UpdateContext) {
+        _ = hierarchy.wrappedValue
         cache.rebuiltChunks = 0
         var active: Set<ObjectIdentifier> = []
-        maps.wrappedValue.forEach { component, transform, visibility in
-            guard visibility != .hidden else {
+        maps.wrappedValue.forEach { entity, component, transform, visibility in
+            guard visibility.isVisible(inHierarchyOf: entity) else {
                 return
             }
             for layer in component.tileMap.layers where layer.isEnabled {

@@ -140,15 +140,17 @@ public func ExtractSprite(
     _ sprites: Extract<
         Query<Entity, Sprite, GlobalTransform, Transform, Visibility>
     >,
+    _ hierarchy: Extract<Query<RelationshipComponent>>,
     _ extractedSprites: ResMut<ExtractedSprites>
 ) {
+    _ = hierarchy.wrappedValue
     // Fill a local set and swap it in once: writing through `ResMut`'s keypath-based dynamic member
     // per sprite costs runtime keypath access, allocations and change-tick bookkeeping for every row.
     var extracted = SparseSet<Entity.ID, ExtractedSprite>()
     swap(&extracted, &extractedSprites.wrappedValue.sprites)
     extracted.removeAll(keepingCapacity: true)
     sprites.wrappedValue.forEach { entity, sprite, globalTransform, transform, visible in
-        if visible == .hidden {
+        guard visible.isVisible(inHierarchyOf: entity) else {
             return
         }
         var extractedSprite = ExtractedSprite(

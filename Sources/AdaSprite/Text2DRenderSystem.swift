@@ -97,12 +97,14 @@ public func ExtractText(
     _ texts: Extract<
         Query<Entity, TextComponent, TextLayoutComponent, GlobalTransform, Transform, Visibility>
     >,
+    _ hierarchy: Extract<Query<RelationshipComponent>>,
     _ extractedTexts: ResMut<ExtractedTexts>
 ) {
+    _ = hierarchy.wrappedValue
     extractedTexts.texts.removeAll(keepingCapacity: true)
 
     texts.wrappedValue.forEach { entity, textComponent, textLayoutComponent, globalTransform, transform, visible in
-        if visible == .hidden {
+        guard visible.isVisible(inHierarchyOf: entity) else {
             return
         }
 

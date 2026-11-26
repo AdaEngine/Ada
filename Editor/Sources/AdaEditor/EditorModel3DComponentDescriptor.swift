@@ -26,13 +26,17 @@ extension EditorComponentRegistry {
                 repeats: payload["repeats"]?.boolValue ?? true,
                 animationGraph: try EditorAnimationGraphPayload.decode(payload["animationGraph"]),
                 lod: try payload["lod"].flatMap { value in
-                    if case .null = value { return nil }
+                    if case .null = value {
+                        return nil
+                    }
                     return try JSONDecoder().decode(Model3DSourceLOD.self, from: Data(value.jsonString.utf8))
                 },
                 voxel: voxelSettings(in: payload),
                 morphWeights: EditorMorphWeightsPayload.decode(payload["morphWeights"]),
                 animationLibraries: try payload["animationLibraries"].map { try JSONDecoder().decode([String].self, from: JSONEncoder().encode($0)) } ?? []
             )
+            source.lightmapSource = payload["lightmapSource"]?.stringValue ?? ""
+            source.lightmapIntensity = payload["lightmapIntensity"]?.doubleValue.map(Float.init) ?? 1
             if let path = payload["animationModifiers"]?.stringValue, !path.isEmpty { source.animationModifiers = path }
             if let bindings = payload["modifierBindings"], bindings != .null {
                 source.modifierBindings = try JSONDecoder().decode([String: AnimationIKBinding3D].self, from: JSONEncoder().encode(bindings))

@@ -130,6 +130,10 @@ final class EditorSceneViewportModel {
     private var transformDrag: TransformDrag?
     private var transformInspectorUpdateTask: Task<Void, Never>?
     private var sceneLoadTask: Task<Void, Never>?
+    let liveSceneEdits = EditorSceneLiveEdits()
+    var liveSceneSourceURL: URL? { sceneSourceURL }
+    var liveSceneLoadsPhysics: Bool { isImmersive }
+    var hasHostedSceneApplication: Bool { sceneApplication != nil }
     private var presentationPauseTask: Task<Void, Never>?
     private var isPresentationActive = true
     private var sceneLoadGeneration = 0
@@ -171,13 +175,14 @@ final class EditorSceneViewportModel {
         resourceRootURL: URL? = nil,
         scriptableObjectCatalog: [EditorScriptableObjectDescriptor] = [],
         isHistoryChange: Bool = false,
+        replacesDocument: Bool = false,
         onSelectionChanged: @escaping (EditorInspectorSidebarViewModel.SelectedEntity?) -> Void,
         onDocumentContentChanged: @escaping (String) -> Void,
         onTransformChanged: ((String, EditorComponentPayload) -> Void)? = nil,
         onLocomotionInspectorChanged: ((String, EditorLocomotionInspectorState) -> Void)? = nil
     ) -> EditorSceneRuntimeLoadResult? {
         let contentChanged = self.sceneContent != sceneContent
-        let contextChanged = sceneSourceURL != sourceURL || sceneResourceRootURL != resourceRootURL
+        let contextChanged = (replacesDocument && contentChanged) || sceneSourceURL != sourceURL || sceneResourceRootURL != resourceRootURL
         if contextChanged {
             csgPreview.clear()
             csgTargets = [:]
@@ -227,12 +232,20 @@ final class EditorSceneViewportModel {
         let retainedHistory = isHistoryChange && runtimeChanged && !contextChanged && sceneLoadTask == nil
             && previousModel.map { restoreMeshTerrainHistory(previous: $0, next: model, sourceURL: sourceURL) } == true
         if runtimeChanged && !retainedHistory && supersedingHistory { endTerrainStroke(cancelled: true) }
-        let loadResult = runtimeChanged && !retainedHistory ? reloadSceneRuntimeIfReady() : nil
+        var loadResult: EditorSceneRuntimeLoadResult?
+        if runtimeChanged && !retainedHistory {
+            if !contextChanged && liveSceneEdits.isReady {
+                liveSceneEdits.submit(model, in: self)
+            } else {
+                loadResult = reloadSceneRuntimeIfReady()
+            }
+        }
         onSelectionChanged(selectedEntityViewModel(editorID: selectedEditorID, model: model))
         return loadResult
     }
 
     func disconnect() {
+        liveSceneEdits.reset()
         decalEditing.setEnabled(false)
         endTransformDrag(cancelled: true)
         endSpatialTransform(cancelled: true)
@@ -288,6 +301,7 @@ final class EditorSceneViewportModel {
 
     func attachSceneWorld(_ world: World, loadResult: EditorSceneRuntimeLoadResult) {
         self.world = world
+        if let model = sceneModel { liveSceneEdits.install(model, result: loadResult) }
         self.entitiesByEditorID = loadResult.entitiesByEditorID
         self.editorIDsByEntityID = loadResult.editorIDsByEntityID
         csgTargets = loadResult.csgTargets
@@ -305,6 +319,7 @@ final class EditorSceneViewportModel {
         guard let world, let model = sceneModel else {
             return nil
         }
+        liveSceneEdits.reset()
         let previousLoad = sceneLoadTask
         previousLoad?.cancel()
         sceneLoadGeneration += 1
@@ -529,11 +544,26 @@ final class EditorSceneViewportModel {
     }
 
     private func finishSceneRuntime(_ result: EditorSceneRuntimeLoadResult, in world: World) {
+        if let model = sceneModel { liveSceneEdits.install(model, result: result) }
+        publishRuntimeMappings(result, in: world)
+    }
+
+    func publishLiveSceneEdit(_ result: EditorSceneRuntimeLoadResult, in world: World, refreshCamera: Bool) {
+        publishRuntimeMappings(result, in: world, refreshCamera: refreshCamera)
+        if terrainEditing.isEnabled { refreshTerrainSourceControls() }
+        refreshLocomotionInspector()
+        onSceneLoaded?(result)
+    }
+
+    private func publishRuntimeMappings(_ result: EditorSceneRuntimeLoadResult, in world: World, refreshCamera: Bool = true) {
         entitiesByEditorID = result.entitiesByEditorID
         editorIDsByEntityID = result.editorIDsByEntityID
         csgTargets = result.csgTargets
         csgPreview.refresh(sceneModel, viewport: self)
         csgPreview.restore(in: self)
+        guard refreshCamera else {
+            return
+        }
         refreshSceneEnvironmentCamera(in: world)
         cameraEntityID = isImmersive ? nil : findCameraEntity(in: world)?.id
         if !isImmersive { applyCamera() }
@@ -1165,6 +1195,7 @@ extension EditorSceneViewportModel {
             }
         } else {
             entity.components += transform
+            liveSceneEdits.noteTransform(payload, of: editorID)
         }
     }
 
@@ -1887,6 +1918,7 @@ extension EditorSceneViewportModel {
     func attachImmersiveWorld(_ world: World, loadResult: EditorSceneRuntimeLoadResult) {
         isImmersive = true
         self.world = world
+        if let model = sceneModel { liveSceneEdits.install(model, result: loadResult) }
         entitiesByEditorID = loadResult.entitiesByEditorID
         editorIDsByEntityID = loadResult.editorIDsByEntityID
         cameraEntityID = nil
