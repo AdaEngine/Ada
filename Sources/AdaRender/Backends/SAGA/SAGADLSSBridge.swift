@@ -80,6 +80,7 @@
             UInt64, UInt64, UnsafeRawPointer, UnsafeMutablePointer<UnsafeMutableRawPointer?>
         ) -> Int32
         private typealias Evaluate = @convention(c) (UInt64, UnsafeMutableRawPointer, UnsafeRawPointer) -> Int32
+        private typealias EvaluateWithHitDistance = @convention(c) (UInt64, UnsafeMutableRawPointer, UnsafeRawPointer, UnsafeRawPointer) -> Int32
         private typealias Release = @convention(c) (UnsafeMutableRawPointer?) -> Void
 
         let directory: String
@@ -93,12 +94,16 @@
         private let denoiserSupportedFunction: Supported
         private let createDenoiserFunction: Create
         private let evaluateDenoiserFunction: Evaluate
+        private let evaluateWithHitDistanceFunction: EvaluateWithHitDistance?
+        var supportsSpecularHitDistance: Bool { evaluateWithHitDistanceFunction != nil }
 
         /// Loads the bridge from `directory`; nil when it is missing, has another ABI version or lacks a function.
         init?(directory: String) {
             self.directory = directory
             let path = directory + "/" + DLSSRuntime.bridgeName
-            guard let library = Self.open(path) else { return nil }
+            guard let library = Self.open(path) else {
+                return nil
+            }
             func symbol<T>(_ name: String, as _: T.Type) -> T? {
                 Self.symbol(library, name).map { unsafeBitCast($0, to: T.self) }
             }
@@ -124,6 +129,7 @@
             denoiserSupportedFunction = denoiserSupported
             createDenoiserFunction = createDenoiser
             evaluateDenoiserFunction = evaluateDenoiser
+            evaluateWithHitDistanceFunction = symbol("ada_ngx_dlssd_evaluate_with_hit_distance", as: EvaluateWithHitDistance.self)
         }
 
         /// Whether DLSS Ray Reconstruction is usable; valid after initialize(instance:physicalDevice:device:instanceProcedure:deviceProcedure:dataDirectory:).
@@ -135,8 +141,20 @@
             return (result, handle)
         }
 
-        func evaluateDenoiser(commandBuffer: UInt, handle: UnsafeMutableRawPointer, frame: DLSSDBridgeFrame) -> Int32 {
-            withUnsafePointer(to: frame) { evaluateDenoiserFunction(UInt64(commandBuffer), handle, $0) }
+        func evaluateDenoiser(
+            commandBuffer: UInt,
+            handle: UnsafeMutableRawPointer,
+            frame: DLSSDBridgeFrame,
+            specularHitDistance: DLSSBridgeImage?
+        ) -> Int32 {
+            withUnsafePointer(to: frame) { framePointer in
+                if let specularHitDistance, let evaluateWithHitDistanceFunction {
+                    return withUnsafePointer(to: specularHitDistance) {
+                        evaluateWithHitDistanceFunction(UInt64(commandBuffer), handle, framePointer, $0)
+                    }
+                }
+                return evaluateDenoiserFunction(UInt64(commandBuffer), handle, framePointer)
+            }
         }
 
         /// The Vulkan extensions NGX needs enabled when the instance and device are created.
@@ -145,9 +163,13 @@
             var deviceCount: UInt32 = 0
             var instanceNames: UnsafePointer<UnsafePointer<CChar>?>?
             var deviceNames: UnsafePointer<UnsafePointer<CChar>?>?
-            guard requiredExtensionsFunction(&instanceCount, &instanceNames, &deviceCount, &deviceNames) == Self.success else { return nil }
+            guard requiredExtensionsFunction(&instanceCount, &instanceNames, &deviceCount, &deviceNames) == Self.success else {
+                return nil
+            }
             func strings(_ names: UnsafePointer<UnsafePointer<CChar>?>?, _ count: UInt32) -> [String] {
-                guard let names else { return [] }
+                guard let names else {
+                    return []
+                }
                 return (0..<Int(count)).compactMap { names[$0].map { String(cString: $0) } }
             }
             return (strings(instanceNames, instanceCount), strings(deviceNames, deviceCount))
@@ -155,7 +177,11 @@
 
         /// Initializes NGX on the device and reports whether DLSS Super Resolution is usable on it.
         func initialize(
-            instance: UInt, physicalDevice: UInt, device: UInt, instanceProcedure: UnsafeRawPointer?, deviceProcedure: UnsafeRawPointer?,
+            instance: UInt,
+            physicalDevice: UInt,
+            device: UInt,
+            instanceProcedure: UnsafeRawPointer?,
+            deviceProcedure: UnsafeRawPointer?,
             dataDirectory: String
         ) -> (result: Int32, supported: Bool) {
             let result = dataDirectory.withCString(encodedAs: UTF16.self) { data in

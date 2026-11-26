@@ -31,7 +31,7 @@ extension Render3DGPUTests {
             return total / count
         }
 
-        @Test(.enabled(if: DLSSSuperResolution.enabled))
+        @Test(.enabled(if: Self.enabled))
         func dlssMatchesNativeResolutionAtLeastAsWellAsThePortableReconstruction() async throws {
             let scene = try await DebugViews.makeScene(temporalRenderScale: 0.5)
             for _ in 0..<200 where !scene.device.dlssStatus.isAvailable && (scene.device.dlssStatus.unavailableReason ?? "").contains("initializing") {
@@ -69,7 +69,7 @@ extension Render3DGPUTests {
             #expect(dlssError <= portableError * 1.5 + 0.01, "DLSS \(dlssError) is much worse than portable \(portableError)")
         }
 
-        @Test(.enabled(if: DLSSSuperResolution.enabled))
+        @Test(.enabled(if: Self.enabled))
         func rayReconstructionDenoisesAPathTracedFrame() async throws {
             let scene = try await DebugViews.makeScene(temporalRenderScale: 1, pathTracingPresentation: true)
             for _ in 0..<200 where !scene.device.dlssStatus.isAvailable && (scene.device.dlssStatus.unavailableReason ?? "").contains("initializing") {
@@ -94,6 +94,10 @@ extension Render3DGPUTests {
             #expect(path.denoiserFallback == nil && path.failure == nil)
             let temporal = try #require(world.getResource(Render3DTemporalStatistics.self)?.snapshots[key])
             #expect(temporal.fallbackFrames == 0, "\(temporal)")
+            if ProcessInfo.processInfo.environment["ADAENGINE_TEST_RR_HIT_DISTANCE"] == "1" {
+                let json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(path)) as? [String: Any])
+                #expect(json["rayReconstructionSpecularHitDistance"] as? Bool == true)
+            }
 
             try scene.configure { $0.pathTracing.denoiser = .portable }
             camera.temporalUpscaling = nil

@@ -60,6 +60,9 @@ struct PathTracing3DGeometryTable: Sendable {
 
     func contains(_ key: Key) -> Bool { blocks[key] != nil }
 
+    /// Primitive-index-ordered shading data for building the world-space emitter table.
+    func words(for key: Key) -> [Vector4]? { blocks[key]?.words }
+
     /// Pack one shared mesh in primitive-index order. The GPU supplies the transform, material and flags for each hit.
     mutating func pack(_ part: Mesh.Part, material: PBRMaterial, key: Key) -> Int {
         let descriptor = part.meshDescriptor

@@ -1490,7 +1490,7 @@ if let sagaPath = sagaCheckoutPath {
     package.dependencies.append(.package(name: "SAGA", path: sagaPath))
 } else {
     // Metal indexed draw grouping and validated shared upload batches.
-    let sagaRevision = "9fe3bbe84079514682b9eca77e6e899d7ac3a622"
+    let sagaRevision = "33b3a442d63bcc90986fd1a6efbfeaf73aee806b"
     package.dependencies.append(.package(
         url: "https://github.com/AdaEngine/SAGA.git",
         revision: sagaRevision

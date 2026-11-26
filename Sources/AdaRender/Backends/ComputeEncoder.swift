@@ -23,6 +23,12 @@ public protocol ComputePipelineState: AnyObject, Sendable {
     /// Whether the device finished creating the pipeline. Creation is asynchronous on some backends, and a dispatch of a
     /// pipeline that failed or is still pending cannot run, so callers check this and use a fallback until it is true.
     var isReady: Bool { get }
+    /// The asynchronous backend reported a pipeline creation failure.
+    var creationFailure: String? { get }
+}
+
+extension ComputePipelineState {
+    public var creationFailure: String? { nil }
 }
 
 /// Configures a compute pass.
@@ -40,6 +46,10 @@ public struct ComputeResourceSet {
         public enum Resource {
             /// A uniform buffer, bound in full.
             case uniformBuffer(UniformBuffer)
+            /// A whole buffer, bound as uniform or storage according to the shader declaration.
+            case buffer(any Buffer)
+            /// A top-level acceleration structure for compute ray queries.
+            case accelerationStructure(any AccelerationStructure)
             /// A texture sampled with `textureLoad` or a sampler. A `mipLevel` binds a single level; nil binds every level.
             case sampledTexture(Texture, mipLevel: Int?)
             /// A texture written through a `texture_storage_2d` binding. The texture needs ``Texture/Usage/storage``.

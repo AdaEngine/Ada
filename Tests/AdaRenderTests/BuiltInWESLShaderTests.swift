@@ -91,7 +91,7 @@
             Expectation(
                 path: "Sources/AdaCorePipelines/Assets/Shaders/path_tracing_3d.wesl",
                 entryPoints: ["path_vertex": "vertex", "path_fragment": "fragment"],
-                uniformBytes: [4: 480]
+                uniformBytes: [4: 496]
             ),
             Expectation(
                 path: "Sources/AdaCorePipelines/Assets/Shaders/particles_3d.wesl",

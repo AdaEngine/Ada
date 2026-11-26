@@ -79,6 +79,7 @@ for relative in [
     "Tests/AdaEngineTests/Render3DDynamicIrradianceTests.swift",
     "Tests/AdaEngineTests/Render3DPathTracingTests.swift",
     "Tests/AdaEngineTests/Render3DHardwarePathTracingTests.swift",
+    "Tests/AdaEngineTests/Render3DDLSSTests.swift",
     "Tests/AdaEngineTests/Temporal3DTests.swift",
     "Tests/AdaEngineTests/Render3DSkinningBatchTests.swift",
     "Tests/AdaRenderTests/WindowFrameRequestsTests.swift",

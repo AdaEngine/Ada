@@ -154,7 +154,7 @@ ADA_NGX_API int32_t ada_ngx_dlssd_create(uint64_t device, uint64_t commandBuffer
     return result;
 }
 
-ADA_NGX_API int32_t ada_ngx_dlssd_evaluate(uint64_t commandBuffer, void *handle, const AdaNGXDLSSDFrame *frame) {
+static int32_t evaluateDLSSD(uint64_t commandBuffer, void *handle, const AdaNGXDLSSDFrame *frame, const AdaNGXImage *hitDistance) {
     NVSDK_NGX_Parameter *parameters = nullptr;
     NVSDK_NGX_Result result = NVSDK_NGX_VULKAN_AllocateParameters(&parameters);
     if (NVSDK_NGX_FAILED(result)) return result;
@@ -178,6 +178,11 @@ ADA_NGX_API int32_t ada_ngx_dlssd_evaluate(uint64_t commandBuffer, void *handle,
     eval.pInDiffuseAlbedo = &diffuse;
     eval.pInSpecularAlbedo = &specular;
     eval.pInNormals = &normals;
+    NVSDK_NGX_Resource_VK specularHitDistance{};
+    if (hitDistance) {
+        specularHitDistance = resource(*hitDistance, false);
+        eval.pInSpecularHitDistance = &specularHitDistance;
+    }
     eval.pInWorldToViewMatrix = worldToView;
     eval.pInViewToClipMatrix = viewToClip;
     eval.InJitterOffsetX = frame->jitterX;
@@ -189,4 +194,13 @@ ADA_NGX_API int32_t ada_ngx_dlssd_evaluate(uint64_t commandBuffer, void *handle,
     result = NGX_VULKAN_EVALUATE_DLSSD_EXT(reinterpret_cast<VkCommandBuffer>(commandBuffer), static_cast<NVSDK_NGX_Handle *>(handle), parameters, &eval);
     NVSDK_NGX_VULKAN_DestroyParameters(parameters);
     return result;
+}
+
+ADA_NGX_API int32_t ada_ngx_dlssd_evaluate(uint64_t commandBuffer, void *handle, const AdaNGXDLSSDFrame *frame) {
+    return evaluateDLSSD(commandBuffer, handle, frame, nullptr);
+}
+
+ADA_NGX_API int32_t ada_ngx_dlssd_evaluate_with_hit_distance(uint64_t commandBuffer, void *handle, const AdaNGXDLSSDFrame *frame,
+                                                          const AdaNGXImage *hitDistance) {
+    return evaluateDLSSD(commandBuffer, handle, frame, hitDistance);
 }

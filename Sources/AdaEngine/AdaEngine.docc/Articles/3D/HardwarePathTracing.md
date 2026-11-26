@@ -27,6 +27,49 @@ environment.pathTracing.intersection = .software
 A view falls back to the shader BVH as a whole; it never mixes the two in one frame. Switching between them restarts the
 view's accumulation, like any other scene change.
 
+## Use interactive lighting
+
+```swift
+environment.pathTracing = .init(isEnabled: true, samplesPerPixel: 1,
+    maximumBounces: 3, resolutionScale: 0.5)
+environment.pathTracing.transport = .interactive
+environment.pathTracing.radianceCache = true
+```
+
+Interactive transport samples an analytic light or an emissive triangle at each interaction. It can run with the
+shader BVH or hardware ray queries. Existing scenes decode to `.exhaustive`, which evaluates every analytic light.
+With one analytic light and emissive meshes, the interactive sampler draws proposals from both groups at each
+interaction. This uses a smaller sample budget and preserves the proposal weights.
+
+The optional world-space radiance cache needs Vulkan ray queries, the raster G-buffer first hit and at least three
+surface interactions. It reuses diffuse lighting after warming, including at the last eligible hit within the bounce
+limit. On smooth surfaces that use the cache, the tracer still evaluates specular lighting and follows specular paths.
+The cache uses about 4.5 MiB per active view. Use
+`radianceCache = false` for an uncached comparison. On compatible Windows systems, the same transport can feed
+DLSS Ray Reconstruction. Use an updated NGX bridge to receive the optional specular hit distance guide.
+
+The cache retains compatible probes while objects move. During motion it refreshes probes against current visibility,
+reduces their lifetime and weighs new samples more heavily. A lighting-only edit gradually refreshes existing diffuse
+probes against the new light. During this refresh, a compatible probe may provide its deepest estimate when the
+path needs one more interaction than the cache stores. Changes to scene structure, sky or bounce depth start a new
+cache history.
+With interactive Ray Reconstruction, switching an analytic light or adjusting a mesh emitter's emission keeps the
+history needed for reprojection. Rays can respond to the new light on the next frame.
+
+When the Vulkan scene has only opaque, double-sided surfaces without per-mesh tracing distance limits, the
+device accepts hits during traversal. Mixed scenes use the shader's alpha, face and distance checks.
+
+## Benchmark on Windows Vulkan
+
+The standalone `SolariComparison` demo accepts `--uncapped --benchmark 300` to request immediate presentation and record
+300 intervals after warm-up. It reports output size, trace size, the mean and 95th-percentile intervals, and the rates
+of encoded frames and completed scene textures that reach the view. The renderer logs the selected presentation mode.
+The renderer uses FIFO when the Windows Vulkan surface lacks immediate presentation support.
+
+Run a separate diagnostic pass with `--gpu-timing` to read Vulkan timestamps. The tracer's interval
+starts at its first timed GPU pass and ends at its last. Acceleration structure builds before that
+interval and window presentation are outside the measurement.
+
 ## Check what ran
 
 `Render3DPathTracingStatistics`, a resource of the render world, reports per view which traversal ran and why hardware
@@ -36,6 +79,8 @@ was not used:
 if let status = statistics.snapshots[String(cameraID)] {
     print(status.implementation)            // "vulkan-ray-query" or "portable-shader-bvh"
     if let reason = status.intersectionFallback { print("Hardware not used: \(reason)") }
+    print(status.radianceCache ?? "disabled")
+    if let reason = status.radianceCacheFallback { print(reason) }
 }
 ```
 

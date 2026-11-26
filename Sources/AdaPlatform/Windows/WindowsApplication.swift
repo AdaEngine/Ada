@@ -18,6 +18,7 @@
     final class WindowsApplication: Application {
         private var task: Task<Void, Never>?
         private let screenManager: WindowsScreenManager
+        private var backgroundFrameDeadline: LongTimeInterval?
         /// Upper target for a foreground mailbox producer. Input can wake the pacing timer early.
         private static let mailboxFrameDuration: LongTimeInterval = 1.0 / 120.0
         /// `TIMER_ALL_ACCESS`; the macro is not imported into Swift.
@@ -120,17 +121,25 @@
 
         private func waitForNextFrameIfNeeded(startedAt frameStartedAt: LongTimeInterval, appWorlds: AppWorlds) async throws {
             guard let framePacing = appWorlds.getResource(ApplicationFramePacing.self) else {
+                backgroundFrameDeadline = nil
                 await Task.yield()
                 return
             }
 
             let frameRequests = appWorlds.getResource(WindowFrameRequests.self)
             let windows = windowManager as? WindowsWindowManager
+            let foregroundWindow = windows?.foregroundRenderWindow(requests: nil)
+            if foregroundWindow != nil { backgroundFrameDeadline = nil }
             var paceLatestFrameProducer = false
             if framePacing.synchronizesWithDisplayRefreshRate, let windows, let engine = unsafe RenderEngine.shared {
                 // Only the foreground swapchain paces interactive input.
-                if let id = windows.foregroundRenderWindow(requests: frameRequests),
+                if let id = foregroundWindow, frameRequests?.shouldRender(id) != false,
                     let mode = await engine.pacePendingWindowPresentation(id) {
+                    if mode == .uncapped {
+                        // A fast swapchain can leave no pending ticket to await. Let scene completions run on the main actor.
+                        await Task.yield()
+                        return
+                    }
                     guard mode == .synchronizedLatest else {
                         return
                     }
@@ -156,7 +165,20 @@
             } else {
                 frameDuration = framePacing.minimumFrameDuration
             }
-            let remainingTime = frameDuration - (Time.absolute - frameStartedAt)
+            let frameDeadline: LongTimeInterval
+            if windowVisible, foregroundWindow == nil, framePacing.synchronizesWithDisplayRefreshRate,
+                framePacing.idleMaximumFramesPerSecond != nil {
+                // Keep the same phase across ticks so a timer wake-up a little past its deadline does not lower the frame rate.
+                // A message can wake the timer early. Do not let those wakeups queue future intervals.
+                let frameStart = min(backgroundFrameDeadline ?? frameStartedAt, frameStartedAt)
+                let nextDeadline = frameStart + frameDuration
+                frameDeadline = nextDeadline > frameStartedAt ? nextDeadline : frameStartedAt + frameDuration
+                backgroundFrameDeadline = frameDeadline
+            } else {
+                backgroundFrameDeadline = nil
+                frameDeadline = frameStartedAt + frameDuration
+            }
+            let remainingTime = frameDeadline - Time.absolute
             guard remainingTime > 0 else {
                 await Task.yield()
                 return
@@ -165,7 +187,7 @@
             try Task.checkCancellation()
             // Run queued main-actor work first; the precise wait below blocks the main thread for at most one frame.
             await Task.yield()
-            let waitTime = frameDuration - (Time.absolute - frameStartedAt)
+            let waitTime = frameDeadline - Time.absolute
             if waitTime > 0 { waitPrecisely(seconds: waitTime) }
             // Let queued main-actor work, such as render-completion delivery, run before the next frame.
             await Task.yield()

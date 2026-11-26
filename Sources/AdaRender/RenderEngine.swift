@@ -90,11 +90,12 @@ public final class RenderEngine: RenderBackend, Sendable {
 
         package func pacePendingWindowPresentation(_ id: WindowID) async -> RenderPresentationMode? {
             #if SAGA_RENDER && SAGA_NATIVE && canImport(SAGAVulkan) && canImport(SAGACompiler)
-                guard let window = (renderBackend as? SAGANativeRenderBackend)?.window(for: id),
-                    await window.pacePendingPresentation() else {
+                guard let window = (renderBackend as? SAGANativeRenderBackend)?.window(for: id) else {
                     return nil
                 }
-                return window.presentationMode
+                let pending = await window.pacePendingPresentation()
+                let mode = window.presentationMode
+                return pending || mode == .uncapped ? mode : nil
             #else
                 nil
             #endif

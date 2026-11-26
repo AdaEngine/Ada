@@ -58,6 +58,8 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
     private let hostSubworldName: AppWorldName
     private let pipelinedRendering: Bool
     private let maximumPendingFrames: Int?
+    private let maximumRenderSize: SizeInt?
+    private let queuesCompletedFrames: Bool
     private var currentSize: SizeInt = .zero
     private var scaleFactor: Float = 1
     private var pendingResize: (size: SizeInt, scaleFactor: Float, readyAt: ContinuousClock.Instant)?
@@ -98,11 +100,15 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         frameCaptureLabel: String? = nil,
         pipelinedRendering: Bool = false,
         maximumPendingFrames: Int? = nil,
+        maximumRenderSize: SizeInt? = nil,
+        queuesCompletedFrames: Bool = false,
         joinsHostSession: Bool = true,
         resizeClock: @escaping () -> ContinuousClock.Instant = { .now }
     ) {
         self.pipelinedRendering = pipelinedRendering
         self.maximumPendingFrames = maximumPendingFrames
+        self.maximumRenderSize = maximumRenderSize
+        self.queuesCompletedFrames = queuesCompletedFrames
         self.joinsHostSession = joinsHostSession
         self.resizeClock = resizeClock
         self.frameCaptureLabel = frameCaptureLabel
@@ -215,10 +221,11 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
         pendingResize = nil
     }
 
-    func updateSize(_ size: SizeInt, scaleFactor: Float) {
-        guard size.width > 0 && size.height > 0 else {
+    func updateSize(_ requestedSize: SizeInt, scaleFactor: Float) {
+        guard requestedSize.width > 0 && requestedSize.height > 0 else {
             return
         }
+        let size = boundedRenderSize(requestedSize)
         guard
             size.width <= maximumRenderTextureDimension,
             size.height <= maximumRenderTextureDimension,
@@ -241,6 +248,23 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             // Frame delta can include a render stall that occurred before this request.
             pendingResize = (size, scaleFactor, resizeClock().advanced(by: resizeApplyDelay))
         }
+    }
+
+    private func boundedRenderSize(_ size: SizeInt) -> SizeInt {
+        guard let limit = maximumRenderSize, limit.width > 0, limit.height > 0,
+            size.width > limit.width || size.height > limit.height
+        else {
+            return size
+        }
+        let factor = min(Double(limit.width) / Double(size.width), Double(limit.height) / Double(size.height))
+        let width = max(1, Int((Double(size.width) * factor).rounded()))
+        let height = max(1, Int((Double(size.height) * factor).rounded()))
+        // A layout rounded to physical pixels can be a pixel off the intended aspect ratio.
+        // Normalize that difference so the capped render texture survives window resizing.
+        if width >= limit.width - 1 && height >= limit.height - 1 {
+            return limit
+        }
+        return SizeInt(width: width, height: height)
     }
 
     func tick(_ deltaTime: AdaUtils.TimeInterval) {
@@ -538,6 +562,7 @@ final class SceneViewCoordinator: OffscreenViewportDelegate {
             if previousFrontTexture !== completedTarget.texture {
                 didPublish = true
             }
+            if queuesCompletedFrames { break }
         }
         if didPublish {
             traceInput("publish", texture: frontRenderTexture)

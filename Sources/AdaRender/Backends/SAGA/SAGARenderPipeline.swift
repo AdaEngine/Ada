@@ -50,6 +50,9 @@
     final class SAGARenderPipeline: RenderPipeline, @unchecked Sendable {
         let descriptor: RenderPipelineDescriptor
         let slot = ResourceSlot<SAGATypes.RenderPipeline>()
+        private let creationError = Mutex<String?>(nil)
+        var isReady: Bool { (try? slot.get()) != nil }
+        var creationFailure: String? { creationError.withLock { $0 } }
         /// AdaRender vertex buffer indices in the dense slot order used by the SAGA pipeline.
         let vertexBufferSlots: [Int]
         let context: SAGAContext
@@ -164,20 +167,27 @@
             }
 
             let slot = self.slot
-            context.queue.enqueue { device in
-                let pipeline = try await device.createRenderPipeline(
-                    vertex: vertexStage,
-                    fragment: fragmentStage,
-                    colorFormat: colorTargets.first?.format,
-                    vertexBuffers: layouts,
-                    depthState: depth,
-                    primitive: primitive,
-                    colorState: colorTargets.first?.colorState ?? .init(),
-                    additionalColorTargets: Dictionary(
-                        uniqueKeysWithValues: colorTargets.enumerated().dropFirst().map { (UInt32($0.offset), $0.element) }
+            context.queue.enqueue(
+                onUnavailable: { [self] in creationError.withLock { $0 = "The SAGA device is unavailable" } }
+            ) { [self] device in
+                do {
+                    let pipeline = try await device.createRenderPipeline(
+                        vertex: vertexStage,
+                        fragment: fragmentStage,
+                        colorFormat: colorTargets.first?.format,
+                        vertexBuffers: layouts,
+                        depthState: depth,
+                        primitive: primitive,
+                        colorState: colorTargets.first?.colorState ?? .init(),
+                        additionalColorTargets: Dictionary(
+                            uniqueKeysWithValues: colorTargets.enumerated().dropFirst().map { (UInt32($0.offset), $0.element) }
+                        )
                     )
-                )
-                slot.fulfill(pipeline)
+                    slot.fulfill(pipeline)
+                } catch {
+                    creationError.withLock { $0 = String(describing: error) }
+                    throw error
+                }
             }
         }
 

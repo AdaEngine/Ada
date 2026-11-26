@@ -36,13 +36,18 @@ struct PathTracing3DScene: Sendable {
     var atlas: Texture2D?
     var nodeCount = 0
     var triangleCount = 0
+    /// Every hardware candidate can be accepted without testing face winding, alpha, or view distance.
+    private(set) var opaqueRayCandidates = false
+    private(set) var emitters = PathTracing3DEmitterTable()
     var digest: UInt64?
     /// Counts every change of the prepared scene, including moving objects.
     var generation: UInt64 = 0
     /// Counts changes of the scene's content (meshes, instances, materials, textures, flags) but not of where things are.
     /// Denoisers keep their history across moving objects and restart it only when this changes.
     private(set) var structureGeneration: UInt64 = 0
-    private var structureDigest: UInt64?
+    private(set) var structureDigest: UInt64?
+    private(set) var reconstructionDigest: UInt64?
+    private(set) var motionDigest: UInt64?
     /// One entry per placed part in table order, and the parts' geometry, for hardware ray queries (see `hardwareOrder`).
     private(set) var placements: [PathTracing3DPlacement] = []
     private(set) var parts: [PathTracing3DPartKey: Mesh.Part] = [:]
@@ -63,19 +68,21 @@ struct PathTracing3DScene: Sendable {
 
     private struct PreparedSource {
         let source: Mesh3DRenderSource
-        let parts: [Mesh.Part]
+        let parts: [(index: Int, part: Mesh.Part)]
     }
 
-    private static func traceableParts(_ source: Mesh3DRenderSource) -> [Mesh.Part] {
-        var parts: [Mesh.Part] = []
+    private static func traceableParts(_ source: Mesh3DRenderSource) -> [(index: Int, part: Mesh.Part)] {
+        var parts: [(index: Int, part: Mesh.Part)] = []
+        var firstIndex = 0
         for model in source.mesh.models {
-            for part in model.parts {
+            for (offset, part) in model.parts.enumerated() {
                 guard part.primitiveTopology == .triangleList, min(part.indexCount, part.meshDescriptor.indicies.count) >= 3,
                     source.materials.indices.contains(part.materialIndex),
                     !isRasterOverlay(source.materials[part.materialIndex], castsShadows: source.castShadows)
                 else { continue }
-                parts.append(part)
+                parts.append((firstIndex + offset, part))
             }
+            firstIndex += model.parts.count
         }
         return parts
     }
@@ -86,7 +93,8 @@ struct PathTracing3DScene: Sendable {
         device: RenderDevice,
         textureTileSize: Int = 128,
         hardwareOrder wantsHardwareOrder: Bool = false,
-        hardwareTriangleStep: Int? = nil
+        hardwareTriangleStep: Int? = nil,
+        prepareEmitters: Bool = false
     ) async throws {
         let preparedSources = sources.compactMap { source -> PreparedSource? in
             guard source.instances?.isEmpty != true else {
@@ -106,6 +114,9 @@ struct PathTracing3DScene: Sendable {
         var hash = FrameDigest3D()
         // Transforms and skinning poses: where things are, as opposed to what they are.
         var motion = FrameDigest3D()
+        // Emission changes the light transport while leaving the reconstruction guides compatible.
+        var emission = FrameDigest3D()
+        var opaqueCandidates = wantsHardwareOrder
         let requestedTileSize = textureTileSize >= 512 ? 512 : (textureTileSize >= 256 ? 256 : 128)
         hash.combine(UInt64(requestedTileSize))
         hash.combine(wantsHardwareOrder ? UInt64(1) : 0)
@@ -124,46 +135,38 @@ struct PathTracing3DScene: Sendable {
             }
             hash.combine(UInt64(source.entity))
             motion.combine(source.transform)
-            if wantsHardwareOrder { hash.combine(source.pathTracingMaximumDistance ?? 0) }
-            hash.combine(UInt64(source.instances?.count ?? 1))
-            hash.combine(source.instances == nil ? UInt64(0) : 1)
-            if let instances = source.instances {
-                let revision = source.instanceRevision
-                if placementDigests[revision] == nil {
-                    newPlacementRevision = true
-                    var placementContent = FrameDigest3D()
-                    var placementMotion = FrameDigest3D()
-                    for instance in instances {
-                        placementContent.combine(instance.id)
-                        placementContent.combine(instance.color)
-                        placementMotion.combine(instance.transform)
-                    }
-                    placementDigests[revision] = (placementContent.value, placementMotion.value)
-                }
-                if let cached = placementDigests[revision] {
-                    hash.combine(cached.content)
-                    motion.combine(cached.motion)
-                }
+            if wantsHardwareOrder {
+                let distance = source.pathTracingMaximumDistance ?? 0
+                hash.combine(distance)
+                opaqueCandidates = opaqueCandidates && distance <= 0
             }
-            hash.combine(source.castShadows ? UInt64(1) : 0)
-            hash.combine(source.receiveShadows ? UInt64(1) : 0)
-            if source.skinningBuffer != nil {
-                for matrix in skinning?.matrices(for: source.entity) ?? [] { motion.combine(matrix) }
-            }
-            for model in source.mesh.models {
-                for part in model.parts {
-                    hash.combine(UInt64(bitPattern: Int64(ObjectIdentifier(part.vertexBuffer).hashValue)))
-                    hash.combine(UInt64(bitPattern: Int64(ObjectIdentifier(part.indexBuffer).hashValue)))
-                    hash.combine(UInt64(part.indexCount))
-                }
-            }
-            for material in source.materials {
+            let updatedPlacement = combineSourceGeometry(
+                source,
+                skinning: skinning,
+                content: &hash,
+                motion: &motion
+            )
+            newPlacementRevision = newPlacementRevision || updatedPlacement
+            hash.combine(UInt64(source.materials.count))
+            for (slot, material) in source.materials.enumerated() {
                 if Self.isRasterOverlay(material, castsShadows: source.castShadows) { continue }
                 guard let pbr = material as? PBRMaterial, pbr.graphMaterial == nil else {
                     throw PathTracing3DError.unsupported(
                         "Unsupported traced material \(String(reflecting:type(of:material))) on entity \(source.entity); shadow-casting shader graphs require a tracing material"
                     )
                 }
+                // Slot membership is local to the mesh. Shared material inputs contribute once to the scene digest.
+                hash.combine(UInt64(slot))
+                if let existing = materialIDs[pbr.rid] {
+                    hash.combine(UInt64(existing))
+                    continue
+                }
+                guard materialList.count < Self.maximumMaterials else { throw PathTracing3DError.unsupported("Path tracing material budget exceeded (262144)") }
+                let materialIndex = materialList.count
+                materialIDs[pbr.rid] = materialIndex
+                materialList.append(pbr)
+                opaqueCandidates = opaqueCandidates && pbr.effectiveAlphaMode == .opaque && pbr.effectiveDoubleSided
+                hash.combine(UInt64(materialIndex))
                 if let terrain = pbr.terrainBindings {
                     guard wantsHardwareOrder else {
                         throw PathTracing3DError.unsupported(
@@ -172,23 +175,18 @@ struct PathTracing3DScene: Sendable {
                     }
                     hash.combine(UInt64(bitPattern: Int64(ObjectIdentifier(terrain).hashValue)))
                 }
-                if materialIDs[pbr.rid] == nil {
-                    guard materialList.count < Self.maximumMaterials else { throw PathTracing3DError.unsupported("Path tracing material budget exceeded (262144)") }
-                    materialIDs[pbr.rid] = materialList.count
-                    materialList.append(pbr)
-                    if wantsHardwareOrder {
-                        var uvLayout = FrameDigest3D()
-                        uvLayout.combine(pbr.terrainBindings == nil ? UInt64(0) : 1)
-                        for transform in pbr.textureTransforms {
-                            uvLayout.combine(Vector4(transform.offset.x, transform.offset.y, transform.scale.x, transform.scale.y))
-                            uvLayout.combine(transform.rotation)
-                        }
-                        for coordinate in pbr.textureCoordinates { uvLayout.combine(UInt64(max(0, coordinate))) }
-                        uvLayouts[pbr.rid] = uvLayout.value
+                if wantsHardwareOrder {
+                    var uvLayout = FrameDigest3D()
+                    uvLayout.combine(pbr.terrainBindings == nil ? UInt64(0) : 1)
+                    for transform in pbr.textureTransforms {
+                        uvLayout.combine(Vector4(transform.offset.x, transform.offset.y, transform.scale.x, transform.scale.y))
+                        uvLayout.combine(transform.rotation)
                     }
+                    for coordinate in pbr.textureCoordinates { uvLayout.combine(UInt64(max(0, coordinate))) }
+                    uvLayouts[pbr.rid] = uvLayout.value
                 }
                 hash.combine(pbr.baseColorFactor)
-                hash.combine(Vector4(pbr.emissiveFactor, pbr.emissiveStrength))
+                emission.combine(Vector4(pbr.emissiveFactor, pbr.emissiveStrength))
                 hash.combine(Vector4(pbr.metallicFactor, pbr.roughnessFactor, pbr.effectiveAlphaCutoff, pbr.normalScale))
                 hash.combine(UInt64(pbr.effectiveAlphaMode.rawValue))
                 hash.combine(pbr.effectiveDoubleSided ? UInt64(1) : 0)
@@ -211,8 +209,11 @@ struct PathTracing3DScene: Sendable {
                 }
             }
         }
+        let reconstruction = hash.value
+        hash.combine(emission.value)
         var full = hash
         full.combine(motion.value)
+        full.combine(prepareEmitters ? UInt64(1) : 0)
         if newPlacementRevision || placementDigests.count > sources.count {
             let liveRevisions = Set(sources.lazy.filter { $0.instances != nil }.map(\.instanceRevision))
             placementDigests = placementDigests.filter { liveRevisions.contains($0.key) }
@@ -220,11 +221,14 @@ struct PathTracing3DScene: Sendable {
         if digest == full.value {
             return
         }
+        let reuseHardwareTables = wantsHardwareOrder && hardwareOrder && digest != nil && structureDigest == hash.value
         // After a partial upload, even a return to the preceding scene must reconcile its slots before tracing.
         digest = nil
-        try terrainMaterials.prepare(materialList, textures: &textures, ids: &textureIDs)
-        guard textures.count <= Self.maximumTextures else { throw PathTracing3DError.unsupported("Path tracing texture budget exceeded (256)") }
-        try await prepareAtlas(textures, tileSize: requestedTileSize, device: device)
+        if !reuseHardwareTables {
+            try terrainMaterials.prepare(materialList, textures: &textures, ids: &textureIDs)
+            guard textures.count <= Self.maximumTextures else { throw PathTracing3DError.unsupported("Path tracing texture budget exceeded (256)") }
+            try await prepareAtlas(textures, tileSize: requestedTileSize, device: device)
+        }
         func tile(_ texture: Texture2D?) -> Float { texture.flatMap { textureIDs[.material(ObjectIdentifier($0))] }.map(Float.init) ?? -1 }
         var materialData: [Vector4] = []
         for pbr in materialList {
@@ -241,10 +245,11 @@ struct PathTracing3DScene: Sendable {
         }
         var tintMaterials: [TintKey: Int] = [:]
         var geometry: [PathTracing3DBVH.Triangle] = []
-        if wantsHardwareOrder {
+        if wantsHardwareOrder, !reuseHardwareTables {
             try prepareHardwareShading(preparedSources, uvLayouts: uvLayouts, hardwareTriangleStep: hardwareTriangleStep)
         }
         var instanceMetadata: [Vector4] = []
+        var emitterTable = PathTracing3DEmitterTable()
         var placedTriangleCount = 0
         var placed: [PathTracing3DPlacement] = []
         var placedParts: [PathTracing3DPartKey: Mesh.Part] = [:]
@@ -255,7 +260,7 @@ struct PathTracing3DScene: Sendable {
                 let transform = source.transform * (source.instances?[placement].transform ?? .identity)
                 let tint = source.instances?[placement].color ?? .one
                 let normalMatrix = wantsHardwareOrder ? Transform3D.identity : transform.inverse.transpose
-                for part in prepared.parts {
+                for (partIndex, part) in prepared.parts {
                     preparedPartVisitCount += 1
                     guard let pbr = source.materials[part.materialIndex] as? PBRMaterial, let baseMaterial = materialIDs[pbr.rid]
                     else { continue }
@@ -278,6 +283,9 @@ struct PathTracing3DScene: Sendable {
                             tintMaterials[key] = material
                         }
                     }
+                    let emission = materialData[material * 5 + 1].xyz
+                    let emitsLight = prepareEmitters && pbr.terrainBindings == nil && LocalLighting3DMath.isFinite(emission)
+                        && max(emission.x, max(emission.y, emission.z)) > 0
                     let descriptor = part.meshDescriptor
                     if wantsHardwareOrder {
                         let key = PathTracing3DPartKey(part)
@@ -292,8 +300,27 @@ struct PathTracing3DScene: Sendable {
                             )
                         )
                         placedParts[key] = part
-                        let flags = (source.castShadows ? 1 : 0) + (source.receiveShadows ? 2 : 0)
-                        instanceMetadata.append(Vector4(Float(first), Float(material), Float(flags), source.pathTracingMaximumDistance ?? 0))
+                        if emitsLight, let words = hardwareGeometry.words(for: shading) {
+                            for first in stride(from: 0, to: words.count, by: 12) {
+                                if emitterTable.overflowed { break }
+                                emitterTable.append(
+                                    words,
+                                    first: first,
+                                    transform: transform,
+                                    material: material,
+                                    maximumDistance: source.pathTracingMaximumDistance ?? 0,
+                                    identity: .init(
+                                        entity: source.entity, instance: source.instances?[placement].id, part: partIndex, triangle: first / 12
+                                    )
+                                )
+                            }
+                        }
+                        if !reuseHardwareTables {
+                            // Match the shader candidate test. Keep the shadow flags in the low two bits.
+                            let flags = (source.castShadows ? 1 : 0) | (source.receiveShadows ? 2 : 0)
+                                | (pbr.effectiveDoubleSided ? 4 : 0) | (Int(pbr.effectiveAlphaMode.rawValue) << 3)
+                            instanceMetadata.append(Vector4(Float(first), Float(material), Float(flags), source.pathTracingMaximumDistance ?? 0))
+                        }
                         placedTriangleCount += key.indexCount / 3
                         continue
                     }
@@ -363,15 +390,31 @@ struct PathTracing3DScene: Sendable {
                             return Vector4(a.x, a.y, b.x, b.y)
                         }
                         geometry.append(.init(vertices: vertices))
+                        if emitsLight {
+                            emitterTable.append(
+                                vertices,
+                                first: 0,
+                                transform: .identity,
+                                material: material,
+                                maximumDistance: 0,
+                                identity: .init(
+                                    entity: source.entity, instance: source.instances?[placement].id, part: partIndex, triangle: offset / 3
+                                )
+                            )
+                        }
                     }
                 }
             }
         }
         hardwareOrder = wantsHardwareOrder
         placements = placed
+        emitterTable.finish()
+        emitters = emitterTable
         parts = placedParts
         if wantsHardwareOrder {
-            nodes = Self.dataTexture(instanceMetadata, label: "Path tracing instance materials and geometry offsets")
+            if !reuseHardwareTables {
+                nodes = Self.dataTexture(instanceMetadata, label: "Path tracing instance materials and geometry offsets")
+            }
             triangles = hardwareGeometry.texture
             nodeCount = 0
         } else {
@@ -383,15 +426,63 @@ struct PathTracing3DScene: Sendable {
             triangles = Self.dataTexture(bvh.triangles.flatMap(\.vertices), label: "Path tracing triangles")
             nodeCount = bvh.nodes.count
         }
-        terrainMaterials.appendHeaders(to: &materialData)
-        materials = Self.dataTexture(materialData, label: "Path tracing materials")
+        if !reuseHardwareTables {
+            terrainMaterials.appendHeaders(to: &materialData)
+            materials = Self.dataTexture(materialData, label: "Path tracing materials")
+        }
         triangleCount = wantsHardwareOrder ? placedTriangleCount : geometry.count
+        opaqueRayCandidates = opaqueCandidates
         digest = full.value
+        reconstructionDigest = reconstruction
+        motionDigest = motion.value
         generation &+= 1
         if structureDigest != hash.value {
             structureDigest = hash.value
             structureGeneration &+= 1
         }
+    }
+
+    private mutating func combineSourceGeometry(
+        _ source: Mesh3DRenderSource,
+        skinning: Skinning3DUniforms?,
+        content: inout FrameDigest3D,
+        motion: inout FrameDigest3D
+    ) -> Bool {
+        var hasNewPlacement = false
+        content.combine(UInt64(source.instances?.count ?? 1))
+        content.combine(source.instances == nil ? UInt64(0) : 1)
+        if let instances = source.instances {
+            let revision = source.instanceRevision
+            if placementDigests[revision] == nil {
+                hasNewPlacement = true
+                var placementContent = FrameDigest3D()
+                var placementMotion = FrameDigest3D()
+                for instance in instances {
+                    placementContent.combine(instance.id)
+                    placementContent.combine(instance.color)
+                    placementMotion.combine(instance.transform)
+                }
+                placementDigests[revision] = (placementContent.value, placementMotion.value)
+            }
+            if let cached = placementDigests[revision] {
+                content.combine(cached.content)
+                motion.combine(cached.motion)
+            }
+        }
+        content.combine(source.castShadows ? UInt64(1) : 0)
+        content.combine(source.receiveShadows ? UInt64(1) : 0)
+        if source.skinningBuffer != nil {
+            for matrix in skinning?.matrices(for: source.entity) ?? [] { motion.combine(matrix) }
+        }
+        for model in source.mesh.models {
+            for part in model.parts {
+                content.combine(UInt64(bitPattern: Int64(ObjectIdentifier(part.vertexBuffer).hashValue)))
+                content.combine(UInt64(bitPattern: Int64(ObjectIdentifier(part.indexBuffer).hashValue)))
+                content.combine(UInt64(part.indexCount))
+                content.combine(UInt64(bitPattern: Int64(part.materialIndex)))
+            }
+        }
+        return hasNewPlacement
     }
 
     private mutating func prepareAtlas(
@@ -453,7 +544,7 @@ struct PathTracing3DScene: Sendable {
         var seen: Set<PathTracing3DGeometryTable.Key> = []
         var missing: [(PathTracing3DGeometryTable.Key, Mesh.Part, PBRMaterial)] = []
         for prepared in preparedSources {
-            for part in prepared.parts {
+            for (_, part) in prepared.parts {
                 let key = PathTracing3DGeometryTable.Key(part: .init(part), uvLayout: uvLayouts[prepared.source.materials[part.materialIndex].rid] ?? 0)
                 if seen.insert(key).inserted {
                     keys.append(key)
@@ -501,7 +592,7 @@ struct PathTracing3DScene: Sendable {
             }
             remainingPlacements -= placements
             guard placements > 0 else { continue }
-            for part in prepared.parts {
+            for (_, part) in prepared.parts {
                 let triangles = min(part.indexCount, part.meshDescriptor.indicies.count) / 3
                 guard triangles <= remainingTriangles / placements else {
                     throw PathTracing3DError.unsupported("Path tracing triangle work budget exceeded (131072)")

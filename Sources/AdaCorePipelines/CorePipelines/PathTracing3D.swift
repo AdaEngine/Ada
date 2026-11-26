@@ -13,6 +13,14 @@ public enum PathTracingDenoiser: String, Codable, Sendable, CaseIterable {
     case off
 }
 
+/// How a path-traced view estimates lighting at each surface.
+public enum PathTracingTransport: String, Codable, Sendable, CaseIterable {
+    /// Evaluate every analytic light. This is the compatibility and analytic-light reference mode.
+    case exhaustive
+    /// Sample a bounded set of analytic lights and emissive triangles.
+    case interactive
+}
+
 /// How a path-traced view finds ray intersections.
 public enum PathTracingIntersection: String, Codable, Sendable, CaseIterable {
     /// GPU ray queries when the device and the whole view support them; the shader BVH otherwise.
@@ -54,8 +62,7 @@ public struct PathTracingTraversalSelection: Equatable, Sendable {
     }
 }
 
-/// Experimental world-space path tracing on the portable GPU backend.
-/// Intersections run in a shader BVH; this does not claim hardware RT acceleration.
+/// Experimental world-space path tracing with software BVH and, where available, GPU ray queries.
 public struct PathTracing3D: Codable, Equatable, Sendable {
     public var isEnabled: Bool = false
     public var samplesPerPixel: Int = 1
@@ -74,6 +81,12 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
     public var denoiser: PathTracingDenoiser = .automatic
     /// Intersection selection. See ``PathTracingIntersection``.
     public var intersection: PathTracingIntersection = .automatic
+    /// Controls light selection and the interactive radiance cache.
+    public var transport: PathTracingTransport = .exhaustive
+    /// Requests the world-space cache when the interactive transport and device support it.
+    public var radianceCache: Bool = true
+    /// Counts representative GPU cache lookups and updates for on-demand diagnostics.
+    public var radianceCacheDiagnostics: Bool = false
     /// Use the raster G-buffer for the first visible surface when supported.
     /// Disable to find the first surface with a ray as well. Ray Reconstruction needs the raster guides.
     public var rasterFirstHit: Bool = true
@@ -120,6 +133,7 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
     private enum CodingKeys: CodingKey {
         case isEnabled, samplesPerPixel, maximumBounces, resolutionScale, textureTileSize, maximumDistance, maximumRadiance, historyLimit, rayBias
         case denoiser, minimumHistoryWeight, intersection, rasterFirstHit, denoiserStrength
+        case transport, radianceCache, radianceCacheDiagnostics
     }
 
     public init(from decoder: Decoder) throws {
@@ -136,6 +150,9 @@ public struct PathTracing3D: Codable, Equatable, Sendable {
         denoiser = try c.decodeIfPresent(PathTracingDenoiser.self, forKey: .denoiser) ?? .automatic
         minimumHistoryWeight = try c.decodeIfPresent(Float.self, forKey: .minimumHistoryWeight) ?? 1.0 / 32
         intersection = try c.decodeIfPresent(PathTracingIntersection.self, forKey: .intersection) ?? .automatic
+        transport = try c.decodeIfPresent(PathTracingTransport.self, forKey: .transport) ?? .exhaustive
+        radianceCache = try c.decodeIfPresent(Bool.self, forKey: .radianceCache) ?? true
+        radianceCacheDiagnostics = try c.decodeIfPresent(Bool.self, forKey: .radianceCacheDiagnostics) ?? false
         rasterFirstHit = try c.decodeIfPresent(Bool.self, forKey: .rasterFirstHit) ?? true
         denoiserStrength = try c.decodeIfPresent(Float.self, forKey: .denoiserStrength) ?? 1
     }

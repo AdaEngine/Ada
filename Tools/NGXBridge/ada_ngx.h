@@ -62,5 +62,8 @@ ADA_NGX_API void ada_ngx_dlss_release(void *handle);
 ADA_NGX_API int32_t ada_ngx_dlssd_supported(void);
 ADA_NGX_API int32_t ada_ngx_dlssd_create(uint64_t device, uint64_t commandBuffer, const AdaNGXDLSSDescription *description, void **handle);
 ADA_NGX_API int32_t ada_ngx_dlssd_evaluate(uint64_t commandBuffer, void *handle, const AdaNGXDLSSDFrame *frame);
+// Optional extension to ABI v3. Existing v3 bridges continue to accept the original entry point.
+ADA_NGX_API int32_t ada_ngx_dlssd_evaluate_with_hit_distance(uint64_t commandBuffer, void *handle, const AdaNGXDLSSDFrame *frame,
+                                                          const AdaNGXImage *hitDistance);
 
 #endif

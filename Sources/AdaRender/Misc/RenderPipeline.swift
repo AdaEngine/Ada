@@ -12,6 +12,15 @@ import Math
 public protocol RenderPipeline: AnyObject, Sendable {
     /// /// Contains information about render pipeline descriptor.
     var descriptor: RenderPipelineDescriptor { get }
+    /// Whether asynchronous backend creation has completed successfully.
+    var isReady: Bool { get }
+    /// A device error reported while creating the pipeline asynchronously.
+    var creationFailure: String? { get }
+}
+
+extension RenderPipeline {
+    public var isReady: Bool { true }
+    public var creationFailure: String? { nil }
 }
 
 /// An object that defines the front-facing or back-facing stencil operations of a depth and stencil state object.

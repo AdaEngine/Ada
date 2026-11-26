@@ -48,9 +48,11 @@ public struct TemporalUpscalingSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: CodingKey { case renderScale, resetGeneration, method }
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(renderScale: try c.decodeIfPresent(Float.self, forKey: .renderScale) ?? 0.75,
+        self.init(
+            renderScale: try c.decodeIfPresent(Float.self, forKey: .renderScale) ?? 0.75,
             resetGeneration: try c.decodeIfPresent(UInt64.self, forKey: .resetGeneration) ?? 0,
-            method: try c.decodeIfPresent(TemporalReconstructionMethod.self, forKey: .method) ?? .automatic)
+            method: try c.decodeIfPresent(TemporalReconstructionMethod.self, forKey: .method) ?? .automatic
+        )
     }
 }
 
@@ -60,6 +62,8 @@ public struct RayReconstructionGuides: Sendable {
     public var diffuseAlbedo: Texture
     public var specularAlbedo: Texture
     public var normalRoughness: Texture
+    /// Optional R32Float distance to the first specular hit, in world units.
+    public var specularHitDistance: Texture?
     /// Unjittered world-to-view and view-to-clip transforms of the frame.
     public var worldToView: Transform3D
     public var viewToClip: Transform3D
@@ -72,11 +76,13 @@ public struct RayReconstructionGuides: Sendable {
         normalRoughness: Texture,
         worldToView: Transform3D,
         viewToClip: Transform3D,
-        reset: Bool = false
+        reset: Bool = false,
+        specularHitDistance: Texture? = nil
     ) {
         self.diffuseAlbedo = diffuseAlbedo
         self.specularAlbedo = specularAlbedo
         self.normalRoughness = normalRoughness
+        self.specularHitDistance = specularHitDistance
         self.worldToView = worldToView
         self.viewToClip = viewToClip
         self.reset = reset
@@ -87,6 +93,8 @@ public struct RayReconstructionGuides: Sendable {
 public protocol TemporalUpscaler: AnyObject, Sendable {
     /// Whether ``encodeDenoised(commandBuffer:color:depth:motion:reactive:guides:output:jitter:reset:)`` can succeed.
     var supportsDenoising: Bool { get }
+    /// Whether this instance accepts the optional specular hit-distance texture.
+    var supportsSpecularHitDistance: Bool { get }
 
     /// Denoises and reconstructs a noisy path-traced frame; false means the caller must use ``encode`` instead.
     func encodeDenoised(
@@ -116,6 +124,7 @@ public protocol TemporalUpscaler: AnyObject, Sendable {
 
 extension TemporalUpscaler {
     public var supportsDenoising: Bool { false }
+    public var supportsSpecularHitDistance: Bool { false }
 
     public func encodeDenoised(
         commandBuffer _: CommandBuffer,
