@@ -10,7 +10,9 @@ extension EditorSceneViewportModel {
             let owner = runtimeEntity(for: plan.ownerEditorID), owner.components[MeshTerrain3DSourceSurface.self] != nil else { return false }
         var roots: [String: Entity] = [:]
         for source in plan.sources {
-            guard let root = runtimeEntity(for: source.editorID) else { return false }
+            guard let root = runtimeEntity(for: source.editorID) else {
+                return false
+            }
             roots[source.editorID] = root
         }
         let generation = UUID()
@@ -19,7 +21,9 @@ extension EditorSceneViewportModel {
         terrainEditing.sourceFailure = nil
         terrainEditing.sourceStatus = "Restoring Mesh Terrain…"
         let isCurrent: @MainActor () -> Bool = { [weak self] in
-            guard let self else { return false }
+            guard let self else {
+                return false
+            }
             var current = self.sceneModel, expected = next
             current?.editor = nil; expected.editor = nil
             return self.terrainEditing.sourceGeneration == generation && current == expected
@@ -30,8 +34,15 @@ extension EditorSceneViewportModel {
                 let file = try EditorTerrainResource.resolve(plan.uri, sourceURL: sourceURL, resourceRootURL: context.assetsRoot)
                 let asset = try await EditorMeshTerrainHistory.prepare(file)
                 try Task.checkCancellation()
-                try await EditorMeshTerrainHistory.apply(plan, candidate: asset, file: file, owner: owner, roots: roots,
-                    application: context.application, isCurrent: isCurrent)
+                try await EditorMeshTerrainHistory.apply(
+                    plan,
+                    candidate: asset,
+                    file: file,
+                    owner: owner,
+                    roots: roots,
+                    application: context.application,
+                    isCurrent: isCurrent
+                )
                 if let self, isCurrent() {
                     self.liveSceneEdits.noteAppliedChanges(in: next)
                     self.refreshTerrainSourceControls()
@@ -39,7 +50,9 @@ extension EditorSceneViewportModel {
                 }
             },
             failed: { [weak self] error in
-                guard let self, isCurrent() else { return }
+                guard let self, isCurrent() else {
+                    return
+                }
                 self.terrainEditing.sourceStatus = "Mesh Terrain could not be updated."
                 self.terrainEditing.sourceFailure = error
             },

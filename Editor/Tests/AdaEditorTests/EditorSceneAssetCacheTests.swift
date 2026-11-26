@@ -56,8 +56,14 @@ struct EditorSceneAssetCacheTests {
         let source = try modelFile(in: root)
         let model = sceneModel(source: source.lastPathComponent, count: 2)
         let viewport = EditorSceneViewportModel()
-        viewport.configure(sceneContent: "fixture", model: model, sourceURL: root.appendingPathComponent("Main.ascn"),
-                           resourceRootURL: root, onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
+        viewport.configure(
+            sceneContent: "fixture",
+            model: model,
+            sourceURL: root.appendingPathComponent("Main.ascn"),
+            resourceRootURL: root,
+            onSelectionChanged: { _ in },
+            onDocumentContentChanged: { _ in }
+        )
         let world = World()
         var finished: EditorSceneRuntimeLoadResult?
         viewport.loadSceneWorld(world, onLoadingChanged: { _ in }, onLoaded: { finished = $0 })
@@ -70,8 +76,14 @@ struct EditorSceneAssetCacheTests {
         viewport.disconnect()
 
         let closed = EditorSceneViewportModel()
-        closed.configure(sceneContent: "fixture", model: model, sourceURL: root.appendingPathComponent("Main.ascn"),
-                         resourceRootURL: root, onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
+        closed.configure(
+            sceneContent: "fixture",
+            model: model,
+            sourceURL: root.appendingPathComponent("Main.ascn"),
+            resourceRootURL: root,
+            onSelectionChanged: { _ in },
+            onDocumentContentChanged: { _ in }
+        )
         var staleCallback = false
         let abandoned = World()
         closed.loadSceneWorld(abandoned, onLoadingChanged: { _ in }, onLoaded: { _ in staleCallback = true })
@@ -261,7 +273,8 @@ struct EditorSceneAssetCacheTests {
         let recorder = ResourceProgressRecorder()
         let cache = try await EditorSceneAssetCache.prepare(
             model: sceneModel(source: source.lastPathComponent, count: 5),
-            sourceURL: root.appendingPathComponent("Main.ascn"), resourceRootURL: root,
+            sourceURL: root.appendingPathComponent("Main.ascn"),
+            resourceRootURL: root,
             onProgress: { progress in await recorder.append(progress) }
         )
         #expect(cache.models.count == 1)
@@ -321,8 +334,17 @@ struct EditorSceneAssetCacheTests {
             }
         }
         defer { ticker.cancel() }
-        let item = EditorProjectSidebarViewModel.Item(id: url.path, disclosure: "", icon: "", title: url.lastPathComponent,
-                                                     relativePath: url.lastPathComponent, level: 0, isActive: false, isFolder: false, kind: .scene)
+        let item = EditorProjectSidebarViewModel.Item(
+            id: url.path,
+            disclosure: "",
+            icon: "",
+            title: url.lastPathComponent,
+            relativePath: url.lastPathComponent,
+            level: 0,
+            isActive: false,
+            isFolder: false,
+            kind: .scene
+        )
         let document = EditorViewModel.document(for: item)
         let requested = ContinuousClock.now
         let workbench = EditorWorkbenchViewModel(openDocuments: [document], activeDocumentID: document.id)
@@ -334,8 +356,14 @@ struct EditorSceneAssetCacheTests {
         let decoded = ContinuousClock.now
         let viewport = EditorSceneViewportModel()
         let world = World()
-        viewport.configure(sceneContent: loaded.content, model: model, sourceURL: url, resourceRootURL: assets,
-                           onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
+        viewport.configure(
+            sceneContent: loaded.content,
+            model: model,
+            sourceURL: url,
+            resourceRootURL: assets,
+            onSelectionChanged: { _ in },
+            onDocumentContentChanged: { _ in }
+        )
         defer { viewport.disconnect() }
         let result = await withCheckedContinuation { continuation in
             viewport.loadSceneWorld(world, onLoadingChanged: { _ in }, onLoaded: { continuation.resume(returning: $0) })
@@ -358,7 +386,7 @@ struct EditorSceneAssetCacheTests {
             "scope": "Production file/document/decode and editing viewport load with the headless renderer; GPU presentation is checked separately"
         ]
         let data = try JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys])
-        print(String(decoding: data, as: UTF8.self))
+        print(try #require(String(bytes: data, encoding: .utf8)))
         if let output = ProcessInfo.processInfo.environment["ADAEDITOR_PREVIEW_BENCHMARK_REPORT"] {
             try data.write(to: URL(fileURLWithPath: output))
         }
@@ -388,12 +416,15 @@ struct EditorSceneAssetCacheTests {
     func sceneJSONParity() throws {
         var model = sceneModel(source: nil, count: 2)
         model.entities[0].components["fixture.large-values"] = [
-            "values": .array([.null, .bool(true), .int(-12), .uint(.max), .double(1.25), .string("true"),
-                              .object(["vector": .array([.double(0), .double(-0.25)])])])
+            "values": .array([
+                .null, .bool(true), .int(-12), .uint(.max), .double(1.25), .string("true"),
+                .object(["vector": .array([.double(0), .double(-0.25)])])
+            ])
         ]
         model.entities[1].components["fixture.other"] = ["title": .string("Осень"), "enabled": .bool(false)]
         let data = try JSONEncoder().encode(model)
-        let fast = try EditorSceneModel.decode(from: String(decoding: data, as: UTF8.self))
+        let content = try #require(String(bytes: data, encoding: .utf8))
+        let fast = try EditorSceneModel.decode(from: content)
         let conventional = try JSONDecoder().decode(EditorSceneModel.self, from: data)
         #expect(fast == conventional)
     }
@@ -403,15 +434,29 @@ struct EditorSceneAssetCacheTests {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }
         var model = sceneModel(source: nil, count: 1)
-        model.entities[0].components["fixture.geometry"] = ["vertices": .array((0..<30_000).map {
-            .object(["x": .double(Double($0) * 0.01), "y": .double(0), "z": .double(-0.25)])
-        })]
+        model.entities[0].components["fixture.geometry"] = [
+            "vertices": .array((0..<30_000).map {
+                .object(["x": .double(Double($0) * 0.01), "y": .double(0), "z": .double(-0.25)])
+            })
+        ]
         let url = root.appendingPathComponent("Main.ascn")
         try JSONEncoder().encode(model).write(to: url)
-        let item = EditorProjectSidebarViewModel.Item(id: url.path, disclosure: "", icon: "", title: url.lastPathComponent,
-                                                     relativePath: "Main.ascn", level: 0, isActive: false, isFolder: false, kind: .scene)
+        let item = EditorProjectSidebarViewModel.Item(
+            id: url.path,
+            disclosure: "",
+            icon: "",
+            title: url.lastPathComponent,
+            relativePath: "Main.ascn",
+            level: 0,
+            isActive: false,
+            isFolder: false,
+            kind: .scene
+        )
         let start = ContinuousClock.now
-        guard case let .scene(document) = EditorViewModel.document(for: item) else { Issue.record("Expected a scene document"); return }
+        guard case let .scene(document) = EditorViewModel.document(for: item) else {
+            Issue.record("Expected a scene document")
+            return
+        }
         #expect(start.duration(to: .now) < .milliseconds(500))
         #expect(document.isLoading)
         #expect(document.sceneModel == nil)
@@ -457,8 +502,13 @@ struct EditorSceneAssetCacheTests {
 
     private func sceneModel(source: String?, count: Int) -> EditorSceneModel {
         EditorSceneModel(scene: EditorSceneMetadata(id: "fixture", name: "Preview"), entities: (0..<count).map { index in
-            EditorSceneEntity(id: "\(index)", name: "Owner \(index)", enabled: true, parent: nil,
-                              components: source.map { [EditorBuiltInComponentType.model3DSource: ["source": .string($0)]] } ?? [:])
+            EditorSceneEntity(
+                id: "\(index)",
+                name: "Owner \(index)",
+                enabled: true,
+                parent: nil,
+                components: source.map { [EditorBuiltInComponentType.model3DSource: ["source": .string($0)]] } ?? [:]
+            )
         })
     }
 

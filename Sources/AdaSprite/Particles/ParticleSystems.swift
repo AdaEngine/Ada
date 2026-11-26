@@ -61,9 +61,14 @@ struct ExtractParticleSpritesSystem {
             emitter.simulation?.forEachParticle(transform: transform.matrix) { sample in
                 let texture = effect.textures.indices.contains(sample.emitterIndex) ? effect.textures[sample.emitterIndex]?.asset : nil
                 extracted.sprites[renderID] = ExtractedSprite(
-                    entityId: renderID, texture: texture, size: Size(width: sample.size, height: sample.size),
-                    flipX: false, flipY: false, tintColor: sample.color,
-                    transform: Transform(matrix: sample.transform), worldTransform: sample.transform,
+                    entityId: renderID,
+                    texture: texture,
+                    size: Size(width: sample.size, height: sample.size),
+                    flipX: false,
+                    flipY: false,
+                    tintColor: sample.color,
+                    transform: Transform(matrix: sample.transform),
+                    worldTransform: sample.transform,
                     visibilityEntityId: entity.id
                 )
                 renderID -= 1

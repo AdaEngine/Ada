@@ -24,7 +24,9 @@ extension EditorViewModel {
         projectSidebar.select(item)
         let absolutePath = Self.absoluteFilePath(from: item.id)
         if let existing = workbench.openDocuments.first(where: { document in
-            guard document.relativePath == item.relativePath, document.absolutePath == absolutePath else { return false }
+            guard document.relativePath == item.relativePath, document.absolutePath == absolutePath else {
+                return false
+            }
             return Self.canReuseOpenDocument(document, for: item)
         }) {
             // Selecting a file is navigation. Keep its edits, prepared scene and
@@ -55,14 +57,24 @@ extension EditorViewModel {
     private static func canReuseOpenDocument(_ document: EditorWorkbenchDocument, for item: EditorProjectSidebarViewModel.Item) -> Bool {
         switch document {
         case let .scene(scene):
-            if scene.isDirty { return true }
-            guard scene.errorMessage == nil else { return false }
+            if scene.isDirty {
+                return true
+            }
+            guard scene.errorMessage == nil else {
+                return false
+            }
             let disk = sceneFileContent(for: item)
             return disk.errorMessage == nil && disk.value == scene.content
         case let .text(text), let .ui(text):
-            guard !text.id.hasPrefix("raw:") else { return false }
-            if text.isDirty { return true }
-            guard text.errorMessage == nil else { return false }
+            guard !text.id.hasPrefix("raw:") else {
+                return false
+            }
+            if text.isDirty {
+                return true
+            }
+            guard text.errorMessage == nil else {
+                return false
+            }
             let disk = textFileContent(for: item)
             return disk.errorMessage == nil && disk.value == text.content
         case .asset, .git:
@@ -158,7 +170,9 @@ extension EditorViewModel {
     @MainActor
     func importAssets() {
         Task { [weak self] in
-            guard let urls = await ProjectOpenPicker.pickAssetImportURLs(), !urls.isEmpty else { return }
+            guard let urls = await ProjectOpenPicker.pickAssetImportURLs(), !urls.isEmpty else {
+                return
+            }
             self?.importAssets(from: urls)
         }
     }

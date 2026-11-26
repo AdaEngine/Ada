@@ -26,7 +26,9 @@ extension EditorComponentRegistry {
                 repeats: payload["repeats"]?.boolValue ?? true,
                 animationGraph: try EditorAnimationGraphPayload.decode(payload["animationGraph"]),
                 lod: try payload["lod"].flatMap { value in
-                    if case .null = value { return nil }
+                    if case .null = value {
+                        return nil
+                    }
                     return try JSONDecoder().decode(Model3DSourceLOD.self, from: Data(value.jsonString.utf8))
                 },
                 voxel: voxelSettings(in: payload),

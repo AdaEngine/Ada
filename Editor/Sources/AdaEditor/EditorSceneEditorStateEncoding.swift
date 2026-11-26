@@ -26,12 +26,16 @@ extension EditorSceneModel {
             new["editor"] = nil
             return old == new
         }
-        guard let oldStart = editorStateStart(in: before), let newStart = editorStateStart(in: after) else { return false }
+        guard let oldStart = editorStateStart(in: before), let newStart = editorStateStart(in: after) else {
+            return false
+        }
         return before[..<oldStart] == after[..<newStart]
     }
 
     private static func editorStateStart(in content: String) -> String.Index? {
-        guard let range = content.range(of: "\neditor:", options: .backwards) else { return nil }
+        guard let range = content.range(of: "\neditor:", options: .backwards) else {
+            return nil
+        }
         let start = content.index(after: range.lowerBound)
         let tail = String(content[start...])
         // Unusual key order, flow/JSON documents or anchors use the normal complete encoder.

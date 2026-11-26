@@ -137,7 +137,9 @@ final class EditorVRWorkspace {
     }
 
     func stopPlay(id: UUID? = nil) {
-        guard let playSession, id == nil || id == playSession.id else { return }
+        guard let playSession, id == nil || id == playSession.id else {
+            return
+        }
         playSession.runtime.performanceSession.stop()
         playSession.controls.finish()
         self.playSession = nil
@@ -161,8 +163,11 @@ final class EditorVRWorkspace {
                 settingsWindow.selectedPage = page
             }
         } else {
-            settingsWindow = EditorSettingsWindowViewModel(editorViewModel: editor,
-                selectedSection: section, selectedPage: editor.requestedSettingsPage)
+            settingsWindow = EditorSettingsWindowViewModel(
+                editorViewModel: editor,
+                selectedSection: section,
+                selectedPage: editor.requestedSettingsPage
+            )
         }
         editor.requestedSettingsSection = nil
         editor.requestedSettingsPage = nil
