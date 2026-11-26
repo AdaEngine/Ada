@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "id": "studio.ai-example",
+  "actions": [
+    {
+      "id": "status",
+      "kind": "tool",
+      "title": {"en": "Read the example plugin status", "ru": "Узнать состояние примера"},
+      "binding": "status",
+      "effect": "read",
+      "input": {"type": "object", "additionalProperties": false},
+      "output": {
+        "type": "object",
+        "properties": {"status": {"type": "string", "enum": ["ready"]}},
+        "required": ["status"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

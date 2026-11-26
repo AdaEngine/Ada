@@ -5,7 +5,9 @@ struct EditorStudioToolDefinition {
     let schema: AdaScriptToolSchema
     let sources: [AdaScriptCompilerSource]
     let directory: URL
-    var signature: String { sources.map { $0.path + "\n" + $0.source }.joined(separator: "\n") }
+    let manifest: EditorStudioPluginManifest?
+    let manifestRevision: String
+    var signature: String { manifestRevision + "\n" + sources.map { $0.path + "\n" + $0.source }.joined(separator: "\n") }
 }
 
 enum EditorStudioToolDiscovery {
@@ -34,8 +36,13 @@ enum EditorStudioToolDiscovery {
                 sources.append(.init(path: local, source: try overrides[relative] ?? String(contentsOf: file, encoding: .utf8)))
             }
             sources.sort { $0.path < $1.path }
-            for schema in try AdaScriptSchemaParser.parseTools(sources: sources) {
-                result.append(.init(schema: schema, sources: sources, directory: folder))
+            let manifestURL = folder.appendingPathComponent(EditorStudioPluginManifest.filename)
+            let data = FileManager.default.fileExists(atPath: manifestURL.path) ? try EditorStudioPluginManifest.readFile(manifestURL) : nil
+            let manifest = try data.map(EditorStudioPluginManifest.decode)
+            let schemas = try AdaScriptSchemaParser.parseTools(sources: sources)
+            if let manifest, schemas.count != 1 || schemas.first?.id != manifest.id { throw EditorStudioPluginManifest.Failure.manifest }
+            for schema in schemas {
+                result.append(.init(schema: schema, sources: sources, directory: folder, manifest: manifest, manifestRevision: data?.base64EncodedString() ?? ""))
             }
         }
         var ids = Set<String>()

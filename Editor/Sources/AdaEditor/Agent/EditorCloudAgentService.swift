@@ -81,7 +81,10 @@ actor EditorCloudAgentService: EditorAgentServicing {
         #else
         let preset: [EditorCloudAgentTool] = []
         #endif
-        return native + EditorLocalMCPSettings.shared.cloudTools(preset: preset, isCurrentProject: isCurrentProject, mayInvoke: mayInvoke)
+        let local = EditorLocalMCPSettings.shared.cloudTools(preset: preset, isCurrentProject: isCurrentProject, mayInvoke: mayInvoke)
+        guard EditorAgentMCPTools.shared.isCurrentWorkspace(root, generation: workspaceGeneration),
+              let studioTools = EditorAgentMCPTools.shared.activeViewModel?.studioTools else { return native + local }
+        return native + local + EditorStudioPluginTurn(host: studioTools, isCurrentWorkspace: isCurrentProject).tools()
         #else
         return native
         #endif
@@ -99,17 +102,23 @@ actor EditorCloudAgentService: EditorAgentServicing {
         let hasExternalTools = host == .desktop && availableTools.contains { $0.name.hasPrefix("editor_external_") }
         let baseVersion = EditorCloudToolCatalog.currentVersion
         let externalVersion = EditorCloudToolCatalog.externalVersion
+        let pluginVersion = EditorCloudToolCatalog.pluginVersion
+        let hasStudioPluginTools = host == .desktop && availableTools.contains { $0.name.hasPrefix("editor_plugins_") }
         let version: Int?
-        if host == .desktop, connection.toolContract == Int64(externalVersion) || (hasExternalTools && connection.supportsExternalTools) {
+        if host == .desktop, connection.toolContract == Int64(pluginVersion) || (hasStudioPluginTools && connection.supportsStudioPluginTools) {
+            version = pluginVersion
+        } else if host == .desktop, connection.toolContract == Int64(externalVersion) || (hasExternalTools && connection.supportsExternalTools) {
             version = externalVersion
         } else {
             version = connection.toolContract == Int64(baseVersion) ? baseVersion : nil
         }
         let selection = try version.map {
-            try EditorCloudToolCatalog.load(version: $0, hasExternalTools: hasExternalTools).selection(host: host, planning: planning)
+            try EditorCloudToolCatalog.load(version: $0, hasExternalTools: hasExternalTools, hasStudioPluginTools: hasStudioPluginTools)
+                .selection(host: host, planning: planning)
         }
         let tools = availableTools.filter {
-            if $0.name.hasPrefix("editor_external_") { return version == externalVersion && hasExternalTools }
+            if $0.name.hasPrefix("editor_external_") { return (version == externalVersion || version == pluginVersion) && hasExternalTools }
+            if $0.name.hasPrefix("editor_plugins_") { return version == pluginVersion && hasStudioPluginTools }
             if selection != nil {
                 return true
             }
@@ -214,7 +223,7 @@ actor EditorCloudAgentService: EditorAgentServicing {
                     }
                 } catch is CancellationError { throw CancellationError() } catch {
                     let details = error.localizedDescription
-                    let message = name == "editor_external" ? await MainActor.run { L10n.tr(details) } : details
+                    let message = ["editor_external", "editor_plugins"].contains(name) ? await MainActor.run { L10n.tr(details) } : details
                     output = "Tool failed: " + message
                     toolEvent.toolCall?.status = .failed
                 }

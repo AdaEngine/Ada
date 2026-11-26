@@ -49,8 +49,9 @@ public final class AdaScriptToolRuntime {
     private let budget: AdaScriptCommunityBudget
     private let module: ResolvedGravityScriptModule
     private var isActive = false
+    private let readOnlyTool: Bool
 
-    public init(sources: [AdaScriptSource], schema: AdaScriptToolSchema, grantedPermissions: [AdaScriptToolPermission]) throws {
+    public init(sources: [AdaScriptSource], schema: AdaScriptToolSchema, grantedPermissions: [AdaScriptToolPermission], readOnlyTool: Bool = false) throws {
         guard try AdaScriptSchemaParser.parseTools(sources: sources).first(where: { $0.id == schema.id }) == schema else {
             throw AdaScriptError.invalidManifest("Tool metadata does not match its sources.")
         }
@@ -58,7 +59,8 @@ public final class AdaScriptToolRuntime {
             throw AdaScriptError.invalidManifest("This tool requires an unsupported Studio API or platform.")
         }
         let supported = Self.supportedPermissions(apiVersion: schema.apiVersion)
-        guard Set(schema.permissions).isSubset(of: supported), Set(schema.permissions).isSubset(of: Set(grantedPermissions)) else {
+        guard Set(schema.permissions).isSubset(of: supported),
+              readOnlyTool || Set(schema.permissions).isSubset(of: Set(grantedPermissions)) else {
             throw AdaScriptError.invalidManifest("The tool's requested permissions are unsupported or have not been granted.")
         }
         for source in sources { try AdaScriptCommunityLowerer.validate(source: source.source) }
@@ -67,12 +69,13 @@ public final class AdaScriptToolRuntime {
         try module.requireSynchronousCallback(className: schema.className, method: "deactivate", annotation: "@tool")
         self.module = module
         self.schema = schema
+        self.readOnlyTool = readOnlyTool
         let guardedSources = try module.sourcesByPath.mapValues {
             ResolvedGravityScriptModule.Source(fileID: $0.fileID, source: try AdaScriptCommunityLowerer.instrument(source: $0.source))
         }
         let delegate = AnnotatedGravityRuntimeDelegate(module: module, sourcesByPath: guardedSources)
         self.delegate = delegate
-        let bridge = AdaScriptToolBridge.make(permissions: Set(schema.permissions), apiVersion: schema.apiVersion)
+        let bridge = AdaScriptToolBridge.make(permissions: readOnlyTool ? [] : Set(schema.permissions), apiVersion: schema.apiVersion)
         self.bridge = bridge
         let bundle = try AdaScriptRuntimeCoordinator.lock.withLock {
             let vm = GravityVirtualMachine(settings: .init(), delegate: delegate)
@@ -107,7 +110,8 @@ public final class AdaScriptToolRuntime {
     }
 
     /// Activation stages registrations; the editor publishes them only after UI validation succeeds.
-    public func activate() throws {
+    public func activate(requirePanel: Bool = true) throws {
+        guard !readOnlyTool else { throw AdaScriptError.invalidManifest("Read-only tools cannot activate editor panels.") }
         guard !isActive else {
             return
         }
@@ -115,7 +119,7 @@ public final class AdaScriptToolRuntime {
             bridge.isRegistering = true
             defer { bridge.isRegistering = false }
             try invoke("activate", arguments: [context])
-            guard !bridge.panels.isEmpty else { throw AdaScriptError.invalidManifest("The tool did not register a .ui panel.") }
+            guard !requirePanel || !bridge.panels.isEmpty else { throw AdaScriptError.invalidManifest("The tool did not register a .ui panel.") }
             panels = bridge.panels
             try refreshValues()
             isActive = true
@@ -128,6 +132,27 @@ public final class AdaScriptToolRuntime {
                 throw AdaScriptError.invalidManifest("Missing tool action '\(action)'.")
             }
             try module.requireSynchronousCallback(className: schema.className, method: action, annotation: "@tool")
+        }
+    }
+
+    /// Runs an AI tool in a fresh, unactivated runtime with no editor permissions or context argument.
+    public func performReadOnlyTool(_ action: String, inputJSON: String) throws -> String {
+        guard readOnlyTool, !isFailed, inputJSON.utf8.count <= 16_000 else {
+            throw AdaScriptError.invalidManifest("Read-only Studio tool input is unavailable.")
+        }
+        try validateAction(action)
+        return try AdaScriptRuntimeCoordinator.lock.withLock {
+            budget.reset()
+            let errorCount = delegate.errors.count
+            guard let value = instance.callMethod(named: action, with: [inputJSON]), value.isString,
+                  delegate.errors.count == errorCount else {
+                throw AdaScriptError.invalidManifest("The Studio tool must return a JSON object string.")
+            }
+            let response = value.toString
+            guard response.utf8.count <= 16_000 else {
+                throw AdaScriptError.invalidManifest("The Studio tool result is too large.")
+            }
+            return response
         }
     }
 

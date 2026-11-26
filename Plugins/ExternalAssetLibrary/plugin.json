@@ -1,0 +1,39 @@
+{
+  "version": 1,
+  "id": "studio.external-asset-library",
+  "view": "externalAssets",
+  "actions": [
+    {
+      "id": "search",
+      "kind": "assetSearch",
+      "title": {"en": "Find saved external assets", "ru": "Найти сохранённые ассеты"},
+      "binding": "native_search",
+      "effect": "read"
+    },
+    {
+      "id": "details",
+      "kind": "tool",
+      "title": {"en": "Read details for a saved asset", "ru": "Посмотреть сведения об ассете"},
+      "binding": "native_details",
+      "effect": "read",
+      "assetReferenceInput": "asset",
+      "input": {
+        "type": "object",
+        "properties": {"asset": {"type": "string", "maxLength": 36}},
+        "required": ["asset"],
+        "additionalProperties": false
+      },
+      "output": {
+        "type": "object",
+        "properties": {
+          "asset": {"type": "string", "maxLength": 36},
+          "name": {"type": "string", "maxLength": 480},
+          "store": {"type": "string", "enum": ["fab", "unity"]},
+          "localFile": {"type": "boolean"}
+        },
+        "required": ["asset", "name", "store", "localFile"],
+        "additionalProperties": false
+      }
+    }
+  ]
+}

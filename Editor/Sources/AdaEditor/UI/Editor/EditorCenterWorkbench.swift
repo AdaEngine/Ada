@@ -36,6 +36,7 @@ struct EditorCenterWorkbench: View {
     var onOpenProjectItem: ((EditorProjectSidebarViewModel.Item) -> Void)?
     var annotationAgent: EditorAgentViewModel?
     var onAnnotationAdded: (() -> Void)?
+    var studioTools: EditorStudioToolHost?
 
     @Environment(\.metrics) private var metrics
     @Environment(\.theme) private var theme
@@ -65,6 +66,7 @@ struct EditorCenterWorkbench: View {
             .onChange(of: viewModel.activeDocumentID) { _, id in
                 if !id.isEmpty {
                     filesBrowserPanes.remove(viewModel.pane(for: id))
+                    if viewModel.pane(for: id) == .primary { studioTools?.showsExternalAssets = false }
                 }
             }
             .onChange(of: playModeState) { _, state in
@@ -102,9 +104,15 @@ extension EditorCenterWorkbench {
                             .allowsHitTesting(false)
                     }
             }
-            activeDocumentView(in: pane)
-                .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
-                .layoutPriority(100)
+            if pane == .primary, let studioTools, studioTools.showsExternalAssets, let library = studioTools.externalAssets {
+                EditorExternalAssetGallery(host: studioTools, library: library)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                    .layoutPriority(100)
+            } else {
+                activeDocumentView(in: pane)
+                    .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
+                    .layoutPriority(100)
+            }
         }
         .frame(minWidth: 0, maxWidth: .infinity, minHeight: 0, maxHeight: .infinity)
         .onPrimaryInteraction {
@@ -144,7 +152,16 @@ extension EditorCenterWorkbench {
                         filesTab(in: pane)
                     #endif
                     ForEach(viewModel.documents(in: pane), id: \.id) { document in
-                        editorTab(document, active: !filesBrowserPanes.contains(pane) && document.id == viewModel.selectedDocument(in: pane)?.id)
+                        editorTab(document, active: !filesBrowserPanes.contains(pane) && document.id == viewModel.selectedDocument(in: pane)?.id
+                            && (pane != .primary || studioTools?.showsExternalAssets != true))
+                    }
+                    if pane == .primary, let studioTools, studioTools.externalAssets != nil {
+                        Button(L10n.text("External Asset Library")) { studioTools.showsExternalAssets = true }
+                            .font(.system(size: 12))
+                            .padding(.horizontal, 10)
+                            .frame(height: tabHeight)
+                            .modifier(EditorWorkspaceTabChrome(isSelected: studioTools.showsExternalAssets, isDropTarget: false))
+                            .accessibilityIdentifier("studio.external-assets.tab")
                     }
                 }
                 .padding(.horizontal, compactChrome ? 0 : 8)
@@ -210,6 +227,7 @@ extension EditorCenterWorkbench {
                     return
                 }
                 filesBrowserPanes.remove(viewModel.pane(for: document.id))
+                if viewModel.pane(for: document.id) == .primary { studioTools?.showsExternalAssets = false }
                 onSelectDocument?(document.id) ?? viewModel.selectDocument(id: document.id)
             }) {
                 HStack(spacing: 7) {

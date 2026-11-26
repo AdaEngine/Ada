@@ -245,6 +245,8 @@ final class EditorModelPreviewCamera {
 struct EditorModelPreviewViewport: View {
     let model: EditorModelAssetPreviewModel
     let camera: EditorModelPreviewCamera
+    var isInteractive = true
+    var onFrameRendered: (@MainActor (Texture2D) -> Void)?
     @Environment(\.theme) private var theme
 
     static func configure(_ app: AppWorlds, model: EditorModelAssetPreviewModel, camera: EditorModelPreviewCamera) {
@@ -284,6 +286,7 @@ struct EditorModelPreviewViewport: View {
             let _ = camera.setViewportSize(geometry.size)
             ZStack(anchor: .bottomLeading) {
                 SceneView(
+                    isInteractive: isInteractive,
                     updatesWhenWindowInactive: false,
                     make: { app in
                         Self.configure(app, model: model, camera: camera)
@@ -304,10 +307,11 @@ struct EditorModelPreviewViewport: View {
                         world.getResource(EditorSkeleton3DOverlay.self)?.showsAxes = camera.showsAxes
                         world.getResource(EditorSkeleton3DOverlay.self)?.gridHeight = model.normalizedBounds.min.y
                         world.getResource(EditorSkeleton3DOverlay.self)?.modifierHandles = model.modifierHandleSegments()
-                    }
+                    },
+                    onFrameRendered: onFrameRendered
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                if geometry.size.width >= 360, geometry.size.height >= 240 {
+                if isInteractive, geometry.size.width >= 360, geometry.size.height >= 240 {
                     Text(L10n.text("Drag: orbit · Middle drag: pan · Scroll: zoom\nRight drag: look · WASD: move · Q/E: down/up · Shift: faster"))
                     .font(.system(size: 11))
                     .foregroundColor(theme.editorColors.muted)

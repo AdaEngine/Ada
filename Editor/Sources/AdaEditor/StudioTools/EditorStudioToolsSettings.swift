@@ -2,14 +2,26 @@ import AdaEngine
 
 struct EditorStudioToolsSettings: View {
     let host: EditorStudioToolHost
+    @State private var pendingRemoval: String?
     @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
+            #if os(macOS) || os(Windows)
+            Button(L10n.text("Install Plugin ZIP")) {
+                let generation = host.projectGeneration
+                Task {
+                    guard let url = await EditorStudioPluginPicker.pick(title: "Install Plugin ZIP", extensions: ["zip"]) else { return }
+                    let finishAccess = EditorStudioPluginPicker.openAccess(url)
+                    defer { finishAccess() }
+                    host.installPlugin(url, generation: generation)
+                }
+            }
+            #endif
             Text(L10n.text("Access applies only to this project on this computer. Revoking it stops the tool and closes its panels."))
                 .font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
             if let error = host.error {
-                Text(error).font(.system(size: 12)).foregroundColor(Color(red: 0.9, green: 0.3, blue: 0.2))
+                Text(L10n.tr(error)).font(.system(size: 12)).foregroundColor(Color(red: 0.9, green: 0.3, blue: 0.2))
             }
             if host.definitions.isEmpty {
                 Text(L10n.text("No tools found. Add tool folders under Tools/ in this project.")).font(.system(size: 12))
@@ -36,6 +48,31 @@ struct EditorStudioToolsSettings: View {
                         .font(.system(size: 12))
                     ForEach(definition.schema.permissions, id: \.rawValue) { permission in
                         Text(L10n.tr(permission.studioAccessTitle)).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
+                    }
+                    if let manifest = definition.manifest {
+                        if host.enabledIDs.contains(definition.schema.id), !manifest.actions.isEmpty {
+                            Toggle(L10n.text("Allow Ada AI to use this plugin"), isOn: Binding(
+                                get: { host.pluginAIIDs.contains(definition.schema.id) },
+                                set: { host.setPluginAI(definition.schema.id, allowed: $0) }
+                            ))
+                            Text(L10n.text("Enabled actions can send their results to the selected AI provider."))
+                                .font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
+                            ForEach(manifest.actions, id: \.id) { action in
+                                Text(EditorLocalization.shared.language == .russian ? action.title.ru : action.title.en).font(.system(size: 12))
+                            }
+                        }
+                        if pendingRemoval == definition.schema.id {
+                            Text(L10n.text("Remove this plugin from the project?"))
+                            HStack {
+                                Button(L10n.text("Remove Plugin")) {
+                                    host.uninstallPlugin(definition)
+                                    pendingRemoval = nil
+                                }
+                                Button(L10n.text("Cancel")) { pendingRemoval = nil }
+                            }
+                        } else if EditorStudioPluginInstaller.isManaged(definition) {
+                            Button(L10n.text("Uninstall Plugin")) { pendingRemoval = definition.schema.id }
+                        }
                     }
                     if let reason = host.unavailabilityReason(definition) {
                         Text(reason).font(.system(size: 12)).foregroundColor(theme.editorColors.muted)

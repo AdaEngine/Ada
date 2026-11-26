@@ -32,6 +32,29 @@ Ask the Studio agent for a pixel sprite or a short animation. The
 [pixel art guide](AgentPixelArt.md) covers palettes, saved AdaScript recipes,
 animation sheets and GIF previews in the chat.
 
+## Asset Store
+
+The **External Asset Library** is an optional desktop plugin for Windows and macOS.
+Install its Ada Asset Store ZIP under **Project Settings → Studio Tools → Install Plugin ZIP**.
+Review its access, enable it, then choose **Open External Asset Library** from the Studio Tools sidebar.
+
+Add a listing link and give it a name. Filter the gallery by **Fab** or **Unity Asset Store**
+and search by asset name. Select a card to see its details. In a narrow window,
+use **Back to assets** to return to the grid.
+
+For a Fab model, open the listing and get the asset through Fab. In the Fab launcher,
+choose GLB and export it using **Custom (disk location)**, or download a GLB when it is available
+on the listing. Use **Add local model** in the gallery to attach the self-contained GLB
+(up to 32 MiB). The gallery generates a still thumbnail and lets you inspect the selected
+model in 3D. Use **Import into project** to create a project asset that can be placed in a scene.
+Expand **Local files** to replace the model, attach a PNG or JPEG cover, or remove the local copy.
+**Remove local copy** clears the plugin's managed model and its generated preview. The original
+file, the imported project asset and any separately attached cover are kept.
+
+For Unity Asset Store listings, obtain the file through Unity and export a compatible GLB
+where the asset's license permits. See [Studio Tools](StudioTools.md) for plugin installation
+and [Ada AI](CloudAI.md) for enabling AI search of the saved library.
+
 ## Import and place a 3D model
 
 To create and export a Blender model with Ada AI on Windows, see the

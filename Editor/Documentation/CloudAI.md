@@ -119,3 +119,20 @@ backend validation report live in adaengine-service/docs.
 
 Focused tests: `EditorCloudAgentTests`, `EditorAICreditsTests`,
 `EditorLocalizationTests`, and WebUI `ai-credits.test.mjs`.
+
+## Studio plugin intents and tools
+
+On macOS and Windows, installed Studio plugins can add read-only actions to the
+Ada AI catalog for the open project. Enable the plugin, then turn on **Allow Ada AI
+to use this plugin** in **Project Settings → Studio Tools**. The permissions page
+shows which actions become available. Turn the option off to withdraw access.
+
+With the [External Asset Library](EditorGuide.md#asset-store), try “Find my Fab
+benches and tell me which ones I already have locally.” Ada AI can search your saved
+titles and look up a result through its asset reference. The search shares titles,
+store labels and file availability with the AI provider. Images and model files
+stay in Studio. Use the gallery to add, import or remove a managed file.
+
+The hosted connection must advertise tool contract version 4 for plugin actions.
+Earlier connections can continue using their existing tools. For manifest and
+handler details, see the [Studio Tools guide](StudioTools.md#offer-read-only-actions-to-ada-ai).
