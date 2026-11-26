@@ -41,9 +41,40 @@ come from the same current CPU poses used to prepare raster skinning, not GPU
 buffer mapping. Cast/receive flags and alpha tests are respected; alpha blending
 uses stochastic straight-through coverage, without glass refraction.
 
+## Interactive transport
+
+Enable interactive transport on the camera's existing environment:
+
+```swift
+environment.pathTracing = .init(isEnabled: true, samplesPerPixel: 1,
+    maximumBounces: 3, resolutionScale: 0.5)
+environment.pathTracing.transport = .interactive
+environment.pathTracing.radianceCache = true
+```
+
+The interactive estimator draws eight direct-light candidates at the first interaction and four at later interactions.
+With one analytic light and emissive meshes it draws four candidates at the first interaction and two later.
+It samples directional, point and spot lights and emissive mesh triangles. It traces visibility for up to one
+candidate per interaction. This reduces shadow-ray work in many-light scenes and can introduce more per-frame
+noise. Denoising or accumulation helps the samples converge. `.exhaustive` selects the analytic-light reference
+estimator and is the default for saved scenes.
+
+The world-space cache reuses lighting for broad diffuse paths on SAGA Vulkan with ray queries, a raster first hit and at
+least three surface interactions. It uses about 4.5 MiB per view and warms over successive frames. The cache
+keeps separate estimates for different remaining path lengths. Short segments, sharp lobes, disagreeing normals
+and cold cells continue tracing. Camera motion preserves valid cells. Moving objects refresh affected probes against
+current visibility, and lighting-only edits gradually refresh compatible probes. Changes to scene structure, sky or
+bounce depth replace the cache history. On backends without the cache path, the interactive estimator traces
+uncached. Set `radianceCache = false` to compare images or measure the uncached path.
+
+Read `transport`, `radianceCache`, `radianceCacheBytes` and `radianceCacheFallback` on
+`Render3DPathTracingStatistics.snapshots` to identify what encoded. Enable `radianceCacheDiagnostics` and call
+`try await statistics.radianceCacheCounters(for: camera.id)` to download GPU probe hits, misses and updates on
+demand. Counts describe the sampled GPU probes that warm the cache.
+
 ## First hit from the G-buffer
 
-On devices with the extra G-buffer outputs (verified on native WebGPU; Metal is not yet verified), a traced view takes its first hit
+On devices with the extra G-buffer outputs, a traced view takes its first hit
 from the raster G-buffer: position, normal, roughness and metallic as before, plus base colour and emission,
 which the main pass writes for traced views only. Paths start tracing at the first bounce. The image keeps
 the full detail of the rasterized model, and the denoisers' guides match the traced light exactly. Pixels the raster
@@ -67,7 +98,7 @@ The Sponza example rasters the full 8.8 M-triangle model and traces its 122 K-tr
 
 | Value | Behaviour |
 | --- | --- |
-| `.automatic` (default) | DLSS Ray Reconstruction when the camera uses DLSS temporal upscaling on a supported NVIDIA GPU and the tracer runs at input size (`resolutionScale` 1); otherwise `.portable`. |
+| `.automatic` (default) | DLSS Ray Reconstruction when the camera uses DLSS temporal upscaling on a supported NVIDIA GPU and the G-buffer first hit is available. It traces at the DLSS input size. Other views use `.portable`. |
 | `.rayReconstruction` | Ray Reconstruction, falling back to `.portable` with `denoiserFallback` set in the statistics. |
 | `.portable` | Temporal reprojection and an edge-aware wavelet filter, on every backend. |
 | `.off` | Plain accumulation of a still view, for reference renders. |
@@ -86,9 +117,11 @@ Camera, light and object motion keep history (moving objects use a higher histor
 quickly, and the reprojection guides reject history that no longer matches); adding or removing a mesh, or changing a
 light, material or setting, restarts it. Plain accumulation (`.off`) restarts on any change, including motion. On an RTX 4070 at 1260×523 the chain costs about 1.1 ms of GPU time.
 
-**Ray Reconstruction.** The tracer writes one fresh sample per frame and diffuse albedo, specular albedo and world
-normals with roughness as guides. DLSS Ray Reconstruction then denoises and upscales in one step, replacing Super
-Resolution for that view. See [DLSS](DLSS.md) for its runtime.
+**Ray Reconstruction.** The tracer writes fresh noisy samples each frame along with diffuse albedo, specular albedo
+and world normals with roughness as guides. Specular albedo incorporates the view angle and roughness. A bridge that exposes
+the optional hit-distance input also receives the first sampled specular hit's distance in world units. A specular
+ray that escapes uses the configured maximum ray distance, and pixels with no specular sample use zero.
+DLSS Ray Reconstruction then denoises and upscales in one step, replacing Super Resolution for that view. See [DLSS](DLSS.md) for its runtime.
 
 **`.off`.** Plain accumulation restarts on any camera, projection, geometry, pose, material, light or sky change.
 
@@ -124,10 +157,11 @@ Current limits:
 - Atlas textures repeat and use a downsampled level zero; arbitrary sampler
   address modes, mip gradients, HDR material texture values and in-place texture
   edits are not reproduced. Replacing a texture refreshes its atlas tile.
-- Emissive surfaces and the environment have no next-event importance sampling;
-  small emitters can be very noisy. There is no ReSTIR/MIS. Radiance clamping and finite path length introduce bias.
-- The denoisers trade noise for lag: the portable history weight and clamp follow moving lights within a few frames,
-  and disocclusions start from one sample. Every light is still sampled at every bounce, which dominates trace cost.
+- The interactive estimator caps its emissive proposal at 65,536 eligible triangles. A scene beyond that cap uses
+  BSDF hits for emissive surfaces and reports `emissiveSamplingFallback`. Environment radiance is sampled when
+  a ray escapes. Radiance clamping and the diffuse cache introduce approximation error.
+- The denoisers trade noise for lag. The portable history weight and clamp follow moving lights within a few frames,
+  and disocclusions start from one sample.
 - The G-buffer first hit uses base metallic/roughness, base colour and emission; clearcoat, sheen and anisotropy
   are not reproduced there either.
 - Cosmetic shader graphs, particles, analytic/volumetric fog, raster depth/motion guides and overlays

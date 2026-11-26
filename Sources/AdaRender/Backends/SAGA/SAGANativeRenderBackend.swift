@@ -68,16 +68,25 @@
 
             func attachSurface(
                 _ target: VulkanSurfaceTarget,
-                prefersLatestFrame: Bool,
+                presentation: RenderPresentationMode,
                 onPresentationRetryChanged: @escaping @Sendable (Bool) -> Void
-            ) async throws -> (id: UInt32, usesMailbox: Bool) {
+            ) async throws -> (id: UInt32, mode: RenderPresentationMode) {
                 switch self {
                 case .vulkan(let device):
-                    return try await device.attachSurface(target, prefersLatestFrame: prefersLatestFrame, onPresentationRetryChanged: onPresentationRetryChanged)
+                    if presentation == .uncapped {
+                        let surface = try await device.attachUncappedSurface(target, onPresentationRetryChanged: onPresentationRetryChanged)
+                        return (surface.id, surface.usesImmediate ? .uncapped : .synchronized)
+                    }
+                    let surface = try await device.attachSurface(
+                        target,
+                        prefersLatestFrame: presentation == .synchronizedLatest,
+                        onPresentationRetryChanged: onPresentationRetryChanged
+                    )
+                    return (surface.id, surface.usesMailbox ? .synchronizedLatest : .synchronized)
                 #if SAGA_D3D12
                 case .direct3D12(let device):
                     guard case .win32(_, let hwnd) = target else { throw SetupError.unsupportedWindow }
-                    return (try await device.addSurface(windowHandle: hwnd), false)
+                    return (try await device.addSurface(windowHandle: hwnd), .synchronized)
                 #endif
                 }
             }
@@ -201,18 +210,24 @@
                 limitsQueuedPresentations: limitsQueuedPresentations
             )
             let native = self.native
-            let prefersLatestFrame = context.shaderOutput == .spirv && (unsafe RenderEngine.presentationMode == .synchronizedLatest)
+            #if os(Windows)
+                let presentation = context.shaderOutput == .spirv ? (unsafe RenderEngine.presentationMode) : .synchronized
+            #else
+                let presentation = RenderPresentationMode.synchronized
+            #endif
             let logger = context.logger
             let surfaceSlot = window.surface
             context.queue.enqueue { _ in
                 defer { withExtendedLifetime(lifetime) {} }
-                let surface = try await native.attachSurface(target, prefersLatestFrame: prefersLatestFrame) { [weak window] in
+                let surface = try await native.attachSurface(target, presentation: presentation) { [weak window] in
                     window?.updatePresentationRetry($0)
                 }
-                if prefersLatestFrame {
-                    logger.info("Windows Vulkan presentation: \(surface.usesMailbox ? "mailbox" : "FIFO")")
+                if presentation == .uncapped {
+                    logger.info("Windows Vulkan presentation: \(surface.mode == .uncapped ? "immediate" : "FIFO (uncapped unavailable)")")
+                } else if presentation == .synchronizedLatest {
+                    logger.info("Windows Vulkan presentation: \(surface.mode == .synchronizedLatest ? "mailbox" : "FIFO")")
                 }
-                window.setMailboxPresentation(surface.usesMailbox)
+                window.setPresentationMode(surface.mode)
                 surfaceSlot.fulfill(surface.id)
             }
             windows.withLock { $0[windowId] = WindowBinding(window: window, lifetime: lifetime) }
@@ -290,6 +305,14 @@
             onPresentationRetryChanged: (@Sendable (Bool) -> Void)?
         ) throws -> (id: UInt32, usesMailbox: Bool) {
             (try addSurface(target, onPresentationRetryChanged: onPresentationRetryChanged), false)
+        }
+
+        // The package's pinned SAGA remains usable until the immediate presentation API is available there.
+        func attachUncappedSurface(
+            _ target: VulkanSurfaceTarget, onPresentationRetryChanged: (@Sendable (Bool) -> Void)?
+        ) throws -> (id: UInt32, usesImmediate: Bool) {
+            let surface = try attachSurface(target, prefersLatestFrame: false, onPresentationRetryChanged: onPresentationRetryChanged)
+            return (surface.id, false)
         }
     }
 #endif

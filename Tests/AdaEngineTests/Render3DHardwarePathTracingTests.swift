@@ -79,6 +79,185 @@
                 #expect(error < 0.005, "Hardware differs from the software tracer by \(error)")
             }
 
+            @Test(.enabled(if: Self.enabled))
+            func worldCacheSurvivesMotionAndInvalidatesWhenSceneContentChanges() async throws {
+                let scene = try await Self.scene()
+                guard scene.device.supportsRayQueries else {
+                    return
+                }
+                try scene.configure {
+                    $0.pathTracing.transport = .interactive
+                    $0.pathTracing.radianceCache = true
+                    $0.pathTracing.radianceCacheDiagnostics = true
+                    $0.pathTracing.samplesPerPixel = 1
+                    $0.pathTracing.maximumBounces = 3
+                    $0.pathTracing.resolutionScale = 0.5
+                }
+                func report() throws -> [String: Any] {
+                    let data = try JSONEncoder().encode(Self.status(scene))
+                    return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+                }
+
+                try scene.setSunIntensity(1)
+                // Cache pipelines compile asynchronously. Begin warm-up only once the cache is active.
+                for _ in 0..<12 {
+                    _ = try await scene.render(.none, frames: 8)
+                    if try Self.status(scene).radianceCache == "world-space" { break }
+                }
+                _ = try await scene.render(.none, frames: 24)
+                let initial = try report()
+                #expect(initial["radianceCache"] as? String == "world-space", "\(initial)")
+                let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld))
+                let statistics = try #require(world.getResource(Render3DPathTracingStatistics.self))
+                let counters = try #require(try await statistics.radianceCacheCounters(for: scene.camera.id))
+                #expect(counters.hits > 0 && counters.misses > 0 && counters.updates > 0)
+                #expect(counters.updates <= Int(try Self.status(scene).encodedFrames) * 4_096)
+                print("Radiance cache probes: \(counters.hits) hits, \(counters.misses) misses, \(counters.updates) updates")
+                let bytes = initial["radianceCacheBytes"] as? Int ?? 0
+                #expect(bytes > 0 && bytes <= 16 * 1024 * 1024)
+                let resets = initial["radianceCacheResets"] as? Int
+
+                if var camera = scene.camera.components[Transform.self] {
+                    camera.position.x += 0.05
+                    scene.camera.components[Transform.self] = camera
+                }
+                _ = try await scene.render(.none, frames: 3)
+                #expect(try report()["radianceCacheResets"] as? Int == resets)
+
+                try scene.setSunIntensity(2)
+                _ = try await scene.render(.none, frames: 3)
+                #expect(try report()["radianceCacheResets"] as? Int == resets, "A lighting-only edit must keep compatible diffuse probes")
+                let relit = try #require(try await statistics.radianceCacheCounters(for: scene.camera.id))
+                #expect(relit.updates >= counters.updates)
+
+                let blocker = try #require(scene.sphereEntities.first)
+                let startingPose = try #require(blocker.components[Transform.self])
+                var movedPose = startingPose
+                movedPose.position.x += 0.4
+                blocker.components[Transform.self] = movedPose
+                _ = try await scene.render(.none, frames: 3)
+                #expect(try report()["radianceCacheResets"] as? Int == resets, "Moving geometry must preserve compatible cache cells")
+
+                scene.app.main.removeEntity(blocker.id, recursively: true)
+                _ = try await scene.render(.none, frames: 3)
+                #expect(try report()["radianceCacheResets"] as? Int == (resets ?? 0) + 1)
+
+                try scene.configure { $0.pathTracing.maximumBounces = 4 }
+                let warmed = try await scene.render(.none, frames: 24)
+                #expect(try report()["radianceCacheResets"] as? Int == (resets ?? 0) + 2)
+
+                try scene.configure { $0.pathTracing.intersection = .software }
+                _ = try await scene.render(.none, frames: 3)
+                let fallback = try report()
+                #expect(fallback["radianceCache"] as? String == "uncached")
+                #expect(fallback["radianceCacheFallback"] is String)
+                #expect(fallback["radianceCacheBytes"] as? Int == 0)
+                #expect(fallback["transport"] as? String == "interactive")
+                #expect(try await statistics.radianceCacheCounters(for: scene.camera.id) == nil)
+
+                try scene.configure {
+                    $0.pathTracing.intersection = .automatic
+                    $0.pathTracing.radianceCache = false
+                }
+                let uncached = try await scene.render(.none, frames: 24)
+                let error = Self.difference(warmed, uncached)
+                print("Warmed versus uncached radiance difference: \(error)")
+                #expect(error < 0.06)
+            }
+
+            @Test(.enabled(if: Self.enabled && ProcessInfo.processInfo.environment["ADAENGINE_DLSS"] == "1"))
+            func interactiveCacheFeedsRayReconstructionDuringCameraMotion() async throws {
+                let scene = try await DebugViews.makeScene(temporalRenderScale: 1, pathTracingPresentation: true)
+                for _ in 0..<200 where !scene.device.dlssStatus.isAvailable && (scene.device.dlssStatus.unavailableReason ?? "").contains("initializing") {
+                    try await Task.sleep(for: .milliseconds(50))
+                }
+                try #require(scene.device.supportsRayQueries)
+                try #require(scene.device.dlssStatus.isAvailable)
+                try scene.configure {
+                    $0.imageBasedLighting = nil
+                    $0.fog.isEnabled = false
+                    $0.localShadows.isEnabled = false
+                    $0.pathTracing = .init(isEnabled: true, samplesPerPixel: 1, maximumBounces: 3, resolutionScale: 0.5)
+                    $0.pathTracing.transport = .interactive
+                    $0.pathTracing.radianceCache = true
+                    $0.pathTracing.denoiser = .rayReconstruction
+                }
+                var camera = try #require(scene.camera.components[Camera.self])
+                camera.temporalUpscaling = .init(renderScale: 1, method: .dlss)
+                scene.camera.components[Camera.self] = camera
+                _ = try await scene.render(.none, frames: 16)
+                var transform = try #require(scene.camera.components[Transform.self])
+                transform.position.x += 0.1
+                scene.camera.components[Transform.self] = transform
+                let image = try await scene.render(.none, frames: 16)
+                let path = try Self.status(scene)
+                #expect(path.failure == nil && path.denoiserFallback == nil)
+                #expect(path.denoiser == PathTracingDenoiser.rayReconstruction.rawValue)
+                #expect(path.radianceCache == "world-space", "\(String(describing: path.radianceCacheFallback))")
+                if ProcessInfo.processInfo.environment["ADAENGINE_TEST_RR_HIT_DISTANCE"] == "1" {
+                    #expect(path.rayReconstructionSpecularHitDistance == true)
+                }
+                let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld))
+                let temporal = try #require(world.getResource(Render3DTemporalStatistics.self)?.snapshots[String(scene.camera.id)])
+                #expect(temporal.fallbackFrames == 0 && temporal.encodedFrames > 0)
+                try FileManager.default.createDirectory(at: GoldenFrame.outputDirectory, withIntermediateDirectories: true)
+                try image.writePNG(to: GoldenFrame.outputDirectory.appendingPathComponent("dlss-rr-interactive-moving.png"))
+
+                let daylight = try #require(scene.sun.components[DirectionalLightComponent.self]).intensity
+                try scene.setSunIntensity(0)
+                let night = try await scene.render(.none, frames: 24)
+                let lightsOff = try Self.status(scene)
+                #expect(lightsOff.historyResets == path.historyResets, "A sun switch must retain Ray Reconstruction history")
+                #expect(lightsOff.radianceCacheResets == path.radianceCacheResets)
+                #expect(night.getPixel(x: 320, y: 410).red < image.getPixel(x: 320, y: 410).red * 0.7, "The ground retained stale direct sunlight")
+                try scene.setSunIntensity(daylight)
+
+                let mesh = try #require(scene.sphereEntities[1].components[Mesh3DComponent.self])
+                let lamp = try #require(mesh.materials.first as? PBRMaterial)
+                lamp.emissiveStrength = 4
+                let litByLamp = try await scene.render(.none, frames: 24)
+                let lampOn = try Self.status(scene)
+                #expect(lampOn.historyResets == path.historyResets, "Changing mesh emission must retain Ray Reconstruction history")
+                #expect((lampOn.emissiveTriangles ?? 0) > 0)
+
+                lamp.emissiveStrength = 0
+                let unlitByLamp = try await scene.render(.none, frames: 24)
+                let lampOff = try Self.status(scene)
+                #expect(lampOff.historyResets == path.historyResets, "Turning the emissive lamp off must retain Ray Reconstruction history")
+                #expect(lampOff.radianceCacheResets == lampOn.radianceCacheResets)
+                #expect(lampOff.emissiveTriangles == 0)
+                #expect(Self.difference(litByLamp, unlitByLamp) > 0.005, "The reconstructed image did not respond to the lamp switching off")
+
+                try scene.configure {
+                    $0.pathTracing.denoiser = .portable
+                }
+                camera.temporalUpscaling = nil
+                scene.camera.components[Camera.self] = camera
+                let portable = try await scene.render(.none, frames: 16)
+                let litGround = image.getPixel(x: 320, y: 410).red
+                let error = Self.difference(image, portable)
+                print("Moved scene Ray Reconstruction versus portable difference: \(error)")
+                #expect(litGround > 0.1, "The reconstructed frame lost the lit ground")
+                #expect(error < 0.12, "The reconstructed and portable frames differ by \(error)")
+            }
+
+            #if os(Windows)
+            @Test(.enabled(if: Self.enabled))
+            func hardwarePathTracingReportsGPUTime() async throws {
+                let scene = try await Self.scene()
+                guard scene.device.supportsRayQueries else {
+                    return
+                }
+                let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld))
+                let metrics = Render3DPerformanceMetrics(warmupSamples: 0)
+                world.insertResource(metrics)
+
+                _ = try await scene.render(.none, frames: 24)
+                let sample = try #require(metrics.samples.first { $0.pass == "pathTracing" }, "The Vulkan tracer must report measured GPU time")
+                #expect(sample.count >= 1 && sample.averageMilliseconds > 0)
+            }
+            #endif
+
             /// Renders the scene with both traversals and checks that hardware ran and matches software.
             private static func expectHardwareMatchesSoftware(_ scene: DebugViews.Scene, _ step: String, tolerance: Float = 0.005) async throws {
                 try scene.configure { $0.pathTracing.intersection = .software }
@@ -142,6 +321,30 @@
             }
 
             @Test(.enabled(if: Self.enabled))
+            func hardwareMotionKeepsUnchangedShadingTextures() async throws {
+                let scene = try await Self.scene()
+                guard scene.device.supportsRayQueries else {
+                    return
+                }
+                try scene.configure { $0.pathTracing.intersection = .automatic }
+                _ = try await scene.render(.none, frames: 12)
+
+                let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld))
+                let before = try #require(world.getResource(PathTracing3DViews.self)?.scene)
+                let oldNodes = try #require(before.nodes)
+                let oldMaterials = try #require(before.materials)
+                #expect(before.hardwareOrder)
+                let sphere = try #require(scene.sphereEntities.first)
+                sphere.components[Transform.self] = Transform(position: [0.4, 0.3, 0.2])
+                _ = try await scene.render(.none, frames: 2)
+
+                let moved = try #require(world.getResource(PathTracing3DViews.self)?.scene)
+                #expect(moved.generation > before.generation)
+                #expect(moved.nodes === oldNodes, "Motion must reuse the unchanged ray-query instance metadata")
+                #expect(moved.materials === oldMaterials, "Motion must reuse the unchanged path-tracing material texture")
+            }
+
+            @Test(.enabled(if: Self.enabled))
             func movingAddingAndRemovingMeshesKeepsHardwareInStepWithSoftware() async throws {
                 let scene = try await Self.scene()
                 guard scene.device.supportsRayQueries else {
@@ -163,6 +366,30 @@
 
                 scene.app.main.removeEntity(cube.id, recursively: true)
                 try await Self.expectHardwareMatchesSoftware(scene, "removed cube")
+            }
+
+            @Test(.enabled(if: Self.enabled))
+            func opaqueRayQueriesMatchTheSoftwareBVH() async throws {
+                let scene = try await Self.scene()
+                guard scene.device.supportsRayQueries else {
+                    return
+                }
+                for entity in scene.app.main.getEntities() {
+                    for case let material as PBRMaterial in entity.components[Mesh3DComponent.self]?.materials ?? [] {
+                        material.doubleSided = true
+                    }
+                }
+                try await Self.expectHardwareMatchesSoftware(scene, "opaque double-sided scene")
+                let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld))
+                let ready = try #require(world.getResource(PathTracing3DViews.self))
+                #expect(ready.scene.opaqueRayCandidates)
+
+                let mesh = try #require(scene.sphereEntities.first?.components[Mesh3DComponent.self])
+                let material = try #require(mesh.materials.first as? PBRMaterial)
+                material.doubleSided = false
+                _ = try await scene.render(.none, frames: 3)
+                let updated = try #require(world.getResource(PathTracing3DViews.self))
+                #expect(!updated.scene.opaqueRayCandidates)
             }
 
             @Test(.enabled(if: Self.enabled))

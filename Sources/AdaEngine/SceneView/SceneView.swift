@@ -48,6 +48,8 @@ public struct SceneView<Placeholder: View>: View {
     private var frameCaptureLabel: String?
     private var pipelinedRendering = false
     private var maximumPendingFrames: Int?
+    private var maximumRenderSize: SizeInt?
+    private var queuesCompletedFrames = false
 
     /// Makes completed frames of this scene readable through ``SceneViewFrameRegistry``.
     ///
@@ -76,6 +78,24 @@ public struct SceneView<Placeholder: View>: View {
     public func maximumPendingFrames(_ count: Int) -> Self {
         var view = self
         view.maximumPendingFrames = max(1, count)
+        return view
+    }
+
+    /// Sets a physical-pixel render texture limit when the viewport is created. The completed image still fills the view.
+    /// Use this for noninteractive previews where the view and rendered viewport can differ in size.
+    @_spi(AdaEngine)
+    public func maximumRenderSize(_ size: SizeInt?) -> Self {
+        var view = self
+        view.maximumRenderSize = size
+        return view
+    }
+
+    /// Configures the viewport to present one completed scene frame per update when it is created.
+    /// This trades up to the render queue's depth in latency for a steadier cadence at a fixed display rate.
+    @_spi(AdaEngine)
+    public func queuesCompletedFrames(_ enabled: Bool = true) -> Self {
+        var view = self
+        view.queuesCompletedFrames = enabled
         return view
     }
 
@@ -128,7 +148,7 @@ public struct SceneView<Placeholder: View>: View {
 
     public var body: some View {
         OffscreenViewportContainer(
-            delegateFactory: { [make, updateContent, onFrameRendered, useSceneCameras, prepareFramePresentation, frameCaptureLabel, pipelinedRendering, maximumPendingFrames] in
+            delegateFactory: { [self] in
                 SceneViewCoordinator(
                     useSceneCameras: useSceneCameras,
                     make: make,
@@ -137,7 +157,9 @@ public struct SceneView<Placeholder: View>: View {
                     prepareFramePresentation: prepareFramePresentation,
                     frameCaptureLabel: frameCaptureLabel,
                     pipelinedRendering: pipelinedRendering,
-                    maximumPendingFrames: maximumPendingFrames
+                    maximumPendingFrames: maximumPendingFrames,
+                    maximumRenderSize: maximumRenderSize,
+                    queuesCompletedFrames: queuesCompletedFrames
                 )
             },
             contentBuilder: { [placeholder, isInteractive, updatesWhenWindowInactive] delegate in

@@ -33,7 +33,7 @@
             var queuedPresentations = 0
             var presentationNeedsRetry = false
             var presentationWaiters: [AsyncStream<Bool>.Continuation] = []
-            var usesMailbox = false
+            var presentationMode: RenderPresentationMode = .synchronized
             var isPresenting = false
             var isRetired = false
         }
@@ -59,12 +59,12 @@
             self.state = Mutex(State(size: size, scaleFactor: scaleFactor, backbuffer: nil))
         }
 
-        func setMailboxPresentation(_ active: Bool) {
-            state.withLock { $0.usesMailbox = active }
+        func setPresentationMode(_ mode: RenderPresentationMode) {
+            state.withLock { $0.presentationMode = mode }
         }
 
         var presentationMode: RenderPresentationMode {
-            state.withLock { $0.usesMailbox ? .synchronizedLatest : .synchronized }
+            state.withLock { $0.presentationMode }
         }
 
         var hasPendingPresentation: Bool {

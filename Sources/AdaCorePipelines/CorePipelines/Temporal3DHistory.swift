@@ -147,6 +147,7 @@ struct PrepareTemporal3DSystem {
             entry.encoded = false
             target.temporalUpscalingActive = true
             target.rayReconstructionAvailable = entry.scaler?.supportsDenoising == true
+            target.rayReconstructionSpecularHitDistanceAvailable = entry.scaler?.supportsSpecularHitDistance == true
             if target.temporalInputTexture?.size != input.size || target.temporalInputTexture?.pixelFormat != .rgba_16f {
                 target.temporalInputTexture = RenderTexture(
                     size: input.size,

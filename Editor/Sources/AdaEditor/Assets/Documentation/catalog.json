@@ -4238,6 +4238,60 @@
       },
       {
         "kind": "heading",
+        "text": "Use interactive lighting",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "environment.pathTracing = .init(isEnabled: true, samplesPerPixel: 1,\n    maximumBounces: 3, resolutionScale: 0.5)\nenvironment.pathTracing.transport = .interactive\nenvironment.pathTracing.radianceCache = true",
+        "language": "swift",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Interactive transport samples an analytic light or an emissive triangle at each interaction. It can run with the\nshader BVH or hardware ray queries. Existing scenes decode to `.exhaustive`, which evaluates every analytic light.\nWith one analytic light and emissive meshes, the interactive sampler draws proposals from both groups at each\ninteraction. This uses a smaller sample budget and preserves the proposal weights.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The optional world-space radiance cache needs Vulkan ray queries, the raster G-buffer first hit and at least three\nsurface interactions. It reuses diffuse lighting after warming, including at the last eligible hit within the bounce\nlimit. On smooth surfaces that use the cache, the tracer still evaluates specular lighting and follows specular paths.\nThe cache uses about 4.5 MiB per active view. Use\n`radianceCache = false` for an uncached comparison. On compatible Windows systems, the same transport can feed\nDLSS Ray Reconstruction. Use an updated NGX bridge to receive the optional specular hit distance guide.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The cache retains compatible probes while objects move. During motion it refreshes probes against current visibility,\nreduces their lifetime and weighs new samples more heavily. A lighting-only edit gradually refreshes existing diffuse\nprobes against the new light. During this refresh, a compatible probe may provide its deepest estimate when the\npath needs one more interaction than the cache stores. Changes to scene structure, sky or bounce depth start a new\ncache history.\nWith interactive Ray Reconstruction, switching an analytic light or adjusting a mesh emitter's emission keeps the\nhistory needed for reprojection. Rays can respond to the new light on the next frame.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "When the Vulkan scene has only opaque, double-sided surfaces without per-mesh tracing distance limits, the\ndevice accepts hits during traversal. Mixed scenes use the shader's alpha, face and distance checks.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Benchmark on Windows Vulkan",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The standalone `SolariComparison` demo accepts `--uncapped --benchmark 300` to request immediate presentation and record\n300 intervals after warm-up. It reports output size, trace size, the mean and 95th-percentile intervals, and the rates\nof encoded frames and completed scene textures that reach the view. The renderer logs the selected presentation mode.\nThe renderer uses FIFO when the Windows Vulkan surface lacks immediate presentation support.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Run a separate diagnostic pass with `--gpu-timing` to read Vulkan timestamps. The tracer's interval\nstarts at its first timed GPU pass and ends at its last. Acceleration structure builds before that\ninterval and window presentation are outside the measurement.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
         "text": "Check what ran",
         "level": 2,
         "links": []
@@ -4250,7 +4304,7 @@
       },
       {
         "kind": "code",
-        "text": "if let status = statistics.snapshots[String(cameraID)] {\n    print(status.implementation)            // \"vulkan-ray-query\" or \"portable-shader-bvh\"\n    if let reason = status.intersectionFallback { print(\"Hardware not used: \\(reason)\") }\n}",
+        "text": "if let status = statistics.snapshots[String(cameraID)] {\n    print(status.implementation)            // \"vulkan-ray-query\" or \"portable-shader-bvh\"\n    if let reason = status.intersectionFallback { print(\"Hardware not used: \\(reason)\") }\n    print(status.radianceCache ?? \"disabled\")\n    if let reason = status.radianceCacheFallback { print(reason) }\n}",
         "language": "swift",
         "links": []
       },

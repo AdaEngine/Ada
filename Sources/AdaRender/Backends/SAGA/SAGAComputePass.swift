@@ -10,6 +10,7 @@
     import SAGA
     import SAGACore
     import SAGATypes
+    import Synchronization
 
     enum SAGAComputeError: Error {
         case wrongStage
@@ -21,7 +22,9 @@
         let slot = ResourceSlot<SAGATypes.ComputePipeline>()
         let context: SAGAContext
 
+        private let creationError = Mutex<String?>(nil)
         var isReady: Bool { (try? slot.get()) != nil }
+        var creationFailure: String? { creationError.withLock { $0 } }
 
         init(context: SAGAContext, descriptor: ComputePipelineDescriptor) throws {
             guard descriptor.shader.stage == .compute else { throw SAGAComputeError.wrongStage }
@@ -30,8 +33,13 @@
             self.descriptor = descriptor
             let artifact = compiled.artifact
             let slot = self.slot
-            context.queue.enqueue { device in
-                slot.fulfill(try await device.createComputePipeline(artifact))
+            context.queue.enqueue { [self] device in
+                do {
+                    slot.fulfill(try await device.createComputePipeline(artifact))
+                } catch {
+                    creationError.withLock { $0 = String(describing: error) }
+                    throw error
+                }
             }
         }
     }
@@ -40,6 +48,7 @@
         private let buffer: SAGACommandBuffer
         private var pipeline: SAGAComputePipeline?
         private var buffers: [ComputeBindingSlot: SAGABuffer] = [:]
+        private var accelerationStructures: [ComputeBindingSlot: SAGAAccelerationStructure] = [:]
         private var textures: [ComputeBindingSlot: ResourceSlot<ResourceID>] = [:]
         private var samplers: [ComputeBindingSlot: SAGASampler] = [:]
         /// Keeps bound textures alive until the commands are built.
@@ -59,6 +68,10 @@
                 switch entry.resource {
                 case .uniformBuffer(let uniform):
                     buffers[slot] = uniform as? SAGABuffer
+                case .buffer(let resource):
+                    buffers[slot] = resource as? SAGABuffer
+                case .accelerationStructure(let structure):
+                    accelerationStructures[slot] = structure as? SAGAAccelerationStructure
                 case let .sampledTexture(texture, mipLevel):
                     guard let gpu = texture.gpuTexture as? SAGAGPUTexture else { continue }
                     owners.append(gpu)
@@ -78,6 +91,7 @@
                 return
             }
             let buffers = self.buffers, textures = self.textures, samplers = self.samplers, owners = self.owners
+            let accelerationStructures = self.accelerationStructures
             let groups = DispatchWorkgroups(x: UInt32(threadgroups.x), y: UInt32(threadgroups.y), z: UInt32(threadgroups.z))
             buffer.append {
                 withExtendedLifetime(owners) {}
@@ -86,7 +100,8 @@
                     bindings: try buffers.mapValues { try $0.slot.get() },
                     workgroups: groups,
                     textures: try textures.mapValues { try $0.get() },
-                    samplers: try samplers.mapValues { try $0.slot.get() }
+                    samplers: try samplers.mapValues { try $0.slot.get() },
+                    accelerationStructures: try accelerationStructures.mapValues { try $0.slot.get() }
                 )
             }
         }

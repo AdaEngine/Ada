@@ -43,6 +43,51 @@ struct Render3DPathTracingSettingsTests {
         #expect(settings.sanitized.minimumHistoryWeight == 0.005)
     }
 
+    @Test func transportDecodesOldAndOptInSettings() throws {
+        let decoder = JSONDecoder()
+        let old = try decoder.decode(PathTracing3D.self, from: Data(#"{"isEnabled":true}"#.utf8))
+        let interactive = try decoder.decode(
+            PathTracing3D.self,
+            from: Data(#"{"isEnabled":true,"transport":"interactive","radianceCache":false}"#.utf8)
+        )
+        let encoder = JSONEncoder()
+        let oldJSON = try #require(JSONSerialization.jsonObject(with: encoder.encode(old)) as? [String: Any])
+        let interactiveJSON = try #require(JSONSerialization.jsonObject(with: encoder.encode(interactive)) as? [String: Any])
+        #expect(oldJSON["transport"] as? String == "exhaustive")
+        #expect(interactiveJSON["transport"] as? String == "interactive")
+        #expect(interactiveJSON["radianceCache"] as? Bool == false)
+        #expect(interactive != old)
+    }
+
+    @Test func emissiveTrianglePackingKeepsSourceIdentityAcrossReordering() {
+        let vertices: [Vector4] = [Vector4(0, 0, 0, 0), Vector4(1, 0, 0, 0), Vector4(0, 1, 0, 0)]
+            + Array(repeating: .zero, count: 9)
+        func table(for instances: [UInt64]) -> PathTracing3DEmitterTable {
+            var table = PathTracing3DEmitterTable()
+            for identifier in instances {
+                table.append(
+                    vertices,
+                    first: 0,
+                    transform: .identity,
+                    material: Int(identifier),
+                    maximumDistance: 0,
+                    identity: .init(entity: 42, instance: identifier, part: 0, triangle: 3)
+                )
+            }
+            table.finish()
+            return table
+        }
+        let ordered = table(for: [1, 3])
+        let reordered = table(for: [3, 1])
+        let expanded = table(for: [2, 3, 1])
+        #expect(reordered.identities == ordered.identities)
+        #expect(reordered.words == ordered.words)
+        #expect(reordered.identityDigest.value == ordered.identityDigest.value)
+        #expect(expanded.identities.filter { $0.instance != 2 } == ordered.identities)
+        #expect(expanded.identityDigest.value != ordered.identityDigest.value)
+        #expect(reordered.words[0].w == 1 && reordered.words[6].w == 3)
+    }
+
     @Test func pathTracingSurfaceVariantNeedsBothOutputs() {
         // Without both outputs attached the variant would write undeclared fragment outputs and fail to compile.
         #expect(Model3DDrawPass.writesPathTracingSurface(active:true,albedo:true,emission:true))
@@ -142,6 +187,72 @@ extension Render3DGPUTests {
             node.update(from: world)
             #expect(statistics.snapshots[key] == nil)
             #expect(world.getResource(PathTracing3DViews.self)?.entries[scene.camera.id] == nil)
+        }
+
+        @Test(.enabled(if: GoldenFrame.activeBackend != nil))
+        func interactiveTransportSamplesAnOffscreenEmissiveSurface() async throws {
+            let scene = try await Self.scene()
+            _ = Self.receiver(scene)
+            let emitter = PBRMaterial()
+            emitter.emissiveFactor = [1, 0, 0]
+            emitter.emissiveStrength = 32
+            emitter.doubleSided = true
+            scene.app.main.spawn("Small emissive panel") {
+                Mesh3DComponent(mesh: Mesh.generateCube(size: [0.5, 0.5, 0.05], renderDevice: scene.device), materials: [emitter])
+                Transform(position: [0.8, 0, -3.6])
+            }
+            try scene.configure {
+                $0.pathTracing.intersection = .software
+                $0.pathTracing.denoiser = .off
+            }
+            let reference = try await scene.render(.none, frames: 8)
+            let settings = try JSONDecoder().decode(
+                PathTracing3D.self,
+                from: Data(#"{"isEnabled":true,"transport":"interactive","radianceCache":false,"intersection":"software","denoiser":"off","samplesPerPixel":4,"maximumBounces":1}"#.utf8)
+            )
+            try scene.configure { $0.pathTracing = settings }
+            let interactive = try await scene.render(.none, frames: 16)
+            let status = try #require(Self.stats(scene).snapshots[String(scene.camera.id)])
+            #expect(status.failure == nil)
+            #expect(Self.red(interactive) > Self.red(reference) + 0.025, "Direct emissive sampling lights the receiver at one interaction")
+        }
+
+        @Test(.enabled(if: GoldenFrame.activeBackend != nil))
+        func boundedLightSamplingConvergesToAnalyticReference() async throws {
+            let scene = try await Self.scene()
+            _ = Self.receiver(scene)
+            try scene.configure {
+                $0.pathTracing.intersection = .software
+                $0.pathTracing.denoiser = .off
+                $0.pathTracing.samplesPerPixel = 1
+                $0.pathTracing.historyLimit = 32
+            }
+            let world = try #require(scene.app.getSubworldBuilder(by: .renderWorld)?.main)
+            func image(_ mode: PathTracingTransport, lamps: Int) async throws -> Image {
+                try scene.configure { $0.pathTracing.transport = mode }
+                let timings = Render3DPerformanceMetrics(warmupSamples: 4)
+                world.insertResource(timings)
+                let start = ContinuousClock.now
+                let image = try await scene.render(.none, frames: 24)
+                let elapsed = start.duration(to: .now)
+                let gpu = timings.samples.first { $0.pass == "pathTracing" }?.averageMilliseconds
+                print("Path tracing \(mode.rawValue), \(lamps) lights: \(elapsed) wall, GPU ms \(String(describing: gpu))")
+                return image
+            }
+            for i in 0..<32 {
+                let position = i == 0 ? Vector3(0, 0, -2) : Vector3(Float(i % 8 - 4) * 0.6, Float(i / 8 - 2) * 0.45, -2.2)
+                scene.app.main.spawn("Comparison point \(i)") {
+                    PointLightComponent(intensity: i == 0 ? 12 : 4, range: 8)
+                    Transform(position: position)
+                }
+                if i != 0 && i != 31 { continue }
+                let reference = try await image(.exhaustive, lamps: i + 1)
+                let sampled = try await image(.interactive, lamps: i + 1)
+                let expected = Self.red(reference)
+                let actual = Self.red(sampled)
+                #expect(expected > 0.015 && actual.isFinite)
+                #expect(abs(actual - expected) < max(0.02, expected * 0.2))
+            }
         }
 
         @Test(.enabled(if: GoldenFrame.activeBackend != nil))

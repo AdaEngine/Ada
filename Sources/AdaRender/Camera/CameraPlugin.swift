@@ -89,6 +89,7 @@ public struct RenderViewTarget: @unchecked Sendable {
     public var pathTracingSurfaceActive = false
     /// This view's temporal upscaler can denoise a path-traced frame (DLSS Ray Reconstruction).
     public var rayReconstructionAvailable = false
+    public var rayReconstructionSpecularHitDistanceAvailable = false
 
     /// Resolved pixel-perfect settings for this frame. Nil when the camera is not pixel perfect or a feature that
     /// takes precedence (temporal upscaling, foveation) is active.
@@ -147,6 +148,7 @@ func ConfigurateRenderViewTarget(
         }
         renderViewTarget.temporalUpscalingActive = false
         renderViewTarget.rayReconstructionAvailable = false
+        renderViewTarget.rayReconstructionSpecularHitDistanceAvailable = false
         renderViewTarget.temporalJitter = .zero
         renderViewTarget.pixelPerfect = nil
         // A drawable belongs to this frame only, including frames we cannot render.

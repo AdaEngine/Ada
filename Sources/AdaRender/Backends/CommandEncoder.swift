@@ -334,6 +334,8 @@ public struct RenderResourceSet {
     public struct Binding {
         public enum Resource {
             case uniformBuffer(UniformBuffer, offset: Int)
+            /// A buffer declared as storage in the shader.
+            case storageBuffer(any Buffer)
             case texture(Texture)
             case sampler(Sampler)
             /// A top-level acceleration structure bound for ray queries.

@@ -114,6 +114,7 @@
             let hasCompletionHandlers = !completed.isEmpty || !timing.isEmpty
             let debugErrors = context.debugErrors
             let usesDirect3D12 = context.shaderOutput == .hlsl
+            let measuresVulkan = context.shaderOutput == .spirv && !timing.isEmpty
             let queue = context.queue
             #if os(Windows)
                 let retireOffQueue = hasCompletionHandlers && !debugErrors
@@ -124,28 +125,30 @@
             completedHandlers = []
             timingHandlers = []
             retainedResources = []
-            let finish: @Sendable (Bool) -> Void = { success in
+            let finish: @Sendable (Bool, Double?) -> Void = { success, seconds in
                 reportResult(success)
-                timing.forEach { $0(nil) }
+                timing.forEach { $0(seconds) }
                 completed.forEach { $0() }
                 withExtendedLifetime(resources) {}
             }
-            let notifyUnavailable: @Sendable () -> Void = { finish(false) }
+            let notifyUnavailable: @Sendable () -> Void = { finish(false, nil) }
             let unavailable = hasCompletionHandlers || !observers.isEmpty ? notifyUnavailable : nil
             queue.enqueue(onUnavailable: unavailable) { device in
                 var completedHere = true
                 var succeeded = false
+                var seconds: Double?
                 defer {
                     if completedHere {
                         if retireOffQueue {
                             let result = succeeded
-                            queue.enqueueRetirement { finish(result) }
+                            let duration = seconds
+                            queue.enqueueRetirement { finish(result, duration) }
                         } else {
-                            finish(succeeded)
+                            finish(succeeded, seconds)
                         }
                     }
                 }
-                let wait: @Sendable () async throws -> Void
+                let wait: @Sendable () async throws -> Double?
                 if builders.isEmpty {
                     guard hasCompletionHandlers || !observers.isEmpty else {
                         return
@@ -153,62 +156,85 @@
                     // Even an empty frame fence must retire after earlier device work.
                     if usesDirect3D12 {
                         let fence = try await device.submitCommands([])
-                        wait = { _ = try await fence.wait() }
+                        wait = {
+                            _ = try await fence.wait()
+                            return nil
+                        }
                     } else {
                         let fence = try await device.submitResourceUse([])
-                        wait = { try await fence.wait() }
+                        wait = {
+                            try await fence.wait()
+                            return nil
+                        }
                     }
                 } else {
+                    let submission = PerformanceStallProbe.begin()
+                    defer {
+                        if submission != nil { PerformanceStallProbe.end("SAGA.Submit.\(submissionLabel)", since: submission, count: builders.count) }
+                    }
                     let commands = try builders.map { try $0() }
+                    var capture = measuresVulkan ? await SAGAVulkanTiming.prepare(commands, on: device) : nil
+                    let submittedCommands = capture?.commands ?? commands
                     let ticket: CommandTicket
                     do {
                         #if SAGA_METAL_NATIVE_PASS
                         if !groupableDraws.isEmpty {
                             ticket = try await MetalIndexedDrawGrouping.$commands.withValue(groupableDraws) {
-                                try await device.submitCommands(commands)
+                                try await device.submitCommands(submittedCommands)
                             }
                         } else {
-                            ticket = try await device.submitCommands(commands)
+                            ticket = try await device.submitCommands(submittedCommands)
                         }
                         #else
-                        ticket = try await device.submitCommands(commands)
+                        ticket = try await device.submitCommands(submittedCommands)
                         #endif
                         if Self.tracesSubmission {
                             print("ADA-SAGA\t\(Date().timeIntervalSince1970)\t\(ticket.sequence)\t\(submissionLabel)")
                         }
+                    } catch GPUError.validation where capture != nil {
+                        // SAGA rejects invalid command lists before submission. Keep rendering if only profiling is unsupported.
+                        await capture?.release(on: device)
+                        capture = nil
+                        ticket = try await device.submitCommands(commands)
                     } catch {
+                        await capture?.release(on: device)
                         if debugErrors {
                             print("[SAGA] submit failed with \(error): \(commands.count) commands")
                             for command in commands.prefix(6) { print("[SAGA]   \(String(String(describing: command).prefix(700)))") }
                         }
                         throw error
                     }
-                    wait = { _ = try await ticket.wait() }
+                    let timing = capture
+                    wait = {
+                        if let timing {
+                            return try await timing.complete(ticket, on: device)
+                        }
+                        _ = try await ticket.wait()
+                        return nil
+                    }
                 }
 
                 if retireOffQueue {
                     completedHere = false
                     queue.enqueueRetirement {
                         do {
-                            try await wait()
-                            finish(true)
+                            finish(true, try await wait())
                         } catch {
-                            finish(false)
+                            finish(false, nil)
                             throw error
                         }
                     }
                 } else if hasCompletionHandlers || debugErrors || builders.isEmpty {
-                    try await wait()
+                    seconds = try await wait()
                     succeeded = true
                 } else if !resources.isEmpty || !observers.isEmpty {
                     // Observe retirement off the ordered bridge without delaying later submissions.
                     completedHere = false
                     Task {
                         do {
-                            try await wait()
-                            finish(true)
+                            finish(true, try await wait())
                         } catch {
-                            finish(false)
+                            finish(false, nil)
                         }
                     }
                 }
@@ -441,6 +467,8 @@
                 switch entry.resource {
                 case let .uniformBuffer(buffer, offset):
                     uniforms[slot] = binding(buffer, offset: offset)
+                case let .storageBuffer(buffer):
+                    uniforms[slot] = binding(buffer, offset: 0)
                 case let .texture(texture):
                     textures[slot] = texture.gpuTexture as? SAGAGPUTexture
                 case let .sampler(sampler):
