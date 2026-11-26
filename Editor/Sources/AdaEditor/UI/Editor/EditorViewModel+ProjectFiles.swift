@@ -310,7 +310,12 @@ extension EditorViewModel {
                     continue
                 }
                 do {
-                    sceneDocument.content = try String(contentsOf: changedURL, encoding: .utf8)
+                    let content = try String(contentsOf: changedURL, encoding: .utf8)
+                    // The watcher also reports Studio's own autosave.
+                    guard content != sceneDocument.content || sceneDocument.errorMessage != nil else {
+                        continue
+                    }
+                    sceneDocument.content = content
                     sceneDocument.lastSavedContent = sceneDocument.content
                     sceneDocument.isLoading = sceneDocument.content.utf8.count > 256 * 1024
                     sceneDocument.sceneModel = sceneDocument.isLoading ? nil : EditorSceneFileLoader.model(from: sceneDocument.content)

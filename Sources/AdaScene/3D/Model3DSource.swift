@@ -198,6 +198,10 @@ public struct Model3DSource: Codable, Equatable, Sendable {
             }
         }
         let root = model.instantiate(in: world)
+        var attached = false
+        defer {
+            if !attached { world.removeEntity(root, recursively: true) }
+        }
         if !libraries.isEmpty, let rig = model.animationRig {
             root.components[ModelAnimation3DComponent.self] = ModelAnimation3DComponent(player: try SkeletalAnimationPlayer(rig: rig, clips: clips))
         }
@@ -247,6 +251,7 @@ public struct Model3DSource: Codable, Equatable, Sendable {
             root.components[VoxelAnimationPlayback3DComponent.self] = voxelPlayback
         }
         owner.addChild(root)
+        attached = true
         if let lod {
             var pending = root.children
             while let node = pending.popLast() {

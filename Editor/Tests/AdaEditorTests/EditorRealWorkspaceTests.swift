@@ -256,6 +256,32 @@ struct EditorRealWorkspaceTests {
         #expect(try EditorSceneModel.decode(from: savedContent).entities.count == 2)
         #expect(viewModel.workbench.activeDocument?.isDirty == false)
 
+        let documentBeforeFileNotification = viewModel.workbench.activeSceneDocument
+        viewModel.reloadOpenProjectFile(relativePath: "Assets/Scenes/Main.ascn")
+        #expect(viewModel.workbench.activeSceneDocument == documentBeforeFileNotification)
+        let didUndo = viewModel.handleMenuCommand(.undo)
+        #expect(didUndo)
+        #expect(viewModel.workbench.activeSceneDocument?.sceneModel?.entities.count == 1)
+        let didSaveUndo = await waitForRealWorkspaceCondition {
+            viewModel.workbench.activeSceneDocument?.isDirty == false
+        }
+        #expect(didSaveUndo)
+        viewModel.reloadOpenProjectFile(relativePath: "Assets/Scenes/Main.ascn")
+        let didRedo = viewModel.handleMenuCommand(.redo)
+        #expect(didRedo)
+        #expect(viewModel.workbench.activeSceneDocument?.sceneModel?.entities.count == 2)
+        let didSaveRedo = await waitForRealWorkspaceCondition {
+            viewModel.workbench.activeSceneDocument?.isDirty == false
+        }
+        #expect(didSaveRedo)
+        let backup = sceneDirectory.appendingPathComponent("Main.scene-reload-fixture")
+        try FileManager.default.moveItem(at: sceneURL, to: backup)
+        viewModel.reloadOpenProjectFile(relativePath: "Assets/Scenes/Main.ascn")
+        #expect(viewModel.workbench.activeSceneDocument?.errorMessage != nil)
+        try FileManager.default.moveItem(at: backup, to: sceneURL)
+        viewModel.reloadOpenProjectFile(relativePath: "Assets/Scenes/Main.ascn")
+        #expect(viewModel.workbench.activeSceneDocument?.errorMessage == nil)
+
         guard case let .scene(savedDocument)? = viewModel.workbench.activeDocument else {
             Issue.record("Expected a scene document")
             return

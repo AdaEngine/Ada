@@ -16,18 +16,23 @@ public func ExtractLighting2D(
     _ lights: Extract<Query<Entity, Light2D, GlobalTransform, Visibility>>,
     _ modulateQuery: Extract<Query<Entity, LightModulate2D>>,
     _ occluders: Extract<Query<Entity, LightOccluder2D, GlobalTransform, Visibility>>,
+    _ hierarchy: Extract<Query<RelationshipComponent>>,
     _ extracted: ResMut<ExtractedLighting2D>
 ) {
+    _ = hierarchy.wrappedValue
     extracted.lights.removeAll(keepingCapacity: true)
     extracted.occluders.removeAll(keepingCapacity: true)
     extracted.modulate = .white
 
-    modulateQuery.wrappedValue.forEach { _, mod in
+    modulateQuery.wrappedValue.forEach { entity, mod in
+        guard (entity.components[Visibility.self] ?? .visible).isVisible(inHierarchyOf: entity) else {
+            return
+        }
         extracted.modulate = mod.color
     }
 
-    lights.wrappedValue.forEach { _, light, globalTransform, visibility in
-        guard light.isEnabled, visibility != .hidden else {
+    lights.wrappedValue.forEach { entity, light, globalTransform, visibility in
+        guard light.isEnabled, visibility.isVisible(inHierarchyOf: entity) else {
             return
         }
         let matrix = globalTransform.matrix
@@ -54,8 +59,8 @@ public func ExtractLighting2D(
         )
     }
 
-    occluders.wrappedValue.forEach { _, occluder, globalTransform, visibility in
-        guard occluder.isEnabled, visibility != .hidden, occluder.points.count >= 3 else {
+    occluders.wrappedValue.forEach { entity, occluder, globalTransform, visibility in
+        guard occluder.isEnabled, occluder.points.count >= 3, visibility.isVisible(inHierarchyOf: entity) else {
             return
         }
         let matrix = globalTransform.matrix

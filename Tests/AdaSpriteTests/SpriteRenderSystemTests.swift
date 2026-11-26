@@ -10,6 +10,49 @@ import Testing
 @MainActor
 @Suite("Sprite render system")
 struct SpriteRenderSystemTests {
+    @Test("Sprite extraction follows hierarchy visibility without replacing sprites")
+    func extractionFollowsHierarchyVisibility() async throws {
+        let scene = World()
+        let group = scene.spawn("Group")
+        let sprite = scene.spawn("Sprite") {
+            Sprite()
+            Transform()
+            GlobalTransform(matrix: .identity)
+            Visibility.visible
+        }
+        group.addChild(sprite)
+        scene.flush()
+
+        let render = World()
+        render.addSchedulers(.extract)
+        render.insertResource(MainWorld(world: scene))
+        render.insertResource(ExtractedSprites())
+        render.addSystem(ExtractSpriteSystem.self, on: .extract)
+
+        await render.runScheduler(.extract)
+        #expect(render.getResource(ExtractedSprites.self)?.sprites[sprite.id] != nil)
+
+        group.isActive = false
+        await render.runScheduler(.extract)
+        #expect(render.getResource(ExtractedSprites.self)?.sprites[sprite.id] == nil)
+
+        group.isActive = true
+        await render.runScheduler(.extract)
+        #expect(render.getResource(ExtractedSprites.self)?.sprites[sprite.id] != nil)
+
+        scene.insert(Visibility.hidden, for: sprite.id)
+        scene.flush()
+        #expect(scene.getEntityByID(sprite.id) === sprite)
+        await render.runScheduler(.extract)
+        #expect(render.getResource(ExtractedSprites.self)?.sprites[sprite.id] == nil)
+
+        scene.insert(Visibility.visible, for: sprite.id)
+        sprite.addChild(group)
+        scene.flush()
+        await render.runScheduler(.extract)
+        #expect(render.getResource(ExtractedSprites.self)?.sprites[sprite.id] == nil, "A cyclic hierarchy is not renderable")
+    }
+
     @Test("Graph material boundaries preserve sprite order and reuse compiled code")
     func graphMaterialsSplitBatchesAndSharePipelines() async throws {
         try Self.setupHeadlessRenderEngineIfNeeded()

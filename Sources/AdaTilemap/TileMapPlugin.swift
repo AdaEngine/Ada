@@ -45,6 +45,7 @@ struct ExtractTileMapSpritesSystem {
     @Extract<Query<Entity, TileMapComponent, GlobalTransform, Visibility>>
     private var tileMaps
 
+    @Extract<Query<RelationshipComponent>> private var hierarchy
     @Extract<Query<Entity, NoFrustumCulling>> private var unculled
 
     @ResMut<AdditionalExtractedSprites>
@@ -58,6 +59,7 @@ struct ExtractTileMapSpritesSystem {
     }
 
     func update(context _: UpdateContext) {
+        _ = hierarchy.wrappedValue
         extractedSprites.sprites.removeAll(keepingCapacity: true)
         extractedChunks.chunks.removeAll(keepingCapacity: true)
         var renderID = Int.min
@@ -65,7 +67,7 @@ struct ExtractTileMapSpritesSystem {
         unculled.wrappedValue.forEach { entity, _ in unculledIDs.insert(entity.id) }
 
         tileMaps.wrappedValue.forEach { entity, component, globalTransform, visibility in
-            if visibility == .hidden {
+            guard visibility.isVisible(inHierarchyOf: entity) else {
                 return
             }
 

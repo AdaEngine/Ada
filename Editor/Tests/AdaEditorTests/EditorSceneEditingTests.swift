@@ -722,10 +722,10 @@ struct EditorSceneEditingTests {
         }
     }
 
-    @Test("viewport reloads edited scene content without recreating camera")
+    @Test("viewport adds entities in place and retains the camera")
     @MainActor
-    func viewportReloadsSceneContentInAttachedWorld() throws {
-        var model = EditorSceneModel.default(projectName: "Reload")
+    func viewportEditsSceneContentInAttachedWorld() throws {
+        var model = EditorSceneModel.default(projectName: "Live edit")
         let initialContent = try model.encodedYAML()
         let world = World()
         let cameraEntity = world.spawn("SceneView_Camera") {
@@ -739,15 +739,18 @@ struct EditorSceneEditingTests {
         viewportModel.configure(sceneContent: initialContent, onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
         viewportModel.attachSceneWorld(world, loadResult: initialResult)
 
-        _ = model.addEntity(name: "Reloaded")
+        let rootID = try #require(model.rootEntityID)
+        let root = try #require(viewportModel.runtimeEntity(for: rootID))
+        let added = model.addEntity(name: "Added")
         let updatedContent = try model.encodedYAML()
-        let reloadResult = try #require(viewportModel.configure(sceneContent: updatedContent, onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in }))
+        viewportModel.configure(sceneContent: updatedContent, onSelectionChanged: { _ in }, onDocumentContentChanged: { _ in })
         let sceneEntities = world.getEntities().filter { $0.id != cameraEntity.id }
 
-        #expect(reloadResult.entityCount == model.entities.count)
         #expect(world.getEntityByID(cameraEntity.id) === cameraEntity)
+        #expect(viewportModel.runtimeEntity(for: rootID) === root)
         #expect(sceneEntities.count == model.entities.count)
-        #expect(sceneEntities.contains { $0.name == "Reloaded" })
+        #expect(viewportModel.runtimeEntity(for: added.id)?.parent === root)
+        #expect(sceneEntities.contains { $0.name == "Added" })
     }
 
     @Test("viewport mode animates projection before settling on the target render graph")

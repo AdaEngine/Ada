@@ -223,6 +223,7 @@ extension EditorSceneViewportModel {
         guard let model = sceneModel, let content = try? model.encodedYAML() else {
             return
         }
+        liveSceneEdits.noteAppliedChanges(in: model)
         sceneContent = content
         onDocumentContentChanged?(content)
     }

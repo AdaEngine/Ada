@@ -33,6 +33,8 @@ extension EditorComponentRegistry {
                 morphWeights: EditorMorphWeightsPayload.decode(payload["morphWeights"]),
                 animationLibraries: try payload["animationLibraries"].map { try JSONDecoder().decode([String].self, from: JSONEncoder().encode($0)) } ?? []
             )
+            source.lightmapSource = payload["lightmapSource"]?.stringValue ?? ""
+            source.lightmapIntensity = payload["lightmapIntensity"]?.doubleValue.map(Float.init) ?? 1
             if let path = payload["animationModifiers"]?.stringValue, !path.isEmpty { source.animationModifiers = path }
             if let bindings = payload["modifierBindings"], bindings != .null {
                 source.modifierBindings = try JSONDecoder().decode([String: AnimationIKBinding3D].self, from: JSONEncoder().encode(bindings))

@@ -44,16 +44,20 @@ package struct ExtractedParticleSprites: Resource {
 @PlainSystem
 struct ExtractParticleSpritesSystem {
     @Extract<Query<Entity, ParticleEmitter, GlobalTransform, Visibility>> private var emitters
+    @Extract<Query<RelationshipComponent>> private var hierarchy
     @ResMut<ExtractedParticleSprites> private var extracted
 
     init(world _: World) {}
 
     func update(context _: UpdateContext) {
+        _ = hierarchy.wrappedValue
         extracted.sprites.removeAll(keepingCapacity: true)
         // Entities use positive IDs; tilemap render IDs start at Int.min / Int.min/2.
         var renderID = -1
         emitters.wrappedValue.forEach { entity, emitter, transform, visibility in
-            guard visibility != .hidden, let effect = emitter.effect?.asset else { return }
+            guard visibility.isVisible(inHierarchyOf: entity), let effect = emitter.effect?.asset else {
+                return
+            }
             emitter.simulation?.forEachParticle(transform: transform.matrix) { sample in
                 let texture = effect.textures.indices.contains(sample.emitterIndex) ? effect.textures[sample.emitterIndex]?.asset : nil
                 extracted.sprites[renderID] = ExtractedSprite(

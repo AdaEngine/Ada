@@ -6,35 +6,66 @@ extension EditorWorkbenchViewModel {
         guard let achievements, let path = scene.absolutePath, let model = scene.sceneModel else {
             return
         }
-        var values: [EditorAchievementID: Int] = [:]
         let changed = previousContent != scene.content
-        // Selection autosaves keep identical entity bytes; they need no achievement diff or full scene decode.
-        if changed, previousContent.map({ EditorSceneModel.onlyEditorStateChanged(from: $0, to: scene.content) }) != true {
-            let previous = previousContent.flatMap { try? EditorSceneModel.decode(from: $0) }
-            values = EditorAchievementRules.savedScene(
+        let redone = achievementRedos.remove(scene.id) != nil
+        let scriptEdited = achievementScriptEdits.remove(scene.id) != nil && achievementAdaScriptProject
+        guard changed else {
+            achievements.record(redone ? [.redo: 1] : [:])
+            return
+        }
+        let previous = previousContent.flatMap { content in
+            let undo = sceneUndoHistory[scene.id]?.last { $0.content == content }?.sceneModel
+            return undo ?? sceneRedoHistory[scene.id]?.last { $0.content == content }?.sceneModel
+        }
+        let root = achievementResourceRoot
+        let date = Date()
+        let profileID = achievements.profileID
+        Task { [weak achievements] in
+            let values = await Self.savedSceneAchievementValues(
                 model,
+                content: scene.content,
                 previous: previous,
+                previousContent: previousContent,
+                scriptEdited: scriptEdited,
                 source: URL(fileURLWithPath: path),
-                resourceRoot: achievementResourceRoot
+                root: root
             )
-            if achievementAdaScriptProject, achievementScriptEdits.contains(scene.id),
-                model.entities.contains(where: { entity in
-                    guard
-                        let old = previous?.entities.first(where: { $0.id == entity.id }),
-                        let scripts = entity.components[EditorBuiltInComponentType.scriptableComponents]
-                    else {
-                        return false
-                    }
-                    return scripts != old.components[EditorBuiltInComponentType.scriptableComponents]
-                }) {
+            guard let achievements, achievements.profileID == profileID else {
+                return
+            }
+            achievements.record(values, date: date)
+        }
+        achievements.record(redone ? [.redo: 1] : [:], date: date, activeDay: true)
+    }
+
+    @concurrent
+    nonisolated private static func savedSceneAchievementValues(
+        _ model: EditorSceneModel,
+        content: String,
+        previous: EditorSceneModel?,
+        previousContent: String?,
+        scriptEdited: Bool,
+        source: URL,
+        root: URL?
+    ) async -> [EditorAchievementID: Int] {
+        guard previousContent.map({ EditorSceneModel.onlyEditorStateChanged(from: $0, to: content) }) != true else {
+            return [:]
+        }
+        let previous = previous ?? previousContent.flatMap { try? EditorSceneModel.decode(from: $0) }
+        var values = EditorAchievementRules.savedScene(model, previous: previous, source: source, resourceRoot: root)
+        if scriptEdited, let previous {
+            let key = EditorBuiltInComponentType.scriptableComponents
+            let previousEntities = Dictionary(previous.entities.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            if model.entities.contains(where: { entity in
+                guard let old = previousEntities[entity.id], let scripts = entity.components[key] else {
+                    return false
+                }
+                return scripts != old.components[key]
+            }) {
                 values[.scriptField] = 1
             }
         }
-        if achievementRedos.remove(scene.id) != nil {
-            values[.redo] = 1
-        }
-        achievementScriptEdits.remove(scene.id)
-        achievements.record(values, activeDay: changed)
+        return values
     }
 
     func recordAchievementSave(text: EditorTextDocument, previousContent: String?) {

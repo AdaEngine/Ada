@@ -421,9 +421,12 @@ final class EditorVRWorkspace {
             }
             _ = self.viewport.configure(
                 sceneContent: document.content,
+                model: document.sceneModel,
                 sourceURL: document.absolutePath.map { URL(fileURLWithPath: $0) },
                 resourceRootURL: self.resourceRootURL,
                 scriptableObjectCatalog: self.inspector.scriptableObjectCatalog,
+                isHistoryChange: document.statusMessage == "Undo" || document.statusMessage == "Redo",
+                replacesDocument: document.statusMessage == "Reloaded",
                 onSelectionChanged: { [weak self] in self?.inspector.selectEntity($0) },
                 onDocumentContentChanged: { [weak self] in self?.publishContent($0) },
                 onTransformChanged: { [weak self] id, payload in self?.inspector.updateLiveTransform(editorID: id, payload: payload) }

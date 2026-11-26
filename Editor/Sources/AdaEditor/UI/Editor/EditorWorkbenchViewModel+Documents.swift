@@ -542,17 +542,18 @@ extension EditorWorkbenchViewModel {
                 document.statusMessage = "Edit blocked: file is read-only"
                 return
             }
-            guard var model = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content) else {
+            guard let previous = document.sceneModel ?? EditorSceneFileLoader.model(from: document.content) else {
                 document.statusMessage = "Scene model unavailable"
                 return
             }
 
+            var model = previous
             update(&model)
 
             do {
+                document.content = try model.encodedYAML(updatingEntitiesFrom: previous, in: document.content)
                 document.sceneModel = model
-                document.content = try model.encodedYAML()
-                document.loadSummary = EditorSceneFileLoader.summary(from: document.content)
+                document.loadSummary = EditorSceneLoadSummary(entityCount: model.entities.count, warnings: [])
                 document.isDirty = true
                 document.statusMessage = status
                 document.errorMessage = nil

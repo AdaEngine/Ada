@@ -33,6 +33,7 @@ extension EditorSceneViewportModel {
                 try await EditorMeshTerrainHistory.apply(plan, candidate: asset, file: file, owner: owner, roots: roots,
                     application: context.application, isCurrent: isCurrent)
                 if let self, isCurrent() {
+                    self.liveSceneEdits.noteAppliedChanges(in: next)
                     self.refreshTerrainSourceControls()
                     if let model = self.sceneModel { self.onSelectionChanged?(self.selectedEntityViewModel(editorID: self.selectedEditorID, model: model)) }
                 }

@@ -33,6 +33,27 @@ public enum Visibility: Codable, Sendable, DefaultValue {
     case inherited
 
     public static let defaultValue: Self = .visible
+
+    package func isVisible(inHierarchyOf entity: Entity) -> Bool {
+        guard self != .hidden, entity.isActive else {
+            return false
+        }
+        var ancestor = entity.parent
+        var slow = entity
+        var advanceSlow = false
+        while let parent = ancestor {
+            guard parent !== slow, parent.isActive, parent.components[Self.self] != .hidden else {
+                return false
+            }
+            ancestor = parent.parent
+            // Malformed authored relationships can contain an indirect cycle.
+            if advanceSlow, let next = slow.parent {
+                slow = next
+            }
+            advanceSlow.toggle()
+        }
+        return true
+    }
 }
 
 /// This components indicates that entity will not affected by frustum culling.
