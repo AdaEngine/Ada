@@ -1,5 +1,30 @@
 # Studio tools with .ui panels
 
+## Install a packaged plugin
+
+Open **Project Settings → Studio Tools → Install Plugin ZIP**, select the downloaded ZIP,
+and review access before enabling the plugin. Supported packages contain a root
+`plugin.json` manifest and an AdaScript `@tool` declaration for the same ID.
+The package may include AdaScript sources and `.ui` files at its root.
+See the [External Asset Library walkthrough](EditorGuide.md#asset-store).
+
+### Offer read-only actions to Ada AI
+
+A version 1 manifest can declare `actions`. Each action has a unique ID, localized title,
+`read` effect and implementation binding. The studio-defined `assetSearch` intent has a
+fixed schema. A custom `tool` action declares its input and output JSON object schemas
+with `additionalProperties` set to `false`. Studio validates both the request and the result.
+Tools that accept an asset reference declare its input field with `assetReferenceInput`.
+Studio resolves only references issued to that plugin during the current Ada AI turn.
+
+Copy the [AI Example](Examples/StudioTools/AIExample) folder into the project's `Tools/`
+directory, enable the plugin and turn on **Allow Ada AI to use this plugin**.
+With a compatible Ada AI connection, ask it to run the example status tool. The tool
+returns a structured object containing a `status` property with value `ready`.
+The AdaScript binding is synchronous. It receives a validated JSON string and returns a JSON
+object string. It runs in a fresh restricted runtime without the editor context.
+See [Ada AI permissions](CloudAI.md#studio-plugin-intents-and-tools).
+
 Studio APIs 1 and 2 support project-local AdaScript tools with a `.ui` panel in the
 native macOS/Windows workspace's right sidebar. Declare the desired hosts in `platforms`.
 API 2 adds [animation authoring jobs](AnimationAuthoring.md) through the shared

@@ -32,6 +32,10 @@ struct EditorStudioToolsSidebar: View {
                 Button(L10n.text("Review Tool Access")) { host.reviewAvailableTools() }
                     .accessibilityIdentifier("studio.tools.review-access")
             }
+            if host.externalAssets != nil {
+                Button(L10n.text("Open External Asset Library")) { host.showsExternalAssets = true }
+                    .accessibilityIdentifier("studio.external-assets.open")
+            }
             if let panel = host.selectedPanel {
                 if host.panels.count > 1 {
                     ScrollView(.horizontal) {
@@ -50,7 +54,7 @@ struct EditorStudioToolsSidebar: View {
                 UISceneView(session: panel.session)
                     .id(panel.id)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            } else {
+            } else if host.externalAssets == nil {
                 Text(host.definitions.isEmpty ? L10n.text("Add a .ada tool and its .ui under Tools/ in this project.") : L10n.text("Tool access is managed in Project Settings."))
                     .font(.system(size: 12)).foregroundColor(theme.editorColors.muted)
                 Spacer()

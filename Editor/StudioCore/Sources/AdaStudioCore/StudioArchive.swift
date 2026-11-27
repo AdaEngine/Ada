@@ -57,6 +57,7 @@ public enum StudioArchive {
         maximumBytes: Int,
         maximumFileBytes: Int,
         maximumFiles: Int,
+        regularFilesOnly: Bool = false,
         permits: (String) -> Bool
     ) throws -> [StudioFile] {
         guard maximumBytes > 0, maximumBytes <= 128 * 1024 * 1024, maximumFileBytes > 0, maximumFileBytes <= maximumBytes,
@@ -88,6 +89,11 @@ public enum StudioArchive {
             let flags = archive.read16(cursor + 8)
             let method = archive.read16(cursor + 10)
             let crc = archive.read32(cursor + 16)
+            let attributes = archive.read32(cursor + 38)
+            let fileType = (attributes >> 16) & 0o170000
+            if regularFilesOnly, (attributes & 0x10 != 0 || (fileType != 0 && fileType != 0o100000)) {
+                throw StudioError.invalid("Недопустимый тип файла ZIP.")
+            }
             guard let compressed = Int(exactly: archive.read32(cursor + 20)), let size = Int(exactly: archive.read32(cursor + 24)),
                 let local = Int(exactly: archive.read32(cursor + 42)), compressed <= archive.count, local <= start
             else {

@@ -1,5 +1,6 @@
 import AdaEngine
 import AdaScriptCompilerCore
+import Crypto
 import Foundation
 import Observation
 
@@ -13,6 +14,10 @@ final class EditorStudioToolHost {
     var error: String?
     private(set) var permissionRequest: EditorStudioToolPermissionRequest?
     private(set) var enabledIDs: Set<String> = []
+    private(set) var pluginAIIDs: Set<String> = []
+    private(set) var externalAssets: EditorExternalAssetLibrary?
+    var showsExternalAssets = false
+    private(set) var projectGeneration = UUID()
     @ObservationIgnored private var signatures: [String: String] = [:]
     @ObservationIgnored private var uiSignatures: [String: String] = [:]
     @ObservationIgnored private var runtimes: [String: AdaScriptToolRuntime] = [:]
@@ -23,6 +28,7 @@ final class EditorStudioToolHost {
     @ObservationIgnored private var actionTask: Task<Void, Never>?
     @ObservationIgnored private var animationTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var animationQueues: [String: [AdaScriptAnimationToolJob]] = [:]
+    @ObservationIgnored private var pluginGrants: [String: UUID] = [:]
     @ObservationIgnored private let animationExecutor: AnimationExecutor
 
     init(defaults: UserDefaults = .standard, animationExecutor: @escaping AnimationExecutor = { request, workbench in
@@ -40,15 +46,18 @@ final class EditorStudioToolHost {
         guard self.projectURL != projectURL.resolvingSymlinksInPath().standardizedFileURL || self.editor !== editor else {
             return
         }
+        close()
         self.projectURL = projectURL.resolvingSymlinksInPath().standardizedFileURL
         self.editor = editor
         reload()
     }
 
     func close() {
+        projectGeneration = UUID()
         reloadTask?.cancel()
         actionTask?.cancel()
-        for id in Array(runtimes.keys) { retire(id) }
+        for id in enabledIDs { retire(id) }
+        definitions = []
         editor = nil
         projectURL = nil
         permissionRequest = nil
@@ -76,7 +85,7 @@ final class EditorStudioToolHost {
             let overrides = sourceOverrides()
             let candidates = try EditorStudioToolDiscovery.discover(at: projectURL, overrides: overrides)
             definitions = candidates
-            for id in Array(runtimes.keys) where !candidates.contains(where: { $0.schema.id == id }) { retire(id) }
+            for id in enabledIDs where !candidates.contains(where: { $0.schema.id == id }) { retire(id) }
             let approvals = defaults.dictionary(forKey: preferenceKey) as? [String: String] ?? [:]
             error = nil
             for candidate in candidates {
@@ -88,14 +97,28 @@ final class EditorStudioToolHost {
                 do {
                     try install(candidate, projectURL: projectURL, overrides: overrides)
                     enabledIDs.insert(id)
+                    if candidate.manifest != nil, defaults.string(forKey: pluginAIKey(id)) == pluginRevision(candidate) {
+                        pluginAIIDs.insert(id)
+                        if pluginGrants[id] == nil { pluginGrants[id] = UUID() }
+                    } else {
+                        pluginAIIDs.remove(id)
+                        pluginGrants[id] = nil
+                    }
                 } catch { self.error = "\(candidate.schema.name): \(error.localizedDescription) Previous working version retained." }
             }
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            for candidate in definitions where candidate.manifest != nil { retire(candidate.schema.id) }
+            self.error = error.localizedDescription
+        }
     }
 
     private func install(_ definition: EditorStudioToolDefinition, projectURL: URL, overrides: [String: String]) throws {
         if let reason = unavailabilityReason(definition) { throw EditorStudioToolDiscovery.Failure(reason) }
         let id = definition.schema.id
+        if definition.manifest?.view == .externalAssets {
+            if externalAssets == nil { externalAssets = EditorExternalAssetLibrary(project: projectURL) }
+            return
+        }
         let keepsRuntime = signatures[id] == definition.signature && runtimes[id]?.isFailed == false
         let uiSignature = try resourceSignature(definition, projectURL: projectURL, overrides: overrides) + "|" + String(describing: editor?.workbench.uiCatalog.generation)
         if keepsRuntime, uiSignatures[id] == uiSignature {
@@ -106,7 +129,8 @@ final class EditorStudioToolHost {
             runtime = previous
         } else {
             runtime = try AdaScriptToolRuntime(sources: definition.sources, schema: definition.schema, grantedPermissions: definition.schema.permissions)
-            try runtime.activate()
+            try runtime.activate(requirePanel: definition.manifest == nil)
+            for action in definition.manifest?.actions ?? [] { try runtime.validateAction(action.binding) }
         }
         do {
             let mounted = try runtime.panels.map { contribution in
@@ -149,6 +173,12 @@ final class EditorStudioToolHost {
         signatures[id] = nil
         uiSignatures[id] = nil
         enabledIDs.remove(id)
+        pluginAIIDs.remove(id)
+        pluginGrants[id] = nil
+        if id == EditorStudioPluginManifest.assetLibraryID {
+            showsExternalAssets = false
+            externalAssets = nil
+        }
         if !panels.contains(where: { $0.id == selectedPanelID }) { selectedPanelID = panels.first?.id }
     }
 
@@ -263,11 +293,17 @@ final class EditorStudioToolHost {
 
     private func enqueueAnimationJobs(toolID: String, runtime: AdaScriptToolRuntime) {
         let jobs = runtime.takeAnimationJobs()
-        guard !jobs.isEmpty else { return }
+        guard !jobs.isEmpty else {
+            return
+        }
         animationQueues[toolID, default: []].append(contentsOf: jobs)
-        guard animationTasks[toolID] == nil else { return }
+        guard animationTasks[toolID] == nil else {
+            return
+        }
         animationTasks[toolID] = Task { [weak self, weak runtime] in
-            guard let self, let runtime else { return }
+            guard let self, let runtime else {
+                return
+            }
             defer {
                 if self.runtimes[toolID] === runtime {
                     self.animationTasks.removeValue(forKey: toolID)
@@ -283,17 +319,25 @@ final class EditorStudioToolHost {
                 do {
                     let payload = try await self.animationExecutor(job.request, editor.workbench)
                     try Task.checkCancellation()
-                    guard self.runtimes[toolID] === runtime else { return }
+                    guard self.runtimes[toolID] === runtime else {
+                        return
+                    }
                     envelope = ["status": "completed", "result": payload]
-                } catch is CancellationError { return }
-                catch { envelope = ["status": "failed", "error": String(error.localizedDescription.prefix(4_096))] }
-                guard !Task.isCancelled, self.runtimes[toolID] === runtime else { return }
+                } catch is CancellationError { return } catch { envelope = ["status": "failed", "error": String(error.localizedDescription.prefix(4_096))] }
+                guard !Task.isCancelled, self.runtimes[toolID] === runtime else {
+                    return
+                }
                 do {
                     let data = try EditorAnimationAuthoringService.responseData(envelope)
-                    try runtime.completeAnimationJob(job.id, responseJSON: String(decoding: data, as: UTF8.self))
+                    guard let json = String(bytes: data, encoding: .utf8) else {
+                        throw CocoaError(.fileReadInapplicableStringEncoding)
+                    }
+                    try runtime.completeAnimationJob(job.id, responseJSON: json)
                 } catch {
                     let data = try? JSONSerialization.data(withJSONObject: ["status": "failed", "error": error.localizedDescription])
-                    if let data { try? runtime.completeAnimationJob(job.id, responseJSON: String(decoding: data, as: UTF8.self)) }
+                    if let data, let json = String(bytes: data, encoding: .utf8) {
+                        try? runtime.completeAnimationJob(job.id, responseJSON: json)
+                    }
                 }
             }
         }
@@ -403,12 +447,83 @@ extension EditorStudioToolHost {
         var approvals = defaults.dictionary(forKey: preferenceKey) as? [String: String] ?? [:]
         approvals[definition.schema.id] = "denied:" + approvalIdentity(definition)
         defaults.set(approvals, forKey: preferenceKey)
+        defaults.removeObject(forKey: pluginAIKey(definition.schema.id))
     }
 
     private func approvalIdentity(_ definition: EditorStudioToolDefinition) -> String {
         let schema = definition.schema
-        return "consent-v1|" + definition.directory.path + "/" + schema.sourcePath + "|" + String(schema.apiVersion) + "|"
+        let identity = "consent-v1|" + definition.directory.path + "/" + schema.sourcePath + "|" + String(schema.apiVersion) + "|"
             + schema.permissions.map(\.rawValue).sorted().joined(separator: ",") + "|"
             + schema.platforms.map(\.rawValue).sorted().joined(separator: ",")
+        return definition.manifest == nil ? identity : identity + "|" + pluginRevision(definition)
+    }
+}
+
+extension EditorStudioToolHost {
+    func installPlugin(_ archive: URL, generation: UUID) {
+        guard let projectURL, projectGeneration == generation else {
+            return
+        }
+        do {
+            _ = try EditorStudioPluginInstaller.install(archive, in: projectURL)
+            reload()
+        } catch { self.error = error.localizedDescription }
+    }
+
+    func uninstallPlugin(_ definition: EditorStudioToolDefinition) {
+        guard let projectURL else {
+            return
+        }
+        do {
+            try EditorStudioPluginInstaller.uninstall(definition, in: projectURL)
+            disable(definition.schema.id)
+            reload()
+        } catch {
+            reload()
+            self.error = error.localizedDescription
+        }
+    }
+
+    func setPluginAI(_ id: String, allowed: Bool) {
+        guard enabledIDs.contains(id), let definition = definitions.first(where: { $0.schema.id == id }),
+              definition.manifest?.actions.isEmpty == false else { return }
+        if allowed {
+            guard pluginDefinitionIsCurrent(definition) else {
+                return
+            }
+            defaults.set(pluginRevision(definition), forKey: pluginAIKey(id))
+            pluginAIIDs.insert(id)
+            if pluginGrants[id] == nil { pluginGrants[id] = UUID() }
+        } else {
+            pluginAIIDs.remove(id)
+            pluginGrants[id] = nil
+            defaults.removeObject(forKey: pluginAIKey(id))
+        }
+    }
+
+    func pluginDefinitionIsCurrent(_ definition: EditorStudioToolDefinition) -> Bool {
+        guard let projectURL, enabledIDs.contains(definition.schema.id),
+              let latest = try? EditorStudioToolDiscovery.discover(at: projectURL, overrides: sourceOverrides())
+                .first(where: { $0.schema.id == definition.schema.id }) else { return false }
+        return latest.signature == definition.signature
+    }
+
+    func pluginGrant(id: String) -> UUID? { pluginGrants[id] }
+
+    var externalAssetDestination: URL? { editor?.projectAssetsURL }
+
+    func finishExternalAssetImport() throws {
+        guard let editor, let projectURL else {
+            return
+        }
+        try editor.ensureAssetResourcesInManifest(projectURL: projectURL)
+        editor.refreshProjectFiles(logsRefresh: false)
+        editor.refreshSourceControl()
+    }
+
+    private func pluginAIKey(_ id: String) -> String { preferenceKey + ".ai." + id }
+
+    private func pluginRevision(_ definition: EditorStudioToolDefinition) -> String {
+        SHA256.hash(data: Data(definition.signature.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 }

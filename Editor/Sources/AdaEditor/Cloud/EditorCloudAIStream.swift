@@ -5,6 +5,7 @@ typealias EditorCloudAITransport = @Sendable (EditorCloudValue, @escaping @Senda
 struct EditorCloudAIConnection: Sendable {
     let toolContract: Int64?
     var supportsExternalTools = false
+    var supportsStudioPluginTools = false
     let generate: EditorCloudAITransport
 }
 
@@ -13,7 +14,9 @@ struct EditorCloudAIStream {
     private(set) var complete = false
     mutating func event(line: String) throws -> EditorCloudValue? {
         guard line.utf8.count <= 2 * 1024 * 1024 else { throw EditorAIError.invalidResponse }
-        guard line.hasPrefix("data:") else { return nil }
+        guard line.hasPrefix("data:") else {
+            return nil
+        }
         guard !complete else { throw EditorAIError.invalidResponse }
         let data = Data(line.dropFirst(5).trimmingCharacters(in: .whitespaces).utf8)
         let event = try JSONDecoder().decode(EditorCloudValue.self, from: data)

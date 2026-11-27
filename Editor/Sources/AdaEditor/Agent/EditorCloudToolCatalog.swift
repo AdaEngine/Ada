@@ -3,6 +3,7 @@ import Foundation
 struct EditorCloudToolCatalog: Decodable, Sendable {
     static let currentVersion = 2
     static let externalVersion = 3
+    static let pluginVersion = 4
 
     enum Host: String, Sendable {
         case desktop, mobile
@@ -36,6 +37,9 @@ struct EditorCloudToolCatalog: Decodable, Sendable {
         let arguments: [String: EditorCloudValue]
 
         var target: String? {
+            if key.hasPrefix("editor_plugins/") {
+                return arguments["id"]?.string
+            }
             if key == "editor_external/invoke", let tool = arguments["tool"]?.string {
                 let input = arguments["input"]
                 return [tool, input?["name"].string, input?["scene"].string, input?["destination"].string, input?["job"].string]
@@ -194,12 +198,15 @@ struct EditorCloudToolCatalog: Decodable, Sendable {
         return catalog
     }
 
-    static func load(version: Int = currentVersion, hasExternalTools: Bool = false) throws -> Self {
+    static func load(version: Int = currentVersion, hasExternalTools: Bool = false, hasStudioPluginTools: Bool = false) throws -> Self {
         let base = try read("AdaAIToolContract", version: currentVersion)
-        guard version == externalVersion else { return base }
-        guard hasExternalTools else { return Self(version: externalVersion, families: base.families) }
-        let addition = try read("AdaAIExternalToolContract", version: externalVersion)
-        return Self(version: externalVersion, families: base.families + addition.families)
+        guard [externalVersion, pluginVersion].contains(version) else {
+            return base
+        }
+        var families = base.families
+        if hasExternalTools { families += try read("AdaAIExternalToolContract", version: externalVersion).families }
+        if version == pluginVersion, hasStudioPluginTools { families += try read("AdaAIStudioPluginContract", version: pluginVersion).families }
+        return Self(version: version, families: families)
     }
 
     func selection(host: Host, planning: Bool) -> Selection {

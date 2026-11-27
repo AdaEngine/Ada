@@ -79,7 +79,8 @@ struct EditorDocumentWorkbench: View {
                     viewModel.openProjectItem(item)
                 },
                 annotationAgent: viewModel.agent,
-                onAnnotationAdded: viewModel.presentAgentForAnnotation
+                onAnnotationAdded: viewModel.presentAgentForAnnotation,
+                studioTools: viewModel.studioTools
             )
             .frame(maxHeight: .infinity)
             .allowsHitTesting(!viewModel.performance.isExpanded)

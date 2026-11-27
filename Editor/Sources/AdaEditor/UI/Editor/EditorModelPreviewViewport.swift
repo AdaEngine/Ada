@@ -37,7 +37,9 @@ final class EditorModelPreviewCamera {
     }
 
     func setViewportSize(_ size: Size) {
-        guard size.width > 0, size.height > 0, size != viewportSize else { return }
+        guard size.width > 0, size.height > 0, size != viewportSize else {
+            return
+        }
         viewportSize = size
         applyCamera()
     }
@@ -79,7 +81,9 @@ final class EditorModelPreviewCamera {
     }
 
     func frameSelection(_ points: [Vector3]) {
-        guard let first = points.first else { return }
+        guard let first = points.first else {
+            return
+        }
         var lower = first
         var upper = first
         for point in points {
@@ -94,20 +98,32 @@ final class EditorModelPreviewCamera {
 
     func project(_ position: Vector3) -> Vector2? {
         let clip = makeProjection().cameraProjection.makeClipView() * cameraTransform().matrix.inverse * Vector4(position, 1)
-        guard clip.w > 0.000001, clip.z / clip.w >= 0, clip.z / clip.w <= 1 else { return nil }
+        guard clip.w > 0.000001, clip.z / clip.w >= 0, clip.z / clip.w <= 1 else {
+            return nil
+        }
         return Vector2((clip.x / clip.w + 1) * viewportSize.width * 0.5, (1 - clip.y / clip.w) * viewportSize.height * 0.5)
     }
 
     /// Projects the pointer onto a camera-facing plane through a world-space handle.
     func unproject(_ point: Point, atDepthOf position: Vector3) -> Vector3? {
-        guard viewportSize.width > 0, viewportSize.height > 0 else { return nil }
+        guard viewportSize.width > 0, viewportSize.height > 0 else {
+            return nil
+        }
         let matrix = makeProjection().cameraProjection.makeClipView() * cameraTransform().matrix.inverse
         let depth = matrix * Vector4(position, 1)
-        guard depth.w > 1e-6 else { return nil }
-        let clip = Vector4((point.x / viewportSize.width * 2 - 1) * depth.w,
-                           (1 - point.y / viewportSize.height * 2) * depth.w, depth.z, depth.w)
+        guard depth.w > 1e-6 else {
+            return nil
+        }
+        let clip = Vector4(
+            (point.x / viewportSize.width * 2 - 1) * depth.w,
+            (1 - point.y / viewportSize.height * 2) * depth.w,
+            depth.z,
+            depth.w
+        )
         let world = matrix.inverse * clip
-        guard world.w.isFinite, abs(world.w) > 1e-6 else { return nil }
+        guard world.w.isFinite, abs(world.w) > 1e-6 else {
+            return nil
+        }
         let value = world.xyz / world.w
         return value.x.isFinite && value.y.isFinite && value.z.isFinite ? value : nil
     }
@@ -115,11 +131,19 @@ final class EditorModelPreviewCamera {
     private func makeProjection() -> Projection {
         if isOrthographic {
             let height = 2 * distance * Math.tanf(Self.fieldOfView.radians * 0.5)
-            return .orthographic(.init(near: 0.01, far: max(100, distance + halfExtents.length * 4),
-                                      scale: max(0.1, viewportSize.height / max(0.01, height)), viewportSize: viewportSize))
+            return .orthographic(.init(
+                near: 0.01,
+                far: max(100, distance + halfExtents.length * 4),
+                scale: max(0.1, viewportSize.height / max(0.01, height)),
+                viewportSize: viewportSize
+            ))
         }
-        return .perspective(.init(near: 0.01, far: max(100, cameraTransform().position.length + halfExtents.length * 4),
-                                  fieldOfView: Self.fieldOfView, aspectRation: max(0.1, viewportSize.width / max(1, viewportSize.height))))
+        return .perspective(.init(
+            near: 0.01,
+            far: max(100, cameraTransform().position.length + halfExtents.length * 4),
+            fieldOfView: Self.fieldOfView,
+            aspectRation: max(0.1, viewportSize.width / max(1, viewportSize.height))
+        ))
     }
 
     func orbit(by delta: Point) {
@@ -165,7 +189,9 @@ final class EditorModelPreviewCamera {
                         }
                     }
                 case .changed:
-                    guard activeButton == mouse.button, let previousPointer else { return }
+                    guard activeButton == mouse.button, let previousPointer else {
+                        return
+                    }
                     let delta = mouse.motionDelta.map { Point($0.x, $0.y) } ?? (mouse.mousePosition - previousPointer)
                     if mouse.button == .middle || (mouse.button == .left && mouse.modifierKeys.contains(.shift)) {
                         pan(by: delta)
@@ -179,9 +205,7 @@ final class EditorModelPreviewCamera {
                 }
             }
         } else if let key = event as? KeyEvent {
-            if key.status == .up { pressedKeys.remove(key.keyCode) }
-            else if key.keyCode == .escape { endNavigation() }
-            else if activeButton == .right { pressedKeys.insert(key.keyCode) }
+            if key.status == .up { pressedKeys.remove(key.keyCode) } else if key.keyCode == .escape { endNavigation() } else if activeButton == .right { pressedKeys.insert(key.keyCode) }
         } else if let touch = event as? TouchEvent {
             switch touch.phase {
             case .began: previousPointer = touch.location
@@ -202,7 +226,9 @@ final class EditorModelPreviewCamera {
 
     func update(deltaTime: Float = 0) {
         if cameraID == nil { applyCamera() }
-        guard activeButton == .right, deltaTime.isFinite, deltaTime > 0 else { return }
+        guard activeButton == .right, deltaTime.isFinite, deltaTime > 0 else {
+            return
+        }
         let basis = cameraTransform().matrix
         var movement = Vector3.zero
         if pressedKeys.contains(.w) { movement += basis[2].xyz }
@@ -211,18 +237,24 @@ final class EditorModelPreviewCamera {
         if pressedKeys.contains(.a) { movement -= basis[0].xyz }
         if pressedKeys.contains(.e) { movement += .up }
         if pressedKeys.contains(.q) { movement -= .up }
-        guard movement.squaredLength > 0 else { return }
+        guard movement.squaredLength > 0 else {
+            return
+        }
         let speed = max(distance, halfExtents.length * 0.5) * (pressedKeys.contains(.shift) ? 4 : 1)
         target += movement.normalized * speed * min(deltaTime, 0.1)
         applyCamera()
     }
 
     private func applyCamera() {
-        guard let world else { return }
+        guard let world else {
+            return
+        }
         if cameraID == nil {
             cameraID = world.getEntities().first { $0.name == "SceneView_Camera" && $0.components[Camera.self] != nil }?.id
         }
-        guard let cameraID, let entity = world.getEntityByID(cameraID), var camera = entity.components[Camera.self] else { return }
+        guard let cameraID, let entity = world.getEntityByID(cameraID), var camera = entity.components[Camera.self] else {
+            return
+        }
         camera.projection = makeProjection()
         camera.backgroundColor = Color.fromHex(backgroundStyle == "light" ? 0xD9DDE2 : backgroundStyle == "gray" ? 0x62656B : 0x24282F)
         entity.components[Camera.self] = camera
@@ -245,6 +277,8 @@ final class EditorModelPreviewCamera {
 struct EditorModelPreviewViewport: View {
     let model: EditorModelAssetPreviewModel
     let camera: EditorModelPreviewCamera
+    var isInteractive = true
+    var onFrameRendered: (@MainActor (Texture2D) -> Void)?
     @Environment(\.theme) private var theme
 
     static func configure(_ app: AppWorlds, model: EditorModelAssetPreviewModel, camera: EditorModelPreviewCamera) {
@@ -259,7 +293,9 @@ struct EditorModelPreviewViewport: View {
             .addPlugin(Core3DPlugin())
             .addPlugin(UpscalePlugin())
         app.addPlugin(EditorSkeleton3DPlugin())
-        guard let asset = model.asset else { return }
+        guard let asset = model.asset else {
+            return
+        }
         let root = asset.instantiate(in: app.main)
         root.components[Transform.self] = model.normalizationTransform
         let lights = app.main.spawn("Preview lighting") { Transform() }
@@ -284,6 +320,7 @@ struct EditorModelPreviewViewport: View {
             let _ = camera.setViewportSize(geometry.size)
             ZStack(anchor: .bottomLeading) {
                 SceneView(
+                    isInteractive: isInteractive,
                     updatesWhenWindowInactive: false,
                     make: { app in
                         Self.configure(app, model: model, camera: camera)
@@ -304,10 +341,11 @@ struct EditorModelPreviewViewport: View {
                         world.getResource(EditorSkeleton3DOverlay.self)?.showsAxes = camera.showsAxes
                         world.getResource(EditorSkeleton3DOverlay.self)?.gridHeight = model.normalizedBounds.min.y
                         world.getResource(EditorSkeleton3DOverlay.self)?.modifierHandles = model.modifierHandleSegments()
-                    }
+                    },
+                    onFrameRendered: onFrameRendered
                 )
                 .frame(width: geometry.size.width, height: geometry.size.height)
-                if geometry.size.width >= 360, geometry.size.height >= 240 {
+                if isInteractive, geometry.size.width >= 360, geometry.size.height >= 240 {
                     Text(L10n.text("Drag: orbit · Middle drag: pan · Scroll: zoom\nRight drag: look · WASD: move · Q/E: down/up · Shift: faster"))
                     .font(.system(size: 11))
                     .foregroundColor(theme.editorColors.muted)

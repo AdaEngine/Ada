@@ -89,6 +89,45 @@
       },
       {
         "kind": "heading",
+        "text": "Asset Store",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The **External Asset Library** is an optional desktop plugin for Windows and macOS.\nInstall its Ada Asset Store ZIP under **Project Settings → Studio Tools → Install Plugin ZIP**.\nReview its access, enable it, then choose **Open External Asset Library** from the Studio Tools sidebar.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Add a listing link and give it a name. Filter the gallery by **Fab** or **Unity Asset Store**\nand search by asset name. Select a card to see its details. In a narrow window,\nuse **Back to assets** to return to the grid.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For a Fab model, open the listing and get the asset through Fab. In the Fab launcher,\nchoose GLB and export it using **Custom (disk location)**, or download a GLB when it is available\non the listing. Use **Add local model** in the gallery to attach the self-contained GLB\n(up to 32 MiB). The gallery generates a still thumbnail and lets you inspect the selected\nmodel in 3D. Use **Import into project** to create a project asset that can be placed in a scene.\nExpand **Local files** to replace the model, attach a PNG or JPEG cover, or remove the local copy.\n**Remove local copy** clears the plugin's managed model and its generated preview. The original\nfile, the imported project asset and any separately attached cover are kept.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For Unity Asset Store listings, obtain the file through Unity and export a compatible GLB\nwhere the asset's license permits. See Studio Tools for plugin installation\nand Ada AI for enabling AI search of the saved library.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Studio Tools",
+            "destination": "StudioTools"
+          },
+          {
+            "title": "Ada AI",
+            "destination": "CloudAI"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
         "text": "Import and place a 3D model",
         "level": 2,
         "links": []
@@ -3699,6 +3738,383 @@
         "text": "The initial profile covers the macOS workbench, one fixture project and the X translation handle. Play game scenarios, OS dialogs, and file drags use separate verification paths.",
         "level": 0,
         "links": []
+      }
+    ]
+  },
+  {
+    "id": "StudioTools",
+    "title": "Studio tools with .ui panels",
+    "section": "Editor",
+    "source": "Editor/Documentation/StudioTools.md",
+    "blocks": [
+      {
+        "kind": "heading",
+        "text": "Install a packaged plugin",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Open **Project Settings → Studio Tools → Install Plugin ZIP**, select the downloaded ZIP,\nand review access before enabling the plugin. Supported packages contain a root\n`plugin.json` manifest and an AdaScript `@tool` declaration for the same ID.\nThe package may include AdaScript sources and `.ui` files at its root.\nSee the External Asset Library walkthrough.",
+        "level": 0,
+        "links": [
+          {
+            "title": "External Asset Library walkthrough",
+            "destination": "EditorGuide"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Offer read-only actions to Ada AI",
+        "level": 3,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "A version 1 manifest can declare `actions`. Each action has a unique ID, localized title,\n`read` effect and implementation binding. The studio-defined `assetSearch` intent has a\nfixed schema. A custom `tool` action declares its input and output JSON object schemas\nwith `additionalProperties` set to `false`. Studio validates both the request and the result.\nTools that accept an asset reference declare its input field with `assetReferenceInput`.\nStudio resolves only references issued to that plugin during the current Ada AI turn.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Copy the [AI Example](Examples/StudioTools/AIExample) folder into the project's `Tools/`\ndirectory, enable the plugin and turn on **Allow Ada AI to use this plugin**.\nWith a compatible Ada AI connection, ask it to run the example status tool. The tool\nreturns a structured object containing a `status` property with value `ready`.\nThe AdaScript binding is synchronous. It receives a validated JSON string and returns a JSON\nobject string. It runs in a fresh restricted runtime without the editor context.\nSee Ada AI permissions.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Ada AI permissions",
+            "destination": "CloudAI"
+          }
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "Studio APIs 1 and 2 support project-local AdaScript tools with a `.ui` panel in the\nnative macOS/Windows workspace's right sidebar. Declare the desired hosts in `platforms`.\nAPI 2 adds [animation authoring jobs](AnimationAuthoring.md) through the shared\nAnimator/agent service. API 1 retains its existing document capabilities.\nCopy the complete [Animation Helper](Examples/StudioTools/AnimationHelper) into\n`Tools/AnimationHelper` to inspect/extract/edit/save a clip with the job API.\nOpen **Studio Tools** using the wrench icon,\nreview the access dialog and click **Allow and Enable** before the tool code or\nits `.ui` is activated. The panel contains the tool interface plus reload/settings\nicons. Enablement, versions and access management live in **Settings → Project →\nStudio Tools**. **Revoke Access** immediately retires panels and pending actions.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Tools are disabled by default. Grants are stored locally per project. Changed\nsource location, API, platforms or permissions require consent again. Earlier\nimplicit Enable records require confirmation in this explicit consent flow.\n**Not Now** leaves the tool inactive; opening the panel or reloading does not\nrepeat the prompt until access is reviewed explicitly in settings.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Each folder immediately under the project's `Tools/` directory is a tool module.\nIts `.ada` sources and relative imports are compiled together. IDs must be unique\nacross the project. Symbolic-link modules/sources are skipped. The reserved\nproject-level `Tools/` directory is excluded from the AdaScript game source loader,\nincluding when the project's source root is `.`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "Tools/LevelHelper/\n    LevelHelper.ada\n    LevelHelper.ui",
+        "language": "",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Copy [the complete Level Helper example](Examples/StudioTools/LevelHelper) into\nthis location in an existing project, open a scene, approve the tool access, choose the\ncount and click **Generate**. Undo reverses the entire batch; ordinary Save\npersists it. The example creates empty entities with Transform components.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Lifecycle and UI contract",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`@tool` supplies metadata. `activate(editor)` registers panels with:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "code",
+        "text": "editor.addPanel(id: \"helper\", title: \"Helper\", location: \"right\", ui: \"Panel.ui\");",
+        "language": "adascript",
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`ui` is relative to the declaring `.ada` source and must resolve inside its tool\nmodule. API 1 supports up to eight uniquely named right-sidebar panels per tool.\n`deactivate()` is optional; registrations are always removed by the host when the\ntool is disabled or its project closes.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The `.ui` file uses the existing Designer, typed inputs, bindings and named\nactions. Each declared input must have an `@export` scalar field of the same name\nand compatible type in the tool class. Booleans, strings, integers and floating\npoint fields are supported. Numeric UI values written to integer fields must be\nexact integers. UI defaults are for Designer preview; the running tool's exported\nvalues initialize the actual panel.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "An action named `generate` invokes `func generate(editor)`. Callbacks must be\nsynchronous. The first parameter named `editor` receives typed language tooling.\nInput edits remain in the panel's data context and are copied to exported fields\nbefore an action; exported values are copied back after it. AdaUI construction\nnever calls the script VM. Actions are queued in order after the UI callback,\nwith a detached snapshot of inputs and the originating scene. Disabled or replaced\npanels discard pending actions.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Scene capabilities",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "`editor.scenePath`, `editor.sceneRevision` and `editor.entityCount` read the\noriginating scene snapshot and require `editor.documents.read`.\n`editor.createEntity(name, x, y)` stages a root-level entity with a Transform and\nrequires `editor.documents.write`. An action may stage up to 256 entities.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The host applies the complete batch to the open document only after a successful\ncallback. A changed active document, stale revision, read-only scene or invalid\noperation rejects the batch. Changes use the production scene model, dirty state\nand document Undo/Redo history, preserving the user's selection and tool panel.\nA failed script does not commit queued edits.\nScript field changes themselves are not scene undo steps.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Reload and execution boundaries",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "**Reload**, saved filesystem changes and dirty open tool documents reload the\nmodule/panels. Valid `.ui` reloads retain input values. Successful script reloads\nreplace the instance and registrations; invalid source/UI leaves the previous\nworking version active and reports the error. Permission metadata changes retire\nthe old version until it is enabled again. Invalid discovery retains the existing\nworking set and reports its diagnostic.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The tool runtime uses the restricted AdaScript profile and bounds loops/functions,\ncallback time, VM allocation blocks, stack and recursion. It exposes no direct\neditor models, native resource handles, process, network or workspace file APIs.\nThis is an in-process scripting profile, not OS process isolation. The supported\npermissions in this first slice are document read/write; other requests fail.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The static language catalog includes planned command/menu/formatter/settings/event\nAPIs. Those registrations are not implemented by this panel host. iPadOS tools,\nAdaScript `@view` panels, async tool callbacks and distribution/marketplace support\nare not part of API 1's current macOS implementation.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Verification",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The initial macOS slice was checked on 2026-10-10 with 12 passing\n`EditorStudioToolsTests` in the initial slice and clean SwiftLint for the new source/test files.\nThe native Studio window mounted the sample `.ui`, executed Generate to add three\nentities, retained the selected entity and the tool panel, and removed the entire\nbatch through ordinary scene Undo. The tests also cover Redo and Save/reopen.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "![Studio Tools in the native macOS workspace](Images/StudioTools.png)",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Validation used an isolated SwiftPM scratch directory and a temporary VFS overlay\nfor unrelated existing compilation errors in `EditorAgentAssetTools.swift`,\n`EditorProjectPublisher.swift` and `EditorPublicationTests.swift`; those sources\nwere not edited for this feature. A broader 33-test UI/LSP run reported four\nissues in existing annotation/view diagnostics and Designer Inspector layout\nexpectations. This is focused tool-path evidence, not a passing full Editor suite.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The explicit consent/settings flow additionally passed 24 tool and settings-tree\ntests on 2026-10-10, including cancellation, stale requests, legacy grants and\nrevocation through the full Project Settings page.",
+        "level": 0,
+        "links": []
+      }
+    ]
+  },
+  {
+    "id": "CloudAI",
+    "title": "Ada AI in Cloud Pro",
+    "section": "Editor",
+    "source": "Editor/Documentation/CloudAI.md",
+    "blocks": [
+      {
+        "kind": "text",
+        "text": "Cloud Pro includes 500 AI credits per account per month. Browser and native Studio\nshare the same balance and billing anniversary. There are no separate AI purchase\ntiers. Token usage is charged by the server's versioned credit tariff; a credit is\nnot a message or an OpenRouter dollar.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Connection",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The backend owns `STUDIO_OPENROUTER_API_KEY` and selects `qwen/qwen3-coder-next`.\nEnable `AI_ENABLED`, the `llm` capability and approved countries on AIService.\nClients use their existing Ada Cloud session and never receive the provider key.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Browser Studio selects Ada AI in Assistant settings. Native Studio selects the\nbuilt-in Ada AI entry in the agent catalog; iPhone Providers has the same choice.\nCloud settings show available, used and reserved credits and the next cycle.\nMissing service is distinct from a real zero balance. Cloud Pro purchase/restore\nuses the existing subscription flow and SKU.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Coder Next is text-only. Image attachments require another compatible provider.\nWhen the server advertises tool contract 2, Ada AI uses a shared catalog of up to\n17 tool families. Each call names a family and provides an `action` and an\n`arguments` object. The model sees only the actions supported by the active host\nand mode. Studio falls back to the legacy contract for servers that have yet to\nadvertise version 2. Existing clients can still use the legacy contract with\nupdated servers.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Working with project tools",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "For an edit, ask Ada AI to read a project file, change one known occurrence, and\nbuild the project. A typical sequence for a project with `Sources/Game.ada` is:",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "| Tool | Arguments sent to the tool |\n| --- | --- |\n| `editor_files` | `{\"action\":\"read\",\"arguments\":{\"path\":\"Sources/Game.ada\"}}` |\n| `editor_files` | `{\"action\":\"patch\",\"arguments\":{\"path\":\"Sources/Game.ada\",\"oldText\":\"// original\",\"newText\":\"// edited\"}}` |\n| `editor_task` | `{\"action\":\"build\",\"arguments\":{}}` |",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Choose `oldText` from the read result. The patch fails when the text is absent or\nambiguous. Desktop reports a started build. Use `editor_task` with `status` and\n`output` to check its result. Mobile and Web return the compilation result in the\nbuild call. Verify gameplay separately in Play.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "In Ask or Plan, Studio offers inspection actions such as `editor_files/read`\nand omits `editor_files/patch`. In Build, approval identifies the action and\nits target. A Web session grant for a patch does not grant permission to replace\nor delete files. Native file tools reject traversal, symbolic links and silent\noverwrites. Save dirty native documents before editing them through Ada AI.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The desktop agent can edit animation drafts, run project tests, and replay Play\nscenarios. Mobile offers isolated simulation and scene validation. Web can\napply a project transaction or import a bundled example. Native hosts can\nsearch and fetch public web references, and approved Build actions can download\nassets. The external agent and Web BYOK catalogs use their own contracts.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Connect a local MCP server",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "On Windows or macOS, open **Settings → Agents → Local MCP servers** and choose\n**Add MCP server**. Give it a unique name and enter the full path to its\nexecutable. Add one row for each argument and keep the launch order. For a local\nPython MCP server, use the path to the Python executable and add the full path\nto the server script as the first argument. Studio launches the executable\ndirectly over stdio with a separate working directory and a minimal environment.\nThe process runs with your operating-system account's permissions, so connect\ncommands you trust.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Choose **Connect**, open **Input details** to inspect a tool's schema, and check\nthe tools you want Ada AI to use. Tools start unchecked. Tool schemas that Studio\ncannot validate are disabled. The settings support up to 12 saved servers and 32\nselected tools. Disconnect stops the connection and keeps selections for a later\nreconnect to the same executable, arguments and tool schemas. Changed tools\nrequire another review. Studio starts no saved servers automatically.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "With an Ada Cloud server that supports the desktop tool contract v3, Ada AI in\nAsk and Plan can look up selected tools. In Build, each call shows the project,\nserver, tool and arguments in a permission card. Results can contain bounded\ntext and structured JSON. Keep private data out of tools you intend to use with\nAda AI. For the Blender workflow, use the existing preset below.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Export a model from Blender on Windows",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The Windows Blender preset requires the hosted tool contract version 3 and a\nlocal MCP for Blender installation. The first verified local configuration uses\nMCP for Blender 2.2.4, add-on 1.8 and Blender 5.3.0. Open Blender and start its\nMCP add-on on the default loopback port. In Studio open **Settings → Agents →\nBlender MCP**, enter the full path to the trusted `mcp-for-blender.exe`, and\nchoose **Connect**. The executable runs with your Windows account permissions.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Enable **Allow Ada AI to create and export GLB models**. Select Ada AI and Build\nmode, then follow the Blender example.\nYou approve each export in the conversation. Ask and Plan can describe the\nselected tools. The preset creates static models from colored primitives and\nsaves a GLB in the project's `Downloads/Blender` folder. Use the returned job ID\nto import, place, and verify the model in visible Play. Disconnect in Settings\nto revoke calls to Blender. You can still finish a job whose export completed.\nReconnect when you need a new export after closing Blender or after an MCP timeout.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Blender example",
+            "destination": "Agent3DWorkflow"
+          }
+        ]
+      },
+      {
+        "kind": "heading",
+        "text": "Accounting and recovery",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "The server reserves a bounded request before calling OpenRouter, rechecks Billing\nbefore execution, then settles measured input/output tokens. Each model/tool round\nis a new metered operation. Completed operation replays never submit again.\nDefinitive provider rejections release funds; uncertain/missing usage retains a\nreservation for reconciliation. A client disconnect does not make admitted work\nfree or trigger a paid retry. Native account/server changes invalidate a running\ntransport before another model round.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Mobile Cloud conversations use `cloud-` session IDs in the native agent store.\nProvider changes start a new conversation; existing external runtime histories\nremain accessible in their provider's session list.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Local builds",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Studio prefers an adjacent AdaMCP checkout when present; `ADA_MCP_LOCAL_PATH`\noverrides that path. The current source uses MCP tool `_meta` verification data.\nThe companion AdaMCP change adds flat Codable metadata support; keep it with this\nintegration when preparing the dependency release. A copy of that patch and the\nbackend validation report live in adaengine-service/docs.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "Focused tests: `EditorCloudAgentTests`, `EditorAICreditsTests`,\n`EditorLocalizationTests`, and WebUI `ai-credits.test.mjs`.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "heading",
+        "text": "Studio plugin intents and tools",
+        "level": 2,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "On macOS and Windows, installed Studio plugins can add read-only actions to the\nAda AI catalog for the open project. Enable the plugin, then turn on **Allow Ada AI\nto use this plugin** in **Project Settings → Studio Tools**. The permissions page\nshows which actions become available. Turn the option off to withdraw access.",
+        "level": 0,
+        "links": []
+      },
+      {
+        "kind": "text",
+        "text": "With the External Asset Library, try “Find my Fab\nbenches and tell me which ones I already have locally.” Ada AI can search your saved\ntitles and look up a result through its asset reference. The search shares titles,\nstore labels and file availability with the AI provider. Images and model files\nstay in Studio. Use the gallery to add, import or remove a managed file.",
+        "level": 0,
+        "links": [
+          {
+            "title": "External Asset Library",
+            "destination": "EditorGuide"
+          }
+        ]
+      },
+      {
+        "kind": "text",
+        "text": "The hosted connection must advertise tool contract version 4 for plugin actions.\nEarlier connections can continue using their existing tools. For manifest and\nhandler details, see the Studio Tools guide.",
+        "level": 0,
+        "links": [
+          {
+            "title": "Studio Tools guide",
+            "destination": "StudioTools"
+          }
+        ]
       }
     ]
   },

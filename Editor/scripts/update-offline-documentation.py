@@ -13,10 +13,11 @@ OUTPUT = EDITOR / 'Sources/AdaEditor/Assets/Documentation/catalog.json'
 def articles():
     sources = [(EDITOR / f'Documentation/{name}.md', 'Editor')
                for name in ['EditorGuide', 'AgentInterface', 'Agent3DWorkflow', 'AgentPixelArt', 'A2UI', 'AdaScriptGameplayRecipes',
-                            'InspectorGroups', 'BuildExport', 'Terrain', 'CSG', 'StudioInteractionFlows']]
+                            'InspectorGroups', 'BuildExport', 'Terrain', 'CSG', 'StudioInteractionFlows', 'StudioTools', 'CloudAI']]
     for module, section in [('AdaEngine', 'AdaEngine'), ('AdaScripting', 'AdaScript')]:
         catalog = ROOT / f'Sources/{module}/{module}.docc'
-        sources += [(path, section) for path in sorted(catalog.rglob('*.md'))
+        markdown_files = sorted(catalog.rglob('*.md'), key=lambda path: (path.as_posix().casefold(), path.as_posix()))
+        sources += [(path, section) for path in markdown_files
                     if path.stem not in {'HowToBuildEngine', 'MakeTutorials'}]
     order = ['EditorGuide', 'AdaEngine', 'Building', 'AdaUIIdentity', 'VisionOSWindowed',
              'SPMDebug', 'Contributing', 'AdaScripting', 'GettingStartedWithAdaScript',
