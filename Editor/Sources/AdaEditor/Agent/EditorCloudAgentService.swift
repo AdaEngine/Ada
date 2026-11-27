@@ -5,9 +5,9 @@ struct EditorCloudAgentTool: Sendable {
     var definition: EditorCloudValue
     var readOnly: Bool
     var invoke: @Sendable (EditorCloudValue) async throws -> String
-    var validate: (@Sendable (EditorCloudValue) throws -> Void)? = nil
-    var approvalTarget: (@Sendable (EditorCloudValue) -> String?)? = nil
-    var approvalDetails: (@Sendable (EditorCloudValue) throws -> String?)? = nil
+    var validate: (@Sendable (EditorCloudValue) throws -> Void)?
+    var approvalTarget: (@Sendable (EditorCloudValue) -> String?)?
+    var approvalDetails: (@Sendable (EditorCloudValue) throws -> String?)?
 }
 
 /// The native tool loop uses the same server wallet and model as browser Studio.
@@ -35,14 +35,16 @@ actor EditorCloudAgentService: EditorAgentServicing {
     }
 
     func connect(
-        _ request: EditorAgentRunRequest, onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
+        _ request: EditorAgentRunRequest,
+        onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
         onProjectFileChanged: @escaping @Sendable (String) async -> Void
     ) async throws -> EditorAgentSessionConfiguration {
         do { _ = try await connectionFactory() } catch { throw await Self.localized(error) }
         return .init(agentName: "Ada AI · Coder Next", selectors: [])
     }
     func send(
-        _ request: EditorAgentRunRequest, onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
+        _ request: EditorAgentRunRequest,
+        onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
         onProjectFileChanged: @escaping @Sendable (String) async -> Void
     ) async throws -> EditorAgentRunResult {
         guard turns[request.session.id] == nil else { throw EditorAgentServiceError.sessionUnavailable }
@@ -90,7 +92,8 @@ actor EditorCloudAgentService: EditorAgentServicing {
         #endif
     }
     private func run(
-        _ request: EditorAgentRunRequest, onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
+        _ request: EditorAgentRunRequest,
+        onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void,
         onProjectFileChanged: @escaping @Sendable (String) async -> Void
     ) async throws -> EditorAgentRunResult {
         guard !request.attachments.contains(where: { $0.mimeType.hasPrefix("image/") }) else {
@@ -117,8 +120,12 @@ actor EditorCloudAgentService: EditorAgentServicing {
                 .selection(host: host, planning: planning)
         }
         let tools = availableTools.filter {
-            if $0.name.hasPrefix("editor_external_") { return (version == externalVersion || version == pluginVersion) && hasExternalTools }
-            if $0.name.hasPrefix("editor_plugins_") { return version == pluginVersion && hasStudioPluginTools }
+            if $0.name.hasPrefix("editor_external_") {
+                return (version == externalVersion || version == pluginVersion) && hasExternalTools
+            }
+            if $0.name.hasPrefix("editor_plugins_") {
+                return version == pluginVersion && hasStudioPluginTools
+            }
             if selection != nil {
                 return true
             }
@@ -129,7 +136,9 @@ actor EditorCloudAgentService: EditorAgentServicing {
         let definitions = selection?.definitions ?? tools.map(\.definition)
         guard definitions.count <= 96 else { throw EditorAIError.invalidResponse }
         var messages = request.session.events.compactMap { event -> EditorCloudValue? in
-            guard let message = event.message, [.user, .assistant].contains(message.role) else { return nil }
+            guard let message = event.message, [.user, .assistant].contains(message.role) else {
+                return nil
+            }
             let text = message.segments.compactMap(\.text).joined(separator: "\n")
             let references = EditorAgentSceneAnnotation.referenceBlock(message.sceneAnnotations ?? [])
             return ["role": .string(message.role.rawValue), "content": .string(text + (references.isEmpty ? "" : "\n\n" + references))]
@@ -167,8 +176,11 @@ actor EditorCloudAgentService: EditorAgentServicing {
             let (text, calls) = try await response.result()
             if calls.isEmpty {
                 return .init(
-                    upstreamSessionID: request.session.id, assistantText: text, stopReason: "end_turn",
-                    configuration: .init(agentName: "Ada AI · Coder Next", selectors: []))
+                    upstreamSessionID: request.session.id,
+                    assistantText: text,
+                    stopReason: "end_turn",
+                    configuration: .init(agentName: "Ada AI · Coder Next", selectors: [])
+                )
             }
             messages.append(["role": "assistant", "content": .string(text), "toolCalls": .array(calls)])
             for call in calls {
@@ -176,8 +188,10 @@ actor EditorCloudAgentService: EditorAgentServicing {
                 let id = call["id"].string ?? ""
                 let name = call["function"]["name"].string ?? ""
                 var toolEvent = EditorAgentEvent(
-                    id: id, kind: .toolCall,
-                    toolCall: .init(id: id, title: name.replacingOccurrences(of: "_", with: "."), kind: "tool", status: .inProgress, content: [], locations: []))
+                    id: id,
+                    kind: .toolCall,
+                    toolCall: .init(id: id, title: name.replacingOccurrences(of: "_", with: "."), kind: "tool", status: .inProgress, content: [], locations: [])
+                )
                 let output: String
                 do {
                     guard let raw = call["function"]["arguments"].string,
@@ -235,19 +249,31 @@ actor EditorCloudAgentService: EditorAgentServicing {
         throw EditorAgentServiceError.providerFailure("The agent reached its step limit. Continue from the saved project.")
     }
     private func permission(
-        session: String, toolID: String, name: String, inputDetails: String?,
+        session: String,
+        toolID: String,
+        name: String,
+        inputDetails: String?,
         onEvent: @escaping @Sendable (EditorAgentEvent) async -> Void
     ) async -> Bool {
         let id = UUID().uuidString
         let event = EditorAgentEvent(
             kind: .permission,
             permission: .init(
-                id: id, summary: name, toolCallID: toolID,
+                id: id,
+                summary: name,
+                toolCallID: toolID,
                 options: [.init(id: "allow", name: "Allow once", kind: "allow_once"), .init(id: "deny", name: "Reject", kind: "reject_once")],
-                state: .pending, selectedOptionID: nil, inputDetails: inputDetails))
+                state: .pending,
+                selectedOptionID: nil,
+                inputDetails: inputDetails
+            )
+        )
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
-                guard !Task.isCancelled else { continuation.resume(returning: false); return }
+                guard !Task.isCancelled else {
+                    continuation.resume(returning: false)
+                    return
+                }
                 permissions[id] = (session, continuation)
                 Task { await onEvent(event) }
             }

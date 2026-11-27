@@ -493,7 +493,7 @@ final class EditorCloudAccount: NSObject {
         return published
     }
     func uploadPublicationImage(_ data: Data) async throws -> EditorCloudValue {
-        guard data.count > 0, data.count <= 5_000_000 else { throw CloudError.message("Choose an image up to 5 MB.") }
+        guard !data.isEmpty, data.count <= 5_000_000 else { throw CloudError.message("Choose an image up to 5 MB.") }
         return try await request("/media", method: "POST", rawBody: data)
     }
 
@@ -504,7 +504,14 @@ final class EditorCloudAccount: NSObject {
         return try await request("/multiplayer/sessions", method: "POST", body: [:])
     }
 
-    func request(_ path: String, method: String = "GET", body: EditorCloudValue? = nil, authenticated: Bool = true, retry: Bool = true, rawBody: Data? = nil) async throws -> EditorCloudValue {
+    func request(
+        _ path: String,
+        method: String = "GET",
+        body: EditorCloudValue? = nil,
+        authenticated: Bool = true,
+        retry: Bool = true,
+        rawBody: Data? = nil
+    ) async throws -> EditorCloudValue {
         let revision = sessionRevision
         let origin = server
         guard let base = URL(string: server), Self.isAllowedCloudURL(base), let url = URL(string: server.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + "/v1" + path) else {
@@ -566,15 +573,21 @@ final class EditorCloudAccount: NSObject {
         guard sessionRevision == revision else { throw EditorAIError.sessionChanged }
         let supportsExternalTools = provider["toolContracts"].array.contains(.integer(Int64(EditorCloudToolCatalog.externalVersion)))
         let supportsStudioPluginTools = provider["toolContracts"].array.contains(.integer(Int64(EditorCloudToolCatalog.pluginVersion)))
-        return EditorCloudAIConnection(toolContract: provider["toolContract"].int, supportsExternalTools: supportsExternalTools,
-                                       supportsStudioPluginTools: supportsStudioPluginTools) { [weak self] input, receive in
+        return EditorCloudAIConnection(
+            toolContract: provider["toolContract"].int,
+            supportsExternalTools: supportsExternalTools,
+            supportsStudioPluginTools: supportsStudioPluginTools
+        ) { [weak self] input, receive in
             guard let self else { throw EditorAIError.sessionChanged }
             try await self.generateHostedAI(input, revision: revision, receive: receive)
         }
     }
 
-    private func generateHostedAI(_ input: EditorCloudValue, revision: UUID,
-                                  receive: @escaping @Sendable (EditorCloudValue) async throws -> Void) async throws {
+    private func generateHostedAI(
+        _ input: EditorCloudValue,
+        revision: UUID,
+        receive: @escaping @Sendable (EditorCloudValue) async throws -> Void
+    ) async throws {
         guard sessionRevision == revision else { throw EditorAIError.sessionChanged }
         // Refresh authentication through a read-only call. Never automatically retry a paid submission.
         _ = try await request("/ai/providers")
@@ -595,8 +608,8 @@ final class EditorCloudAccount: NSObject {
             #if canImport(FoundationNetworking)
             let (data, response) = try await URLSession.shared.data(for: request)
             try Self.validateAIHTTP(response, data: data)
-            let lines = String(decoding: data, as: UTF8.self).components(separatedBy: .newlines)
-            for line in lines {
+            guard let text = String(bytes: data, encoding: .utf8) else { throw EditorAIError.invalidResponse }
+            for line in text.components(separatedBy: .newlines) {
                 try Task.checkCancellation()
                 guard sessionRevision == revision else { throw EditorAIError.sessionChanged }
                 if let event = try parser.event(line: line) { try await receive(event) }
@@ -666,7 +679,9 @@ final class EditorCloudAccount: NSObject {
     }
 
     func loadAIUsage(restart: Bool = false) async {
-        guard let client = try? aiClient() else { return }
+        guard let client = try? aiClient() else {
+            return
+        }
         await aiCredits.loadHistory(client: client, restart: restart)
     }
 

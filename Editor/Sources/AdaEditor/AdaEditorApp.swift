@@ -141,10 +141,12 @@ struct AdaEditorApp: App {
                 dragRegionHeight: EditorWindowSafeAreaPolicy.dragRegionHeight
             )
         )
-        .windowTrafficLightOffset(
-            x: 0,
-            y: launchProject == nil ? ProjectOpeningLayout.trafficLightOffsetY : ProjectEditorLauncher.trafficLightOffsetY
-        )
+        #if os(macOS)
+            .windowTrafficLightOffset(
+                x: 0,
+                y: launchProject == nil ? ProjectOpeningLayout.trafficLightOffsetY : ProjectEditorLauncher.trafficLightOffsetY
+            )
+        #endif
         .windowShadow(ProjectOpeningWindowConfiguration.hasShadow)
         .windowResizable(ProjectOpeningWindowConfiguration.isResizable)
         .minimumSize(width: ProjectOpeningLayout.windowWidth, height: ProjectOpeningLayout.windowHeight)

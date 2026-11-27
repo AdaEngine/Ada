@@ -37,7 +37,9 @@ struct EditorCloudToolCatalog: Decodable, Sendable {
         let arguments: [String: EditorCloudValue]
 
         var target: String? {
-            if key.hasPrefix("editor_plugins/") { return arguments["id"]?.string }
+            if key.hasPrefix("editor_plugins/") {
+                return arguments["id"]?.string
+            }
             if key == "editor_external/invoke", let tool = arguments["tool"]?.string {
                 let input = arguments["input"]
                 return [tool, input?["name"].string, input?["scene"].string, input?["destination"].string, input?["job"].string]
@@ -198,7 +200,9 @@ struct EditorCloudToolCatalog: Decodable, Sendable {
 
     static func load(version: Int = currentVersion, hasExternalTools: Bool = false, hasStudioPluginTools: Bool = false) throws -> Self {
         let base = try read("AdaAIToolContract", version: currentVersion)
-        guard [externalVersion, pluginVersion].contains(version) else { return base }
+        guard [externalVersion, pluginVersion].contains(version) else {
+            return base
+        }
         var families = base.families
         if hasExternalTools { families += try read("AdaAIExternalToolContract", version: externalVersion).families }
         if version == pluginVersion, hasStudioPluginTools { families += try read("AdaAIStudioPluginContract", version: pluginVersion).families }

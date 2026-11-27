@@ -11,7 +11,9 @@ struct EditorStudioToolsSettings: View {
             Button(L10n.text("Install Plugin ZIP")) {
                 let generation = host.projectGeneration
                 Task {
-                    guard let url = await EditorStudioPluginPicker.pick(title: "Install Plugin ZIP", extensions: ["zip"]) else { return }
+                    guard let url = await EditorStudioPluginPicker.pick(title: "Install Plugin ZIP", extensions: ["zip"]) else {
+                        return
+                    }
                     let finishAccess = EditorStudioPluginPicker.openAccess(url)
                     defer { finishAccess() }
                     host.installPlugin(url, generation: generation)

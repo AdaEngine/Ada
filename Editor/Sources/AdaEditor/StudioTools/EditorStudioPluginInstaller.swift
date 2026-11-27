@@ -1,6 +1,10 @@
 import AdaScriptCompilerCore
 import AdaStudioCore
+#if canImport(CryptoKit)
+import CryptoKit
+#else
 import Crypto
+#endif
 import Foundation
 
 enum EditorStudioPluginInstaller {

@@ -1,5 +1,5 @@
 import AdaScriptCompilerCore
-import AdaUI
+import AdaUIDescription
 import Foundation
 import Gravity
 
@@ -204,8 +204,12 @@ public final class AdaScriptToolRuntime {
 
     /// Supported capabilities are versioned independently of project consent.
     public static func supportedPermissions(apiVersion: Int) -> Set<AdaScriptToolPermission> {
-        if apiVersion == 1 { return [.documentRead, .documentWrite] }
-        if apiVersion == 2 { return [.documentRead, .documentWrite, .animationRead, .animationWrite, .animationPreview] }
+        if apiVersion == 1 {
+            return [.documentRead, .documentWrite]
+        }
+        if apiVersion == 2 {
+            return [.documentRead, .documentWrite, .animationRead, .animationWrite, .animationPreview]
+        }
         return []
     }
 
@@ -216,7 +220,9 @@ public final class AdaScriptToolRuntime {
 
     /// Terminal results are consumed by a successful poll callback.
     public func completeAnimationJob(_ id: String, responseJSON: String) throws {
-        guard isActive, !isFailed, !bridge.isRetired else { return }
+        guard isActive, !isFailed, !bridge.isRetired else {
+            return
+        }
         try AdaScriptRuntimeCoordinator.lock.withLock { try bridge.animations.complete(id, responseJSON: responseJSON) }
     }
 
@@ -346,13 +352,17 @@ final class AdaScriptToolBridge {
                 throw AdaScriptError.invalidManifest("Animation request conversion budget exceeded (8,192 values, 64 KiB UTF-8 strings, depth 64); use a bounded Map.")
             }
             let data = try JSONEncoder().encode(detached)
-            return try animations.submit(String(decoding: data, as: UTF8.self))
-        }
-        catch { failure = error.localizedDescription; return "" }
+            guard let json = String(bytes: data, encoding: .utf8) else {
+                throw CocoaError(.fileReadInapplicableStringEncoding)
+            }
+            return try animations.submit(json)
+        } catch { failure = error.localizedDescription; return "" }
     }
 
     func pollAnimation(job: GSValue) -> GSValue? {
-        guard let virtualMachine else { return nil }
+        guard let virtualMachine else {
+            return nil
+        }
         guard !isRetired, !isRegistering, job.isString else {
             failure = "Animation jobs can only be polled from an active action."
             return AdaScriptUIValueBridge.make(.object(["status": .string("failed"), "error": .string(failure ?? "Animation job is unavailable.")]), in: virtualMachine)
@@ -360,8 +370,7 @@ final class AdaScriptToolBridge {
         do {
             let data = Data(try animations.poll(job.toString).utf8)
             return AdaScriptUIValueBridge.make(try JSONDecoder().decode(UIValue.self, from: data), in: virtualMachine)
-        }
-        catch {
+        } catch {
             failure = error.localizedDescription
             return AdaScriptUIValueBridge.make(.object(["status": .string("failed"), "error": .string("Animation job is unavailable.")]), in: virtualMachine)
         }
